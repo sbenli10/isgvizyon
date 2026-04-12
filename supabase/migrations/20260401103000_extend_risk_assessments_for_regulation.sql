@@ -1,0 +1,15 @@
+alter table if exists public.risk_assessments
+  add column if not exists workplace_title text,
+  add column if not exists workplace_address text,
+  add column if not exists employer_name text,
+  add column if not exists employer_representative_name text,
+  add column if not exists occupational_safety_specialist_name text,
+  add column if not exists workplace_doctor_name text,
+  add column if not exists employee_representative_name text,
+  add column if not exists support_personnel_name text,
+  add column if not exists hazard_sources text,
+  add column if not exists identified_risks text,
+  add column if not exists control_measures text,
+  add column if not exists responsible_persons text,
+  add column if not exists legislation_notes text,
+  add column if not exists renewal_triggers_note text;

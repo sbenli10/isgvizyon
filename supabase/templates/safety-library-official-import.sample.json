@@ -1,0 +1,45 @@
+[
+  {
+    "collection_slug": "official-publications",
+    "title": "İnşaatta korkuluk kullanmak hayat kurtarır",
+    "summary": "Yüksekte çalışma ve düşmeye karşı toplu koruma için resmi afiş kaydı.",
+    "body": "Resmi afiş kaydı. Dosya kurum içinde saklanacaksa orijinal kaynak bağlantısı da korunmalıdır.",
+    "item_type": "poster",
+    "audience": "Saha çalışanları ve taşeron ekipler",
+    "sector": "İnşaat",
+    "source_name": "T.C. Çalışma ve Sosyal Güvenlik Bakanlığı İş Sağlığı ve Güvenliği Genel Müdürlüğü",
+    "source_url": "https://www.csgb.gov.tr/isggm/yayinlar-ve-afisler/",
+    "file_url": "",
+    "thumbnail_url": "",
+    "published_year": 2026,
+    "language_code": "tr",
+    "is_official": true,
+    "is_featured": false,
+    "tags": ["afiş", "inşaat", "yüksekte çalışma", "korkuluk"],
+    "metadata": {
+      "official_title": "İnşaatta Korkuluk Kullanmak Hayat Kurtarır",
+      "license_note": "Resmi kaynak açıklamasına uygun kullanılmalıdır."
+    }
+  },
+  {
+    "collection_slug": "official-publications",
+    "title": "İş sağlığı ve güvenliği genel müdürlüğü yayınlar ve afişler arşivi",
+    "summary": "Resmi afiş, broşür, dergi, kitap ve diğer yayınların elektronik arşiv sayfası.",
+    "body": "Bu kayıt, resmi yayınların toplu olarak erişildiği ana sayfayı temsil eder.",
+    "item_type": "link",
+    "audience": "Tüm kullanıcılar",
+    "sector": "Genel",
+    "source_name": "T.C. Çalışma ve Sosyal Güvenlik Bakanlığı İş Sağlığı ve Güvenliği Genel Müdürlüğü",
+    "source_url": "https://www.csgb.gov.tr/isggm/yayinlar-ve-afisler/",
+    "file_url": "",
+    "thumbnail_url": "",
+    "published_year": 2026,
+    "language_code": "tr",
+    "is_official": true,
+    "is_featured": true,
+    "tags": ["resmi yayın", "afiş", "broşür", "dergi"],
+    "metadata": {
+      "import_source": "official_catalog"
+    }
+  }
+]
