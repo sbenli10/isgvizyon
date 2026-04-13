@@ -12,6 +12,78 @@ const DELAY_BETWEEN_PHOTOS_MS = 1500;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const getModelCandidates = (primaryModel: string) => {
+  const configuredFallback = Deno.env.get("GOOGLE_MODEL_FALLBACK")?.trim();
+  return [primaryModel, configuredFallback || "gemini-1.5-flash", "gemini-2.0-flash-exp"]
+    .filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
+};
+
+const shouldRetryProviderStatus = (status: number) => status === 429 || status === 503;
+
+async function invokeGoogleAIWithRetry({
+  requestId,
+  apiKey,
+  models,
+  requestBody,
+  context,
+}: {
+  requestId: string;
+  apiKey: string;
+  models: string[];
+  requestBody: Record<string, unknown>;
+  context: string;
+}) {
+  let lastErrorMessage = "Google AI servisi şu anda yanıt vermiyor.";
+
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`🚀 [${requestId}] Google AI'a gönderiliyor...`, { context, model, attempt });
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        return { data, model };
+      }
+
+      const errorText = await response.text();
+      lastErrorMessage = errorText;
+      console.error(`❌ [${requestId}] HTTP ${response.status}:`, errorText.substring(0, 200));
+
+      if (response.status === 401) {
+        throw new Error("Google API Key geçersiz. Lütfen yeni bir API Key oluşturun.");
+      }
+
+      if (response.status === 404) {
+        console.warn(`⚠️ [${requestId}] Model bulunamadı, sonraki modele geçiliyor: ${model}`);
+        break;
+      }
+
+      if (shouldRetryProviderStatus(response.status) && attempt < 3) {
+        const waitMs = 800 * attempt;
+        console.log(`⏳ [${requestId}] Sağlayıcı yoğun, ${waitMs}ms sonra tekrar denenecek...`);
+        await delay(waitMs);
+        continue;
+      }
+
+      if (!shouldRetryProviderStatus(response.status)) {
+        break;
+      }
+    }
+  }
+
+  throw new Error(
+    `Google AI servisi şu anda yoğun. Sistem tekrar deneme ve yedek model kullanmayı denedi ancak sonuç alamadı. ${lastErrorMessage.substring(0, 220)}`
+  );
+}
+
 /**
  * ✅ JSON Parse Helper - AI'nın döndürdüğü geçersiz JSON'ları temizler
  */
@@ -262,6 +334,7 @@ serve(async (req) => {
     // ✅ Environment Variables
     const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
     const GOOGLE_MODEL = Deno.env.get("GOOGLE_MODEL") || "gemini-2.5-flash";
+    const MODEL_CANDIDATES = getModelCandidates(GOOGLE_MODEL);
 
     if (!GOOGLE_API_KEY) {
       console.error(`❌ [${requestId}] GOOGLE_API_KEY bulunamadı!`);
@@ -275,6 +348,7 @@ serve(async (req) => {
     }
 
     console.log(`🤖 [${requestId}] Model: ${GOOGLE_MODEL}`);
+    console.log(`🪜 [${requestId}] Yedek modeller:`, MODEL_CANDIDATES.slice(1));
 
     const systemPrompt = `Sen 20 yıl sahada çalışmış, sertifikalı A Sınıfı İş Güvenliği Uzmanısın. Türkiye İSG mevzuatına hakimsin ve Fine-Kinney risk değerlendirmesinde uzmansın.
 
@@ -395,35 +469,14 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
         }
       };
 
-      console.log(`🚀 [${requestId}] Google AI'a istek gönderiliyor...`);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ [${requestId}] Google AI Hatası: ${response.status}`);
-        console.error(`📄 [${requestId}] Hata:`, errorText);
-        
-        if (response.status === 401) {
-          throw new Error("Google API Key geçersiz. Lütfen yeni bir API Key oluşturun.");
-        } else if (response.status === 429) {
-          throw new Error("Google AI rate limit aşıldı. Lütfen birkaç saniye bekleyin.");
-        } else if (response.status === 404) {
-          throw new Error(`Model '${GOOGLE_MODEL}' bulunamadı. Lütfen 'gemini-2.0-flash-exp' kullanın.`);
-        }
-        
-        throw new Error(`Google AI hatası (${response.status}): ${errorText.substring(0, 200)}`);
-      }
-
-      const data = await response.json();
-      console.log(`✅ [${requestId}] Google AI yanıtı alındı`);
+      const { data, model: resolvedModel } = await invokeGoogleAIWithRetry({
+        requestId,
+        apiKey: GOOGLE_API_KEY,
+        models: MODEL_CANDIDATES,
+        requestBody,
+        context: "text-only",
+      });
+      console.log(`✅ [${requestId}] Google AI yanıtı alındı`, { model: resolvedModel });
 
       const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       const parsedResult = parseAIResponse(contentText, requestId);
@@ -513,33 +566,14 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
           }
         };
 
-        console.log(`🚀 [${requestId}] Google AI'a gönderiliyor...`);
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody),
-          }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error(`❌ [${requestId}] HTTP ${response.status}:`, errorText.substring(0, 200));
-          
-          if (response.status === 429) {
-            console.log(`⏳ [${requestId}] Rate limit, 3 saniye bekleniyor...`);
-            await delay(3000);
-            continue;
-          }
-          
-          continue;
-        }
-
-        console.log(`✅ [${requestId}] Yanıt alındı`);
-
-        const data = await response.json();
+        const { data, model: resolvedModel } = await invokeGoogleAIWithRetry({
+          requestId,
+          apiKey: GOOGLE_API_KEY,
+          models: MODEL_CANDIDATES,
+          requestBody,
+          context: `photo-${photoNumber}`,
+        });
+        console.log(`✅ [${requestId}] Yanıt alındı`, { model: resolvedModel });
         const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
         
         console.log(`📦 [${requestId}] Ham yanıt (ilk 300 kar):`, contentText.substring(0, 300));
