@@ -2,22 +2,8 @@ import { supabase } from "@/integrations/supabase/client";
 
 const BUCKET_NAME = "inspection-photos";
 
-export async function ensureBucketExists() {
-  const { data: buckets } = await supabase.storage.listBuckets();
-  const bucketExists = buckets?.some((b) => b.name === BUCKET_NAME);
-
-  if (!bucketExists) {
-    await supabase.storage.createBucket(BUCKET_NAME, {
-      public: true,
-      fileSizeLimit: 5242880,
-    });
-  }
-}
-
 export async function uploadInspectionPhoto(file: File, userId: string): Promise<string | null> {
   try {
-    await ensureBucketExists();
-
     const fileExt = file.name.split(".").pop();
     const fileName = `${userId}/${Date.now()}.${fileExt}`;
 

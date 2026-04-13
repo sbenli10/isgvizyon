@@ -98,6 +98,15 @@ const statusFilters = ["all", "completed", "in_progress", "draft", "cancelled"] 
 const PAGE_SIZE = 24;
 const INSPECTIONS_CACHE_TTL = 5 * 60 * 1000;
 
+const fileToDataUrl = async (file: File) => {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Fotoğraf yapay zeka analizi için okunamadı."));
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  });
+};
+
 const statusConfig = {
   completed: { label: "Tamamlandı", color: "bg-success/10 text-success border-success/30", icon: "✅" },
   in_progress: { label: "Devam Ediyor", color: "bg-blue-500/10 text-blue-600 border-blue-500/30", icon: "⏳" },
@@ -299,29 +308,51 @@ export default function Inspections() {
   }, [fetchInspections, fetchSummary]);
 
   const handleAIAnalysis = async () => {
-    if (!notes.trim()) {
-      toast.error("Lütfen notları yazın");
+    if (!notes.trim() && !selectedFile) {
+      toast.error("AI analiz için not veya fotoğraf ekleyin");
       return;
     }
 
     setAiAnalyzing(true);
     try {
+      const images = selectedFile ? [await fileToDataUrl(selectedFile)] : [];
       const { data, error } = await supabase.functions.invoke("analyze-hazard", {
-        body: { hazardDescription: notes.trim() },
+        body: {
+          hazardDescription: notes.trim(),
+          images,
+        },
       });
 
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const aiRisk = data.riskScore?.toLowerCase();
+      const primaryAnalysis =
+        Array.isArray(data?.photoAnalyses) && data.photoAnalyses.length > 0
+          ? data.photoAnalyses.sort((a: any, b: any) => (b?.riskScore || 0) - (a?.riskScore || 0))[0]
+          : data;
+
+      const aiRisk = primaryAnalysis?.riskLevel?.toLowerCase?.() || primaryAnalysis?.riskScore?.toLowerCase?.();
       if (aiRisk === "low" || aiRisk === "düşük") setRiskLevel("low");
       else if (aiRisk === "medium" || aiRisk === "orta") setRiskLevel("medium");
       else if (aiRisk === "high" || aiRisk === "yüksek") setRiskLevel("high");
       else if (aiRisk === "critical" || aiRisk === "kritik") setRiskLevel("critical");
 
-      toast.success(`✅ AI Analizi: Risk = ${data.riskScore}`);
+      if (primaryAnalysis?.hazardDescription && !notes.trim()) {
+        setNotes(primaryAnalysis.hazardDescription);
+      }
+
+      toast.success(
+        Array.isArray(data?.photoAnalyses) && data.photoAnalyses.length > 0
+          ? `✅ ${data.photoAnalyses.length} fotoğraf analiz edildi`
+          : `✅ AI Analizi: Risk = ${primaryAnalysis?.riskScore || primaryAnalysis?.riskLevel || "hesaplandı"}`
+      );
     } catch (e: any) {
-      toast.error(e.message || "AI analizi başarısız");
+      const message = String(e?.message || "");
+      if (message.toLowerCase().includes("unauthorized")) {
+        toast.error("AI analiz servisine erişim doğrulanamadı. Oturumu yenileyip tekrar deneyin.");
+      } else {
+        toast.error(message || "AI analizi başarısız");
+      }
     } finally {
       setAiAnalyzing(false);
     }

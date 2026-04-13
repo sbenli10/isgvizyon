@@ -25,7 +25,9 @@ export async function invokeEdgeFunction<TResponse>(
   }
 
   if (payload.success === false) {
-    throw new Error(payload.error?.message || "Sunucu tarafi AI istegi basarisiz oldu.");
+    const code = payload.error?.code ? `[${payload.error.code}] ` : "";
+    const details = payload.error?.details ? ` ${payload.error.details}` : "";
+    throw new Error(`${code}${payload.error?.message || "Sunucu tarafi AI istegi basarisiz oldu."}${details}`.trim());
   }
 
   return payload as TResponse;

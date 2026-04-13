@@ -52,6 +52,86 @@ importance_level secimi:
 - Duzen, housekeeping veya daha dusuk etkili uygunsuzluklarda Orta
 - Cok sinirli etkili ve dusuk olasilikli durumlarda Dusuk`;
 
+function getApproxPayloadSize(images: string[], prompt: string) {
+  return images.reduce((total, image) => total + image.length, prompt.length);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getModelCandidates(primaryModel: string) {
+  const configuredFallback = Deno.env.get("GOOGLE_MODEL_FALLBACK")?.trim();
+  return [primaryModel, configuredFallback || "gemini-1.5-flash", "gemini-2.0-flash-exp"]
+    .filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
+}
+
+function shouldRetryGeminiError(error: GeminiHttpError) {
+  return ["provider_error", "rate_limited"].includes(error.code);
+}
+
+async function callGeminiWithRetryAndFallback({
+  apiKey,
+  models,
+  body,
+  requestSummary,
+}: {
+  apiKey: string;
+  models: string[];
+  body: Record<string, unknown>;
+  requestSummary: Record<string, unknown>;
+}) {
+  let lastError: GeminiHttpError | null = null;
+
+  for (const model of models) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        console.info("bulk-capa-analyze gemini attempt:", {
+          ...requestSummary,
+          model,
+          attempt,
+        });
+
+        const payload = await callGemini({
+          apiKey,
+          model,
+          body,
+        });
+
+        return { payload, model };
+      } catch (error) {
+        if (!(error instanceof GeminiHttpError)) {
+          throw error;
+        }
+
+        lastError = error;
+
+        console.warn("bulk-capa-analyze gemini retryable error:", {
+          ...requestSummary,
+          model,
+          attempt,
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        });
+
+        if (!shouldRetryGeminiError(error) || attempt === 3) {
+          break;
+        }
+
+        await sleep(600 * attempt);
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new GeminiHttpError(502, "provider_error", "Yapay zeka saglayicisinda gecici bir hata olustu.");
+}
+
 function parseAnalysis(text: string): BulkCapaAnalysis {
   const parsed = JSON.parse(cleanJsonText(text));
 
@@ -109,28 +189,43 @@ Deno.serve(async (req) => {
 
     const apiKey = getRequiredGoogleApiKey();
     const model = getGoogleModel();
+    const modelCandidates = getModelCandidates(model);
+    const requestSummary = {
+      imageCount: images.length,
+      hasPrompt: Boolean(prompt),
+      promptLength: prompt.length,
+      approxPayloadChars: getApproxPayloadSize(images, prompt || DEFAULT_PROMPT),
+      model,
+      fallbackModels: modelCandidates.slice(1),
+    };
+
+    console.info("bulk-capa-analyze request:", requestSummary);
+
     const parts = [
       { text: prompt || DEFAULT_PROMPT },
       ...images.map((image) => toInlineDataPart(parseImageInput(image))),
     ];
 
-    const payload = await callGemini({
-      apiKey,
-      model,
-      body: {
-        contents: [
-          {
-            role: "user",
-            parts,
-          },
-        ],
-        generationConfig: {
-          temperature: 0.15,
-          topP: 0.95,
-          topK: 40,
-          maxOutputTokens: 4096,
+    const requestBody = {
+      contents: [
+        {
+          role: "user",
+          parts,
         },
+      ],
+      generationConfig: {
+        temperature: 0.15,
+        topP: 0.95,
+        topK: 40,
+        maxOutputTokens: 4096,
       },
+    };
+
+    const { payload, model: resolvedModel } = await callGeminiWithRetryAndFallback({
+      apiKey,
+      models: modelCandidates,
+      body: requestBody,
+      requestSummary,
     });
 
     const text = extractTextFromGeminiResponse(payload);
@@ -138,18 +233,29 @@ Deno.serve(async (req) => {
 
     try {
       analysis = parseAnalysis(text);
-    } catch {
+    } catch (parseError) {
+      console.warn("bulk-capa-analyze parse warning:", {
+        ...requestSummary,
+        error: parseError instanceof Error ? parseError.message : String(parseError),
+        responsePreview: text.slice(0, 500),
+      });
       analysis = null;
     }
 
     return jsonResponse(200, {
       success: true,
-      model,
+      model: resolvedModel,
       text,
       analysis,
     });
   } catch (error) {
     if (error instanceof GeminiHttpError) {
+      console.error("bulk-capa-analyze gemini error:", {
+        status: error.status,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
       return jsonResponse(error.status, {
         success: false,
         error: {
@@ -160,7 +266,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.error("bulk-capa-analyze error:", error);
+    console.error("bulk-capa-analyze unexpected error:", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return jsonResponse(500, {
       success: false,
       error: {

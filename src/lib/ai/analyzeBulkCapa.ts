@@ -58,8 +58,17 @@ function mapBulkCapaError(error: unknown) {
   if (message.includes("bos yanit") || message.includes("empty response")) {
     return "Yapay zeka servisi anlamli bir yanit donmedi. Tekrar deneyin.";
   }
+  if (message.includes("currently experiencing high demand") || message.includes("high demand")) {
+    return "Yapay zeka servisi su anda yogun. Sistem otomatik olarak tekrar denedi ancak yanit alinmadi. Bir iki dakika sonra yeniden deneyin.";
+  }
+  if (message.includes("provider_error")) {
+    return "Yapay zeka saglayicisinda gecici bir sorun olustu. Sistem farkli model ve tekrar deneme uyguladi ancak sonuc alinamadi. Biraz sonra yeniden deneyin.";
+  }
   if (message.includes("yogun") || message.includes("rate")) {
     return "Yapay zeka servisi su anda yogun. Biraz sonra tekrar deneyin.";
+  }
+  if (message.includes("provider_model_error") || message.includes("modeli bulunamadi")) {
+    return "Yapay zeka modeli su anda kullanilamiyor. Sistem yedek modele gecti ancak analiz tamamlanamadi.";
   }
   if (message.includes("edge function") || message.includes("failed to send a request")) {
     return "Sunucu tarafi analiz servisine ulasilamadi. Baglantinizi kontrol edip tekrar deneyin.";

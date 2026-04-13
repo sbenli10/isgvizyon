@@ -54,20 +54,6 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import {
-  Document,
-  Packer,
-  Table,
-  TableRow,
-  TableCell,
-  Paragraph,
-  TextRun,
-  WidthType,
-  AlignmentType,
-  UnderlineType,
-  ImageRun,
-} from "docx";
-import { saveAs } from "file-saver";
 import { cn } from "@/lib/utils";
 import {
   analyzeBulkCapaImages,
@@ -188,6 +174,18 @@ interface ProfileContext {
   stamp_url: string | null;
 }
 
+interface BulkCAPADraftSnapshot {
+  companyInputMode: "existing" | "manual";
+  selectedCompanyId: string;
+  manualCompanyName: string;
+  generalInfo: BulkCAPAGeneralInfo;
+  newEntry: HazardEntry;
+  entries: HazardEntry[];
+  overallAnalysis: string;
+  createMode: "single" | "bulk";
+  createStep: "general" | "items";
+}
+
 type ErrorBoundaryProps = {
   children: ReactNode;
 };
@@ -204,6 +202,8 @@ type ModuleCardProps = {
   className?: string;
   children: ReactNode;
 };
+
+const BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX = "bulk-capa-draft";
 
 const coerceText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -628,6 +628,11 @@ const resolveMaybeSignedUrl = async (bucket: string, value?: string | null) => {
   return data?.signedUrl || null;
 };
 
+const downloadBlob = async (blob: Blob, fileName: string) => {
+  const { saveAs } = await import("file-saver");
+  saveAs(blob, fileName);
+};
+
 type DocxImageKind = "jpg" | "png" | "gif" | "bmp";
 
 const inferDocxImageType = (value?: string | null): DocxImageKind => {
@@ -662,6 +667,18 @@ const generateWordDocument = async (
   }
 ): Promise<Blob> => {
   try {
+    const {
+      Document,
+      Packer,
+      Table,
+      TableRow,
+      TableCell,
+      Paragraph,
+      TextRun,
+      WidthType,
+      AlignmentType,
+      ImageRun,
+    } = await import("docx");
     const compact = options?.compact ?? false;
     const today = new Date();
     const dateStr =
@@ -855,7 +872,7 @@ const generateWordDocument = async (
                           spacing: { before: 30 },
                         })
                       : null,
-                  ].filter(Boolean) as Paragraph[]),
+                  ].filter(Boolean) as any[]),
                 ],
                 shading: { fill: "F8FAFC" },
                 margins: { top: 160, bottom: 160, left: 160, right: 160 },
@@ -974,7 +991,7 @@ const generateWordDocument = async (
         })
       );
 
-      const findingTableRows: TableRow[] = [];
+      const findingTableRows = [];
 
       // ROW 1: Bulgu Açıklaması
       findingTableRows.push(
@@ -1699,6 +1716,7 @@ function BulkCAPAContent() {
   const providerLogoInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const activeAnalysisRef = useRef(0);
+  const draftHydratedRef = useRef(false);
   const [entries, setEntries] = useState<HazardEntry[]>([]);
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
   const [profileContext, setProfileContext] = useState<ProfileContext | null>(null);
@@ -1777,6 +1795,62 @@ function BulkCAPAContent() {
     report_no: "",
   });
   const [companySearch, setCompanySearch] = useState("");
+  const draftStorageKey = user ? `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:${user.id}` : null;
+
+  useEffect(() => {
+    if (!user || !draftStorageKey) {
+      draftHydratedRef.current = false;
+      return;
+    }
+
+    try {
+      const rawDraft = window.localStorage.getItem(draftStorageKey);
+      if (!rawDraft) {
+        draftHydratedRef.current = true;
+        return;
+      }
+
+      const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
+
+      if (parsedDraft.companyInputMode === "existing" || parsedDraft.companyInputMode === "manual") {
+        setCompanyInputMode(parsedDraft.companyInputMode);
+      }
+      if (typeof parsedDraft.selectedCompanyId === "string") {
+        setSelectedCompanyId(parsedDraft.selectedCompanyId);
+      }
+      if (typeof parsedDraft.manualCompanyName === "string") {
+        setManualCompanyName(parsedDraft.manualCompanyName);
+      }
+      if (parsedDraft.generalInfo) {
+        setGeneralInfo((prev) => ({
+          ...prev,
+          ...parsedDraft.generalInfo,
+        }));
+      }
+      if (parsedDraft.newEntry) {
+        setNewEntry((prev) => ({
+          ...prev,
+          ...parsedDraft.newEntry,
+        }));
+      }
+      if (Array.isArray(parsedDraft.entries)) {
+        setEntries(parsedDraft.entries);
+      }
+      if (typeof parsedDraft.overallAnalysis === "string") {
+        setOverallAnalysis(parsedDraft.overallAnalysis);
+      }
+      if (parsedDraft.createMode === "single" || parsedDraft.createMode === "bulk") {
+        setCreateMode(parsedDraft.createMode);
+      }
+      if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
+        setCreateStep(parsedDraft.createStep);
+      }
+    } catch (error) {
+      console.warn("Bulk CAPA draft could not be restored:", error);
+    } finally {
+      draftHydratedRef.current = true;
+    }
+  }, [draftStorageKey, user]);
 
   useEffect(() => {
     return () => {
@@ -1877,6 +1951,63 @@ function BulkCAPAContent() {
     [generalInfo.company_name, selectedCompanyName]
   );
 
+  useEffect(() => {
+    if (!draftStorageKey || !draftHydratedRef.current) {
+      return;
+    }
+
+    const snapshot: BulkCAPADraftSnapshot = {
+      companyInputMode,
+      selectedCompanyId,
+      manualCompanyName,
+      generalInfo,
+      newEntry,
+      entries,
+      overallAnalysis,
+      createMode,
+      createStep,
+    };
+
+    const hasMeaningfulDraft =
+      entries.length > 0 ||
+      manualCompanyName.trim().length > 0 ||
+      selectedCompanyId.trim().length > 0 ||
+      overallAnalysis.trim().length > 0 ||
+      generalInfo.company_name.trim().length > 0 ||
+      generalInfo.area_region.trim().length > 0 ||
+      generalInfo.observation_range.trim().length > 0 ||
+      generalInfo.observer_name.trim().length > 0 ||
+      generalInfo.employer_representative_name.trim().length > 0 ||
+      generalInfo.report_no.trim().length > 0 ||
+      newEntry.description.trim().length > 0 ||
+      newEntry.riskDefinition.trim().length > 0 ||
+      newEntry.correctiveAction.trim().length > 0 ||
+      newEntry.preventiveAction.trim().length > 0 ||
+      newEntry.media_urls.length > 0;
+
+    try {
+      if (!hasMeaningfulDraft) {
+        window.localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      window.localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+    } catch (error) {
+      console.warn("Bulk CAPA draft could not be saved:", error);
+    }
+  }, [
+    companyInputMode,
+    createMode,
+    createStep,
+    draftStorageKey,
+    entries,
+    generalInfo,
+    manualCompanyName,
+    newEntry,
+    overallAnalysis,
+    selectedCompanyId,
+  ]);
+
   const effectiveLocation = useMemo(() =>
     generalInfo.area_region || reportCompanyName,
     [generalInfo.area_region, reportCompanyName]
@@ -1942,22 +2073,22 @@ function BulkCAPAContent() {
       : "Orta";
   const creationOverviewCards = [
     {
-      key: "company",
-      eyebrow: "Firma",
-      title: reportCompanyName || "Henüz seçilmedi",
-      body: "Sistemdeki firmalardan seçebilir veya manuel firma adi girebilirsiniz.",
+      key: "single",
+      eyebrow: "Tekli DÖF",
+      title: "Tek bir bulgu için hızlı form",
+      body: "Tek bir uygunsuzluk için hemen kayıt oluşturup Word çıktısı alabilirsiniz.",
+    },
+    {
+      key: "bulk",
+      eyebrow: "Çoklu DÖF",
+      title: "Birden fazla bulgu için toplu akış",
+      body: "Aynı saha çalışmasındaki birden çok bulguyu tek raporda toplayabilirsiniz.",
     },
     {
       key: "readiness",
-      eyebrow: "Hazirlik",
-      title: `${completedFieldCount}/${requiredFieldChecks.length} alan hazir`,
-      body: "Aktif taslagin eksik alanlarini sayfa üzerindeki karar kartlarindan takip edin.",
-    },
-    {
-      key: "flow",
-      eyebrow: "Çalisma mantigi",
-      title: "Aç, hazirla, listeye ekle",
-      body: "Tek bir form panelinde bulguyu olusturup toplu rapor akisina dahil edin.",
+      eyebrow: "Hazırlık",
+      title: `${completedFieldCount}/${requiredFieldChecks.length} alan hazır`,
+      body: "Eksik alanları tamamlayıp kaydı tekli ya da çoklu akışta ilerletebilirsiniz.",
     },
   ] as const;
 
@@ -1998,7 +2129,7 @@ function BulkCAPAContent() {
   };
 
   const resetEntryDraft = () => {
-    setNewEntry({
+    setNewEntry((prev) => ({
       id: "",
       description: "",
       riskDefinition: "",
@@ -2008,14 +2139,14 @@ function BulkCAPAContent() {
       termin_date: "",
       related_department: "Diger",
       notification_method: "E-mail",
-      responsible_name: "",
-      responsible_role: "",
+      responsible_name: prev.responsible_name,
+      responsible_role: prev.responsible_role,
       approver_name: generalInfo.observer_name || profileContext?.full_name || "",
       approver_title: profileContext?.position || "İş Güvenliği Uzmanı",
       include_stamp: true,
       media_urls: [],
       ai_analyzed: false,
-    });
+    }));
     setEditingEntryId(null);
     setEditBaselineEntry(null);
   };
@@ -2282,6 +2413,10 @@ function BulkCAPAContent() {
 
   const currentSimilarityBase = `${newEntry.description} ${newEntry.riskDefinition}`.trim();
   const currentWords = Array.from(new Set(tokenizeForSimilarity(currentSimilarityBase)));
+  const hasDraftContextForHistory =
+    entries.length > 0 ||
+    newEntry.description.trim().length >= 12 ||
+    newEntry.riskDefinition.trim().length >= 12;
 
   const calculateSimilarity = (candidate: HazardEntry) => {
     if (!currentWords.length) return 0;
@@ -2294,8 +2429,9 @@ function BulkCAPAContent() {
 
   useEffect(() => {
     const fetchHistoricalFindings = async () => {
-      if (!orgData?.id || !reportCompanyName.trim()) {
+      if (!orgData?.id || !reportCompanyName.trim() || !hasDraftContextForHistory) {
         setHistoricalFindings([]);
+        setHistoricalLoading(false);
         return;
       }
 
@@ -2445,8 +2581,14 @@ function BulkCAPAContent() {
       }
     };
 
-    void fetchHistoricalFindings();
-  }, [orgData?.id, reportCompanyName, currentWords.join("|")]);
+    const debounceTimer = window.setTimeout(() => {
+      void fetchHistoricalFindings();
+    }, 650);
+
+    return () => {
+      window.clearTimeout(debounceTimer);
+    };
+  }, [entries.length, hasDraftContextForHistory, orgData?.id, reportCompanyName, currentWords.join("|")]);
 
   const historicalSimilarEntries = historicalFindings
     .filter((entry) => (currentWords.length ? entry.similarity >= 0.18 : true))
@@ -2557,50 +2699,6 @@ function BulkCAPAContent() {
     ? `${reportCompanyName} için geçmis DÖF ve denetim kayitlari taraniyor.`
     : "Firma seçildiginde öneriler sirket baglamini daha net yansitir.";
 
-  const qualityScore = (() => {
-    let score = 0;
-    if (newEntry.description.trim().length >= 40) score += 20;
-    else if (newEntry.description.trim().length >= 15) score += 10;
-
-    if (newEntry.riskDefinition.trim().length >= 30) score += 15;
-    else if (newEntry.riskDefinition.trim().length >= 10) score += 8;
-
-    if (newEntry.correctiveAction.trim().length >= 35) score += 20;
-    else if (newEntry.correctiveAction.trim().length >= 15) score += 10;
-
-    if (newEntry.preventiveAction.trim().length >= 35) score += 20;
-    else if (newEntry.preventiveAction.trim().length >= 15) score += 10;
-
-    if (newEntry.related_department !== "Diger") score += 10;
-    if (newEntry.termin_date) score += 10;
-    if (newEntry.notification_method.trim().length > 0) score += 5;
-    if (reportCompanyName.trim()) score += 5;
-    return Math.min(score, 100);
-  })();
-
-  const qualityFeedback = [
-    newEntry.description.trim().length < 25
-      ? "Bulgu açiklamasini daha somut hale getirin; görülen riskin nerede ve nasil ortaya çiktigini belirtin."
-      : null,
-    newEntry.riskDefinition.trim().length < 20
-      ? "Risk tanimi kisa kaliyor; olasi sonuç ve etkisini biraz daha netlestirin."
-      : null,
-    newEntry.correctiveAction.trim().length < 25
-      ? "Düzeltici faaliyet daha uygulanabilir ve adim adim yazilmali."
-      : null,
-    newEntry.preventiveAction.trim().length < 25
-      ? "Önleyici faaliyet tekrar riskini azaltacak kalici bir yöntem içermeli."
-      : null,
-    !newEntry.termin_date
-      ? "Termin tarihi olmadan DÖF takibi zayif kalir; hizli bir termin seçin."
-      : null,
-    !reportCompanyName.trim()
-      ? "Firma seçimi yapilmadan kayit kurum baglamina oturmaz; önce firma seçin veya manuel girin."
-      : null,
-  ].filter(Boolean) as string[];
-
-  const qualityLabel =
-    qualityScore >= 80 ? "Güçlü" : qualityScore >= 60 ? "Gelistirilebilir" : "Zayif";
   const historicalPriorityDistribution = historicalSimilarEntries.reduce<Record<string, number>>((acc, entry) => {
     if (!entry.priority) return acc;
     acc[entry.priority] = (acc[entry.priority] || 0) + 1;
@@ -2622,8 +2720,6 @@ function BulkCAPAContent() {
   const similarityEvidenceSummary = reportCompanyName.trim()
     ? `Bu liste, "${reportCompanyName}" adına yakın geçmiş kayıtlar içinden açıklama ve risk tanımı kelime örtüşmesine göre sıralanır.`
     : "Firma seçildiğinde geçmiş DÖF kayıtları aynı şirket adı üzerinden taranır.";
-  const qualityEvidenceSummary =
-    "Bu değerlendirme gerçek denetim doğrulaması değildir; yalnızca form alanlarının doluluğu, metin netliği ve takip alanlarının tamamlanma durumuna göre hesaplanır.";
   const nextDofNumber = `DOF-${String(entries.length + 1).padStart(3, "0")}`;
 
   const analyzeImagesWithAI = async (
@@ -2654,13 +2750,16 @@ function BulkCAPAContent() {
       }
 
       try {
-        await loadCompanyOptions(user.id);
+        const [, profileResponse] = await Promise.all([
+          loadCompanyOptions(user.id),
+          supabase
+            .from("profiles")
+            .select("organization_id, full_name, position, avatar_url, stamp_url")
+            .eq("id", user.id)
+            .maybeSingle(),
+        ]);
 
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("organization_id, full_name, position, avatar_url, stamp_url")
-          .eq("id", user.id)
-          .maybeSingle();
+        const { data: profile, error: profileError } = profileResponse;
 
         if (profileError) {
           console.warn("Profile context could not be loaded:", profileError);
@@ -2686,17 +2785,20 @@ function BulkCAPAContent() {
         }));
 
         if (profile?.organization_id) {
-          const { data: org } = await supabase
-            .from("organizations")
-            .select("id, name, slug, logo_url")
-            .eq("id", profile.organization_id)
-            .single();
+          const [orgResponse] = await Promise.all([
+            supabase
+              .from("organizations")
+              .select("id, name, slug, logo_url")
+              .eq("id", profile.organization_id)
+              .single(),
+            loadSavedTemplates(profile.organization_id),
+          ]);
+
+          const { data: org } = orgResponse;
 
           if (org) {
             setOrgData(org);
           }
-
-          await loadSavedTemplates(profile.organization_id);
         }
       } catch (error) {
         console.error("Error fetching org data:", error);
@@ -3070,25 +3172,6 @@ ${entries
     }));
   };
 
-  // ? CREATE TABLE CELL
-  const createCell = (text: string, isBold = false) => {
-    return new TableCell({
-      children: [
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: text,
-              bold: isBold,
-              size: 20,
-            }),
-          ],
-        }),
-      ],
-    });
-  };
-
-  
-
   // ? ADD ENTRY
   const handleAddEntry = (): HazardEntry | null => {
     if (!reportCompanyName.trim()) {
@@ -3346,7 +3429,7 @@ ${entries
         }
       }
 
-      saveAs(compactWordBlob, singleFileName);
+      await downloadBlob(compactWordBlob, singleFileName);
       toast.success(
         createdInspectionId
           ? "Tekli DÖF kaydedildi, Denetimler kaydına bağlandı ve Word çıktısı indirildi."
@@ -3611,7 +3694,7 @@ const handleSaveAndExport = async () => {
       toast.info("Kullanıcı kaydı olmadan arşiv bağlantısı oluşturulamadı, Word dosyası indiriliyor.");
     }
 
-    saveAs(wordBlob, reportFileName);
+    await downloadBlob(wordBlob, reportFileName);
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
 
     setEntries([]);
@@ -3686,19 +3769,19 @@ const handleSaveAndExport = async () => {
           <div className="space-y-6">
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-200">
-                Yapay zekâ destekli DÖF üretimi
+                Tekli ve çoklu DÖF oluşturma
               </span>
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
-                Toplu çikti ve takip odakli
+                Önce akışı seçin, sonra kaydı doldurun
               </span>
             </div>
 
             <div className="space-y-4">
               <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">
-                Toplu DÖF Formu
+                Tekli veya çoklu DÖF oluşturun
               </h1>
               <p className="max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-                Bulgulari, riskleri ve faaliyetleri tek bir is akisinda toplayin. Yapay zekâ ilk taslagi hazirlasin, ekip ise kuruma uygun hale getirip hizla çiktiya dönüstürsün.
+                Tek bir bulgu için tekli DÖF, birden fazla bulgu için çoklu DÖF seçin. Yapay zekâ ilk taslağı hazırlasın, siz de kuruma uygun hale getirip kaydı kolayca tamamlayın.
               </p>
             </div>
 
@@ -3723,13 +3806,13 @@ const handleSaveAndExport = async () => {
 
           <div className="rounded-[24px] border border-white/10 bg-slate-950/50 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
-              Operasyon özeti
+              Hızlı seçim rehberi
             </p>
             <h2 className="mt-2 text-lg font-semibold text-white">
-              Kullaniciya siradaki adimi gösteren arayüz
+              Tekli mi, çoklu mu?
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              {activeHeroSummary}
+              Tek bulgu için hızlı kayıt açın, aynı saha çalışmasındaki birden fazla bulgu için çoklu akışı kullanın. İsterseniz fotoğraf veya nottan yapay zekâ ile taslak da oluşturabilirsiniz.
             </p>
 
             <div className="mt-5 space-y-3">
@@ -3755,11 +3838,11 @@ const handleSaveAndExport = async () => {
               </div>
 
               <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                <span className="text-sm font-semibold text-cyan-100">Bu modül neden güçlü?</span>
+                <span className="text-sm font-semibold text-cyan-100">Nasıl karar verilir?</span>
                 <ul className="mt-2 space-y-2 text-xs leading-6 text-cyan-50/90">
-                  <li>• Sablon, fotograf ve manuel akis ayni ekranda birlesir.</li>
-                  <li>• AI ilk taslagi üretirken kullanici karar kontrolünü korur.</li>
-                  <li>• Seçilen firma için geçmis DÖF kayitlari öneri motoruna dahil edilir.</li>
+                  <li>• Tek bir uygunsuzluk varsa tekli DÖF seçin.</li>
+                  <li>• Birden fazla uygunsuzluk varsa çoklu DÖF seçin.</li>
+                  <li>• Fotoğraftan veya nottan başlamak isterseniz yapay zekâ ile taslak oluşturun.</li>
                 </ul>
               </div>
             </div>
@@ -3773,13 +3856,13 @@ const handleSaveAndExport = async () => {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                DÖF oluşturma ekranı
+                Oluşturma tipi seçimi
               </p>
               <h3 className="text-lg font-bold text-foreground">
-                Sayfa bütünlüğünü bozmadan odaklı oluşturma deneyimi
+                Önce hangi akışı kullanacağınızı seçin
               </h3>
               <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                Yapay zeka panelleri, kalite skoru ve benzer kayıt alanları sayfada kalır. Formu yalnızca işlem anında açarsınız; böylece ekran daha temiz ve daha kolay kullanılır.
+                Tekli DÖF tek bir bulgu içindir. Çoklu DÖF ise aynı saha çalışmasındaki birden fazla bulguyu tek raporda toplamak içindir.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -3794,7 +3877,7 @@ const handleSaveAndExport = async () => {
                 className="h-12 gap-2 gradient-primary border-0 text-foreground font-semibold"
               >
                 <Plus className="h-4 w-4" />
-                DÖF Oluştur
+                Tekli DÖF oluştur
               </Button>
               <Button
                 type="button"
@@ -3809,7 +3892,7 @@ const handleSaveAndExport = async () => {
                 className="h-12 gap-2"
               >
                 <Sparkles className="h-4 w-4" />
-                Çoklu DÖF Akışını Aç
+                Çoklu DÖF oluştur
               </Button>
             </div>
           </div>
@@ -3841,26 +3924,26 @@ const handleSaveAndExport = async () => {
                 <div>
                   <div className={cn("flex flex-wrap items-center gap-2", createMode === "single" ? "mb-2" : "mb-3")}>
                     <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90">
-                      {createMode === "single" ? "Tekli DÖF Oluştur" : "Çoklu DÖF Oluştur"}
+                      {createMode === "single" ? "Tekli DÖF" : "Çoklu DÖF"}
                     </span>
                     {createMode === "bulk" ? (
                       <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold text-emerald-100">
-                        Genel Bilgiler → Maddeler → Önizleme
+                        1. Genel bilgiler → 2. Maddeler → 3. Önizleme
                       </span>
                     ) : (
                       <span className="rounded-full bg-cyan-400/15 px-3 py-1 text-[11px] font-semibold text-cyan-100">
-                        Tek form → Tek kayıt
+                        Tek bulgu → Tek kayıt
                       </span>
                     )}
                   </div>
                   <DialogTitle className={cn("flex items-center gap-2 font-bold text-white", createMode === "single" ? "text-lg" : "text-xl")}>
                     {createMode === "single" ? <CheckCircle2 className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-                    {createMode === "single" ? "Tekli DÖF Akışı" : "Çoklu DÖF Akışı"}
+                    {createMode === "single" ? "Tek bir bulgu için DÖF oluşturun" : "Birden fazla bulgu için çoklu DÖF oluşturun"}
                   </DialogTitle>
                   <DialogDescription className={cn("text-white/80", createMode === "single" ? "mt-1 text-[13px] leading-5" : "mt-2 text-sm")}>
                     {createMode === "single"
-                      ? "Tek bir uygunsuzluğu hızlıca hazırlayın, yapay zekâ ile destekleyin ve tek kayıt olarak ekleyin."
-                      : "Önce rapor üst bilgisini oluşturun, ardından maddeleri kontrollü şekilde ekleyin."}
+                      ? "Tek bir uygunsuzluğu hızlıca hazırlayın ve tek kayıt olarak ekleyin."
+                      : "Önce rapor bilgilerini girin, sonra birden fazla bulguyu sırayla ekleyin."}
                   </DialogDescription>
                 </div>
                 <div className={cn("hidden rounded-2xl border border-white/15 bg-white/10 text-right text-xs text-white/80 sm:block", createMode === "single" ? "px-3 py-2.5" : "px-4 py-3")}>
@@ -4847,39 +4930,6 @@ const handleSaveAndExport = async () => {
               </div>
             </ModuleCard>
 
-            <ModuleCard eyebrow="Kural tabanlı öneri" title="Taslak tamlık kontrolü" badge={`${qualityScore}/100`}>
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{qualityLabel}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Form tamlığı ve metin netliği kontrolü</p>
-                    </div>
-                    <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                      Tahmini
-                    </span>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-secondary">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500" style={{ width: `${qualityScore}%` }} />
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{qualityEvidenceSummary}</p>
-                </div>
-
-                {qualityFeedback.length > 0 ? (
-                  <div className="space-y-2">
-                    {qualityFeedback.map((item) => (
-                      <div key={item} className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs leading-6 text-amber-700">
-                        {item}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-xs leading-6 text-emerald-700">
-                    Taslak şu an yeterince güçlü görünüyor. Maddeyi kaydedip toplu rapora ekleyebilirsiniz.
-                  </div>
-                )}
-              </div>
-            </ModuleCard>
           </div>
         </section>
 
