@@ -70,7 +70,7 @@
     --secondary-foreground: 222 47% 11%;
 
     --muted: 220 16% 94%;
-    --muted-foreground: 215 16% 46%;
+    --muted-foreground: 215 20% 40%;
 
     --accent: 220 20% 92%;
     --accent-foreground: 222 47% 11%;
@@ -111,238 +111,26 @@
   }
 }
 
-.light {
-  color: hsl(var(--foreground));
-}
-
+.light,
 .dark {
-  color: hsl(var(--foreground));
-}
-
-.light :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  input,
-  textarea,
-  select
-) {
-  color: hsl(var(--foreground));
-}
-
-.dark :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  input,
-  textarea,
-  select
-) {
   color: hsl(var(--foreground));
 }
 
 /*
   Okunabilirlik önceliği:
-  Durum rozetleri ve istatistik kartları dahil, light modda koyu metin;
-  dark modda açık metin kullan.
+  Light modda koyu arka planlı renkli kartların içindeki metinlere
+  foreground rengi uygulanır. Saturated bg + text-white kuralları ile
+  bu kural arasında doğru bir cascade sağlanır.
+  (Bu kurallar her iki mod için de tutarlılık sağlar.)
 */
-.light :is(
-  [class*="bg-primary"],
-  [class*="bg-success"],
-  [class*="bg-info"],
-  [class*="bg-destructive"],
-  [class*="bg-cyan-"],
-  [class*="bg-sky-"],
-  [class*="bg-blue-"],
-  [class*="bg-violet-"],
-  [class*="bg-fuchsia-"],
-  [class*="bg-purple-"],
-  [class*="bg-emerald-"],
-  [class*="bg-teal-"],
-  [class*="bg-green-"],
-  [class*="bg-orange-"],
-  [class*="bg-amber-"],
-  [class*="bg-rose-"],
-  [class*="bg-red-"],
-  [class*="bg-gradient"],
-  [class*="from-cyan-"],
-  [class*="from-sky-"],
-  [class*="from-blue-"],
-  [class*="from-violet-"],
-  [class*="from-fuchsia-"],
-  [class*="from-purple-"],
-  [class*="from-emerald-"],
-  [class*="from-teal-"],
-  [class*="from-green-"],
-  [class*="from-orange-"],
-  [class*="from-amber-"],
-  [class*="from-rose-"],
-  [class*="from-red-"]
-) :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button
-) {
-  color: hsl(var(--foreground)) !important;
-}
-
-.dark :is(
-  [class*="bg-primary"],
-  [class*="bg-success"],
-  [class*="bg-info"],
-  [class*="bg-destructive"],
-  [class*="bg-cyan-"],
-  [class*="bg-sky-"],
-  [class*="bg-blue-"],
-  [class*="bg-violet-"],
-  [class*="bg-fuchsia-"],
-  [class*="bg-purple-"],
-  [class*="bg-emerald-"],
-  [class*="bg-teal-"],
-  [class*="bg-green-"],
-  [class*="bg-orange-"],
-  [class*="bg-amber-"],
-  [class*="bg-rose-"],
-  [class*="bg-red-"],
-  [class*="bg-gradient"],
-  [class*="from-cyan-"],
-  [class*="from-sky-"],
-  [class*="from-blue-"],
-  [class*="from-violet-"],
-  [class*="from-fuchsia-"],
-  [class*="from-purple-"],
-  [class*="from-emerald-"],
-  [class*="from-teal-"],
-  [class*="from-green-"],
-  [class*="from-orange-"],
-  [class*="from-amber-"],
-  [class*="from-rose-"],
-  [class*="from-red-"]
-) :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button
-) {
-  color: hsl(var(--foreground)) !important;
-}
 
 /*
-  Sadece sayfa bazlı okunabilirlik düzeltmesi gereken ekranlar için:
-  EmailHistory, BoardMeetings, AssignmentLetters.
+  Theme-page-readable bridge:
+  Pages wrapped with .theme-page-readable get extra semantic overrides.
+  Used for EmailHistory, BoardMeetings, AssignmentLetters and other pages.
 */
-.theme-page-readable :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button
-) {
-  color: inherit;
-}
-
-.light .theme-page-readable :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button
-) {
-  color: hsl(var(--foreground)) !important;
-}
-
-.dark .theme-page-readable :is(
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p,
-  span,
-  label,
-  strong,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button
-) {
-  color: hsl(var(--foreground)) !important;
+.theme-page-readable {
+  color: hsl(var(--foreground));
 }
 
 .light .theme-page-readable .text-muted-foreground,
@@ -359,213 +147,15 @@
   color: hsl(var(--muted-foreground)) !important;
 }
 
-/*
-  Semantic token bridge for pages wrapped with theme-page-readable.
-  Goal: preserve layout, improve contrast/readability in light mode,
-  and keep dark mode coherent without touching each screen deeply.
-*/
 .theme-page-readable :is(input, textarea, select, [role="combobox"]) {
   color: hsl(var(--foreground));
+  background: hsl(var(--background)) !important;
+  border-color: hsl(var(--border)) !important;
 }
 
 .theme-page-readable :is(input, textarea, select)::placeholder {
   color: hsl(var(--muted-foreground));
   opacity: 1;
-}
-
-.light .theme-page-readable :is(
-  [class*="bg-slate-950"],
-  [class*="bg-slate-900"],
-  [class*="bg-slate-800"],
-  [class*="bg-zinc-950"],
-  [class*="bg-zinc-900"],
-  [class*="bg-black"],
-  [class*="bg-white/[0."],
-  [class*="bg-slate-950/"],
-  [class*="bg-slate-900/"],
-  [class*="bg-slate-800/"],
-  [class*="bg-slate-700/"]
-) {
-  background: hsl(var(--card)) !important;
-}
-
-.light .theme-page-readable :is(
-  [class*="border-white/"],
-  [class*="border-slate-9"],
-  [class*="border-slate-8"],
-  [class*="border-slate-7"],
-  [class*="border-slate-6"],
-  [class*="border-zinc-9"],
-  [class*="border-zinc-8"],
-  [class*="border-black/"]
-) {
-  border-color: hsl(var(--border)) !important;
-}
-
-.light .theme-page-readable :is(
-  [class*="text-white"],
-  [class*="text-slate-0"],
-  [class*="text-slate-1"],
-  [class*="text-slate-2"],
-  [class*="text-slate-3"],
-  [class*="text-zinc-0"],
-  [class*="text-zinc-1"],
-  [class*="text-zinc-2"],
-  [class*="text-zinc-3"]
-) {
-  color: hsl(var(--foreground)) !important;
-}
-
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-cyan-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-sky-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-blue-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-violet-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-fuchsia-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-purple-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-emerald-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-green-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-amber-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-orange-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-red-"],
-.light .theme-page-readable :is(
-  p,
-  span,
-  label,
-  small,
-  li,
-  td,
-  th,
-  a,
-  button,
-  div
-)[class*="text-rose-"] {
-  color: hsl(var(--foreground)) !important;
-}
-
-.theme-page-readable :is(input, textarea, select, [role="combobox"]) {
-  background: hsl(var(--background)) !important;
-  border-color: hsl(var(--border)) !important;
 }
 
 .theme-page-readable :is(
@@ -577,43 +167,8 @@
   border-color: hsl(var(--border)) !important;
 }
 
-.light .theme-page-readable :is(
-  table,
-  thead,
-  tbody,
-  tr,
-  td,
-  th
-) {
+.light .theme-page-readable :is(table, thead, tbody, tr, td, th) {
   border-color: hsl(var(--border)) !important;
-}
-
-.light .theme-page-readable :is(
-  [class*="bg-cyan-"][class*="/"],
-  [class*="bg-sky-"][class*="/"],
-  [class*="bg-blue-"][class*="/"],
-  [class*="bg-violet-"][class*="/"],
-  [class*="bg-fuchsia-"][class*="/"],
-  [class*="bg-purple-"][class*="/"],
-  [class*="bg-emerald-"][class*="/"],
-  [class*="bg-green-"][class*="/"],
-  [class*="bg-amber-"][class*="/"],
-  [class*="bg-orange-"][class*="/"],
-  [class*="bg-red-"][class*="/"],
-  [class*="bg-rose-"][class*="/"]
-) :is(h1, h2, h3, h4, h5, h6, p, span, label, small, li, td, th, a, button, div) {
-  color: hsl(var(--foreground)) !important;
-}
-
-.light .theme-page-readable :is(
-  [class*="rounded-2xl"],
-  [class*="rounded-3xl"],
-  [class*="rounded-[24px]"],
-  [class*="rounded-[26px]"],
-  [class*="rounded-[28px]"],
-  [class*="rounded-[30px]"]
-) :is(input, textarea, select) {
-  background: hsl(var(--background)) !important;
 }
 
 @layer utilities {
@@ -631,6 +186,43 @@
 
   .badgeSoft {
     @apply border border-border bg-muted text-foreground;
+  }
+
+  /* Stat/info card utility: proper surfaces in both themes */
+  .statCard {
+    @apply rounded-2xl border border-border bg-card p-5 text-foreground shadow-sm;
+  }
+
+  /* Panel surface for secondary content areas */
+  .panelSurface {
+    @apply rounded-xl border border-border bg-muted/50 p-4 text-foreground;
+  }
+
+  /* Colored card variants with proper light/dark foreground/background */
+  .card-blue {
+    @apply rounded-2xl border border-blue-400/20 p-5 shadow-sm;
+    background-color: hsl(217 91% 60% / 0.1);
+    color: hsl(var(--foreground));
+  }
+  .card-amber {
+    @apply rounded-2xl border border-amber-400/20 p-5 shadow-sm;
+    background-color: hsl(38 92% 50% / 0.1);
+    color: hsl(var(--foreground));
+  }
+  .card-green {
+    @apply rounded-2xl border border-emerald-400/20 p-5 shadow-sm;
+    background-color: hsl(142 76% 36% / 0.1);
+    color: hsl(var(--foreground));
+  }
+  .card-violet {
+    @apply rounded-2xl border border-violet-400/20 p-5 shadow-sm;
+    background-color: hsl(252 91% 60% / 0.1);
+    color: hsl(var(--foreground));
+  }
+  .card-red {
+    @apply rounded-2xl border border-red-400/20 p-5 shadow-sm;
+    background-color: hsl(0 84% 60% / 0.1);
+    color: hsl(var(--foreground));
   }
 
   .glass-card {
@@ -677,11 +269,11 @@
 
 /*
   Legacy dark-surface bridge:
-  Uygulamada çok sayıda sabit `bg-slate-*`, `text-white`, `border-slate-*`
-  sınıfı kullanıldığı için light modda bazı ekranlar koyu kalıyordu.
-  Bu köprü, light mod aktifken en sık kullanılan koyu utility'leri
-  temanın açık renk değişkenlerine yaklaştırır.
+  Converts hardcoded dark-mode classes to semantic theme tokens in light mode.
+  This is the global bridge – applies to ALL pages automatically.
 */
+
+/* === Dark backgrounds → card/accent surface === */
 .light [class*="bg-slate-950"],
 .light [class*="bg-slate-900"],
 .light [class*="bg-slate-800"],
@@ -689,7 +281,7 @@
 .light [class*="bg-zinc-950"],
 .light [class*="bg-zinc-900"],
 .light [class*="bg-zinc-800"],
-.light [class*="bg-black"] {
+.light [class*="bg-black"]:not([class*="bg-black/"]) {
   background-color: hsl(var(--card)) !important;
 }
 
@@ -704,6 +296,16 @@
   background-color: hsl(var(--card) / 0.72) !important;
 }
 
+/* === Semi-transparent white overlays → accent surface === */
+.light [class*="bg-white/5"],
+.light [class*="bg-white/8"],
+.light [class*="bg-white/10"],
+.light [class*="bg-white/15"],
+.light [class*="bg-white/[0.0"] {
+  background-color: hsl(var(--accent)) !important;
+}
+
+/* === Dark gradients → card gradients === */
 .light [class*="from-slate-950"],
 .light [class*="from-slate-900"],
 .light [class*="from-slate-800"],
@@ -725,17 +327,27 @@
   background: linear-gradient(180deg, hsl(var(--card)), hsl(var(--accent))) !important;
 }
 
+/* === Dark borders → border token === */
 .light [class*="border-slate-950"],
 .light [class*="border-slate-900"],
 .light [class*="border-slate-800"],
 .light [class*="border-slate-700"],
-.light [class*="border-white/10"],
-.light [class*="border-white/8"],
-.light [class*="border-white/15"],
-.light [class*="border-white/20"] {
+.light [class*="border-zinc-9"],
+.light [class*="border-zinc-8"],
+.light [class*="border-zinc-7"],
+.light [class*="border-white/"],
+.light [class*="border-black/"] {
   border-color: hsl(var(--border)) !important;
 }
 
+/* === Ring overrides === */
+.light [class*="ring-white/"],
+.light [class*="ring-slate-9"],
+.light [class*="ring-slate-8"] {
+  --tw-ring-color: hsl(var(--ring)) !important;
+}
+
+/* === Light text on neutral surfaces → foreground token === */
 .light [class*="text-white"] {
   color: hsl(var(--foreground)) !important;
 }
@@ -747,38 +359,39 @@
   color: hsl(var(--foreground) / 0.9) !important;
 }
 
+/* === Mid-tone text → muted-foreground === */
 .light [class*="text-slate-400"],
 .light [class*="text-slate-500"],
-.light [class*="text-slate-600"] {
+.light [class*="text-slate-600"],
+.light [class*="text-zinc-400"],
+.light [class*="text-zinc-500"],
+.light [class*="text-zinc-600"],
+.light [class*="text-gray-400"],
+.light [class*="text-gray-500"],
+.light [class*="text-gray-600"] {
   color: hsl(var(--muted-foreground)) !important;
 }
 
+/* === Deep shadow softening === */
 .light [class*="shadow-[0_20px_50px"],
 .light [class*="shadow-[0_18px_40px"],
 .light [class*="shadow-[0_22px_55px"],
 .light [class*="shadow-[0_24px_60px"],
 .light [class*="shadow-[0_24px_65px"],
 .light [class*="shadow-[0_28px_80px"],
-.light [class*="shadow-[0_32px_90px"] {
+.light [class*="shadow-[0_32px_90px"],
+.light [class*="shadow-[0_18px_50px"] {
   box-shadow: 0 18px 45px rgba(15, 23, 42, 0.08) !important;
 }
 
-.light [class*="bg-white/5"],
-.light [class*="bg-white/8"],
-.light [class*="bg-white/10"],
-.light [class*="bg-white/15"],
-.light [class*="bg-white/[0.03]"],
-.light [class*="bg-white/[0.04]"],
-.light [class*="bg-white/[0.05]"],
-.light [class*="bg-white/[0.06]"],
-.light [class*="bg-white/[0.08]"] {
-  background-color: hsl(var(--accent)) !important;
-}
-
-.light [class*="placeholder:text-slate-"]::placeholder {
+/* === Placeholder text readability === */
+.light [class*="placeholder:text-slate-"]::placeholder,
+.light [class*="placeholder:text-zinc-"]::placeholder,
+.light [class*="placeholder:text-gray-"]::placeholder {
   color: hsl(var(--muted-foreground)) !important;
 }
 
+/* === Input/form element text in light mode === */
 .light input[class],
 .light textarea[class],
 .light select[class],
@@ -788,188 +401,147 @@
 }
 
 /*
-  Renkli kartlar ve aksiyon yüzeyleri:
-  Light modda nötr yüzeylerde koyu metin isteriz, ama doygun arka planlı
-  kartlarda/CTA'larda açık metin korunmalı.
+  Saturated surface text preservation:
+  On colored/gradient backgrounds, keep white/light text even in light mode.
+  Uses higher specificity to override the global text-white→foreground rule.
 */
-.light [class*="bg-primary"][class*="text-white"],
-.light [class*="bg-primary"] [class*="text-white"],
-.light [class*="bg-success"][class*="text-white"],
-.light [class*="bg-success"] [class*="text-white"],
-.light [class*="bg-info"][class*="text-white"],
-.light [class*="bg-info"] [class*="text-white"],
-.light [class*="bg-destructive"][class*="text-white"],
-.light [class*="bg-destructive"] [class*="text-white"],
-.light [class*="bg-cyan-"][class*="text-white"],
-.light [class*="bg-cyan-"] [class*="text-white"],
-.light [class*="bg-sky-"][class*="text-white"],
-.light [class*="bg-sky-"] [class*="text-white"],
-.light [class*="bg-blue-"][class*="text-white"],
-.light [class*="bg-blue-"] [class*="text-white"],
-.light [class*="bg-violet-"][class*="text-white"],
-.light [class*="bg-violet-"] [class*="text-white"],
-.light [class*="bg-fuchsia-"][class*="text-white"],
-.light [class*="bg-fuchsia-"] [class*="text-white"],
-.light [class*="bg-purple-"][class*="text-white"],
-.light [class*="bg-purple-"] [class*="text-white"],
-.light [class*="bg-emerald-"][class*="text-white"],
-.light [class*="bg-emerald-"] [class*="text-white"],
-.light [class*="bg-teal-"][class*="text-white"],
-.light [class*="bg-teal-"] [class*="text-white"],
-.light [class*="bg-green-"][class*="text-white"],
-.light [class*="bg-green-"] [class*="text-white"],
-.light [class*="bg-orange-"][class*="text-white"],
-.light [class*="bg-orange-"] [class*="text-white"],
-.light [class*="bg-amber-"][class*="text-white"],
-.light [class*="bg-amber-"] [class*="text-white"],
-.light [class*="bg-rose-"][class*="text-white"],
-.light [class*="bg-rose-"] [class*="text-white"],
-.light [class*="bg-red-"][class*="text-white"],
-.light [class*="bg-red-"] [class*="text-white"],
-.light [class*="bg-gradient"][class*="text-white"],
-.light [class*="bg-gradient"] [class*="text-white"],
-.light [class*="from-cyan-"][class*="text-white"],
-.light [class*="from-cyan-"] [class*="text-white"],
-.light [class*="from-sky-"][class*="text-white"],
-.light [class*="from-sky-"] [class*="text-white"],
-.light [class*="from-blue-"][class*="text-white"],
-.light [class*="from-blue-"] [class*="text-white"],
-.light [class*="from-violet-"][class*="text-white"],
-.light [class*="from-violet-"] [class*="text-white"],
-.light [class*="from-fuchsia-"][class*="text-white"],
-.light [class*="from-fuchsia-"] [class*="text-white"],
-.light [class*="from-emerald-"][class*="text-white"],
-.light [class*="from-emerald-"] [class*="text-white"],
-.light [class*="from-teal-"][class*="text-white"],
-.light [class*="from-teal-"] [class*="text-white"],
-.light [class*="from-orange-"][class*="text-white"],
-.light [class*="from-orange-"] [class*="text-white"],
-.light [class*="from-amber-"][class*="text-white"],
-.light [class*="from-amber-"] [class*="text-white"],
-.light [class*="from-rose-"][class*="text-white"],
-.light [class*="from-rose-"] [class*="text-white"],
-.light [class*="from-red-"][class*="text-white"],
-.light [class*="from-red-"] [class*="text-white"] {
+.light :is(
+  [class*="bg-primary"],
+  [class*="bg-success"],
+  [class*="bg-info"],
+  [class*="bg-destructive"],
+  [class*="bg-cyan-"]:not([class*="bg-cyan-"]:is([class*="/1"], [class*="/5"], [class*="/8"])),
+  [class*="bg-sky-"]:not([class*="bg-sky-"]:is([class*="/1"], [class*="/5"], [class*="/8"])),
+  [class*="bg-blue-"]:not([class*="bg-blue-"]:is([class*="/1"], [class*="/5"], [class*="/8"])),
+  [class*="bg-violet-"],
+  [class*="bg-fuchsia-"],
+  [class*="bg-purple-"],
+  [class*="bg-emerald-"],
+  [class*="bg-teal-"],
+  [class*="bg-green-"],
+  [class*="bg-orange-"],
+  [class*="bg-amber-"],
+  [class*="bg-rose-"],
+  [class*="bg-red-"],
+  [class*="bg-gradient"],
+  [class*="from-cyan-"],
+  [class*="from-sky-"],
+  [class*="from-blue-"],
+  [class*="from-violet-"],
+  [class*="from-fuchsia-"],
+  [class*="from-emerald-"],
+  [class*="from-teal-"],
+  [class*="from-orange-"],
+  [class*="from-amber-"],
+  [class*="from-rose-"],
+  [class*="from-red-"]
+) :is(
+  [class*="text-white"],
+  [class*="text-slate-50"],
+  [class*="text-slate-100"],
+  [class*="text-slate-200"]
+) {
   color: #fff !important;
 }
 
-.light [class*="bg-primary"][class*="text-slate-100"],
-.light [class*="bg-primary"] [class*="text-slate-100"],
-.light [class*="bg-success"][class*="text-slate-100"],
-.light [class*="bg-success"] [class*="text-slate-100"],
-.light [class*="bg-info"][class*="text-slate-100"],
-.light [class*="bg-info"] [class*="text-slate-100"],
-.light [class*="bg-destructive"][class*="text-slate-100"],
-.light [class*="bg-destructive"] [class*="text-slate-100"],
-.light [class*="bg-cyan-"][class*="text-slate-100"],
-.light [class*="bg-cyan-"] [class*="text-slate-100"],
-.light [class*="bg-sky-"][class*="text-slate-100"],
-.light [class*="bg-sky-"] [class*="text-slate-100"],
-.light [class*="bg-blue-"][class*="text-slate-100"],
-.light [class*="bg-blue-"] [class*="text-slate-100"],
-.light [class*="bg-violet-"][class*="text-slate-100"],
-.light [class*="bg-violet-"] [class*="text-slate-100"],
-.light [class*="bg-fuchsia-"][class*="text-slate-100"],
-.light [class*="bg-fuchsia-"] [class*="text-slate-100"],
-.light [class*="bg-emerald-"][class*="text-slate-100"],
-.light [class*="bg-emerald-"] [class*="text-slate-100"],
-.light [class*="bg-teal-"][class*="text-slate-100"],
-.light [class*="bg-teal-"] [class*="text-slate-100"],
-.light [class*="bg-orange-"][class*="text-slate-100"],
-.light [class*="bg-orange-"] [class*="text-slate-100"],
-.light [class*="bg-amber-"][class*="text-slate-100"],
-.light [class*="bg-amber-"] [class*="text-slate-100"],
-.light [class*="bg-rose-"][class*="text-slate-100"],
-.light [class*="bg-rose-"] [class*="text-slate-100"],
-.light [class*="bg-red-"][class*="text-slate-100"],
-.light [class*="bg-red-"] [class*="text-slate-100"],
-.light [class*="bg-gradient"][class*="text-slate-100"],
-.light [class*="bg-gradient"] [class*="text-slate-100"],
-.light [class*="from-cyan-"][class*="text-slate-100"],
-.light [class*="from-cyan-"] [class*="text-slate-100"],
-.light [class*="from-sky-"][class*="text-slate-100"],
-.light [class*="from-sky-"] [class*="text-slate-100"],
-.light [class*="from-blue-"][class*="text-slate-100"],
-.light [class*="from-blue-"] [class*="text-slate-100"],
-.light [class*="from-violet-"][class*="text-slate-100"],
-.light [class*="from-violet-"] [class*="text-slate-100"],
-.light [class*="from-fuchsia-"][class*="text-slate-100"],
-.light [class*="from-fuchsia-"] [class*="text-slate-100"],
-.light [class*="from-emerald-"][class*="text-slate-100"],
-.light [class*="from-emerald-"] [class*="text-slate-100"],
-.light [class*="from-teal-"][class*="text-slate-100"],
-.light [class*="from-teal-"] [class*="text-slate-100"],
-.light [class*="from-orange-"][class*="text-slate-100"],
-.light [class*="from-orange-"] [class*="text-slate-100"],
-.light [class*="from-amber-"][class*="text-slate-100"],
-.light [class*="from-amber-"] [class*="text-slate-100"],
-.light [class*="from-rose-"][class*="text-slate-100"],
-.light [class*="from-rose-"] [class*="text-slate-100"],
-.light [class*="from-red-"][class*="text-slate-100"],
-.light [class*="from-red-"] [class*="text-slate-100"] {
-  color: rgba(255, 255, 255, 0.94) !important;
+.light :is(
+  [class*="bg-primary"],
+  [class*="bg-success"],
+  [class*="bg-info"],
+  [class*="bg-destructive"],
+  [class*="bg-cyan-"],
+  [class*="bg-sky-"],
+  [class*="bg-blue-"],
+  [class*="bg-violet-"],
+  [class*="bg-fuchsia-"],
+  [class*="bg-purple-"],
+  [class*="bg-emerald-"],
+  [class*="bg-teal-"],
+  [class*="bg-green-"],
+  [class*="bg-orange-"],
+  [class*="bg-amber-"],
+  [class*="bg-rose-"],
+  [class*="bg-red-"],
+  [class*="bg-gradient"],
+  [class*="from-cyan-"],
+  [class*="from-sky-"],
+  [class*="from-blue-"],
+  [class*="from-violet-"],
+  [class*="from-fuchsia-"],
+  [class*="from-emerald-"],
+  [class*="from-teal-"],
+  [class*="from-orange-"],
+  [class*="from-amber-"],
+  [class*="from-rose-"],
+  [class*="from-red-"]
+)[class*="text-white"] {
+  color: #fff !important;
 }
 
-.light [class*="bg-primary"] [class*="text-slate-"],
-.light [class*="bg-success"] [class*="text-slate-"],
-.light [class*="bg-info"] [class*="text-slate-"],
-.light [class*="bg-destructive"] [class*="text-slate-"],
-.light [class*="bg-cyan-"] [class*="text-slate-"],
-.light [class*="bg-sky-"] [class*="text-slate-"],
-.light [class*="bg-blue-"] [class*="text-slate-"],
-.light [class*="bg-violet-"] [class*="text-slate-"],
-.light [class*="bg-fuchsia-"] [class*="text-slate-"],
-.light [class*="bg-purple-"] [class*="text-slate-"],
-.light [class*="bg-emerald-"] [class*="text-slate-"],
-.light [class*="bg-teal-"] [class*="text-slate-"],
-.light [class*="bg-green-"] [class*="text-slate-"],
-.light [class*="bg-orange-"] [class*="text-slate-"],
-.light [class*="bg-amber-"] [class*="text-slate-"],
-.light [class*="bg-rose-"] [class*="text-slate-"],
-.light [class*="bg-red-"] [class*="text-slate-"],
-.light [class*="bg-gradient"] [class*="text-slate-"],
-.light [class*="from-cyan-"] [class*="text-slate-"],
-.light [class*="from-sky-"] [class*="text-slate-"],
-.light [class*="from-blue-"] [class*="text-slate-"],
-.light [class*="from-violet-"] [class*="text-slate-"],
-.light [class*="from-fuchsia-"] [class*="text-slate-"],
-.light [class*="from-emerald-"] [class*="text-slate-"],
-.light [class*="from-teal-"] [class*="text-slate-"],
-.light [class*="from-orange-"] [class*="text-slate-"],
-.light [class*="from-amber-"] [class*="text-slate-"],
-.light [class*="from-rose-"] [class*="text-slate-"],
-.light [class*="from-red-"] [class*="text-slate-"] {
+.light :is(
+  [class*="bg-primary"],
+  [class*="bg-success"],
+  [class*="bg-info"],
+  [class*="bg-destructive"],
+  [class*="bg-cyan-"],
+  [class*="bg-sky-"],
+  [class*="bg-blue-"],
+  [class*="bg-violet-"],
+  [class*="bg-fuchsia-"],
+  [class*="bg-purple-"],
+  [class*="bg-emerald-"],
+  [class*="bg-teal-"],
+  [class*="bg-green-"],
+  [class*="bg-orange-"],
+  [class*="bg-amber-"],
+  [class*="bg-rose-"],
+  [class*="bg-red-"],
+  [class*="bg-gradient"],
+  [class*="from-cyan-"],
+  [class*="from-sky-"],
+  [class*="from-blue-"],
+  [class*="from-violet-"],
+  [class*="from-fuchsia-"],
+  [class*="from-emerald-"],
+  [class*="from-teal-"],
+  [class*="from-orange-"],
+  [class*="from-amber-"],
+  [class*="from-rose-"],
+  [class*="from-red-"]
+) [class*="text-slate-"] {
   color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.light [class*="bg-primary"] .text-muted-foreground,
-.light [class*="bg-success"] .text-muted-foreground,
-.light [class*="bg-info"] .text-muted-foreground,
-.light [class*="bg-destructive"] .text-muted-foreground,
-.light [class*="bg-cyan-"] .text-muted-foreground,
-.light [class*="bg-sky-"] .text-muted-foreground,
-.light [class*="bg-blue-"] .text-muted-foreground,
-.light [class*="bg-violet-"] .text-muted-foreground,
-.light [class*="bg-fuchsia-"] .text-muted-foreground,
-.light [class*="bg-purple-"] .text-muted-foreground,
-.light [class*="bg-emerald-"] .text-muted-foreground,
-.light [class*="bg-teal-"] .text-muted-foreground,
-.light [class*="bg-green-"] .text-muted-foreground,
-.light [class*="bg-orange-"] .text-muted-foreground,
-.light [class*="bg-amber-"] .text-muted-foreground,
-.light [class*="bg-rose-"] .text-muted-foreground,
-.light [class*="bg-red-"] .text-muted-foreground,
-.light [class*="bg-gradient"] .text-muted-foreground,
-.light [class*="from-cyan-"] .text-muted-foreground,
-.light [class*="from-sky-"] .text-muted-foreground,
-.light [class*="from-blue-"] .text-muted-foreground,
-.light [class*="from-violet-"] .text-muted-foreground,
-.light [class*="from-fuchsia-"] .text-muted-foreground,
-.light [class*="from-emerald-"] .text-muted-foreground,
-.light [class*="from-teal-"] .text-muted-foreground,
-.light [class*="from-orange-"] .text-muted-foreground,
-.light [class*="from-amber-"] .text-muted-foreground,
-.light [class*="from-rose-"] .text-muted-foreground,
-.light [class*="from-red-"] .text-muted-foreground {
+.light :is(
+  [class*="bg-primary"],
+  [class*="bg-success"],
+  [class*="bg-info"],
+  [class*="bg-destructive"],
+  [class*="bg-cyan-"],
+  [class*="bg-sky-"],
+  [class*="bg-blue-"],
+  [class*="bg-violet-"],
+  [class*="bg-fuchsia-"],
+  [class*="bg-purple-"],
+  [class*="bg-emerald-"],
+  [class*="bg-teal-"],
+  [class*="bg-green-"],
+  [class*="bg-orange-"],
+  [class*="bg-amber-"],
+  [class*="bg-rose-"],
+  [class*="bg-red-"],
+  [class*="bg-gradient"],
+  [class*="from-cyan-"],
+  [class*="from-sky-"],
+  [class*="from-blue-"],
+  [class*="from-violet-"],
+  [class*="from-fuchsia-"],
+  [class*="from-emerald-"],
+  [class*="from-teal-"],
+  [class*="from-orange-"],
+  [class*="from-amber-"],
+  [class*="from-rose-"],
+  [class*="from-red-"]
+) .text-muted-foreground {
   color: rgba(255, 255, 255, 0.78) !important;
 }
