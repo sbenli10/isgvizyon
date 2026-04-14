@@ -659,7 +659,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
     toast.success("Excel çıktısı indirildi");
   };
 
-  const overviewCards = [
+   const overviewCards = [
     {
       label: "Aktif faaliyet",
       value: activeWorkRows,
@@ -667,9 +667,11 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
       icon: ClipboardList,
       cardClass:
         "border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-cyan-50/90 to-background dark:border-cyan-400/20 dark:from-cyan-500/20 dark:via-cyan-500/10 dark:to-transparent",
-      titleClass: "text-cyan-900/80 dark:text-cyan-100/80",
-      valueClass: "text-slate-900 dark:text-white",
-      descriptionClass: "text-slate-700 dark:text-cyan-50/80",
+
+      // LIGHT: koyu okunur, DARK: açık okunur (token)
+      titleClass: "text-xs font-medium uppercase tracking-[0.2em] text-foreground/80 dark:text-foreground/80",
+      valueClass: "text-3xl font-semibold text-foreground",
+      descriptionClass: "mt-2 text-sm leading-5 text-foreground/80 dark:text-muted-foreground",
       iconClass: "text-cyan-700 dark:text-cyan-200",
     },
     {
@@ -679,9 +681,10 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
       icon: Clock,
       cardClass:
         "border-amber-200/80 bg-gradient-to-br from-amber-50 via-amber-50/90 to-background dark:border-amber-400/20 dark:from-amber-500/20 dark:via-amber-500/10 dark:to-transparent",
-      titleClass: "text-amber-900/80 dark:text-amber-100/80",
-      valueClass: "text-slate-900 dark:text-white",
-      descriptionClass: "text-slate-700 dark:text-amber-50/80",
+
+      titleClass: "text-xs font-medium uppercase tracking-[0.2em] text-foreground/80 dark:text-foreground/80",
+      valueClass: "text-3xl font-semibold text-foreground",
+      descriptionClass: "mt-2 text-sm leading-5 text-foreground/80 dark:text-muted-foreground",
       iconClass: "text-amber-700 dark:text-amber-200",
     },
     {
@@ -691,9 +694,10 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
       icon: CheckCircle2,
       cardClass:
         "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-emerald-50/90 to-background dark:border-emerald-400/20 dark:from-emerald-500/20 dark:via-emerald-500/10 dark:to-transparent",
-      titleClass: "text-emerald-900/80 dark:text-emerald-100/80",
-      valueClass: "text-slate-900 dark:text-white",
-      descriptionClass: "text-slate-700 dark:text-emerald-50/80",
+
+      titleClass: "text-xs font-medium uppercase tracking-[0.2em] text-foreground/80 dark:text-foreground/80",
+      valueClass: "text-3xl font-semibold text-foreground",
+      descriptionClass: "mt-2 text-sm leading-5 text-foreground/80 dark:text-muted-foreground",
       iconClass: "text-emerald-700 dark:text-emerald-200",
     },
   ];
@@ -943,18 +947,19 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                 alışık olunan Excel şablon mantığını koruyarak daha temiz ve kurumsal bir formatta dışa aktarılır.
               </p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
+                        <div className="grid gap-4 md:grid-cols-3">
               {overviewCards.map((card) => (
                 <div
                   key={card.label}
                   className={`rounded-2xl border p-4 shadow-sm ${card.cardClass} dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]`}
                 >
                   <div className="mb-4 flex items-center justify-between">
-                    <span className={`text-xs font-medium uppercase tracking-[0.2em] ${card.titleClass}`}>{card.label}</span>
+                    <span className={card.titleClass}>{card.label}</span>
                     <card.icon className={`h-4 w-4 ${card.iconClass}`} />
                   </div>
-                  <div className={`text-3xl font-semibold ${card.valueClass}`}>{card.value}</div>
-                  <p className={`mt-2 text-sm leading-5 ${card.descriptionClass}`}>{card.description}</p>
+
+                  <div className={card.valueClass}>{card.value}</div>
+                  <p className={card.descriptionClass}>{card.description}</p>
                 </div>
               ))}
             </div>
@@ -983,18 +988,24 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
               </Select>
             </div>
 
-            <div className="rounded-2xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-cyan-50/90 to-background p-4 dark:border-cyan-400/20 dark:bg-cyan-400/10">
-              <div className="flex items-start gap-3">
-                <Building2 className="mt-0.5 h-4 w-4 text-cyan-700 dark:text-cyan-200" />
-                <div>
-                <p className="text-xs font-medium uppercase tracking-[0.2em] text-cyan-900/80 dark:text-cyan-100/80">Kurum</p>
-                <p className="mt-1 text-sm font-medium text-foreground dark:text-white">{organizationName || "İSGVizyon"}</p>
-                <p className="mt-1 text-sm leading-5 text-slate-700 dark:text-cyan-50/80">
+           <div className="rounded-2xl border border-border bg-muted/30 p-4">
+            <div className="flex items-start gap-3">
+              <Building2 className="mt-0.5 h-4 w-4 text-cyan-700 dark:text-cyan-200" />
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+                  Kurum
+                </p>
+
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {organizationName || "İSGVizyon"}
+                </p>
+
+                <p className="mt-1 text-sm leading-5 text-foreground/70 dark:text-muted-foreground">
                   Çıktılarda kurum adı üst bilgiye otomatik yerleştirilir.
                 </p>
               </div>
-              </div>
             </div>
+          </div>
 
             <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/10 dark:bg-slate-900/70">
               <div className="mb-3 flex items-center justify-between">
