@@ -982,17 +982,17 @@ const handleForceReset2FA = async () => {
         : "border-rose-400/20 bg-rose-400/10 text-rose-100";
 
   const premiumInputClassName =
-    "h-11 rounded-2xl border-white/10 bg-slate-950/60 text-slate-100 placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-visible:border-cyan-400/40 focus-visible:ring-2 focus-visible:ring-cyan-400/20";
+    "h-11 rounded-2xl border-border dark:border-white/10 bg-background text-foreground placeholder:text-muted-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-visible:border-cyan-400/40 focus-visible:ring-2 focus-visible:ring-cyan-400/20";
   const premiumOutlineButtonClassName =
-    "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white";
+    "border-border dark:border-white/10 bg-accent dark:bg-white/5 text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground";
   const premiumPrimaryButtonClassName =
     "bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white shadow-[0_14px_30px_rgba(34,211,238,0.18)] hover:from-fuchsia-500 hover:to-cyan-400";
   const premiumGhostButtonClassName =
-    "text-slate-200 hover:bg-white/10 hover:text-white";
+    "text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground";
   const microCardEyebrowClassName =
-    "text-[11px] font-medium uppercase tracking-[0.24em] text-slate-400";
-  const microCardTitleClassName = "mt-2 text-xl font-semibold text-white";
-  const microCardBodyClassName = "mt-2 text-sm text-slate-300";
+    "text-[11px] font-medium uppercase tracking-[0.24em] text-muted-foreground";
+  const microCardTitleClassName = "mt-2 text-xl font-semibold text-foreground";
+  const microCardBodyClassName = "mt-2 text-sm text-muted-foreground";
 
   const securityRiskLevel = !twoFactorEnabled
     ? "Yüksek"
@@ -1077,23 +1077,23 @@ const handleForceReset2FA = async () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 md:p-8 space-y-6">
+      <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 md:p-8 space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-8 w-40 animate-pulse rounded bg-slate-800" />
+            <div className="h-8 w-40 animate-pulse rounded bg-muted" />
             <div className="h-4 w-80 animate-pulse rounded bg-slate-900" />
           </div>
-          <div className="h-10 w-28 animate-pulse rounded-lg bg-slate-900" />
+          <div className="h-10 w-28 animate-pulse rounded-lg bg-muted" />
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
           <div className="space-y-6">
-            <div className="h-64 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70" />
-            <div className="h-48 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70" />
+            <div className="h-64 animate-pulse rounded-xl border border-border bg-muted" />
+            <div className="h-48 animate-pulse rounded-xl border border-border bg-muted" />
           </div>
           <div className="space-y-6">
-            <div className="h-72 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70" />
-            <div className="h-72 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70" />
+            <div className="h-72 animate-pulse rounded-xl border border-border bg-muted" />
+            <div className="h-72 animate-pulse rounded-xl border border-border bg-muted" />
           </div>
         </div>
       </div>
@@ -1102,8 +1102,8 @@ const handleForceReset2FA = async () => {
 
   return (
     <>
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 md:p-8 space-y-6">
-        <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(17,24,39,0.84))] shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl">
+      <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 md:p-8 space-y-6">
+        <section className="overflow-hidden rounded-[28px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(17,24,39,0.84))] shadow-md dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl">
           <div className="grid gap-6 p-6 md:p-8 xl:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-5">
               <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-cyan-100">
@@ -1111,13 +1111,13 @@ const handleForceReset2FA = async () => {
                 Hesap ve operasyon ayarları
               </div>
               <div className="space-y-3">
-                <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-inner shadow-cyan-500/10">
+                <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/5 shadow-inner shadow-cyan-500/10">
                     <SettingsIcon className="h-6 w-6 text-cyan-300" />
                   </span>
                   Ayarlar
                 </h1>
-                <p className="max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground md:text-base">
                   Profilinizi, güvenlik tercihlerinizi, bildirim akışınızı ve kurumsal bilgilerinizi
                   tek merkezden yönetin. Bu alan ekip kullanımını daha güvenli ve daha tutarlı
                   hale getirmek için tasarlandı.
@@ -1127,13 +1127,13 @@ const handleForceReset2FA = async () => {
                 <Badge className={`rounded-full border px-3 py-1 text-xs font-medium ${subscriptionTone}`}>
                   {subscriptionLabel}
                 </Badge>
-                <Badge variant="outline" className="rounded-full border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200">
+                <Badge variant="outline" className="rounded-full border-border dark:border-white/10 bg-accent dark:bg-white/5 px-3 py-1 text-xs text-foreground">
                   {twoFactorEnabled ? "2FA aktif" : "2FA önerilir"}
                 </Badge>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="rounded-3xl border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <p className={microCardEyebrowClassName}>Plan durumu</p>
                 <p className={microCardTitleClassName}>{status === "premium" ? "Premium" : status === "trial" ? "Deneme" : "Temel"}</p>
                 <p className={microCardBodyClassName}>
@@ -1144,7 +1144,7 @@ const handleForceReset2FA = async () => {
                       : "Temel kullanım paketiyle devam ediyorsunuz."}
                 </p>
               </div>
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="rounded-3xl border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                 <p className={microCardEyebrowClassName}>Güvenlik özeti</p>
                 <p className={microCardTitleClassName}>{twoFactorEnabled ? "Koruma açık" : "Ek doğrulama kapalı"}</p>
                 <p className={microCardBodyClassName}>
@@ -1155,8 +1155,8 @@ const handleForceReset2FA = async () => {
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-slate-950/20 px-6 py-4 md:px-8">
-            <div className="flex items-center gap-3 text-sm text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border dark:border-white/10 bg-muted/50 dark:bg-slate-950/20 px-6 py-4 md:px-8">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,0.55)]" />
               Ayarlar değişiklikleri hesabınıza anında yansır.
             </div>
@@ -1219,9 +1219,9 @@ const handleForceReset2FA = async () => {
           </Card>
         )}
 
-        <Card className="border-white/10 bg-slate-950/55 shadow-[0_24px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
+        <Card className="border-border dark:border-white/10 bg-card dark:bg-slate-950/55 shadow-md dark:shadow-[0_24px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
           <CardContent className="p-4 md:p-5">
-            <div className="flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-2">
+            <div className="flex gap-2 overflow-x-auto rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-2">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -1229,7 +1229,7 @@ const handleForceReset2FA = async () => {
                   className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
                     currentTab === tab.id
                       ? "bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white shadow-[0_12px_30px_rgba(34,211,238,0.22)]"
-                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                      : "text-muted-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
                   }`}
                 >
                   {tab.icon}
@@ -1244,11 +1244,11 @@ const handleForceReset2FA = async () => {
               {currentTab === "general" && (
                 <div className="space-y-6">
                   {/* Profile Section */}
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                  <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Profil merkezi</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">Profil Bilgileri</h2>
-                      <p className="mt-1 text-sm text-slate-400">Kişisel iletişim ve görev bilgilerinizi ekip görünürlüğü için güncel tutun.</p>
+                      <h2 className="mt-2 text-lg font-semibold text-foreground">Profil Bilgileri</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">Kişisel iletişim ve görev bilgilerinizi ekip görünürlüğü için güncel tutun.</p>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1306,7 +1306,7 @@ const handleForceReset2FA = async () => {
                         <CardContent className="p-4">
                           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div className="flex items-center gap-4">
-                              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-indigo-400/30 bg-slate-950/40">
+                              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-indigo-400/30 bg-muted dark:bg-slate-950/40">
                                 {profileData?.stamp_url ? (
                                   <img src={profileData.stamp_url} alt="Kaşe önizleme" className="h-full w-full object-contain p-2" />
                                 ) : (
@@ -1358,11 +1358,11 @@ const handleForceReset2FA = async () => {
                   {organizationData && (
                     <>
                       <div className="h-px bg-border" />
-                      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                      <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                         <div className="mb-5">
                           <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-300/80">Kurumsal kimlik</p>
-                          <h2 className="mt-2 text-lg font-semibold text-white">Şirket Bilgileri</h2>
-                          <p className="mt-1 text-sm text-slate-400">Fatura, çıktı ve rapor üst bilgileri için kullanılan kurumsal verileri yönetin.</p>
+                          <h2 className="mt-2 text-lg font-semibold text-foreground">Şirket Bilgileri</h2>
+                          <p className="mt-1 text-sm text-muted-foreground">Fatura, çıktı ve rapor üst bilgileri için kullanılan kurumsal verileri yönetin.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -1448,7 +1448,7 @@ const handleForceReset2FA = async () => {
                       <p className={microCardTitleClassName}>{twoFactorEnabled ? "Çok katmanlı koruma açık" : "Ek koruma öneriliyor"}</p>
                       <p className={microCardBodyClassName}>{twoFactorEnabled ? "2FA, güvenilir cihazlar ve oturum yönetimi aktif durumda." : "Google Authenticator kurulumu ile hesabınızı daha güçlü koruyabilirsiniz."}</p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5">
                       <p className={microCardEyebrowClassName}>Aktif görünüm</p>
                       <p className={microCardTitleClassName}>{sessions.length} oturum · {trustedDevices.length} güvenilir cihaz</p>
                       <p className={microCardBodyClassName}>Oturumlarınızı kapatın, güvenilir cihaz listesini güncelleyin ve 2FA akışını tek panelden yönetin.</p>
@@ -1471,25 +1471,25 @@ const handleForceReset2FA = async () => {
                         <Shield className="h-8 w-8 opacity-80" />
                       </div>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <p className={microCardEyebrowClassName}>Önerilen aksiyon</p>
-                      <p className="mt-3 text-lg font-semibold text-white">Güvenlik akışını bir sonraki seviyeye taşıyın</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{securityRecommendedAction}</p>
+                      <p className="mt-3 text-lg font-semibold text-foreground">Güvenlik akışını bir sonraki seviyeye taşıyın</p>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">{securityRecommendedAction}</p>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                        <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                           {twoFactorEnabled ? "2FA aktif" : "2FA kurulmalı"}
                         </Badge>
-                        <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                        <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                           {trustedDevices.length} güvenilir cihaz
                         </Badge>
-                        <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                        <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                           {sessions.length} aktif oturum
                         </Badge>
                       </div>
                     </div>
                   </div>
                   <div className="grid gap-4 xl:grid-cols-[0.78fr_1.22fr]">
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                       <p className={microCardEyebrowClassName}>Güven puanı</p>
                       <div className="mt-4 flex items-center gap-5">
                         <div
@@ -1499,47 +1499,47 @@ const handleForceReset2FA = async () => {
                           }}
                         >
                           <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.12),transparent_62%)] animate-pulse" />
-                          <div className="flex h-[78px] w-[78px] items-center justify-center rounded-full bg-slate-950 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                          <div className="flex h-[78px] w-[78px] items-center justify-center rounded-full bg-background dark:bg-slate-950 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                             <div>
-                              <p className="text-xl font-semibold text-white">{animatedSecurityScore}</p>
-                              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">/100</p>
+                              <p className="text-xl font-semibold text-foreground">{animatedSecurityScore}</p>
+                              <p className="text-[10px] uppercase tracking-[0.22em] text-muted-foreground">/100</p>
                             </div>
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <p className="text-sm font-semibold text-white">Güvenlik görünümü dengesi</p>
-                          <p className="text-sm leading-6 text-slate-300">
+                          <p className="text-sm font-semibold text-foreground">Güvenlik görünümü dengesi</p>
+                          <p className="text-sm leading-6 text-muted-foreground">
                             Güven puanı; 2FA kullanımı, güvenilir cihaz sayısı ve aktif oturum yoğunluğuna göre hesaplanır.
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                            <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                               {twoFactorEnabled ? "2FA katkısı yüksek" : "2FA katkısı yok"}
                             </Badge>
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                            <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                               {trustedDevices.length} cihaz etkisi
                             </Badge>
                           </div>
                         </div>
                       </div>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                       <p className={microCardEyebrowClassName}>Önerilen güvenlik adımları</p>
                       <div className="mt-4 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                          <p className="text-sm font-semibold text-white">2FA</p>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">
+                        <div className="rounded-2xl border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 p-4">
+                          <p className="text-sm font-semibold text-foreground">2FA</p>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
                             {twoFactorEnabled ? "Etkin, yeniden kurulum yedeği hazır tutulmalı." : "Öncelikli olarak kurulmalı."}
                           </p>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                          <p className="text-sm font-semibold text-white">Cihazlar</p>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">
+                        <div className="rounded-2xl border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 p-4">
+                          <p className="text-sm font-semibold text-foreground">Cihazlar</p>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
                             {trustedDevices.length > 3 ? "Eski cihazları temizleyin." : "Cihaz listesi kontrollü görünüyor."}
                           </p>
                         </div>
-                        <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                          <p className="text-sm font-semibold text-white">Oturumlar</p>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">
+                        <div className="rounded-2xl border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 p-4">
+                          <p className="text-sm font-semibold text-foreground">Oturumlar</p>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">
                             {sessions.length > 3 ? "Açık oturumları gözden geçirin." : "Oturum yoğunluğu dengeli."}
                           </p>
                         </div>
@@ -1547,10 +1547,10 @@ const handleForceReset2FA = async () => {
                     </div>
                   </div>
                   {/* Change Password */}
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                  <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Kimlik doğrulama</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">Parola Değiştir</h2>
+                      <h2 className="mt-2 text-lg font-semibold text-foreground">Parola Değiştir</h2>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -1605,10 +1605,10 @@ const handleForceReset2FA = async () => {
                       )}
                     </Button>
                   </div>
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                  <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-emerald-300/80">Oturum güvenliği</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">Güvenilir Cihazlar</h2>
+                      <h2 className="mt-2 text-lg font-semibold text-foreground">Güvenilir Cihazlar</h2>
                     </div>
                     <p className="text-sm text-muted-foreground mb-4">
                       Bu cihazlardan giriş yaparken 2FA kodu sorulmaz
@@ -1621,7 +1621,7 @@ const handleForceReset2FA = async () => {
                         </p>
                       ) : (
                         trustedDevices.map((device) => (
-                          <Card key={device.id} className="border-white/10 bg-slate-950/50">
+                          <Card key={device.id} className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/50">
                             <CardContent className="p-4 flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 {getDeviceIcon(device.device_type)}
@@ -1663,13 +1663,13 @@ const handleForceReset2FA = async () => {
                   <div className="h-px bg-border" />
 
                   {/* 2FA */}
-                  <div className="rounded-[24px] border border-purple-400/15 bg-[linear-gradient(180deg,rgba(88,28,135,0.18),rgba(15,23,42,0.35))] p-5 shadow-[0_20px_60px_rgba(88,28,135,0.15)] md:p-6">
+                  <div className="rounded-[24px] border border-purple-400/15 bg-card dark:bg-[linear-gradient(180deg,rgba(88,28,135,0.18),rgba(15,23,42,0.35))] p-5 shadow-[0_20px_60px_rgba(88,28,135,0.15)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-200/80">İleri koruma</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">İki Faktörlü Doğrulama</h2>
+                      <h2 className="mt-2 text-lg font-semibold text-foreground">İki Faktörlü Doğrulama</h2>
                     </div>
                     
-                    <Card className="border-white/10 bg-slate-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <Card className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/45 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
@@ -1846,7 +1846,7 @@ const handleForceReset2FA = async () => {
 
                   <div className="h-px bg-border" />
                   {/* Active Sessions */}
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                  <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-bold">Aktif Oturumlar</h2>
                       <Button
@@ -1901,7 +1901,7 @@ const handleForceReset2FA = async () => {
                         </p>
                       ) : (
                         sessions.map((session) => (
-                          <Card key={session.id} className="border-white/10 bg-slate-950/50">
+                          <Card key={session.id} className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/50">
                             <CardContent className="p-4 flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 {getDeviceIcon(session.device_type)}
@@ -1956,23 +1956,23 @@ const handleForceReset2FA = async () => {
                             : "Yalnızca temel özellikler açık. Yükseltme veya deneme ile limitleri artırabilirsiniz."}
                       </p>
                     </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5">
                       <p className={microCardEyebrowClassName}>Fatura görünümü</p>
                       <p className={microCardTitleClassName}>{billingHistory.length} kayıt</p>
                       <p className={microCardBodyClassName}>Geçmiş ödeme ve fatura hareketlerini tek merkezden takip edin.</p>
                     </div>
                   </div>
                   <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                    <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                       <div className="mb-5">
                         <p className={microCardEyebrowClassName}>Aylık / yıllık kıyas</p>
-                        <h2 className="mt-2 text-lg font-semibold text-white">Ödeme ritmine göre plan görünümü</h2>
-                        <p className="mt-1 text-sm text-slate-400">Detaylı modül ve limit karşılaştırması yükseltme ekranında gösterilir.</p>
+                        <h2 className="mt-2 text-lg font-semibold text-foreground">Ödeme ritmine göre plan görünümü</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">Detaylı modül ve limit karşılaştırması yükseltme ekranında gösterilir.</p>
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-4 shadow-[0_14px_30px_rgba(217,70,239,0.1)]">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-white">Aylık plan</p>
+                            <p className="text-sm font-semibold text-foreground">Aylık plan</p>
                             <div className="flex items-center gap-2">
                               <Badge className="rounded-full bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
                                 Avantajlı fiyat
@@ -1982,16 +1982,16 @@ const handleForceReset2FA = async () => {
                               </Badge>
                             </div>
                           </div>
-                          <p className="mt-3 text-2xl font-semibold text-white">₺{monthlyPlanPrice.toLocaleString("tr-TR")}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">aylık faturalama</p>
-                          <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                          <p className="mt-3 text-2xl font-semibold text-foreground">₺{monthlyPlanPrice.toLocaleString("tr-TR")}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">aylık faturalama</p>
+                          <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                             <li>İstediğiniz zaman yükseltme veya iptal</li>
                             <li>Stripe portalı üzerinden yönetim</li>
                           </ul>
                         </div>
                         <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 shadow-[0_14px_30px_rgba(34,211,238,0.1)]">
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-white">Yıllık plan</p>
+                            <p className="text-sm font-semibold text-foreground">Yıllık plan</p>
                             <div className="flex items-center gap-2">
                               <Badge className="rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 px-3 py-1 text-white">En avantajlı</Badge>
                               <Badge className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-emerald-100">
@@ -1999,9 +1999,9 @@ const handleForceReset2FA = async () => {
                               </Badge>
                             </div>
                           </div>
-                          <p className="mt-3 text-2xl font-semibold text-white">₺{yearlyPlanPrice.toLocaleString("tr-TR")}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">yıllık tahmini paket</p>
-                          <ul className="mt-4 space-y-2 text-sm text-slate-200">
+                          <p className="mt-3 text-2xl font-semibold text-foreground">₺{yearlyPlanPrice.toLocaleString("tr-TR")}</p>
+                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">yıllık tahmini paket</p>
+                          <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                             <li>Daha öngörülebilir bütçe planlaması</li>
                             <li>Kurumsal ekipler için güçlü süreklilik</li>
                           </ul>
@@ -2009,21 +2009,21 @@ const handleForceReset2FA = async () => {
                       </div>
                     </div>
                     <div className="space-y-4">
-                      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                      <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                         <div className="mb-5">
                           <p className={microCardEyebrowClassName}>Kullanım özeti</p>
-                          <h2 className="mt-2 text-lg font-semibold text-white">Hesabınız şu anda ne kullanıyor?</h2>
+                          <h2 className="mt-2 text-lg font-semibold text-foreground">Hesabınız şu anda ne kullanıyor?</h2>
                         </div>
                         <div className="space-y-3">
                           {usageSummary.map((item) => (
-                            <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                            <div key={item.label} className="rounded-2xl border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 p-4">
                               <div className="flex items-center justify-between gap-4">
                                 <div>
-                                  <p className="text-sm font-medium text-slate-200">{item.label}</p>
-                                  <p className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</p>
+                                  <p className="text-sm font-medium text-foreground">{item.label}</p>
+                                  <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-lg font-semibold text-white">{item.value}</p>
+                                  <p className="text-lg font-semibold text-foreground">{item.value}</p>
                                 </div>
                               </div>
                             </div>
@@ -2031,26 +2031,26 @@ const handleForceReset2FA = async () => {
                         </div>
                       </div>
 
-                      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                      <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                         <div className="mb-5">
                           <p className={microCardEyebrowClassName}>Yükseltme notu</p>
-                          <h2 className="mt-2 text-lg font-semibold text-white">Detaylar yükseltme ekranında</h2>
+                          <h2 className="mt-2 text-lg font-semibold text-foreground">Detaylar yükseltme ekranında</h2>
                         </div>
                         <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/10 p-4">
-                          <p className="text-sm font-semibold text-white">
+                          <p className="text-sm font-semibold text-foreground">
                             {plan === "premium" ? "Premium plan kullanıyorsunuz" : "Yükseltme ekranında tüm farklar listelenir"}
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">
                             Free ve Premium arasındaki modül farkları, AI kotaları, kilitli araçlar ve tüm limitler artık Upgrade modal içinde daha net gösterilir.
                           </p>
                           <div className="mt-4 flex flex-wrap gap-2">
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                            <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                               {enabledFeatureCount}+ aktif avantaj
                             </Badge>
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                            <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                               {billingHistory.length} fatura kaydı
                             </Badge>
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
+                            <Badge className="rounded-full border border-border dark:border-white/10 bg-muted dark:bg-slate-950/50 px-3 py-1 text-foreground">
                               {isOrganizationAdmin ? "Yönetici hesabı" : "Yönetici gerekir"}
                             </Badge>
                           </div>
@@ -2059,7 +2059,7 @@ const handleForceReset2FA = async () => {
                     </div>
                   </div>
                   {/* Current Plan */}
-                  <Card className="border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),rgba(15,23,42,0.18))] shadow-[0_20px_60px_rgba(34,211,238,0.08)]">
+                  <Card className="border border-cyan-400/15 bg-card dark:bg-[linear-gradient(180deg,rgba(34,211,238,0.12),rgba(15,23,42,0.18))] shadow-[0_20px_60px_rgba(34,211,238,0.08)]">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div>
@@ -2102,14 +2102,14 @@ const handleForceReset2FA = async () => {
                   </Card>
 
                   {/* Billing History */}
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                  <div className="rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Finans geçmişi</p>
-                      <h2 className="mt-2 text-lg font-semibold text-white">Fatura Geçmişi</h2>
+                      <h2 className="mt-2 text-lg font-semibold text-foreground">Fatura Geçmişi</h2>
                     </div>
                     <div className="space-y-3">
                       {billingHistory.length === 0 ? (
-                        <Card className="border-white/10 bg-slate-950/50">
+                        <Card className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/50">
                           <CardContent className="p-8 text-center">
                             <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                             <p className="text-sm text-muted-foreground">
@@ -2119,7 +2119,7 @@ const handleForceReset2FA = async () => {
                         </Card>
                       ) : (
                         billingHistory.map((bill) => (
-                          <Card key={bill.id} className="border-white/10 bg-slate-950/50">
+                          <Card key={bill.id} className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/50">
                             <CardContent className="p-4 flex items-center justify-between">
                               <div>
                                 <p className="font-semibold">{bill.plan_name}</p>
@@ -2140,7 +2140,7 @@ const handleForceReset2FA = async () => {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="text-slate-200 hover:bg-white/10 hover:text-white"
+                                    className="text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
                                     onClick={() => window.open(bill.invoice_url!, "_blank", "noopener,noreferrer")}
                                   >
                                     <Download className="h-4 w-4" />
@@ -2158,13 +2158,13 @@ const handleForceReset2FA = async () => {
 
               {/* NOTIFICATIONS TAB */}
               {currentTab === "notifications" && (
-                <div className="space-y-4 rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                <div className="space-y-4 rounded-[24px] border border-border dark:border-white/10 bg-accent dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                   <div className="mb-1">
                     <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Bildirim akışı</p>
-                    <h2 className="mt-2 text-lg font-semibold text-white">Bildirim Tercihleri</h2>
+                    <h2 className="mt-2 text-lg font-semibold text-foreground">Bildirim Tercihleri</h2>
                   </div>
                   {Object.entries(notifications).map(([key, value]) => (
-                    <Card key={key} className="border-white/10 bg-slate-950/50">
+                    <Card key={key} className="border-border dark:border-white/10 bg-muted dark:bg-slate-950/50">
                       <CardContent className="p-4 flex items-center justify-between">
                         <div>
                           <p className="font-semibold">
