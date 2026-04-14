@@ -18,11 +18,9 @@ import {
   Flame,
   Calendar,
   Users,
-  Target,
   Mail,
   Bot,
   ChevronDown,
-  PencilRuler,
   History,
   Award,
   Briefcase,
@@ -78,7 +76,6 @@ interface MenuGroup {
 // ====================================================
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
-  // Badge styles readable on card surface in both themes.
   if (badge === "AI") return "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200";
   if (badge === "Pro") return "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-200";
   if (badge === "Beta") return "border-sky-500/25 bg-sky-500/10 text-sky-800 dark:text-sky-200";
@@ -88,28 +85,26 @@ const badgeClassNames = (badge: MenuItem["badge"]) => {
 };
 
 const cardShell =
-  // This makes the whole sidebar look like a floating card.
   "rounded-[22px] border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[0_18px_55px_-35px_rgba(2,6,23,0.30)] dark:shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]";
 
 const cardInnerGlow =
-  // Subtle premium glow (safe in light/dark)
   "bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.10),_transparent_40%)]";
 
 const sectionLabel =
   "px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
+// ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-[13px] font-medium transition-all duration-200";
+  "group relative flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle =
   "text-foreground/80 hover:bg-muted/50 hover:text-foreground";
 
 const menuItemActive =
-  // Active: pill highlight + subtle border and shadow.
   "border border-primary/20 bg-[linear-gradient(90deg,hsl(var(--primary)/0.16),transparent)] text-foreground shadow-[0_12px_30px_-22px_hsl(var(--primary)/0.55)]";
 
 const iconWrapBase =
-  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all duration-200";
+  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all duration-200";
 
 const iconWrapIdle =
   "border-border/60 bg-background/45 text-muted-foreground group-hover:bg-background group-hover:text-foreground";
@@ -125,7 +120,7 @@ function PillBadge({ value, active }: { value: string | number; active: boolean 
   return (
     <span
       className={cn(
-        "ml-auto rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
+        "ml-auto mt-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
         active ? "border-primary/25 bg-primary/10 text-primary" : badgeClassNames(value),
       )}
     >
@@ -163,6 +158,7 @@ export function AppSidebar() {
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .eq("status", "draft");
+
       if (!error) setDraftMeetingsCount(count || 0);
     } catch (error) {
       console.error("Failed to fetch draft meetings count:", error);
@@ -273,11 +269,6 @@ export function AppSidebar() {
     [draftMeetingsCount],
   );
 
-  const bottomItems: MenuItem[] = useMemo(
-    () => [{ title: "Ayarlar", url: "/settings", icon: Settings, badge: null }],
-    [],
-  );
-
   const isItemActive = (item: MenuItem) => {
     if (item.url === "/") return location.pathname === "/";
     return location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
@@ -285,7 +276,9 @@ export function AppSidebar() {
 
   const toggleSubmenu = (label: string) => {
     if (collapsed) return;
-    setCollapsedSubmenus((prev) => (prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label]));
+    setCollapsedSubmenus((prev) =>
+      prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
+    );
   };
 
   const isSubmenuOpen = (item: MenuItem) => {
@@ -327,26 +320,17 @@ export function AppSidebar() {
   }, [menuGroups, normalizedSearch]);
 
   return (
-   <Sidebar
-        collapsible="icon"
-        style={
-          {
-            "--sidebar-width": "16rem",
-            "--sidebar-width-icon": "4.75rem",
-          } as React.CSSProperties
-        }
-        className={cn(
-          "bg-transparent p-3",
-          "h-dvh" // ✅ viewport yüksekliği
-        )}
-      >
-      <div
-          className={cn(
-            cardShell,
-            cardInnerGlow,
-            "flex h-full min-h-0 flex-col" // ✅ kritik: content scroll için
-          )}
-        >
+    <Sidebar
+      collapsible="icon"
+      style={
+        {
+          "--sidebar-width": "18.5rem", // ✅ daha geniş: başlıklar daha rahat sığar
+          "--sidebar-width-icon": "4.75rem",
+        } as React.CSSProperties
+      }
+      className={cn("bg-transparent p-3", "h-dvh")}
+    >
+      <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col")}>
         {/* HEADER */}
         <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
           <div className="flex items-center justify-between gap-2">
@@ -362,7 +346,7 @@ export function AppSidebar() {
                   <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                     İSGVİZYON
                   </div>
-                  <div className="truncate text-sm font-semibold text-sidebar-foreground">
+                  <div className="text-sm font-semibold text-sidebar-foreground">
                     Premium çalışma alanı
                   </div>
                 </div>
@@ -443,9 +427,19 @@ export function AppSidebar() {
 
                             {!collapsed && (
                               <>
-                                <span className="truncate">{item.title}</span>
+                                {/* ✅ truncate yok: tam görünür (wrap) */}
+                                <span className="min-w-0 flex-1 whitespace-normal leading-5">
+                                  {item.title}
+                                </span>
+
                                 {item.badge && <PillBadge value={item.badge} active={active} />}
-                                <ChevronDown className={cn("ml-1 h-4 w-4 text-muted-foreground transition-transform", submenuOpen && "rotate-180")} />
+
+                                <ChevronDown
+                                  className={cn(
+                                    "ml-1 mt-1 h-4 w-4 text-muted-foreground transition-transform",
+                                    submenuOpen && "rotate-180",
+                                  )}
+                                />
                               </>
                             )}
                           </button>
@@ -460,7 +454,7 @@ export function AppSidebar() {
                                     <NavLink
                                       to={child.url}
                                       className={cn(
-                                        "flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
+                                        "flex items-start gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
                                         "text-foreground/70 hover:bg-muted/45 hover:text-foreground",
                                         childActive && "bg-primary/10 text-foreground",
                                       )}
@@ -468,11 +462,14 @@ export function AppSidebar() {
                                     >
                                       <child.icon
                                         className={cn(
-                                          "h-4 w-4",
+                                          "mt-0.5 h-4 w-4",
                                           childActive ? "text-primary" : "text-muted-foreground",
                                         )}
                                       />
-                                      <span className="truncate">{child.title}</span>
+                                      {/* ✅ truncate yok */}
+                                      <span className="min-w-0 flex-1 whitespace-normal leading-5">
+                                        {child.title}
+                                      </span>
                                       {child.badge && <PillBadge value={child.badge} active={childActive} />}
                                     </NavLink>
                                   </SidebarMenuButton>
@@ -490,7 +487,12 @@ export function AppSidebar() {
                           <NavLink
                             to={item.url}
                             end={item.url === "/"}
-                            className={cn(menuItemBase, "border border-transparent", menuItemIdle, active && menuItemActive)}
+                            className={cn(
+                              menuItemBase,
+                              "border border-transparent",
+                              menuItemIdle,
+                              active && menuItemActive,
+                            )}
                             activeClassName=""
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
@@ -500,9 +502,14 @@ export function AppSidebar() {
 
                             {!collapsed && (
                               <>
-                                <span className="truncate">{item.title}</span>
+                                {/* ✅ truncate yok */}
+                                <span className="min-w-0 flex-1 whitespace-normal leading-5">
+                                  {item.title}
+                                </span>
+
                                 {item.badge && <PillBadge value={item.badge} active={active} />}
-                                <ChevronRight className="ml-auto h-4 w-4 text-muted-foreground/70" />
+
+                                <ChevronRight className="ml-auto mt-1 h-4 w-4 text-muted-foreground/70" />
                               </>
                             )}
                           </NavLink>
@@ -525,10 +532,10 @@ export function AppSidebar() {
                   {user.email ? user.email.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-sidebar-foreground">
+                  <div className="text-sm font-semibold text-sidebar-foreground">
                     {user.email?.split("@")[0]}
                   </div>
-                  <div className="truncate text-[10px] font-medium text-muted-foreground">
+                  <div className="text-[10px] font-medium text-muted-foreground">
                     {user.email}
                   </div>
                 </div>
@@ -537,7 +544,6 @@ export function AppSidebar() {
             </div>
           )}
 
-          {/* Icon dock (card style) */}
           <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-sidebar-border bg-background/45 p-2 shadow-sm">
             <ThemeToggle />
 
@@ -559,10 +565,7 @@ export function AppSidebar() {
             </button>
 
             <button
-              onClick={async () => {
-                await signOut();
-                navigate("/auth");
-              }}
+              onClick={handleSignOut}
               className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
               title="Çıkış yap"
               type="button"
