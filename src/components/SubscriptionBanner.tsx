@@ -198,35 +198,33 @@ export function SubscriptionBanner() {
 
   return (
     <>
-      <div className={`rounded-[24px] border px-4 py-4 shadow-[0_18px_50px_rgba(15,23,42,0.14)] ${copy.accentClassName}`}>
+      <div className={`rounded-[24px] border px-4 py-4 shadow-sm dark:shadow-[0_18px_50px_rgba(15,23,42,0.14)] ${copy.accentClassName}`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/55 text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-card text-foreground dark:bg-slate-950/55 dark:text-white">
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-200/85">{copy.eyebrow}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">{copy.eyebrow}</p>
                 <Badge className={`rounded-full px-3 py-1 ${copy.badgeClassName}`}>
                   {variant === "premium" ? "Aktif" : variant === "trial" ? "Deneme" : "Avantajlı"}
                 </Badge>
               </div>
-              <p className="mt-2 text-lg font-semibold text-white">{copy.title}</p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-200/90">{copy.description}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{copy.title}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{copy.description}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button
               onClick={() => setShowUpgradeModal(true)}
-              className="bg-white text-slate-950 hover:bg-slate-100"
             >
               {copy.cta}
             </Button>
             <Button
               variant="ghost"
               onClick={handleDismiss}
-              className="text-slate-100 hover:bg-white/10 hover:text-white"
             >
               <X className="mr-2 h-4 w-4" />
               Kapat

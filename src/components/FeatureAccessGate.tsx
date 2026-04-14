@@ -43,13 +43,13 @@ export function FeatureAccessGate({
 
   if (loading) {
     return (
-      <div className="rounded-[28px] border border-white/10 bg-white/5 p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="rounded-[28px] border border-border bg-card/50 p-6 shadow-sm">
         <div className="animate-pulse space-y-4">
-          <div className="h-5 w-40 rounded bg-slate-800" />
-          <div className="h-4 w-72 rounded bg-slate-900" />
+          <div className="h-5 w-40 rounded bg-muted" />
+          <div className="h-4 w-72 rounded bg-muted/70" />
           <div className="grid gap-3 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="h-24 rounded-2xl border border-slate-800 bg-slate-900/70" />
+              <div key={index} className="h-24 rounded-2xl border border-border bg-card/70" />
             ))}
           </div>
         </div>
@@ -72,18 +72,18 @@ export function FeatureAccessGate({
               <Badge className="rounded-full bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
                 Premium Özellik
               </Badge>
-              <Badge className="rounded-full border border-white/10 bg-slate-950/55 px-3 py-1 text-slate-200">
+              <Badge className="rounded-full border border-border bg-card px-3 py-1 text-muted-foreground">
                 {plan === "premium" ? "Üyelik güncellemesi gerekiyor" : "Free planda kilitli"}
               </Badge>
             </div>
             <div className="mt-4 flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950/55 text-white">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-card text-foreground dark:bg-slate-950/55 dark:text-white">
                 {status === "trial" && isTrialExpired ? <Sparkles className="h-5 w-5" /> : <LockKeyhole className="h-5 w-5" />}
               </div>
               <div>
-                <h1 className="text-2xl font-semibold text-white">{title}</h1>
-                <p className="mt-2 text-sm leading-6 text-slate-200/90">{description}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
+                <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   {status === "trial" && isTrialExpired
                     ? "Premium denemeniz sona erdi. Aynı ekrandan premium planı yeniden etkinleştirerek bu modülü kullanmaya devam edebilirsiniz."
                     : "Bu ekran premium plana dahil. Upgrade ekranında tüm modül farklarını, AI kotalarını ve limit artışlarını karşılaştırabilirsiniz."}
@@ -92,14 +92,14 @@ export function FeatureAccessGate({
             </div>
           </div>
 
-          <div className="min-w-[280px] rounded-[24px] border border-white/10 bg-slate-950/45 p-5">
+          <div className="min-w-[280px] rounded-[24px] border border-border bg-card p-5 dark:border-white/10 dark:bg-slate-950/45">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white">
                 <Crown className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">Premium ile açılır</p>
-                <p className="text-xs text-slate-400">Bulk CAPA, Blueprint, ISG Bot, OSGB ve daha fazlası</p>
+                <p className="text-sm font-semibold text-foreground">Premium ile açılır</p>
+                <p className="text-xs text-muted-foreground">Bulk CAPA, Blueprint, ISG Bot, OSGB ve daha fazlası</p>
               </div>
             </div>
 
@@ -110,7 +110,7 @@ export function FeatureAccessGate({
               >
                 Premium'u İncele
               </Button>
-              <p className="text-xs leading-5 text-slate-400">
+              <p className="text-xs leading-5 text-muted-foreground">
                 Free ve Premium arasındaki tüm farkları, limitleri ve avantajlı fiyat bilgisini bu ekrandan görebilirsiniz.
               </p>
             </div>
