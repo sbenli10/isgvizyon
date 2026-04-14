@@ -66,7 +66,7 @@ export default function NotificationBell() {
 
       <DropdownMenuContent align="end" className="w-[400px] p-0">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-slate-50 dark:bg-slate-900">
+        <div className="flex items-center justify-between p-4 border-b bg-muted">
           <div>
             <DropdownMenuLabel className="p-0 font-bold text-base">
               Bildirimler
@@ -102,8 +102,8 @@ export default function NotificationBell() {
                 <div
                   key={notification.id}
                   className={cn(
-                    "p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer relative",
-                    !notification.is_read && "bg-blue-50/50 dark:bg-blue-950/20"
+                    "p-4 hover:bg-accent transition-colors cursor-pointer relative",
+                    !notification.is_read && "bg-primary/5"
                   )}
                   onClick={() => handleNotificationClick(notification)}
                 >
