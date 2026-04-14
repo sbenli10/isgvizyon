@@ -25,7 +25,7 @@ export function LandingLayout({
   const activePath = useMemo(() => location.pathname, [location.pathname]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#070b15] text-white">
+    <div className="theme-dark-branded min-h-screen overflow-x-hidden bg-[#070b15] text-white">
       <div className="fixed inset-0 -z-20 bg-[radial-gradient(circle_at_16%_14%,rgba(34,211,238,0.08),transparent_22%),radial-gradient(circle_at_84%_16%,rgba(124,58,237,0.12),transparent_24%),radial-gradient(circle_at_60%_80%,rgba(17,24,39,0.95),transparent_28%),linear-gradient(180deg,#060912_0%,#090d18_45%,#070b14_100%)]" />
       <div className="fixed inset-0 -z-10 opacity-[0.08] [background-image:linear-gradient(rgba(148,163,184,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.6)_1px,transparent_1px)] [background-size:104px_104px]" />
 

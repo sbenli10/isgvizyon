@@ -689,7 +689,7 @@ export default function Auth() {
 
   // ======= RENDER =======
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="theme-dark-branded relative min-h-screen overflow-hidden">
       {/* Ultra background (aurora + grid + noise) */}
       <div className="absolute inset-0 -z-10 bg-[#050816]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.35),transparent_65%),radial-gradient(900px_500px_at_10%_20%,rgba(168,85,247,0.25),transparent_60%),radial-gradient(900px_500px_at_90%_40%,rgba(34,211,238,0.18),transparent_60%)]" />

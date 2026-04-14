@@ -79,26 +79,26 @@ interface MenuGroup {
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
   if (badge === "AI") {
-    return "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-400/25";
+    return "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-400/25";
   }
 
   if (badge === "Pro") {
-    return "bg-amber-500/15 text-amber-300 border-amber-400/25";
+    return "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/25";
   }
 
   if (badge === "Beta") {
-    return "bg-sky-500/15 text-sky-300 border-sky-400/25";
+    return "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-400/25";
   }
 
   if (badge === "NEW") {
-    return "bg-emerald-500/15 text-emerald-300 border-emerald-400/25";
+    return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/25";
   }
 
   if (typeof badge === "number") {
-    return "bg-yellow-500/15 text-yellow-300 border-yellow-400/25";
+    return "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-400/25";
   }
 
-  return "bg-slate-500/15 text-slate-200 border-slate-400/20";
+  return "bg-muted text-muted-foreground border-border";
 };
 
 // ====================================================

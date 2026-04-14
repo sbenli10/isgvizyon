@@ -935,7 +935,7 @@ export default function EvacuationEditor() {
 
   return (
     <>
-      <div className="-mx-4 -my-4 flex h-[calc(100vh-3.8rem)] min-h-0 flex-col overflow-hidden bg-gradient-to-b from-slate-950 via-[#020b22] to-[#04133b] lg:-mx-6 lg:-my-6">
+      <div className="theme-dark-branded -mx-4 -my-4 flex h-[calc(100vh-3.8rem)] min-h-0 flex-col overflow-hidden bg-gradient-to-b from-slate-950 via-[#020b22] to-[#04133b] lg:-mx-6 lg:-my-6">
         <div className="sticky top-0 z-20 border-b border-slate-800/80 bg-[#020b22]/95 px-4 py-3 backdrop-blur-md lg:px-6">
           <div className="mb-2 flex items-center gap-2">
             <Layers3 className="h-6 w-6 text-cyan-400" />

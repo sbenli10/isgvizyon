@@ -52,7 +52,7 @@ function buildBannerCopy(
         description: "Tüm premium modüller şu anda açık. Süre bitmeden planınızı seçerek erişimi kesintisiz sürdürebilirsiniz.",
         cta: "Planı İncele",
         accentClassName: "border-amber-400/25 bg-[linear-gradient(90deg,rgba(245,158,11,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-amber-400/25 bg-amber-400/15 text-amber-50",
+        badgeClassName: "border border-amber-400/25 bg-amber-400/15 text-amber-700 dark:text-amber-50",
         icon: Sparkles,
         trigger: "manual",
       };
@@ -63,7 +63,7 @@ function buildBannerCopy(
         description: `Bulk CAPA, gelişmiş AI araçları ve yüksek limitleri yeniden açmak için Premium plana ${formattedPrice} ile geçebilirsiniz.`,
         cta: "Premium'a Geç",
         accentClassName: "border-rose-400/25 bg-[linear-gradient(90deg,rgba(244,63,94,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-rose-400/25 bg-rose-400/15 text-rose-50",
+        badgeClassName: "border border-rose-400/25 bg-rose-400/15 text-rose-700 dark:text-rose-50",
         icon: Crown,
         trigger: "trial_expired",
       };
@@ -74,7 +74,7 @@ function buildBannerCopy(
         description: "Yüksek AI kotaları, premium modüller ve genişletilmiş limitler şu anda kullanılabilir. Faturalama detaylarını istediğiniz zaman yönetebilirsiniz.",
         cta: "Üyeliği Yönet",
         accentClassName: "border-emerald-400/25 bg-[linear-gradient(90deg,rgba(16,185,129,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-emerald-400/25 bg-emerald-400/15 text-emerald-50",
+        badgeClassName: "border border-emerald-400/25 bg-emerald-400/15 text-emerald-700 dark:text-emerald-50",
         icon: ShieldCheck,
         trigger: "manual",
       };
@@ -85,7 +85,7 @@ function buildBannerCopy(
         description: "Dönem sonrasında premium modülleri kaybetmemek için abonelik ayarlarını gözden geçirmeniz iyi olur.",
         cta: "Aboneliği Yönet",
         accentClassName: "border-orange-400/25 bg-[linear-gradient(90deg,rgba(251,146,60,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-orange-400/25 bg-orange-400/15 text-orange-50",
+        badgeClassName: "border border-orange-400/25 bg-orange-400/15 text-orange-700 dark:text-orange-50",
         icon: Crown,
         trigger: "manual",
       };
@@ -96,7 +96,7 @@ function buildBannerCopy(
         description: "Ödeme alınamadı. Premium erişiminizin kesintiye uğramaması için faturalama bilgilerinizi güncelleyin.",
         cta: "Faturalamayı Yönet",
         accentClassName: "border-rose-400/25 bg-[linear-gradient(90deg,rgba(239,68,68,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-rose-400/25 bg-rose-400/15 text-rose-50",
+        badgeClassName: "border border-rose-400/25 bg-rose-400/15 text-rose-700 dark:text-rose-50",
         icon: Crown,
         trigger: "manual",
       };
@@ -108,7 +108,7 @@ function buildBannerCopy(
         description: "Bulk CAPA, gelişmiş AI araçları, geniş export kapasitesi ve daha yüksek operasyon limitleri tek planda açılır.",
         cta: "Premium'u İncele",
         accentClassName: "border-fuchsia-400/25 bg-[linear-gradient(90deg,rgba(217,70,239,0.16),rgba(15,23,42,0.4))]",
-        badgeClassName: "border border-fuchsia-400/25 bg-fuchsia-400/15 text-fuchsia-50",
+        badgeClassName: "border border-fuchsia-400/25 bg-fuchsia-400/15 text-fuchsia-700 dark:text-fuchsia-50",
         icon: Crown,
         trigger: "manual",
       };
@@ -201,32 +201,32 @@ export function SubscriptionBanner() {
       <div className={`rounded-[24px] border px-4 py-4 shadow-[0_18px_50px_rgba(15,23,42,0.14)] ${copy.accentClassName}`}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/55 text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-card/80 text-foreground">
               <Icon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-xs font-medium uppercase tracking-[0.24em] text-slate-200/85">{copy.eyebrow}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">{copy.eyebrow}</p>
                 <Badge className={`rounded-full px-3 py-1 ${copy.badgeClassName}`}>
                   {variant === "premium" ? "Aktif" : variant === "trial" ? "Deneme" : "Avantajlı"}
                 </Badge>
               </div>
-              <p className="mt-2 text-lg font-semibold text-white">{copy.title}</p>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-200/90">{copy.description}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{copy.title}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{copy.description}</p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 lg:justify-end">
             <Button
               onClick={() => setShowUpgradeModal(true)}
-              className="bg-white text-slate-950 hover:bg-slate-100"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {copy.cta}
             </Button>
             <Button
               variant="ghost"
               onClick={handleDismiss}
-              className="text-slate-100 hover:bg-white/10 hover:text-white"
+              className="text-foreground hover:bg-accent"
             >
               <X className="mr-2 h-4 w-4" />
               Kapat
