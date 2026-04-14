@@ -325,16 +325,16 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] text-white shadow-[0_30px_90px_rgba(8,145,178,0.16)]">
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] text-foreground shadow-[0_30px_90px_rgba(8,145,178,0.16)]">
         <DialogHeader>
-          <DialogTitle className="flex items-start justify-between gap-4 text-left text-2xl font-semibold text-white">
+          <DialogTitle className="flex items-start justify-between gap-4 text-left text-2xl font-semibold text-foreground">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-[0_14px_32px_rgba(34,211,238,0.18)]">
                 <Zap className="h-6 w-6" />
               </div>
               <div>
                 <p>Faturalama ve üyelik yönetimi</p>
-                <p className="mt-2 text-sm font-normal leading-6 text-slate-300">
+                <p className="mt-2 text-sm font-normal leading-6 text-muted-foreground">
                   Free ve Premium planları bütün modüller, limitler ve kilitli araçlar üzerinden karşılaştırın. Kullanıcı burada neyin açıldığını ve ne kadar arttığını net görür.
                 </p>
               </div>
@@ -343,7 +343,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               variant="ghost"
               size="icon"
               onClick={() => onOpenChange(false)}
-              className="text-slate-300 hover:bg-white/10 hover:text-white"
+              className="text-muted-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -382,7 +382,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                     className={`rounded-[28px] border p-6 ${
                       premium
                         ? "border-fuchsia-400/25 bg-[linear-gradient(180deg,rgba(168,85,247,0.14),rgba(15,23,42,0.4))]"
-                        : "border-white/10 bg-white/5"
+                        : "border-border dark:border-white/10 bg-card/50 dark:bg-white/5"
                     }`}
                   >
                     <div className="flex items-center justify-between gap-3">
@@ -397,8 +397,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                           {premium ? <Crown className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
                         </div>
                         <div>
-                          <p className="text-xl font-semibold text-white">{entry.planName}</p>
-                          <p className="text-sm text-slate-300">
+                          <p className="text-xl font-semibold text-foreground">{entry.planName}</p>
+                          <p className="text-sm text-muted-foreground">
                             {entry.description || (premium ? "Kurumsal ekipler ve yüksek hacimli kullanım için." : "Temel kullanım ve kontrollü başlangıç için.")}
                           </p>
                         </div>
@@ -420,8 +420,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                     </div>
 
                     <div className="mt-6">
-                      <p className="text-3xl font-semibold text-white">{formatPrice(displayPrice, entry.currency, entry.billingPeriod)}</p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
+                      <p className="text-3xl font-semibold text-foreground">{formatPrice(displayPrice, entry.currency, entry.billingPeriod)}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
                         {entry.billingPeriod === "yearly" ? "yıllık plan" : "aylık plan"}
                       </p>
                     </div>
@@ -439,14 +439,14 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                           variant="outline"
                           onClick={() => void handleCheckout("yearly")}
                           disabled={loadingAction !== null || !isOrganizationAdmin}
-                          className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                          className="w-full border-border dark:border-white/10 bg-card/50 dark:bg-white/5 text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
                         >
                           {loadingAction === "checkout-yearly" ? "Hazırlanıyor..." : "Premium yıllık satın al"}
                         </Button>
                       </div>
                     ) : (
                       <div className="mt-6">
-                        <Button variant="outline" disabled className="w-full border-white/10 bg-white/5 text-slate-300">
+                        <Button variant="outline" disabled className="w-full border-border dark:border-white/10 bg-card/50 dark:bg-white/5 text-muted-foreground">
                           Free plan çekirdek erişim
                         </Button>
                       </div>
@@ -456,9 +456,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               })}
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Premium ile açılanlar</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">
+            <div className="rounded-[28px] border border-border dark:border-white/10 bg-card/50 dark:bg-white/5 p-5">
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-300/80">Premium ile açılanlar</p>
+              <h3 className="mt-2 text-xl font-semibold text-foreground">
                 {premiumOnlyOrExpanded.length} başlıkta fark var
               </h3>
               <div className="mt-4 space-y-3">
@@ -475,15 +475,15 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-white">{feature.label}</p>
-                            <Badge className="border border-white/10 bg-slate-950/60 px-3 py-1 text-slate-100">
+                            <p className="text-sm font-semibold text-foreground">{feature.label}</p>
+                            <Badge className="border border-border dark:border-white/10 bg-card dark:bg-slate-950/60 px-3 py-1 text-foreground">
                               Free: {formatFeatureValue(Boolean(freeFeature?.isEnabled), freeFeature?.limitValue ?? null, feature.kind)}
                             </Badge>
                             <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
                               Premium: {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
                             </Badge>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">{feature.description}</p>
+                          <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
                         </div>
                       </div>
                     </div>
@@ -492,7 +492,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               </div>
             </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+            <div className="rounded-[28px] border border-border dark:border-white/10 bg-card/50 dark:bg-white/5 p-5">
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-300/80">Hızlı işlemler</p>
               <div className="mt-4 space-y-3">
                 {canStartTrial && (
@@ -510,7 +510,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                     variant="outline"
                     onClick={() => void handlePortal()}
                     disabled={loadingAction !== null || !isOrganizationAdmin}
-                    className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                    className="w-full border-border dark:border-white/10 bg-card/50 dark:bg-white/5 text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
                   >
                     {loadingAction === "portal" ? "Portal açılıyor..." : hasStripeSubscription ? "Stripe portalında aboneliği yönet" : "Faturalama durumunu görüntüle"}
                   </Button>
@@ -520,7 +520,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   variant="outline"
                   onClick={() => void handleBackfill()}
                   disabled={loadingAction !== null || !isOrganizationAdmin}
-                  className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                  className="w-full border-border dark:border-white/10 bg-card/50 dark:bg-white/5 text-foreground hover:bg-accent dark:hover:bg-white/10 hover:text-foreground"
                 >
                   {loadingAction === "backfill" ? "Senkronize ediliyor..." : "Mevcut kayıtları limit sayaçlarına eşitle"}
                 </Button>
@@ -529,12 +529,12 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
             <div className="rounded-[28px] border border-cyan-400/15 bg-cyan-400/10 p-5">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950/60 text-cyan-300">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-card dark:bg-slate-950/60 text-cyan-700 dark:text-cyan-300">
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">Abonelik özeti</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">
+                  <p className="text-sm font-semibold text-foreground">Abonelik özeti</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">
                     {status === "trial"
                       ? `${daysLeftInTrial} gün daha tüm premium modülleri deneyebilirsiniz.`
                       : plan === "premium"
@@ -548,21 +548,21 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+          <div className="rounded-[28px] border border-border dark:border-white/10 bg-card/50 dark:bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
             <div className="mb-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Detaylı karşılaştırma</p>
-              <h2 className="mt-2 text-lg font-semibold text-white">Hangi ekranda ne açılıyor, hangi limit ne kadar artıyor?</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-300/80">Detaylı karşılaştırma</p>
+              <h2 className="mt-2 text-lg font-semibold text-foreground">Hangi ekranda ne açılıyor, hangi limit ne kadar artıyor?</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
                 Her satırda Free ve Premium değerlerini birlikte görürsünüz. Son sütun, mevcut hesabınızda özelliğin açık mı kilitli mi olduğunu gösterir.
               </p>
             </div>
 
             <div className="space-y-5">
               {groupedFeatures.map((group) => (
-                <div key={group.category} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                <div key={group.category} className="rounded-2xl border border-border dark:border-white/10 bg-card dark:bg-slate-950/50 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">{group.category}</p>
-                    <Badge className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">
+                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-foreground">{group.category}</p>
+                    <Badge className="rounded-full border border-border dark:border-white/10 bg-card/50 dark:bg-white/5 px-3 py-1 text-foreground">
                       {group.items.length} kalem
                     </Badge>
                   </div>
@@ -577,28 +577,28 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                       return (
                         <div
                           key={feature.key}
-                          className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:grid-cols-[1.5fr_0.55fr_0.55fr_0.48fr] lg:items-center"
+                          className="grid gap-3 rounded-2xl border border-border dark:border-white/10 bg-card dark:bg-slate-950/70 p-4 lg:grid-cols-[1.5fr_0.55fr_0.55fr_0.48fr] lg:items-center"
                         >
                           <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-slate-200">
+                            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-card/50 dark:bg-white/5 text-foreground">
                               <Icon className="h-5 w-5" />
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-white">{feature.label}</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-400">{feature.description}</p>
+                              <p className="text-sm font-semibold text-foreground">{feature.label}</p>
+                              <p className="mt-1 text-xs leading-5 text-muted-foreground">{feature.description}</p>
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Free</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-100">
+                          <div className="rounded-2xl border border-border dark:border-white/10 bg-card/50 dark:bg-white/5 px-3 py-3">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Free</p>
+                            <p className="mt-2 text-sm font-semibold text-foreground">
                               {formatFeatureValue(Boolean(freeFeature?.isEnabled), freeFeature?.limitValue ?? null, feature.kind)}
                             </p>
                           </div>
 
                           <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-3">
                             <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-200/70">Premium</p>
-                            <p className="mt-2 text-sm font-semibold text-white">
+                            <p className="mt-2 text-sm font-semibold text-foreground">
                               {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
                             </p>
                           </div>

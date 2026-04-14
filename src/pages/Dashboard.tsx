@@ -522,7 +522,7 @@ export default function Dashboard() {
         {priorityActions.map((action, index) => (
           <div
             key={action.title}
-            className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)] transition-transform duration-300 hover:-translate-y-0.5 ${action.tone}`}
+            className={`rounded-2xl border p-4 shadow-md dark:shadow-[0_10px_30px_rgba(2,6,23,0.18)] transition-transform duration-300 hover:-translate-y-0.5 ${action.tone}`}
             style={{ animationDelay: `${index * 80}ms` }}
           >
             <div className="flex items-center justify-between">
@@ -544,12 +544,12 @@ export default function Dashboard() {
               className="glass-card space-y-3 border border-primary/10 p-5"
             >
               <div className="flex items-center justify-between">
-                <div className="h-3 w-24 animate-pulse rounded bg-slate-800" />
-                <div className="h-10 w-10 animate-pulse rounded-lg bg-slate-800" />
+                <div className="h-3 w-24 animate-pulse rounded bg-muted" />
+                <div className="h-10 w-10 animate-pulse rounded-lg bg-muted" />
               </div>
               <div className="space-y-2">
-                <div className="h-8 w-16 animate-pulse rounded bg-slate-800" />
-                <div className="h-3 w-28 animate-pulse rounded bg-slate-900" />
+                <div className="h-8 w-16 animate-pulse rounded bg-muted" />
+                <div className="h-3 w-28 animate-pulse rounded bg-muted" />
               </div>
             </div>
           ))
@@ -557,26 +557,26 @@ export default function Dashboard() {
           metrics.map((metric, idx) => (
             <div
               key={idx}
-              className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(8,12,22,0.96))] p-5 transition-all hover:-translate-y-0.5 hover:border-cyan-400/20"
+              className="group relative overflow-hidden rounded-[24px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(8,12,22,0.96))] p-5 transition-all hover:-translate-y-0.5 hover:border-cyan-400/20"
             >
               <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{metric.title}</p>
-                  <p className="text-sm text-slate-300">{metric.subtitle}</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{metric.title}</p>
+                  <p className="text-sm text-foreground/90">{metric.subtitle}</p>
                 </div>
                 <div className={`rounded-2xl bg-gradient-to-br p-3 text-white shadow-lg ${metric.color}`}>
                   {metric.icon}
                 </div>
               </div>
               <div className="mt-6 space-y-2">
-                <p className="text-4xl font-semibold tracking-tight text-white">
+                <p className="text-4xl font-semibold tracking-tight text-foreground">
                   <AnimatedNumber value={metric.value} />
                 </p>
-                <p className="text-sm text-slate-300">{metric.insight}</p>
+                <p className="text-sm text-foreground/90">{metric.insight}</p>
               </div>
               <div className="mt-5 h-px bg-gradient-to-r from-white/0 via-white/10 to-white/0" />
-              <div className="mt-4 flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Durum sinyali</span>
                 <span>{metric.value > 0 ? "Canlı" : "Beklemede"}</span>
               </div>
@@ -589,66 +589,66 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.12fr_0.88fr]">
         <RevealBlock delay={180} className="space-y-6">
           <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-6">
+            <div className="rounded-[28px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-6">
               <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-200/70">Control Thesis</p>
-              <h3 className="mt-3 text-[1.7rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white">
+              <h3 className="mt-3 text-[1.7rem] font-semibold leading-[1.05] tracking-[-0.04em] text-foreground">
                 Güvenlik operasyonu şu an hangi baskıyla yönetiliyor?
               </h3>
-              <p className="mt-4 text-sm leading-7 text-slate-300">
+              <p className="mt-4 text-sm leading-7 text-foreground/90">
                 Panelin merkezinde üç sinyal var: kritik riskin payı, kapanış bekleyen aksiyon yükü ve sahadaki denetim ritmi.
                 Bu üçlü birlikte okunduğunda yöneticinin gerçekten müdahale etmesi gereken tablo ortaya çıkıyor.
               </p>
             </div>
             <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[26px] border border-white/10 bg-white/[0.035] p-5">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Risk Hacmi</p>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
+              <div className="rounded-[26px] border border-border dark:border-white/10 bg-accent dark:bg-white/[0.035] p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Risk Hacmi</p>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-foreground">
                   <AnimatedNumber value={totalRiskVolume} />
                 </p>
-                <p className="mt-2 text-sm text-slate-300">Toplam sınıflandırılmış risk kaydı</p>
+                <p className="mt-2 text-sm text-foreground/90">Toplam sınıflandırılmış risk kaydı</p>
               </div>
-              <div className="rounded-[26px] border border-white/10 bg-white/[0.035] p-5">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Baskın Seviye</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+              <div className="rounded-[26px] border border-border dark:border-white/10 bg-accent dark:bg-white/[0.035] p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Baskın Seviye</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-foreground">
                   {dominantRisk?.name ?? "Veri yok"}
                 </p>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-sm text-foreground/90">
                   {dominantRisk ? `${dominantRisk.value} kayıt ile en yoğun alan` : "Risk dağılımı oluşmadı"}
                 </p>
               </div>
-              <div className="rounded-[26px] border border-white/10 bg-white/[0.035] p-5">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Ritim Farkı</p>
-                <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
+              <div className="rounded-[26px] border border-border dark:border-white/10 bg-accent dark:bg-white/[0.035] p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Ritim Farkı</p>
+                <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-foreground">
                   {momentumDelta > 0 ? "+" : ""}
                   <AnimatedNumber value={Math.abs(momentumDelta)} />
                 </p>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-sm text-foreground/90">
                   {momentumDelta === 0 ? "Son iki ay aynı ritimde" : momentumDelta > 0 ? "Son ay yukarı yönlü" : "Son ay aşağı yönlü"}
                 </p>
               </div>
             </div>
           </section>
 
-          <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(18,24,41,0.92))] p-6 md:p-7">
+          <StorySurface className="rounded-[30px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(18,24,41,0.92))] p-6 md:p-7">
             <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
             <div className="relative grid gap-6 lg:grid-cols-[0.42fr_0.58fr]">
               <div className="space-y-5">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Risk Story Panel</p>
-                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-white">Risk haritası hangi seviyede yoğunlaşıyor?</h3>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">
+                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-foreground">Risk haritası hangi seviyede yoğunlaşıyor?</h3>
+                  <p className="mt-3 text-sm leading-6 text-foreground/90">
                     Grafik burada tek başına bir kart değil. Portföyün hangi yoğunlukta risk ürettiğini, hangi
                     seviyenin baskın olduğunu ve müdahale tonunu birlikte anlatan bir hikâye paneli.
                   </p>
                 </div>
                 <div className="grid gap-3">
                   {riskDistribution.slice(0, 4).map((item) => (
-                    <div key={item.name} className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
+                    <div key={item.name} className="rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/[0.04] p-4">
                       <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-white">{item.name}</p>
-                        <span className="text-sm text-slate-300">{item.value}</span>
+                        <p className="text-sm font-medium text-foreground">{item.name}</p>
+                        <span className="text-sm text-foreground/90">{item.value}</span>
                       </div>
-                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-accent dark:bg-white/10">
                         <div
                           className="h-full rounded-full"
                           style={{
@@ -662,9 +662,9 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
+              <div className="rounded-[26px] border border-border dark:border-white/10 bg-muted/50 dark:bg-black/20 p-4">
                 {loading ? (
-                  <div className="h-[340px] animate-pulse rounded-2xl bg-slate-900/70" />
+                  <div className="h-[340px] animate-pulse rounded-2xl bg-muted" />
                 ) : riskDistribution.length > 0 ? (
                   <ResponsiveContainer width="100%" height={340}>
                     <PieChart>
@@ -697,48 +697,48 @@ export default function Dashboard() {
             </div>
           </StorySurface>
 
-          <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(20,26,44,0.92))] p-6 md:p-7">
+          <StorySurface className="rounded-[30px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(20,26,44,0.92))] p-6 md:p-7">
             <div className="absolute left-0 top-10 h-32 w-32 rounded-full bg-blue-500/10 blur-3xl" />
             <div className="relative">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Field Story</p>
-                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-white">Sahadan son gelen hareketler</h3>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-foreground">Sahadan son gelen hareketler</h3>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-foreground/90">
                     Bu alan son denetimleri sadece listelemez; kritik yoğunluğu ve tamamlanma durumunu yöneticinin
                     tarayabileceği hızlı bir akış halinde gösterir.
                   </p>
                 </div>
-                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                <Badge variant="outline" className="border-border dark:border-white/10 bg-accent dark:bg-white/5 text-foreground">
                   {recentInspections.length} kayıt
                 </Badge>
               </div>
 
-              <div className="relative ml-2 space-y-3 border-l border-white/10 pl-5">
+              <div className="relative ml-2 space-y-3 border-l border-border dark:border-white/10 pl-5">
                 {loading ? (
                   Array.from({ length: 4 }).map((_, idx) => (
                     <div key={idx} className="rounded-2xl border border-border/40 bg-secondary/30 p-4">
-                      <div className="mb-2 h-4 w-52 animate-pulse rounded bg-slate-800" />
-                      <div className="h-3 w-36 animate-pulse rounded bg-slate-900" />
+                      <div className="mb-2 h-4 w-52 animate-pulse rounded bg-muted" />
+                      <div className="h-3 w-36 animate-pulse rounded bg-muted" />
                     </div>
                   ))
                 ) : recentInspections.length > 0 ? (
                   recentInspections.map((inspection, index) => (
                     <div
                       key={inspection.id}
-                      className="relative grid gap-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4 transition-all hover:border-cyan-400/20 hover:bg-white/[0.05] md:grid-cols-[1fr_auto]"
+                      className="relative grid gap-4 rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/[0.03] p-4 transition-all hover:border-cyan-400/20 hover:bg-accent dark:hover:bg-white/[0.05] md:grid-cols-[1fr_auto]"
                     >
-                      <div className="absolute -left-[30px] top-6 flex h-4 w-4 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950">
+                      <div className="absolute -left-[30px] top-6 flex h-4 w-4 items-center justify-center rounded-full border border-cyan-400/30 bg-muted">
                         <div className={`h-2 w-2 rounded-full ${inspection.risk_level === "critical" ? "bg-red-400" : inspection.risk_level === "high" ? "bg-orange-400" : "bg-cyan-400"}`} />
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
-                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">#{String(index + 1).padStart(2, "0")}</p>
-                          <p className="truncate text-sm font-medium text-white">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">#{String(index + 1).padStart(2, "0")}</p>
+                          <p className="truncate text-sm font-medium text-foreground">
                             {inspection.location_name || "İsimsiz Lokasyon"}
                           </p>
                         </div>
-                        <p className="mt-2 text-xs text-slate-400">
+                        <p className="mt-2 text-xs text-muted-foreground">
                           {new Date(inspection.created_at).toLocaleDateString("tr-TR", {
                             day: "numeric",
                             month: "long",
@@ -747,7 +747,7 @@ export default function Dashboard() {
                             minute: "2-digit",
                           })}
                         </p>
-                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-slate-500">Saha Günlüğü</p>
+                        <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Saha Günlüğü</p>
                       </div>
                       <div className="flex flex-col items-start gap-2 md:items-end">
                         <div className="flex items-center gap-2 md:justify-end">
@@ -758,7 +758,7 @@ export default function Dashboard() {
                             {getStatusLabel(inspection.status)}
                           </Badge>
                         </div>
-                        <p className="text-xs text-slate-500">Denetim akışındaki son kayıt</p>
+                        <p className="text-xs text-muted-foreground">Denetim akışındaki son kayıt</p>
                       </div>
                     </div>
                   ))
@@ -778,29 +778,29 @@ export default function Dashboard() {
 
         <RevealBlock delay={240} className="space-y-6">
           <section className="grid gap-4 md:grid-cols-[0.74fr_1.26fr]">
-            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,16,29,0.96),rgba(8,12,22,0.98))] p-6">
+            <div className="rounded-[28px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(180deg,rgba(12,16,29,0.96),rgba(8,12,22,0.98))] p-6">
               <p className="text-[11px] uppercase tracking-[0.32em] text-cyan-200/70">Narrative Cue</p>
-              <h3 className="mt-3 text-[1.7rem] font-semibold leading-[1.05] tracking-[-0.04em] text-white">
+              <h3 className="mt-3 text-[1.7rem] font-semibold leading-[1.05] tracking-[-0.04em] text-foreground">
                 Rapor değil, okuma sırası olan bir yönetim yüzeyi
               </h3>
-              <p className="mt-4 text-sm leading-7 text-slate-300">
+              <p className="mt-4 text-sm leading-7 text-foreground/90">
                 Sağ blok trendin yönünü, alttaki bildirim odası ise o yönü bozan gerçek zamanlı sinyalleri gösterir.
                 Böylece yönetici önce eğilimi, sonra kesintiyi okur.
               </p>
             </div>
-            <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(135deg,rgba(34,211,238,0.08),rgba(99,102,241,0.08),rgba(15,23,42,0.85))] p-6">
+            <div className="rounded-[28px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(34,211,238,0.08),rgba(99,102,241,0.08),rgba(15,23,42,0.85))] p-6">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Son Ay</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">{latestTrend}</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Son Ay</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{latestTrend}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Önceki Ay</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-white">{previousTrend}</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Önceki Ay</p>
+                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-foreground">{previousTrend}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Yorum</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Yorum</p>
+                  <p className="mt-2 text-sm leading-6 text-foreground">
                     {momentumDelta > 0
                       ? "Denetim temposu toparlanıyor."
                       : momentumDelta < 0
@@ -812,36 +812,36 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
+          <StorySurface className="rounded-[30px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
             <div className="absolute bottom-0 right-0 h-40 w-40 rounded-full bg-indigo-500/10 blur-3xl" />
             <div className="relative space-y-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Momentum Story</p>
-                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-white">Denetim ritmi nasıl değişiyor?</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-foreground">Denetim ritmi nasıl değişiyor?</h3>
+                  <p className="mt-2 text-sm leading-6 text-foreground/90">
                     Son altı ayın hareketini, ani düşüş veya yükselişleri daha sinematik bir yüzeyde gösteren trend
                     paneli. Yöneticiye sayıdan çok yön hissi verir.
                   </p>
                 </div>
-                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                <Badge variant="outline" className="border-border dark:border-white/10 bg-accent dark:bg-white/5 text-foreground">
                   6 aylık görünüm
                 </Badge>
               </div>
 
               <div className="grid gap-4 md:grid-cols-3">
                 {monthlyTrend.map((item) => (
-                  <div key={item.month} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">{item.month}</p>
-                    <p className="mt-2 text-2xl font-semibold text-white">{item.denetimler}</p>
-                    <p className="mt-1 text-xs text-slate-400">Tamamlanan denetim</p>
+                  <div key={item.month} className="rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/[0.03] p-4">
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.month}</p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">{item.denetimler}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Tamamlanan denetim</p>
                   </div>
                 ))}
               </div>
 
-              <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
+              <div className="rounded-[26px] border border-border dark:border-white/10 bg-muted/50 dark:bg-black/20 p-4">
                 {loading ? (
-                  <div className="h-[320px] animate-pulse rounded-2xl bg-slate-900/70" />
+                  <div className="h-[320px] animate-pulse rounded-2xl bg-muted" />
                 ) : monthlyTrend.some((m) => m.denetimler > 0) ? (
                   <ResponsiveContainer width="100%" height={320}>
                     <AreaChart data={monthlyTrend}>
@@ -884,21 +884,21 @@ export default function Dashboard() {
             </div>
           </StorySurface>
 
-          <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
+          <StorySurface className="rounded-[30px] border border-border dark:border-white/10 bg-card dark:bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
             <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Signal Room</p>
-                <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-white">Canlı bildirim odası</h3>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                <h3 className="mt-3 text-[1.95rem] font-semibold leading-[1.04] tracking-[-0.045em] text-foreground">Canlı bildirim odası</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-foreground/90">
                   Operasyon akışını kesen uyarılar, hatırlatmalar ve işlem çağrıları bu bölümde odaklı biçimde toplanır.
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-right">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Kontrol modu</p>
-                <p className="mt-2 text-sm font-medium text-white">Gerçek zamanlı bildirim akışı</p>
+              <div className="rounded-2xl border border-border dark:border-white/10 bg-accent dark:bg-white/[0.04] px-4 py-3 text-right">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Kontrol modu</p>
+                <p className="mt-2 text-sm font-medium text-foreground">Gerçek zamanlı bildirim akışı</p>
               </div>
             </div>
-            <div className="rounded-[24px] border border-white/8 bg-black/20">
+            <div className="rounded-[24px] border border-border dark:border-white/10 bg-muted/50 dark:bg-black/20">
               <NotificationWidget />
             </div>
           </StorySurface>

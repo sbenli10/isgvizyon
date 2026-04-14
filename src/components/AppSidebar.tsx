@@ -79,26 +79,26 @@ interface MenuGroup {
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
   if (badge === "AI") {
-    return "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-400/25";
+    return "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200 dark:bg-fuchsia-500/15 dark:text-fuchsia-300 dark:border-fuchsia-400/25";
   }
 
   if (badge === "Pro") {
-    return "bg-amber-500/15 text-amber-300 border-amber-400/25";
+    return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/25";
   }
 
   if (badge === "Beta") {
-    return "bg-sky-500/15 text-sky-300 border-sky-400/25";
+    return "bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-400/25";
   }
 
   if (badge === "NEW") {
-    return "bg-emerald-500/15 text-emerald-300 border-emerald-400/25";
+    return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-400/25";
   }
 
   if (typeof badge === "number") {
-    return "bg-yellow-500/15 text-yellow-300 border-yellow-400/25";
+    return "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-500/15 dark:text-yellow-300 dark:border-yellow-400/25";
   }
 
-  return "bg-slate-500/15 text-slate-200 border-slate-400/20";
+  return "bg-muted text-foreground border-border";
 };
 
 // ====================================================
@@ -503,7 +503,7 @@ export function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 shadow-[0_10px_30px_-20px_rgba(99,102,241,0.8)] backdrop-blur">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sidebar-border bg-sidebar-accent/50 shadow-sm dark:border-white/10 dark:bg-white/5 dark:shadow-[0_10px_30px_-20px_rgba(99,102,241,0.8)] backdrop-blur">
               <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-cyan-400 text-white shadow-sm">
                 <Shield className="h-4 w-4" />
               </div>
@@ -521,7 +521,7 @@ export function AppSidebar() {
           </div>
           <button
             onClick={toggleSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-sidebar-foreground/70 transition hover:border-primary/25 hover:bg-white/10 hover:text-sidebar-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent/50 text-sidebar-foreground/70 transition hover:border-primary/25 hover:bg-sidebar-accent hover:text-sidebar-foreground dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
             title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -535,7 +535,7 @@ export function AppSidebar() {
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Menüde ara..."
-              className="h-10 rounded-2xl border-white/10 bg-white/5 pl-9 text-sm text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/40 focus-visible:ring-primary/30"
+              className="h-10 rounded-2xl border-sidebar-border bg-sidebar-accent/50 pl-9 text-sm text-sidebar-foreground shadow-none placeholder:text-sidebar-foreground/40 focus-visible:ring-primary/30 dark:border-white/10 dark:bg-white/5"
             />
           </div>
         )}
@@ -544,8 +544,8 @@ export function AppSidebar() {
       {/* MAIN CONTENT */}
       <SidebarContent className="overflow-y-auto px-2 py-3 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
         {!collapsed && (
-          <div className="mb-3 rounded-2xl border border-white/10 bg-gradient-to-r from-violet-500/12 via-fuchsia-500/10 to-cyan-500/12 p-3 text-sidebar-foreground shadow-[0_18px_40px_-28px_rgba(99,102,241,0.9)]">
-            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-fuchsia-300">
+          <div className="mb-3 rounded-2xl border border-sidebar-border bg-gradient-to-r from-violet-500/12 via-fuchsia-500/10 to-cyan-500/12 p-3 text-sidebar-foreground shadow-sm dark:border-white/10 dark:shadow-[0_18px_40px_-28px_rgba(99,102,241,0.9)]">
+            <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-fuchsia-600 dark:text-fuchsia-300">
               <Sparkles className="h-3.5 w-3.5" />
               Sık kullanılanlar
             </div>
@@ -561,7 +561,7 @@ export function AppSidebar() {
             <button
               onClick={() => toggleGroup(group.label)}
               className={`flex w-full items-center justify-between rounded-xl px-2 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-sidebar-foreground/45 transition-all ${
-                !collapsed ? "hover:bg-white/5 hover:text-sidebar-foreground/75" : ""
+                !collapsed ? "hover:bg-sidebar-accent hover:text-sidebar-foreground/75 dark:hover:bg-white/5" : ""
               }`}
               disabled={collapsed}
             >
@@ -598,16 +598,16 @@ export function AppSidebar() {
                               type="button"
                               onClick={() => toggleSubmenu(item.title)}
                               className={cn(
-                                "group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-white/10 hover:bg-white/6 hover:text-sidebar-foreground",
+                                "group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:border-white/10 dark:hover:bg-white/6",
                                 isItemActive(item) &&
                                   "border-violet-400/20 bg-[linear-gradient(90deg,rgba(111,66,255,0.95),rgba(132,76,255,0.92),rgba(72,116,255,0.9))] text-white shadow-[0_16px_36px_-22px_rgba(109,61,248,0.95)]",
                               )}
                             >
-                              <div className={cn("absolute inset-y-1 left-0 w-1 rounded-r-full bg-white/80 opacity-0 transition-opacity", isItemActive(item) && "opacity-100")} />
+                              <div className={cn("absolute inset-y-1 left-0 w-1 rounded-r-full bg-primary opacity-0 transition-opacity dark:bg-white/80", isItemActive(item) && "opacity-100")} />
                               <div
                                 className={cn(
-                                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/6 text-violet-300 transition-all duration-200 group-hover:border-white/14 group-hover:bg-white/10",
-                                  isItemActive(item) && "border-white/20 bg-white/10 text-white",
+                                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent/50 text-violet-600 transition-all duration-200 group-hover:border-sidebar-border group-hover:bg-sidebar-accent dark:border-white/8 dark:bg-white/6 dark:text-violet-300 dark:group-hover:border-white/14 dark:group-hover:bg-white/10",
+                                  isItemActive(item) && "border-white/20 bg-white/10 text-white dark:border-white/20 dark:bg-white/10 dark:text-white",
                                 )}
                               >
                                 <item.icon className="h-[16px] w-[16px] shrink-0 transition-transform group-hover:scale-110" />
@@ -634,15 +634,15 @@ export function AppSidebar() {
                             </button>
 
                             {!collapsed && submenuOpen ? (
-                              <div className="ml-5 space-y-1 border-l border-white/10 pl-4">
+                              <div className="ml-5 space-y-1 border-l border-sidebar-border pl-4 dark:border-white/10">
                                 {item.children?.map((child) => (
                                   <SidebarMenuButton key={child.url} asChild tooltip={child.title}>
                                     <NavLink
                                       to={child.url}
-                                      className="group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-sidebar-foreground/68 transition-all duration-200 hover:bg-white/6 hover:text-sidebar-foreground"
-                                      activeClassName="border border-violet-400/20 bg-violet-500/10 text-violet-200"
+                                      className="group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-sidebar-foreground/68 transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:bg-white/6"
+                                      activeClassName="border border-violet-400/20 bg-violet-500/10 text-violet-700 dark:text-violet-200"
                                     >
-                                      <child.icon className="h-4 w-4 shrink-0 text-violet-300" />
+                                      <child.icon className="h-4 w-4 shrink-0 text-violet-600 dark:text-violet-300" />
                                       <span className="flex-1 truncate">{child.title}</span>
                                       {child.badge && (
                                         <span className={`rounded-full border px-2 py-0.5 text-[8px] font-black uppercase tracking-wider ${badgeClassNames(child.badge)}`}>
@@ -660,12 +660,12 @@ export function AppSidebar() {
                             <NavLink
                               to={item.url}
                               end={item.url === "/"}
-                              className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-white/10 hover:bg-white/6 hover:text-sidebar-foreground"
+                              className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:border-white/10 dark:hover:bg-white/6"
                               activeClassName="border-violet-400/20 bg-[linear-gradient(90deg,rgba(111,66,255,0.95),rgba(132,76,255,0.92),rgba(72,116,255,0.9))] text-white font-semibold shadow-[0_16px_36px_-22px_rgba(109,61,248,0.95)]"
                             >
-                              <div className="absolute inset-y-1 left-0 w-1 rounded-r-full bg-white/80 opacity-0 transition-opacity group-[.active]:opacity-100" />
+                              <div className="absolute inset-y-1 left-0 w-1 rounded-r-full bg-primary opacity-0 transition-opacity group-[.active]:opacity-100 dark:bg-white/80" />
 
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/6 text-violet-300 transition-all duration-200 group-hover:border-white/14 group-hover:bg-white/10 group-[.active]:border-white/20 group-[.active]:bg-white/10 group-[.active]:text-white">
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent/50 text-violet-600 transition-all duration-200 group-hover:border-sidebar-border group-hover:bg-sidebar-accent group-[.active]:border-white/20 group-[.active]:bg-white/10 group-[.active]:text-white dark:border-white/8 dark:bg-white/6 dark:text-violet-300 dark:group-hover:border-white/14 dark:group-hover:bg-white/10 dark:group-[.active]:border-white/20 dark:group-[.active]:bg-white/10 dark:group-[.active]:text-white">
                                 <item.icon className="h-[16px] w-[16px] shrink-0 transition-transform group-hover:scale-110" />
                               </div>
 
@@ -700,7 +700,7 @@ export function AppSidebar() {
         ))}
 
         {/* SEPARATOR */}
-        <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div className="mx-2 my-4 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent dark:via-white/10" />
 
         {/* TOOLS SECTION */}
         <SidebarGroup className="gap-2">
@@ -714,10 +714,10 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild tooltip={item.title}>
                     <NavLink
                       to={item.url}
-                      className="group relative flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-white/10 hover:bg-white/6 hover:text-sidebar-foreground"
+                      className="group relative flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/78 transition-all duration-200 hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:border-white/10 dark:hover:bg-white/6"
                       activeClassName="border-violet-400/20 bg-[linear-gradient(90deg,rgba(111,66,255,0.95),rgba(132,76,255,0.92),rgba(72,116,255,0.9))] text-white font-semibold shadow-[0_16px_36px_-22px_rgba(109,61,248,0.95)]"
                     >
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/8 bg-white/6 text-violet-300 transition-all duration-200 group-hover:border-white/14 group-hover:bg-white/10 group-[.active]:border-white/20 group-[.active]:bg-white/10 group-[.active]:text-white">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent/50 text-violet-600 transition-all duration-200 group-hover:border-sidebar-border group-hover:bg-sidebar-accent group-[.active]:border-white/20 group-[.active]:bg-white/10 group-[.active]:text-white dark:border-white/8 dark:bg-white/6 dark:text-violet-300 dark:group-hover:border-white/14 dark:group-hover:bg-white/10 dark:group-[.active]:border-white/20 dark:group-[.active]:bg-white/10 dark:group-[.active]:text-white">
                         <item.icon className="h-[16px] w-[16px] shrink-0 transition-transform group-hover:scale-110" />
                       </div>
                       {!collapsed && (
@@ -738,7 +738,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-3">
         {/* USER INFO PROFILE CARD */}
         {!collapsed && user && (
-          <div className="group cursor-pointer rounded-2xl border border-white/10 bg-white/5 p-3 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.95)] backdrop-blur transition-all hover:border-primary/20">
+          <div className="group cursor-pointer rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-3 shadow-sm backdrop-blur transition-all hover:border-primary/20 dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_40px_-30px_rgba(15,23,42,0.95)]">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-blue-500 text-sm font-bold text-white shadow-sm transition-shadow">
                 {user.email ? user.email.charAt(0).toUpperCase() : "U"}
@@ -759,10 +759,10 @@ export function AppSidebar() {
         )}
 
         {/* BOTTOM CONTROLS */}
-        <div className="flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_18px_40px_-30px_rgba(15,23,42,0.95)] backdrop-blur">
+        <div className="flex items-center justify-between gap-2 rounded-2xl border border-sidebar-border bg-sidebar-accent/50 p-2 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/5 dark:shadow-[0_18px_40px_-30px_rgba(15,23,42,0.95)]">
           <ThemeToggle />
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-sidebar-foreground/70 transition hover:bg-white/8 hover:text-sidebar-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:bg-white/8"
             title="Yardım"
             type="button"
           >
@@ -770,7 +770,7 @@ export function AppSidebar() {
           </button>
           <button
             onClick={() => navigate("/settings")}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-sidebar-foreground/70 transition hover:bg-white/8 hover:text-sidebar-foreground"
+            className="flex h-9 w-9 items-center justify-center rounded-xl text-sidebar-foreground/70 transition hover:bg-sidebar-accent hover:text-sidebar-foreground dark:hover:bg-white/8"
             title="Ayarlar"
             type="button"
           >
