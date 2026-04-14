@@ -93,4 +93,5 @@ temp/
 *.tmp
 *.bak
 *.swp
-*~.nib
+*~.nibnode_modules/
+dist/
