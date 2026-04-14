@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bell, Check, CheckCheck, Trash2, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,29 +17,91 @@ import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-const NotificationIcon = ({ type }: { type: string }) => {
-  const config = {
-    error: { icon: "🚨", className: "bg-red-100 text-red-700 border-red-300" },
-    warning: { icon: "⚠️", className: "bg-orange-100 text-orange-700 border-orange-300" },
-    info: { icon: "ℹ️", className: "bg-blue-100 text-blue-700 border-blue-300" },
-    success: { icon: "✅", className: "bg-green-100 text-green-700 border-green-300" },
+type NotificationType = "error" | "warning" | "info" | "success";
+
+function NotificationIcon({ type }: { type: string }) {
+  const config: Record<
+    NotificationType,
+    { icon: string; ring: string; bg: string; text: string }
+  > = {
+    error: {
+      icon: "🚨",
+      ring: "ring-destructive/25",
+      bg: "bg-destructive/10",
+      text: "text-destructive",
+    },
+    warning: {
+      icon: "⚠️",
+      ring: "ring-amber-500/25 dark:ring-amber-400/25",
+      bg: "bg-amber-500/10 dark:bg-amber-400/10",
+      text: "text-amber-700 dark:text-amber-300",
+    },
+    info: {
+      icon: "ℹ️",
+      ring: "ring-sky-500/25 dark:ring-sky-400/25",
+      bg: "bg-sky-500/10 dark:bg-sky-400/10",
+      text: "text-sky-700 dark:text-sky-300",
+    },
+    success: {
+      icon: "✅",
+      ring: "ring-emerald-500/25 dark:ring-emerald-400/25",
+      bg: "bg-emerald-500/10 dark:bg-emerald-400/10",
+      text: "text-emerald-700 dark:text-emerald-300",
+    },
   };
 
-  const { icon, className } = config[type as keyof typeof config] || config.info;
+  const safeType = (["error", "warning", "info", "success"] as const).includes(
+    type as NotificationType,
+  )
+    ? (type as NotificationType)
+    : "info";
+
+  const c = config[safeType];
 
   return (
-    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-sm border-2", className)}>
-      {icon}
+    <div
+      className={cn(
+        "flex h-8 w-8 items-center justify-center rounded-full text-sm",
+        "ring-1",
+        c.ring,
+        c.bg,
+        c.text,
+      )}
+      aria-hidden="true"
+    >
+      {c.icon}
     </div>
   );
-};
+}
+
+function PriorityBadge({ priority }: { priority: string }) {
+  if (priority === "critical") {
+    return (
+      <Badge className="absolute right-3 top-3 border border-destructive/25 bg-destructive/10 text-destructive">
+        Acil
+      </Badge>
+    );
+  }
+
+  if (priority === "high") {
+    return (
+      <Badge className="absolute right-3 top-3 border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300">
+        Önemli
+      </Badge>
+    );
+  }
+
+  return null;
+}
 
 export default function NotificationBell() {
   const navigate = useNavigate();
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } =
+    useNotifications();
+
   const [open, setOpen] = useState(false);
 
-  const recentNotifications = notifications.slice(0, 5);
+  const recentNotifications = useMemo(() => notifications.slice(0, 5), [notifications]);
 
   const handleNotificationClick = (notification: any) => {
     markAsRead(notification.id);
@@ -53,25 +115,36 @@ export default function NotificationBell() {
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
+          <Bell className="h-5 w-5 text-foreground" />
+
           {unreadCount > 0 && (
-            <Badge 
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-600 hover:bg-red-700 text-white text-xs"
+            <span
+              className={cn(
+                "absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1",
+                "border border-destructive/25 bg-destructive text-destructive-foreground",
+                "text-[10px] font-bold leading-none",
+              )}
             >
               {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
+            </span>
           )}
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-[400px] p-0">
+      <DropdownMenuContent
+        align="end"
+        className={cn(
+          "w-[400px] p-0",
+          "border border-border bg-popover text-popover-foreground shadow-lg",
+        )}
+      >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-slate-50 dark:bg-slate-900">
+        <div className="flex items-center justify-between gap-4 border-b border-border bg-muted/40 p-4">
           <div>
-            <DropdownMenuLabel className="p-0 font-bold text-base">
+            <DropdownMenuLabel className="p-0 text-base font-semibold text-foreground">
               Bildirimler
             </DropdownMenuLabel>
-            <p className="text-xs text-muted-foreground mt-0.5">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : "Tüm bildirimler okundu"}
             </p>
           </div>
@@ -81,7 +154,7 @@ export default function NotificationBell() {
               variant="ghost"
               size="sm"
               onClick={markAllAsRead}
-              className="h-8 text-xs gap-1"
+              className="h-8 gap-1 text-xs text-foreground hover:bg-accent"
             >
               <CheckCheck className="h-3 w-3" />
               Tümünü Okundu İşaretle
@@ -93,113 +166,128 @@ export default function NotificationBell() {
         <ScrollArea className="h-[400px]">
           {recentNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Bell className="h-12 w-12 text-muted-foreground opacity-50 mb-3" />
+              <Bell className="mb-3 h-12 w-12 text-muted-foreground/60" />
               <p className="text-sm text-muted-foreground">Henüz bildirim yok</p>
             </div>
           ) : (
-            <div className="divide-y">
-              {recentNotifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={cn(
-                    "p-4 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer relative",
-                    !notification.is_read && "bg-blue-50/50 dark:bg-blue-950/20"
-                  )}
-                  onClick={() => handleNotificationClick(notification)}
-                >
-                  {/* Unread indicator */}
-                  {!notification.is_read && (
-                    <div className="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 bg-blue-600 rounded-full" />
-                  )}
+            <div className="divide-y divide-border">
+              {recentNotifications.map((notification) => {
+                const unread = !notification.is_read;
 
-                  <div className="flex gap-3">
-                    <NotificationIcon type={notification.type} />
-
-                    <div className="flex-1 min-w-0">
-                      {/* Title */}
-                      <p className={cn(
-                        "text-sm font-semibold mb-1 line-clamp-1",
-                        !notification.is_read && "text-foreground"
-                      )}>
-                        {notification.title}
-                      </p>
-
-                      {/* Message */}
-                      <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                        {notification.message}
-                      </p>
-
-                      {/* Footer */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(notification.created_at), {
-                            addSuffix: true,
-                            locale: tr,
-                          })}
-                        </span>
-
-                        {notification.action_url && (
-                          <Button
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0 text-xs gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleNotificationClick(notification);
-                            }}
-                          >
-                            {notification.action_label}
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-1">
-                      {!notification.is_read && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            markAsRead(notification.id);
-                          }}
-                          title="Okundu işaretle"
-                        >
-                          <Check className="h-3 w-3" />
-                        </Button>
+                return (
+                  <DropdownMenuItem
+                    key={notification.id}
+                    // DropdownMenuItem default styles sometimes add focus bg; we align it.
+                    className={cn(
+                      "relative cursor-pointer select-none p-0 focus:bg-transparent",
+                    )}
+                    onSelect={(e) => {
+                      // prevent menu from closing when clicking internal actions
+                      e.preventDefault();
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "relative w-full p-4 transition-colors",
+                        "hover:bg-accent/60",
+                        unread && "bg-primary/5",
+                      )}
+                      onClick={() => handleNotificationClick(notification)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") handleNotificationClick(notification);
+                      }}
+                    >
+                      {/* Unread indicator */}
+                      {unread && (
+                        <div className="absolute left-3 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary" />
                       )}
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteNotification(notification.id);
-                        }}
-                        title="Sil"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
+                      <div className="flex gap-3">
+                        <NotificationIcon type={notification.type} />
 
-                  {/* Priority badge */}
-                  {notification.priority === 'critical' && (
-                    <Badge className="absolute top-2 right-2 bg-red-600 text-white text-xs">
-                      Acil
-                    </Badge>
-                  )}
-                  {notification.priority === 'high' && (
-                    <Badge className="absolute top-2 right-2 bg-orange-600 text-white text-xs">
-                      Önemli
-                    </Badge>
-                  )}
-                </div>
-              ))}
+                        <div className="min-w-0 flex-1">
+                          {/* Title */}
+                          <p
+                            className={cn(
+                              "mb-1 line-clamp-1 text-sm font-semibold",
+                              "text-foreground",
+                              !unread && "font-medium",
+                            )}
+                          >
+                            {notification.title}
+                          </p>
+
+                          {/* Message */}
+                          <p className="mb-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                            {notification.message}
+                          </p>
+
+                          {/* Footer */}
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(notification.created_at), {
+                                addSuffix: true,
+                                locale: tr,
+                              })}
+                            </span>
+
+                            {notification.action_url && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                className="h-auto p-0 text-xs text-primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNotificationClick(notification);
+                                }}
+                              >
+                                {notification.action_label}
+                                <ExternalLink className="ml-1 h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col gap-1">
+                          {unread && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:bg-accent hover:text-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(notification.id);
+                              }}
+                              title="Okundu işaretle"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteNotification(notification.id);
+                            }}
+                            title="Sil"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Priority badge */}
+                      <PriorityBadge priority={notification.priority} />
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
             </div>
           )}
         </ScrollArea>
@@ -211,7 +299,7 @@ export default function NotificationBell() {
             <div className="p-2">
               <Button
                 variant="ghost"
-                className="w-full justify-center text-sm"
+                className="w-full justify-center text-sm text-foreground hover:bg-accent"
                 onClick={() => {
                   navigate("/notifications");
                   setOpen(false);
