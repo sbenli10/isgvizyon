@@ -551,47 +551,22 @@
   Pages/components with .theme-dark-branded keep their dark styling
   even in light mode (Auth, Landing, EvacuationEditor etc.).
   These are intentionally dark-themed branded surfaces.
+
+  Strategy: Override CSS variables to dark-theme values so the global
+  bridge rules produce dark results instead of light ones.
 */
-.light .theme-dark-branded,
-.light .theme-dark-branded * {
-  color: inherit;
-}
-.light .theme-dark-branded [class*="text-white"] {
-  color: #fff !important;
-}
-.light .theme-dark-branded [class*="text-slate-50"],
-.light .theme-dark-branded [class*="text-slate-100"],
-.light .theme-dark-branded [class*="text-slate-200"],
-.light .theme-dark-branded [class*="text-slate-300"] {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-.light .theme-dark-branded [class*="text-slate-400"],
-.light .theme-dark-branded [class*="text-slate-500"] {
-  color: rgba(148, 163, 184, 1) !important;
-}
-.light .theme-dark-branded [class*="bg-slate-950"],
-.light .theme-dark-branded [class*="bg-slate-900"],
-.light .theme-dark-branded [class*="bg-slate-800"] {
-  background-color: revert !important;
-}
-.light .theme-dark-branded [class*="bg-white/"],
-.light .theme-dark-branded [class*="bg-white/[0.0"] {
-  background-color: revert !important;
-}
-.light .theme-dark-branded [class*="border-white/"] {
-  border-color: revert !important;
-}
-.light .theme-dark-branded [class*="bg-[linear-gradient"],
-.light .theme-dark-branded [class*="bg-[radial-gradient"] {
-  background: revert !important;
-}
-.light .theme-dark-branded [class*="from-slate-"],
-.light .theme-dark-branded [class*="to-slate-"],
-.light .theme-dark-branded [class*="via-slate-"] {
-  --tw-gradient-from: revert !important;
-  --tw-gradient-to: revert !important;
-  --tw-gradient-stops: revert !important;
-}
-.light .theme-dark-branded [class*="shadow-["] {
-  box-shadow: revert !important;
+.light .theme-dark-branded {
+  --background: 222 47% 5%;
+  --foreground: 210 40% 98%;
+  --card: 222 47% 8%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 8%;
+  --popover-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  color: hsl(var(--foreground));
 }
