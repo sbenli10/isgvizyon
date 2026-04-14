@@ -144,7 +144,9 @@ export default function NotificationBell() {
             <DropdownMenuLabel className="p-0 text-base font-semibold text-foreground">
               Bildirimler
             </DropdownMenuLabel>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+
+            {/* light'ta daha koyu secondary text */}
+            <p className="mt-0.5 text-xs text-foreground/65 dark:text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : "Tüm bildirimler okundu"}
             </p>
           </div>
@@ -167,7 +169,9 @@ export default function NotificationBell() {
           {recentNotifications.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Bell className="mb-3 h-12 w-12 text-muted-foreground/60" />
-              <p className="text-sm text-muted-foreground">Henüz bildirim yok</p>
+              <p className="text-sm text-foreground/70 dark:text-muted-foreground">
+                Henüz bildirim yok
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -177,20 +181,18 @@ export default function NotificationBell() {
                 return (
                   <DropdownMenuItem
                     key={notification.id}
-                    // DropdownMenuItem default styles sometimes add focus bg; we align it.
-                    className={cn(
-                      "relative cursor-pointer select-none p-0 focus:bg-transparent",
-                    )}
-                    onSelect={(e) => {
-                      // prevent menu from closing when clicking internal actions
-                      e.preventDefault();
-                    }}
+                    // Don't let DropdownMenuItem apply its own text/focus colors.
+                    className="p-0 focus:bg-transparent focus:text-inherit"
+                    onSelect={(e) => e.preventDefault()}
                   >
                     <div
                       className={cn(
-                        "relative w-full p-4 transition-colors",
+                        // ✅ text-foreground sabitle: light modda beyaza düşmesin
+                        "relative w-full p-4 text-foreground transition-colors",
                         "hover:bg-accent/60",
                         unread && "bg-primary/5",
+                        // keyboard focus inside item
+                        "focus:outline-none",
                       )}
                       onClick={() => handleNotificationClick(notification)}
                       role="button"
@@ -209,24 +211,18 @@ export default function NotificationBell() {
 
                         <div className="min-w-0 flex-1">
                           {/* Title */}
-                          <p
-                            className={cn(
-                              "mb-1 line-clamp-1 text-sm font-semibold",
-                              "text-foreground",
-                              !unread && "font-medium",
-                            )}
-                          >
+                          <p className={cn("mb-1 line-clamp-1 text-sm font-semibold text-foreground")}>
                             {notification.title}
                           </p>
 
-                          {/* Message */}
-                          <p className="mb-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                          {/* Message - light'ta koyu, dark'ta muted */}
+                          <p className="mb-2 line-clamp-2 text-xs leading-5 text-foreground/70 dark:text-muted-foreground">
                             {notification.message}
                           </p>
 
                           {/* Footer */}
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-foreground/60 dark:text-muted-foreground">
                               {formatDistanceToNow(new Date(notification.created_at), {
                                 addSuffix: true,
                                 locale: tr,
@@ -282,7 +278,6 @@ export default function NotificationBell() {
                         </div>
                       </div>
 
-                      {/* Priority badge */}
                       <PriorityBadge priority={notification.priority} />
                     </div>
                   </DropdownMenuItem>
