@@ -335,7 +335,7 @@ export default function AssignmentLetters() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="theme-page-readable space-y-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
@@ -357,17 +357,17 @@ export default function AssignmentLetters() {
       </section>
       <AssignmentTypeCards onCreate={openCreateModal} />
 
-      <Card className="border-slate-700/70 bg-gradient-to-r from-slate-950/80 to-slate-900/60">
+      <Card className="cardBase">
         <CardHeader>
-          <CardTitle className="text-slate-100">Minimum Süre Kuralı</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="cardTitle">Minimum Süre Kuralı</CardTitle>
+          <CardDescription className="cardDescription">
             Tehlike sınıfına göre sistem bilgi amaçlı minimum süre uyarısı gösterir.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 text-sm text-slate-300 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">Az Tehlikeli: çalışan başına 10 dakika</div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">Tehlikeli: çalışan başına 20 dakika</div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">Çok Tehlikeli: çalışan başına 40 dakika</div>
+        <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-3">
+          <div className="rounded-2xl border border-border bg-muted/30 p-4 text-foreground">Az Tehlikeli: çalışan başına 10 dakika</div>
+          <div className="rounded-2xl border border-border bg-muted/30 p-4 text-foreground">Tehlikeli: çalışan başına 20 dakika</div>
+          <div className="rounded-2xl border border-border bg-muted/30 p-4 text-foreground">Çok Tehlikeli: çalışan başına 40 dakika</div>
         </CardContent>
       </Card>
 

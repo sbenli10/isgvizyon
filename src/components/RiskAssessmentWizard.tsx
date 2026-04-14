@@ -410,7 +410,7 @@ export default function RiskAssessmentWizard() {
 
   return (
     <>
-    <div className="space-y-8">
+    <div className="theme-page-readable space-y-8">
       <section className="overflow-hidden rounded-[30px] border border-slate-200/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94))] p-6 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
         <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
           <div>

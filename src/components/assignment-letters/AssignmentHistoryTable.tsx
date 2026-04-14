@@ -20,12 +20,12 @@ interface AssignmentHistoryTableProps {
 
 export function AssignmentHistoryTable({ items, onDownload, onEdit, onDelete }: AssignmentHistoryTableProps) {
   return (
-    <Card className="border-slate-700/70 bg-slate-950/60">
+    <Card className="cardBase">
       <CardHeader>
-        <CardTitle className="text-slate-100">Belge Geçmişi</CardTitle>
+        <CardTitle className="cardTitle">Belge Geçmişi</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-hidden rounded-2xl border border-slate-800">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
@@ -63,7 +63,7 @@ export function AssignmentHistoryTable({ items, onDownload, onEdit, onDelete }: 
                         <Button
                           variant="outline"
                           size="sm"
-                          className="gap-2 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                          className="gap-2 border-rose-300 bg-rose-50 text-rose-900 hover:bg-rose-100 dark:border-rose-500/30 dark:bg-transparent dark:text-rose-300 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
                           onClick={() => onDelete(item.id)}
                         >
                           <Trash2 className="h-4 w-4" />

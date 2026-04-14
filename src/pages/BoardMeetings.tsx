@@ -164,17 +164,20 @@ export default function BoardMeetings() {
       draft: {
         label: "Taslak",
         icon: Clock,
-        className: "bg-yellow-500/20 text-yellow-600 border-yellow-500/30",
+        className:
+          "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-100",
       },
       completed: {
         label: "Tamamland\u0131",
         icon: CheckCircle2,
-        className: "bg-green-500/20 text-green-600 border-green-500/30",
+        className:
+          "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-100",
       },
       cancelled: {
         label: "\u0130ptal",
         icon: XCircle,
-        className: "bg-red-500/20 text-red-600 border-red-500/30",
+        className:
+          "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/30 dark:bg-rose-500/15 dark:text-rose-100",
       },
     } as const;
 
@@ -208,22 +211,22 @@ export default function BoardMeetings() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 space-y-6">
+      <div className="min-h-screen bg-background p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <div className="h-8 w-72 animate-pulse rounded bg-slate-800" />
-            <div className="h-4 w-96 animate-pulse rounded bg-slate-900" />
+            <div className="h-8 w-72 animate-pulse rounded bg-muted" />
+            <div className="h-4 w-96 animate-pulse rounded bg-muted/70" />
           </div>
-          <div className="h-10 w-36 animate-pulse rounded-lg bg-slate-900" />
+          <div className="h-10 w-36 animate-pulse rounded-lg bg-muted/70" />
         </div>
 
-        <div className="h-12 animate-pulse rounded-xl bg-slate-900/70" />
+        <div className="h-12 animate-pulse rounded-xl bg-muted/70" />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-24 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70"
+              className="h-24 animate-pulse rounded-xl border border-border bg-muted/70"
             />
           ))}
         </div>
@@ -232,7 +235,7 @@ export default function BoardMeetings() {
           {Array.from({ length: 5 }).map((_, index) => (
             <div
               key={index}
-              className="h-28 animate-pulse rounded-xl border border-slate-800 bg-slate-900/70"
+              className="h-28 animate-pulse rounded-xl border border-border bg-muted/70"
             />
           ))}
         </div>
@@ -241,14 +244,14 @@ export default function BoardMeetings() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 space-y-6">
+    <div className="theme-page-readable min-h-screen bg-background p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
+          <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
             <Users className="h-8 w-8 text-blue-500" />
             {"\u0130SG Kurul Toplant\u0131lar\u0131"}
           </h1>
-          <p className="mt-1 text-slate-400">
+          <p className="mt-1 text-muted-foreground">
             {"Toplant\u0131lar\u0131 y\u00f6netin, g\u00fcndem olu\u015fturun ve tutanak \u00e7\u0131kar\u0131n"}
           </p>
         </div>
@@ -266,7 +269,7 @@ export default function BoardMeetings() {
         <Button
           variant="outline"
           onClick={() => navigate("/board-meetings/guide")}
-          className="gap-2 border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
+          className="gap-2 border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100 dark:border-blue-500/30 dark:bg-transparent dark:text-blue-300 dark:hover:bg-blue-500/10"
         >
           <BookOpen className="h-4 w-4" />
           {"Nas\u0131l Kullan\u0131l\u0131r?"}
@@ -282,58 +285,58 @@ export default function BoardMeetings() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="border-slate-800 bg-slate-900/50">
+        <Card className="cardBase">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">{"Toplam Toplant\u0131"}</p>
-                <p className="mt-1 text-2xl font-bold text-white">{meetings.length}</p>
+                <p className="text-sm text-muted-foreground">{"Toplam Toplant\u0131"}</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">{meetings.length}</p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20">
-                <Users className="h-6 w-6 text-blue-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-200">
+                <Users className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/50">
+        <Card className="cardBase">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Tamamlanan</p>
-                <p className="mt-1 text-2xl font-bold text-white">
+                <p className="text-sm text-muted-foreground">Tamamlanan</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
                   {meetings.filter((meeting) => meeting.status === "completed").length}
                 </p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/20">
-                <CheckCircle2 className="h-6 w-6 text-green-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200">
+                <CheckCircle2 className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/50">
+        <Card className="cardBase">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Taslak</p>
-                <p className="mt-1 text-2xl font-bold text-white">
+                <p className="text-sm text-muted-foreground">Taslak</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
                   {meetings.filter((meeting) => meeting.status === "draft").length}
                 </p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-500/20">
-                <Clock className="h-6 w-6 text-yellow-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                <Clock className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-slate-800 bg-slate-900/50">
+        <Card className="cardBase">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-400">Bu Ay</p>
-                <p className="mt-1 text-2xl font-bold text-white">
+                <p className="text-sm text-muted-foreground">Bu Ay</p>
+                <p className="mt-1 text-2xl font-semibold text-foreground">
                   {
                     meetings.filter(
                       (meeting) =>
@@ -342,29 +345,29 @@ export default function BoardMeetings() {
                   }
                 </p>
               </div>
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20">
-                <Calendar className="h-6 w-6 text-purple-400" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200">
+                <Calendar className="h-6 w-6" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-slate-800 bg-slate-900/50">
+      <Card className="cardBase">
         <CardContent className="p-4">
           <div className="flex flex-col gap-4 md:flex-row">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={"Firma, lokasyon veya toplant\u0131 no ile ara..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-slate-700 bg-slate-800 pl-10 text-white"
+                className="border-border bg-background pl-10 text-foreground placeholder:text-muted-foreground"
               />
             </div>
 
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full border-slate-700 bg-slate-800 text-white md:w-48">
+              <SelectTrigger className="w-full border-border bg-background text-foreground md:w-48">
                 <Filter className="mr-2 h-4 w-4" />
                 <SelectValue />
               </SelectTrigger>
@@ -381,11 +384,11 @@ export default function BoardMeetings() {
 
       <div className="space-y-4">
         {filteredMeetings.length === 0 ? (
-          <Card className="border-slate-800 bg-slate-900/50">
+          <Card className="cardBase">
             <CardContent className="p-12 text-center">
-              <Users className="mx-auto mb-4 h-16 w-16 text-slate-600" />
-              <h3 className="mb-2 text-lg font-semibold text-white">{"Hen\u00fcz toplant\u0131 yok"}</h3>
-              <p className="mb-6 text-slate-400">
+              <Users className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-semibold text-foreground">{"Hen\u00fcz toplant\u0131 yok"}</h3>
+              <p className="mb-6 text-muted-foreground">
                 {'\u0130lk \u0130SG kurul toplant\u0131n\u0131z\u0131 olu\u015fturmak i\u00e7in "Yeni Toplant\u0131" butonuna t\u0131klay\u0131n.'}
               </p>
               <Button
@@ -401,25 +404,25 @@ export default function BoardMeetings() {
           filteredMeetings.map((meeting) => (
             <Card
               key={meeting.id}
-              className="border-slate-800 bg-slate-900/50 transition-all hover:border-blue-500/30"
+              className="cardBase transition-all hover:border-blue-500/30"
             >
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="mb-3 flex items-center gap-3">
-                      <h3 className="text-lg font-bold text-white">
+                      <h3 className="text-lg font-bold text-foreground">
                         {meeting.meeting_number || "Toplant\u0131"}
                       </h3>
                       {getStatusBadge(meeting.status)}
                     </div>
 
                     <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-muted-foreground">
                         <Building2 className="h-4 w-4" />
                         <span>{meeting.company?.name}</span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-muted-foreground">
                         <Calendar className="h-4 w-4" />
                         <span>
                           {new Date(meeting.meeting_date).toLocaleDateString("tr-TR")}
@@ -428,13 +431,13 @@ export default function BoardMeetings() {
                       </div>
 
                       {meeting.location && (
-                        <div className="flex items-center gap-2 text-slate-400">
+                        <div className="flex items-center gap-2 text-muted-foreground">
                           <Users className="h-4 w-4" />
                           <span>{meeting.location}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-muted-foreground">
                         <FileText className="h-4 w-4" />
                         <span>
                           {meeting.attendee_count || 0} {"Kat\u0131l\u0131mc\u0131"} · {meeting.agenda_count || 0} {"G\u00fcndem"}
@@ -443,7 +446,7 @@ export default function BoardMeetings() {
                     </div>
 
                     {meeting.president_name && (
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-2 text-sm text-muted-foreground">
                         {"Ba\u015fkan:"} {meeting.president_name}
                       </p>
                     )}
@@ -454,7 +457,7 @@ export default function BoardMeetings() {
                       variant="ghost"
                       size="icon"
                       onClick={() => navigate(`/board-meetings/${meeting.id}`)}
-                      className="text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                      className="text-blue-700 hover:bg-blue-100 hover:text-blue-900 dark:text-blue-300 dark:hover:bg-blue-500/10 dark:hover:text-blue-200"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -463,7 +466,7 @@ export default function BoardMeetings() {
                       variant="ghost"
                       size="icon"
                       onClick={() => navigate(`/board-meetings/${meeting.id}/edit`)}
-                      className="text-slate-400 hover:bg-slate-800 hover:text-white"
+                      className="text-muted-foreground hover:bg-muted hover:text-foreground"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -473,7 +476,7 @@ export default function BoardMeetings() {
                         variant="ghost"
                         size="icon"
                         onClick={() => window.open(meeting.pdf_url, "_blank", "noopener,noreferrer")}
-                        className="text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                        className="text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 dark:text-emerald-300 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-200"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -483,7 +486,7 @@ export default function BoardMeetings() {
                       variant="ghost"
                       size="icon"
                       onClick={() => handleDeleteMeeting(meeting.id)}
-                      className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                      className="text-rose-700 hover:bg-rose-100 hover:text-rose-900 dark:text-rose-300 dark:hover:bg-rose-500/10 dark:hover:text-rose-200"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

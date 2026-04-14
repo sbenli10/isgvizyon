@@ -1412,7 +1412,7 @@ export default function CAPA() {
     }));
 
   return (
-    <div className="space-y-8">
+    <div className="theme-page-readable space-y-8">
       <section className="relative overflow-hidden rounded-[28px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_28%),linear-gradient(145deg,rgba(7,10,24,0.98),rgba(15,23,42,0.94))] p-6 shadow-[0_24px_90px_rgba(10,14,35,0.45)] lg:p-8">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:34px_34px] opacity-40" />
         <div className="relative grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">

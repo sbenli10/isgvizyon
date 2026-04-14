@@ -3763,7 +3763,7 @@ const handleSaveAndExport = async () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="theme-page-readable space-y-8">
       <div className="rounded-[28px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.2),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] p-6 shadow-[0_28px_100px_rgba(15,23,42,0.45)] md:p-8">
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-6">

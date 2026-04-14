@@ -344,7 +344,7 @@ export default function ADEPPlans() {
 
   return (
     <>
-      <div className="space-y-8 pb-10">
+      <div className="theme-page-readable space-y-8 pb-10">
         <div className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.18),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_30px_80px_rgba(2,6,23,0.45)] md:p-8">
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.05),transparent_35%,transparent_70%,rgba(255,255,255,0.04))]" />
           <div className="relative grid gap-6 xl:grid-cols-[1.3fr_0.82fr] xl:items-end">

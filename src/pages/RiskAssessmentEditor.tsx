@@ -3424,7 +3424,7 @@ const exportToPDFAndShare = async () => {
   // ========================
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="theme-page-readable min-h-screen flex flex-col overflow-x-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       <div className="border-b border-white/10 bg-slate-950/80 px-6 py-4 backdrop-blur-xl">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-4">

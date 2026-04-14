@@ -73,27 +73,32 @@ const statusTone: Record<
   }
 > = {
   sent: {
-    badge: "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
+    badge:
+      "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/25 dark:bg-emerald-500/15 dark:text-emerald-100",
     dot: "bg-emerald-400",
-    card: "border-emerald-500/10",
+    card: "border-emerald-200/80 dark:border-emerald-500/20",
   },
   failed: {
-    badge: "border-red-400/20 bg-red-500/10 text-red-100",
+    badge:
+      "border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-500/25 dark:bg-rose-500/15 dark:text-rose-100",
     dot: "bg-red-400",
-    card: "border-red-500/10",
+    card: "border-rose-200/80 dark:border-rose-500/20",
   },
   bounced: {
-    badge: "border-amber-400/20 bg-amber-500/10 text-amber-100",
+    badge:
+      "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-500/25 dark:bg-amber-500/15 dark:text-amber-100",
     dot: "bg-amber-400",
-    card: "border-amber-500/10",
+    card: "border-amber-200/80 dark:border-amber-500/20",
   },
 };
 
 const reportTypeTone: Record<ReportType, string> = {
-  risk_assessment: "border-cyan-400/20 bg-cyan-500/10 text-cyan-100",
-  dof: "border-violet-400/20 bg-violet-500/10 text-violet-100",
-  adep: "border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100",
-  inspection: "border-sky-400/20 bg-sky-500/10 text-sky-100",
+  risk_assessment:
+    "border-cyan-300 bg-cyan-50 text-cyan-900 dark:border-cyan-500/25 dark:bg-cyan-500/15 dark:text-cyan-100",
+  dof: "border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-500/25 dark:bg-violet-500/15 dark:text-violet-100",
+  adep: "border-fuchsia-300 bg-fuchsia-50 text-fuchsia-900 dark:border-fuchsia-500/25 dark:bg-fuchsia-500/15 dark:text-fuchsia-100",
+  inspection:
+    "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-500/25 dark:bg-sky-500/15 dark:text-sky-100",
 };
 
 const formatDateTime = (value: string) =>
@@ -199,20 +204,20 @@ export default function EmailHistory() {
   }, [currentPage, filteredLogs]);
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
-      <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_35%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,0.96))] shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+    <div className="theme-page-readable container mx-auto space-y-6 py-6">
+      <section className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_24px_80px_rgba(2,6,23,0.12)] dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
         <div className="flex flex-col gap-6 px-6 py-7 lg:flex-row lg:items-start lg:justify-between lg:px-8">
           <div className="max-w-3xl space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200">
+            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300 bg-cyan-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-900 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
               <Send className="h-3.5 w-3.5" />
               Gönderim Merkezi
             </div>
             <div className="space-y-2">
-              <h1 className="flex items-center gap-3 text-3xl font-black tracking-tight text-white">
-                <Mail className="h-8 w-8 text-cyan-300" />
+              <h1 className="flex items-center gap-3 text-3xl font-black tracking-tight text-foreground">
+                <Mail className="h-8 w-8 text-cyan-600 dark:text-cyan-300" />
                 E-posta Geçmişi
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground lg:text-base">
                 Firmalara iletilen raporları, teslim durumlarını ve geçmiş hareketleri daha sade bir akışta izleyin.
               </p>
             </div>
@@ -221,56 +226,56 @@ export default function EmailHistory() {
           <div className="flex flex-col gap-3 lg:items-end">
             <Button
               variant="outline"
-              className="gap-2 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
+              className="gap-2 rounded-2xl border-border bg-background text-foreground hover:bg-muted"
               onClick={() => void loadEmailLogs()}
             >
               <RefreshCw className="h-4 w-4" />
               Listeyi Yenile
             </Button>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
-              Sonuç: <span className="font-semibold text-white">{filteredLogs.length}</span> kayıt
+            <div className="rounded-2xl border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              Sonuç: <span className="font-semibold text-foreground">{filteredLogs.length}</span> kayıt
             </div>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-white/10 bg-slate-950/70">
+        <Card className="cardBase">
           <CardHeader className="pb-2">
-            <CardDescription className="text-slate-400">Toplam kayıt</CardDescription>
-            <CardTitle className="text-3xl text-white">{logs.length}</CardTitle>
+            <CardDescription className="cardDescription">Toplam kayıt</CardDescription>
+            <CardTitle className="text-3xl text-foreground">{logs.length}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-emerald-500/15 bg-emerald-500/5">
+        <Card className="border border-emerald-200 bg-emerald-50 text-foreground dark:border-emerald-500/20 dark:bg-emerald-500/10">
           <CardHeader className="pb-2">
-            <CardDescription className="text-emerald-100/70">Başarıyla iletildi</CardDescription>
-            <CardTitle className="text-3xl text-emerald-300">{sentCount}</CardTitle>
+            <CardDescription className="text-emerald-800 dark:text-emerald-200">Başarıyla iletildi</CardDescription>
+            <CardTitle className="text-3xl text-emerald-950 dark:text-emerald-100">{sentCount}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-red-500/15 bg-red-500/5">
+        <Card className="border border-rose-200 bg-rose-50 text-foreground dark:border-rose-500/20 dark:bg-rose-500/10">
           <CardHeader className="pb-2">
-            <CardDescription className="text-red-100/70">Gönderim hatası</CardDescription>
-            <CardTitle className="text-3xl text-red-300">{failedCount}</CardTitle>
+            <CardDescription className="text-rose-800 dark:text-rose-200">Gönderim hatası</CardDescription>
+            <CardTitle className="text-3xl text-rose-950 dark:text-rose-100">{failedCount}</CardTitle>
           </CardHeader>
         </Card>
-        <Card className="border-amber-500/15 bg-amber-500/5">
+        <Card className="border border-amber-200 bg-amber-50 text-foreground dark:border-amber-500/20 dark:bg-amber-500/10">
           <CardHeader className="pb-2">
-            <CardDescription className="text-amber-100/70">Teslim edilemedi</CardDescription>
-            <CardTitle className="text-3xl text-amber-300">{bouncedCount}</CardTitle>
+            <CardDescription className="text-amber-800 dark:text-amber-200">Teslim edilemedi</CardDescription>
+            <CardTitle className="text-3xl text-amber-950 dark:text-amber-100">{bouncedCount}</CardTitle>
           </CardHeader>
         </Card>
       </section>
 
-      <Card className="border-white/10 bg-slate-950/70 shadow-[0_16px_40px_rgba(2,6,23,0.28)]">
+      <Card className="cardBase shadow-[0_16px_40px_rgba(2,6,23,0.08)] dark:shadow-[0_16px_40px_rgba(2,6,23,0.28)]">
         <CardHeader className="gap-4">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <CardTitle className="text-xl text-white">Gönderim kayıtları</CardTitle>
-              <CardDescription className="text-slate-400">
+              <CardTitle className="text-xl text-foreground">Gönderim kayıtları</CardTitle>
+              <CardDescription className="cardDescription">
                 Kayıtları arayın, filtreleyin ve rapor bağlantılarını güvenli şekilde açın.
               </CardDescription>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-slate-400">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
               <Filter className="h-3.5 w-3.5" />
               Profesyonel görünüm • Sayfalı liste
             </div>
@@ -278,17 +283,17 @@ export default function EmailHistory() {
 
           <div className="grid gap-3 lg:grid-cols-[1.1fr_0.4fr_0.4fr_0.35fr_0.35fr]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Alıcı, konu veya rapor türü ara..."
-                className="h-11 rounded-2xl border-white/10 bg-white/[0.04] pl-10 text-slate-100 placeholder:text-slate-500"
+                className="h-11 rounded-2xl border-border bg-background pl-10 text-foreground placeholder:text-muted-foreground"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </div>
 
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as EmailStatus | "all")}>
-              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100">
+              <SelectTrigger className="h-11 rounded-2xl border-border bg-background text-foreground">
                 <SelectValue placeholder="Durum filtrele" />
               </SelectTrigger>
               <SelectContent>
@@ -300,7 +305,7 @@ export default function EmailHistory() {
             </Select>
 
             <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ReportType | "all")}>
-              <SelectTrigger className="h-11 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100">
+              <SelectTrigger className="h-11 rounded-2xl border-border bg-background text-foreground">
                 <SelectValue placeholder="Rapor türü" />
               </SelectTrigger>
               <SelectContent>
@@ -316,29 +321,29 @@ export default function EmailHistory() {
               type="date"
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
-              className="h-11 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100"
+              className="h-11 rounded-2xl border-border bg-background text-foreground"
             />
 
             <Input
               type="date"
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
-              className="h-11 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100"
+              className="h-11 rounded-2xl border-border bg-background text-foreground"
             />
           </div>
 
           {(startDate || endDate) && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-400/15 bg-cyan-500/5 px-4 py-3 text-sm">
-              <div className="text-slate-300">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm dark:border-cyan-500/15 dark:bg-cyan-500/5">
+              <div className="text-cyan-900 dark:text-cyan-100">
                 Tarih aralığı filtresi aktif:
-                <span className="ml-2 font-semibold text-cyan-100">
+                <span className="ml-2 font-semibold text-cyan-950 dark:text-cyan-100">
                   {startDate || "Başlangıç yok"} - {endDate || "Bitiş yok"}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-xl border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"
+                className="rounded-xl border-border bg-background text-foreground hover:bg-muted"
                 onClick={() => {
                   setStartDate("");
                   setEndDate("");
@@ -354,21 +359,21 @@ export default function EmailHistory() {
           {loading ? (
             <div className="space-y-3 py-2">
               {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]" />
+                <div key={index} className="h-24 animate-pulse rounded-2xl border border-border bg-muted/40" />
               ))}
             </div>
           ) : pagedLogs.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.02] px-6 py-14 text-center">
-              <Mail className="mx-auto h-10 w-10 text-slate-600" />
-              <h3 className="mt-4 text-lg font-semibold text-slate-100">Kayıt bulunamadı</h3>
-              <p className="mt-2 text-sm text-slate-400">
+            <div className="rounded-3xl border border-dashed border-border bg-muted/20 px-6 py-14 text-center">
+              <Mail className="mx-auto h-10 w-10 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold text-foreground">Kayıt bulunamadı</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
                 Arama veya filtreleri değiştirerek sonucu daraltmayı deneyin.
               </p>
             </div>
           ) : (
             <>
-              <div className="overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.7),rgba(15,23,42,0.5))]">
-                <div className="hidden grid-cols-[1.3fr_0.9fr_0.6fr_0.6fr_0.55fr] gap-4 border-b border-white/10 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500 lg:grid">
+              <div className="overflow-hidden rounded-[26px] border border-border bg-card">
+                <div className="hidden grid-cols-[1.3fr_0.9fr_0.6fr_0.6fr_0.55fr] gap-4 border-b border-border px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground lg:grid">
                   <span>Konu ve alıcı</span>
                   <span>Tarih</span>
                   <span>Rapor türü</span>
@@ -376,23 +381,23 @@ export default function EmailHistory() {
                   <span className="text-right">İşlem</span>
                 </div>
 
-                <div className="divide-y divide-white/10">
+                <div className="divide-y divide-border">
                   {pagedLogs.map((log) => (
                     <div
                       key={log.id}
                       className={cn(
-                        "grid gap-4 px-5 py-5 transition-colors hover:bg-white/[0.03] lg:grid-cols-[1.3fr_0.9fr_0.6fr_0.6fr_0.55fr] lg:items-center",
+                        "grid gap-4 px-5 py-5 transition-colors hover:bg-muted/40 lg:grid-cols-[1.3fr_0.9fr_0.6fr_0.6fr_0.55fr] lg:items-center",
                         statusTone[log.status].card,
                       )}
                     >
                       <div className="min-w-0 space-y-3">
                         <div className="flex items-start gap-3">
-                          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-400/15 bg-cyan-500/10 text-cyan-200">
+                          <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/15 dark:bg-cyan-500/10 dark:text-cyan-200">
                             <FileText className="h-4.5 w-4.5" />
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white lg:text-base">{log.subject}</p>
-                            <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
+                            <p className="truncate text-sm font-semibold text-foreground lg:text-base">{log.subject}</p>
+                            <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
                               <User className="h-3.5 w-3.5" />
                               <span className="truncate">{log.recipient_email}</span>
                             </p>
@@ -400,9 +405,9 @@ export default function EmailHistory() {
                         </div>
                       </div>
 
-                      <div className="text-sm text-slate-300">
+                      <div className="text-sm text-muted-foreground">
                         <p className="flex items-center gap-2">
-                          <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
+                          <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
                           {formatDateTime(log.created_at)}
                         </p>
                       </div>
@@ -425,12 +430,12 @@ export default function EmailHistory() {
                           href={log.report_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm font-medium text-slate-100 transition-colors hover:bg-white/[0.08]"
+                          className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted"
                         >
                           {log.status === "sent" ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                           ) : (
-                            <AlertTriangle className="h-4 w-4 text-amber-300" />
+                            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
                           )}
                           Raporu Aç
                           <ExternalLink className="h-4 w-4" />
@@ -442,19 +447,19 @@ export default function EmailHistory() {
               </div>
 
               {filteredLogs.length > PAGE_SIZE ? (
-                <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 text-sm text-slate-400 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 px-4 py-4 text-sm text-muted-foreground lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    Sayfa <span className="font-semibold text-slate-100">{currentPage}</span> /{" "}
-                    <span className="font-semibold text-slate-100">{totalPages}</span>
-                    <span className="mx-2 text-slate-600">•</span>
-                    Toplam <span className="font-semibold text-slate-100">{filteredLogs.length}</span> kayıt
+                    Sayfa <span className="font-semibold text-foreground">{currentPage}</span> /{" "}
+                    <span className="font-semibold text-foreground">{totalPages}</span>
+                    <span className="mx-2 text-muted-foreground">•</span>
+                    Toplam <span className="font-semibold text-foreground">{filteredLogs.length}</span> kayıt
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 rounded-xl border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"
+                      className="gap-2 rounded-xl border-border bg-background text-foreground hover:bg-muted"
                       disabled={currentPage === 1}
                       onClick={() => setPage((prev) => Math.max(1, prev - 1))}
                     >
@@ -462,14 +467,14 @@ export default function EmailHistory() {
                       Önceki
                     </Button>
 
-                    <div className="rounded-xl border border-white/10 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200">
+                    <div className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground">
                       {currentPage}
                     </div>
 
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-2 rounded-xl border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/[0.08]"
+                      className="gap-2 rounded-xl border-border bg-background text-foreground hover:bg-muted"
                       disabled={currentPage === totalPages}
                       onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
                     >

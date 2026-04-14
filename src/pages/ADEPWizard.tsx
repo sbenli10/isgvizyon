@@ -1724,9 +1724,9 @@ export default function ADEPWizard() {
   const finalSteps = STEPS.filter((s) => s.category === "final");
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="theme-page-readable space-y-8 pb-10">
       {/* ✅ Premium Header */}
-      <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-6 shadow-[0_28px_80px_rgba(2,6,23,0.45)] md:p-8">
+      <div className="relative overflow-hidden rounded-[28px] border border-border bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.12),_transparent_32%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--muted)))] p-6 shadow-[0_20px_55px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] dark:shadow-[0_28px_80px_rgba(2,6,23,0.45)] md:p-8">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.06),transparent_30%,transparent_70%,rgba(255,255,255,0.04))]" />
         <div className="absolute -top-14 right-10 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl" />
         <div className="absolute -bottom-16 left-8 h-40 w-40 rounded-full bg-fuchsia-500/10 blur-3xl" />
@@ -1734,24 +1734,24 @@ export default function ADEPWizard() {
         <div className="relative grid gap-6 xl:grid-cols-[1.4fr_0.85fr] xl:items-end">
           <div className="space-y-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 shadow-[0_12px_30px_rgba(15,23,42,0.35)] backdrop-blur">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background/80 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10 dark:shadow-[0_12px_30px_rgba(15,23,42,0.35)]">
                 <StepIcon className="h-7 w-7 text-cyan-200" />
               </div>
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge className="border-cyan-400/30 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
+                  <Badge className="border-cyan-400/30 bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-100">
                     ADEP Operasyon Merkezi
                   </Badge>
-                  <Badge className="border-white/10 bg-white/8 text-slate-200 hover:bg-white/8">
+                  <Badge className="border-border bg-muted text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
                     Kurumsal plan sihirbazı
                   </Badge>
                 </div>
-                <h1 className="text-3xl font-bold leading-tight tracking-tight text-white md:text-4xl">
+                <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl">
                   Acil Durum Eylem Planı
                 </h1>
-                <p className="mt-2 text-sm text-slate-300">
+                <p className="mt-2 text-sm text-muted-foreground">
                   AI Destekli Kurumsal ADEP Sihirbazı •{" "}
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-foreground">
                     {planRow.plan_name?.trim() ? planRow.plan_name : "Yeni Plan"}
                   </span>
                 </p>
@@ -1759,20 +1759,20 @@ export default function ADEPWizard() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="gap-1.5 border-white/10 bg-white/10 text-white hover:bg-white/10">
+              <Badge className="gap-1.5 border-border bg-background/80 text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/10">
                 <Building2 className="h-3 w-3 text-cyan-200" />
                 {planRow.company_name || "Firma Adı"}
               </Badge>
-              <Badge className="gap-1.5 border-orange-400/25 bg-orange-400/10 text-orange-100 hover:bg-orange-400/10">
+              <Badge className="gap-1.5 border-orange-400/25 bg-orange-400/10 text-orange-700 hover:bg-orange-400/10 dark:text-orange-100">
                 <AlertTriangle className="h-3 w-3" />
                 {planRow.hazard_class}
               </Badge>
-              <Badge className="gap-1.5 border-emerald-400/25 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/10">
+              <Badge className="gap-1.5 border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/10 dark:text-emerald-100">
                 <Users className="h-3 w-3" />
                 {planRow.employee_count} Çalışan
               </Badge>
               {planId && (
-                <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-100 hover:bg-fuchsia-400/10">
+                <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-700 hover:bg-fuchsia-400/10 dark:text-fuchsia-100">
                   <FileText className="h-3 w-3" />
                   {planId.slice(0, 8)}...
                 </Badge>
@@ -1780,35 +1780,35 @@ export default function ADEPWizard() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Aktif Adım</div>
-                <div className="mt-2 text-lg font-semibold text-white">{stepMeta.label}</div>
-                <div className="mt-1 text-xs text-slate-400">Kurumsal akışta şu an işlenen modül</div>
+              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Aktif Adım</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">{stepMeta.label}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Kurumsal akışta şu an işlenen modül</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Tamamlanma</div>
-                <div className="mt-2 text-lg font-semibold text-white">%{progress}</div>
-                <div className="mt-1 text-xs text-slate-400">Plan genel doluluk seviyesi</div>
+              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Tamamlanma</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">%{progress}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Plan genel doluluk seviyesi</div>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/8 p-4 backdrop-blur">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Durum</div>
-                <div className="mt-2 text-lg font-semibold text-white">
+              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Durum</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">
                   {progress >= 100 ? "Tamamlandı" : "Çalışma sürüyor"}
                 </div>
-                <div className="mt-1 text-xs text-slate-400">PDF ve paylaşım öncesi operasyon görünümü</div>
+                <div className="mt-1 text-xs text-muted-foreground">PDF ve paylaşım öncesi operasyon görünümü</div>
               </div>
             </div>
           </div>
 
-          <div className="rounded-[24px] border border-white/10 bg-slate-950/65 p-5 shadow-[0_20px_50px_rgba(2,6,23,0.35)] backdrop-blur">
+          <div className="rounded-[24px] border border-border bg-card/95 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/65 dark:shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
             <div className="min-w-[260px]">
-              <div className="mb-2 flex justify-between text-xs text-slate-400">
+              <div className="mb-2 flex justify-between text-xs text-muted-foreground">
                 <span className="font-medium uppercase tracking-[0.18em]">Tamamlanma Durumu</span>
-                <span className="font-semibold text-white">
+                <span className="font-semibold text-foreground">
                   {progressLoading ? "Hesaplanıyor..." : `%${progress}`}
                 </span>
               </div>
-              <Progress value={progress} className="h-2.5 bg-white/10" />
+              <Progress value={progress} className="h-2.5 bg-muted dark:bg-white/10" />
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1816,8 +1816,8 @@ export default function ADEPWizard() {
                 className={[
                   "gap-1.5 border px-3 py-1",
                   progress >= 100
-                    ? "border-emerald-400/25 bg-emerald-400/15 text-emerald-100"
-                    : "border-amber-400/25 bg-amber-400/15 text-amber-100",
+                    ? "border-emerald-400/25 bg-emerald-400/15 text-emerald-700 dark:text-emerald-100"
+                    : "border-amber-400/25 bg-amber-400/15 text-amber-700 dark:text-amber-100",
                 ].join(" ")}
               >
                 {progress >= 100 ? (
@@ -1827,36 +1827,36 @@ export default function ADEPWizard() {
                 )}
                 {progress >= 100 ? "Tamamlandı" : "Devam Ediyor"}
               </Badge>
-              <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-100">
+              <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-700 dark:text-fuchsia-100">
                 <Sparkles className="h-3.5 w-3.5 text-purple-500" />
                 AI Destekli
               </Badge>
             </div>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/5 p-4">
+              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-amber-200">Firma Risk Özeti</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{companyRiskSummary.level}</div>
+                    <div className="text-[11px] uppercase tracking-[0.2em] text-amber-700 dark:text-amber-200">Firma Risk Özeti</div>
+                    <div className="mt-2 text-lg font-semibold text-foreground dark:text-white">{companyRiskSummary.level}</div>
                   </div>
-                  <div className="rounded-full border border-amber-300/20 bg-white/5 px-3 py-2 text-sm font-semibold text-amber-100">
+                  <div className="rounded-full border border-amber-300/30 bg-background/70 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-300/20 dark:bg-white/5 dark:text-amber-100">
                     {companyRiskSummary.score}/100
                   </div>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-200">
+                <p className="mt-3 text-sm leading-6 text-muted-foreground dark:text-slate-200">
                   {companyRiskSummary.recommendation}
                 </p>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Operasyon Özeti</div>
-                <p className="mt-2 text-sm leading-6 text-slate-200">
+              <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/5">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Operasyon Özeti</div>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground dark:text-slate-200">
                   Temel modüller ve AI modülleri tek akışta ilerliyor. Her adım kaydedilebilir ve PDF aşamasına kontrollü geçiş yapılıyor.
                 </p>
               </div>
-              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-200">Kullanıcı Etkisi</div>
-                <p className="mt-2 text-sm leading-6 text-cyan-50">
+              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-200">Kullanıcı Etkisi</div>
+                <p className="mt-2 text-sm leading-6 text-cyan-800 dark:text-cyan-50">
                   Kullanıcı önce planı kurar, sonra ekipler, senaryolar ve risk kaynakları üzerinden çıktıya hazır kurumsal bir ADEP üretir.
                 </p>
               </div>
@@ -1866,7 +1866,7 @@ export default function ADEPWizard() {
       </div>
 
       {/* ✅ Modern Stepper */}
-      <Card className="overflow-hidden rounded-[24px] border-white/10 bg-slate-950/70 shadow-[0_22px_55px_rgba(2,6,23,0.28)] backdrop-blur">
+      <Card className="overflow-hidden rounded-[24px] border-border bg-card/95 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_22px_55px_rgba(2,6,23,0.28)]">
         <CardContent className="pt-6">
           <div className="space-y-4">
             {/* Core Steps */}
@@ -1893,7 +1893,7 @@ export default function ADEPWizard() {
                           ? "border-cyan-400/40 bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20"
                           : done
                           ? "border-emerald-400/35 bg-emerald-400/10 text-emerald-200 hover:border-emerald-400"
-                          : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-cyan-400/35 hover:bg-cyan-400/5",
+                          : "border-border bg-background text-foreground hover:border-cyan-400/35 hover:bg-cyan-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
                       ].join(" ")}
                     >
                       <span
@@ -1941,13 +1941,13 @@ export default function ADEPWizard() {
                           ? "border-fuchsia-400 bg-gradient-to-r from-fuchsia-500 to-violet-500 text-white shadow-lg shadow-fuchsia-500/20"
                           : done
                           ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-200 hover:border-fuchsia-400"
-                          : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-fuchsia-400/35 hover:bg-fuchsia-400/5",
+                          : "border-border bg-background text-foreground hover:border-fuchsia-400/35 hover:bg-fuchsia-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
                       ].join(" ")}
                     >
                       <span
                         className={[
                           "h-5 w-5 rounded flex items-center justify-center",
-                          active ? "bg-white/20" : "",
+                          active ? "bg-white/20 dark:bg-white/20" : "",
                         ].join(" ")}
                       >
                         {done ? (
@@ -1986,7 +1986,7 @@ export default function ADEPWizard() {
                         "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
                         active
                           ? "border-blue-400 bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                          : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-blue-400/35 hover:bg-blue-400/5",
+                          : "border-border bg-background text-foreground hover:border-blue-400/35 hover:bg-blue-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
                       ].join(" ")}
                     >
                       <Icon className="h-4 w-4" />
@@ -2002,22 +2002,22 @@ export default function ADEPWizard() {
 
       {/* ✅ Content Card */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <Card className="overflow-hidden rounded-[26px] border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_24px_65px_rgba(2,6,23,0.32)]">
-        <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+      <Card className="overflow-hidden rounded-[26px] border-border bg-card shadow-sm dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] dark:shadow-[0_24px_65px_rgba(2,6,23,0.32)]">
+        <CardHeader className="border-b border-border bg-muted/30 dark:border-white/10 dark:bg-white/[0.03]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="mb-2 flex items-center gap-2">
-                <Badge className="border-white/10 bg-white/10 text-slate-200 hover:bg-white/10">
+                <Badge className="border-border bg-muted text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
                   Adım {currentStep}
                 </Badge>
-                <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
+                <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-700 hover:bg-cyan-400/10 dark:text-cyan-100">
                   {stepMeta.category === "core" ? "Temel Modül" : stepMeta.category === "ai" ? "AI Modülü" : "Final Adımı"}
                 </Badge>
               </div>
-              <CardTitle className="text-xl text-white">
+              <CardTitle className="text-xl text-foreground dark:text-white">
                 Adım {currentStep}/13: {stepMeta.label}
               </CardTitle>
-              <CardDescription className="mt-1.5 text-slate-400">
+              <CardDescription className="mt-1.5 text-muted-foreground dark:text-slate-400">
                 {currentStep === 1 && "Plan meta ve işyeri bilgileri"}
                 {currentStep === 2 &&
                   "Standart mevzuat metinleri (düzenlenebilir)"}
@@ -2045,7 +2045,7 @@ export default function ADEPWizard() {
 
             <Button
               variant="outline"
-              className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-white"
               disabled={
                 saving ||
                 !planRow.plan_name?.trim() ||
@@ -2067,54 +2067,54 @@ export default function ADEPWizard() {
           </div>
         </CardHeader>
 
-        <CardContent className="bg-transparent pt-6 text-slate-100">
-          <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-white/10 [&_.bg-card]:bg-slate-950/55 [&_.shadow-sm]:shadow-[0_18px_40px_rgba(2,6,23,0.18)] [&_.text-card-foreground]:text-slate-100 [&_h3]:text-white [&_p.text-muted-foreground]:text-slate-400 [&_label]:text-slate-200 [&_input]:border-white/10 [&_input]:bg-slate-950/60 [&_input]:text-slate-100 [&_textarea]:border-white/10 [&_textarea]:bg-slate-950/60 [&_textarea]:text-slate-100 [&_[role='combobox']]:border-white/10 [&_[role='combobox']]:bg-slate-950/60 [&_[role='combobox']]:text-slate-100 [&_button.variant-outline]:border-white/10 [&_button.variant-outline]:bg-white/5">
+        <CardContent className="bg-transparent pt-6 text-foreground dark:text-slate-100">
+          <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-border [&_.bg-card]:bg-card [&_.shadow-sm]:shadow-sm [&_.text-card-foreground]:text-foreground [&_h3]:text-foreground [&_p.text-muted-foreground]:text-muted-foreground [&_label]:text-foreground [&_input]:border-border [&_input]:bg-background [&_input]:text-foreground [&_textarea]:border-border [&_textarea]:bg-background [&_textarea]:text-foreground [&_[role='combobox']]:border-border [&_[role='combobox']]:bg-background [&_[role='combobox']]:text-foreground [&_button.variant-outline]:border-border [&_button.variant-outline]:bg-background dark:[&_.border]:border-white/10 dark:[&_.bg-card]:bg-slate-950/55 dark:[&_.shadow-sm]:shadow-[0_18px_40px_rgba(2,6,23,0.18)] dark:[&_.text-card-foreground]:text-slate-100 dark:[&_h3]:text-white dark:[&_p.text-muted-foreground]:text-slate-400 dark:[&_label]:text-slate-200 dark:[&_input]:border-white/10 dark:[&_input]:bg-slate-950/60 dark:[&_input]:text-slate-100 dark:[&_textarea]:border-white/10 dark:[&_textarea]:bg-slate-950/60 dark:[&_textarea]:text-slate-100 dark:[&_[role='combobox']]:border-white/10 dark:[&_[role='combobox']]:bg-slate-950/60 dark:[&_[role='combobox']]:text-slate-100 dark:[&_button.variant-outline]:border-white/10 dark:[&_button.variant-outline]:bg-white/5">
             {renderStep()}
           </div>
         </CardContent>
       </Card>
 
       <div className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-        <Card className={`overflow-hidden rounded-[24px] border bg-gradient-to-br ${stepInsight.accent} bg-slate-950/80 shadow-[0_20px_48px_rgba(2,6,23,0.26)] backdrop-blur`}>
-          <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+        <Card className={`overflow-hidden rounded-[24px] border border-border bg-card shadow-sm backdrop-blur dark:border-white/10 dark:bg-gradient-to-br ${stepInsight.accent} dark:bg-slate-950/80 dark:shadow-[0_20px_48px_rgba(2,6,23,0.26)]`}>
+          <CardHeader className="border-b border-border bg-muted/30 dark:border-white/10 dark:bg-white/[0.03]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground dark:text-slate-400">
                   {stepInsight.eyebrow}
                 </div>
-                <CardTitle className="mt-2 text-white">{stepInsight.title}</CardTitle>
+                <CardTitle className="mt-2 text-foreground dark:text-white">{stepInsight.title}</CardTitle>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
-                <stepInsight.icon className="h-5 w-5 text-white" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-background dark:border-white/10 dark:bg-white/10">
+                <stepInsight.icon className="h-5 w-5 text-foreground dark:text-white" />
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-4 p-6">
-            <p className="text-sm leading-6 text-slate-200">{stepInsight.summary}</p>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+            <p className="text-sm leading-6 text-muted-foreground dark:text-slate-200">{stepInsight.summary}</p>
+            <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/10 dark:bg-white/[0.04]">
+              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-400">
                 {stepInsight.metricLabel}
               </div>
-              <div className="mt-2 text-lg font-semibold text-white">{stepInsight.metricValue}</div>
+              <div className="mt-2 text-lg font-semibold text-foreground dark:text-white">{stepInsight.metricValue}</div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
               {moduleCountsLoading
                 ? Array.from({ length: 3 }).map((_, index) => (
                     <div
                       key={`skeleton-${index}`}
-                      className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
+                      className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/[0.03]"
                     >
-                      <div className="h-3 w-20 animate-pulse rounded bg-white/10" />
-                      <div className="mt-3 h-5 w-24 animate-pulse rounded bg-white/15" />
+                      <div className="h-3 w-20 animate-pulse rounded bg-muted-foreground/20 dark:bg-white/10" />
+                      <div className="mt-3 h-5 w-24 animate-pulse rounded bg-muted-foreground/20 dark:bg-white/15" />
                     </div>
                   ))
                 : stepInsight.stats.map((stat) => (
                     <div
                       key={stat.label}
-                      className="rounded-2xl border border-white/8 bg-white/[0.03] p-4"
+                      className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/[0.03]"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-400">
                           {stat.label}
                         </div>
                         <Badge
@@ -2137,7 +2137,7 @@ export default function ADEPWizard() {
               {stepInsight.bullets.map((bullet) => (
                 <div
                   key={bullet}
-                  className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-slate-300"
+                  className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-300"
                 >
                   {bullet}
                 </div>
@@ -2146,10 +2146,10 @@ export default function ADEPWizard() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[24px] border-white/10 bg-slate-950/75 shadow-[0_20px_48px_rgba(2,6,23,0.22)]">
+        <Card className="rounded-[24px] border-border bg-card shadow-sm dark:border-white/10 dark:bg-slate-950/75 dark:shadow-[0_20px_48px_rgba(2,6,23,0.22)]">
           <CardHeader>
-            <CardTitle className="text-white">Hızlı kontrol listesi</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-foreground dark:text-white">Hızlı kontrol listesi</CardTitle>
+            <CardDescription className="text-muted-foreground dark:text-slate-400">
               Final PDF kalitesini yükselten küçük ama kritik kontroller.
             </CardDescription>
           </CardHeader>
@@ -2161,7 +2161,7 @@ export default function ADEPWizard() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 text-sm text-slate-300"
+                className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-300"
               >
                 {item}
               </div>
@@ -2172,11 +2172,11 @@ export default function ADEPWizard() {
       </div>
 
       {/* ✅ Navigation */}
-      <div className="sticky bottom-4 z-20 flex justify-between rounded-2xl border border-white/10 bg-slate-950/80 p-3 shadow-[0_20px_50px_rgba(2,6,23,0.28)] backdrop-blur">
+      <div className="sticky bottom-4 z-20 flex justify-between rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/80 dark:shadow-[0_20px_50px_rgba(2,6,23,0.28)]">
         <Button
           variant="outline"
           size="lg"
-          className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+          className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-white"
           onClick={() => void goToStep(currentStep - 1)}
           disabled={currentStep === 1}
         >

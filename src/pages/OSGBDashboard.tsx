@@ -410,7 +410,7 @@ export default function OSGBDashboard() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-5 sm:space-y-8 sm:py-6">
+    <div className="theme-page-readable container mx-auto space-y-6 py-5 sm:space-y-8 sm:py-6">
       <section className="overflow-hidden rounded-3xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.14),_transparent_35%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.86))] p-4 shadow-2xl shadow-slate-950/40 sm:p-6">
         <div className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
           <div className="space-y-4 sm:space-y-5">

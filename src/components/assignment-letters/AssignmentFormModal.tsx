@@ -68,10 +68,10 @@ export function AssignmentFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl border-slate-700/70 bg-slate-950/95 text-slate-100">
+      <DialogContent className="max-w-2xl border-border bg-card text-foreground">
         <DialogHeader>
           <DialogTitle>{assignmentType ? assignmentTitles[assignmentType] : "Atama Yazısı"}</DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogDescription className="text-muted-foreground">
             Firma, personel ve görevlendirme bilgilerini doldurun. Kayıt tamamlandığında resmi PDF belgesi oluşturulur.
           </DialogDescription>
         </DialogHeader>
@@ -155,7 +155,7 @@ export function AssignmentFormModal({
           </div>
         </div>
 
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="space-y-1">
@@ -166,7 +166,7 @@ export function AssignmentFormModal({
               ) : (
                 <p>Firma çalışan sayısı bulunamadığı için sadece sınıf bazlı süre bilgisi gösteriliyor.</p>
               )}
-              {showWarning ? <p className="font-medium text-amber-200">Girilen haftalık süre önerilen minimum değerin altında görünüyor.</p> : null}
+              {showWarning ? <p className="font-medium text-amber-950 dark:text-amber-200">Girilen haftalık süre önerilen minimum değerin altında görünüyor.</p> : null}
             </div>
           </div>
         </div>

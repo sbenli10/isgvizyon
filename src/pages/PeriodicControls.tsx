@@ -551,7 +551,7 @@ export default function PeriodicControls() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="theme-page-readable space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_22%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(135deg,#020617_0%,#0b1220_42%,#111827_100%)] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.48)]">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-3">

@@ -1623,7 +1623,7 @@ export default function CompanyManager() {
   // ============================================
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="theme-page-readable space-y-8 pb-8">
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_24%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] shadow-[0_28px_80px_rgba(2,6,23,0.45)]">
         <div className="grid gap-6 px-6 py-7 lg:grid-cols-[1.6fr_0.9fr] lg:px-8">
           <div className="space-y-5">

@@ -665,21 +665,36 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
       value: activeWorkRows,
       description: "Takvimde işaretlenen veya sorumlusu belirlenen satırlar",
       icon: ClipboardList,
-      tone: "from-cyan-500/20 via-cyan-500/10 to-transparent",
+      cardClass:
+        "border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-cyan-50/90 to-background dark:border-cyan-400/20 dark:from-cyan-500/20 dark:via-cyan-500/10 dark:to-transparent",
+      titleClass: "text-cyan-900/80 dark:text-cyan-100/80",
+      valueClass: "text-slate-900 dark:text-white",
+      descriptionClass: "text-slate-700 dark:text-cyan-50/80",
+      iconClass: "text-cyan-700 dark:text-cyan-200",
     },
     {
       label: "Planlanan adım",
       value: plannedWorkCount,
       description: "Aylık çalışma planında işaretlenen planlı adımlar",
       icon: Clock,
-      tone: "from-amber-500/20 via-amber-500/10 to-transparent",
+      cardClass:
+        "border-amber-200/80 bg-gradient-to-br from-amber-50 via-amber-50/90 to-background dark:border-amber-400/20 dark:from-amber-500/20 dark:via-amber-500/10 dark:to-transparent",
+      titleClass: "text-amber-900/80 dark:text-amber-100/80",
+      valueClass: "text-slate-900 dark:text-white",
+      descriptionClass: "text-slate-700 dark:text-amber-50/80",
+      iconClass: "text-amber-700 dark:text-amber-200",
     },
     {
       label: "Tamamlanan adım",
       value: completedWorkCount,
       description: "Yıl içinde tamamlandı olarak kapatılan çalışmalar",
       icon: CheckCircle2,
-      tone: "from-emerald-500/20 via-emerald-500/10 to-transparent",
+      cardClass:
+        "border-emerald-200/80 bg-gradient-to-br from-emerald-50 via-emerald-50/90 to-background dark:border-emerald-400/20 dark:from-emerald-500/20 dark:via-emerald-500/10 dark:to-transparent",
+      titleClass: "text-emerald-900/80 dark:text-emerald-100/80",
+      valueClass: "text-slate-900 dark:text-white",
+      descriptionClass: "text-slate-700 dark:text-emerald-50/80",
+      iconClass: "text-emerald-700 dark:text-emerald-200",
     },
   ];
 
@@ -903,28 +918,28 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
   // RENDER
   // ========================
   return (
-    <div className="min-h-screen space-y-8 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-4 md:p-6">
-      <div className="overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/70 shadow-[0_32px_80px_rgba(2,6,23,0.45)] backdrop-blur-xl">
-        <div className="grid gap-6 border-b border-white/10 px-6 py-6 md:grid-cols-[minmax(0,1.4fr)_380px] md:px-8">
+    <div className="min-h-screen space-y-8 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.08),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.08),_transparent_28%),linear-gradient(180deg,hsl(var(--background)),hsl(var(--muted)))] p-4 dark:bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.12),_transparent_22%),radial-gradient(circle_at_top_right,_rgba(168,85,247,0.14),_transparent_28%),linear-gradient(180deg,#020617,#0f172a)] md:p-6">
+      <div className="overflow-hidden rounded-[28px] border border-border bg-card/95 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_32px_80px_rgba(2,6,23,0.45)]">
+        <div className="grid gap-6 border-b border-border px-6 py-6 dark:border-white/10 md:grid-cols-[minmax(0,1.4fr)_380px] md:px-8">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-3">
-              <Badge className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-cyan-100">
+              <Badge className="rounded-full border border-cyan-400/30 bg-cyan-400/10 px-3 py-1 text-cyan-700 dark:text-cyan-100">
                 Yıllık plan merkezi
               </Badge>
-              <Badge className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">
+              <Badge className="rounded-full border border-border bg-muted px-3 py-1 text-foreground dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                 Excel şablon uyumlu çıktı
               </Badge>
             </div>
             <div className="space-y-3">
-              <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-200 shadow-[0_0_40px_rgba(34,211,238,0.15)]">
+              <h1 className="flex items-center gap-3 text-3xl font-semibold tracking-tight text-foreground dark:text-white md:text-4xl">
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-700 shadow-[0_0_24px_rgba(34,211,238,0.10)] dark:text-cyan-200 dark:shadow-[0_0_40px_rgba(34,211,238,0.15)]">
                   <Calendar className="h-6 w-6" />
                 </span>
                 Yıllık çalışma planı
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+              <p className="max-w-2xl text-sm leading-6 text-muted-foreground dark:text-slate-300 md:text-base">
                 Yıllık çalışma planı, eğitim planı ve değerlendirme raporlarını tek merkezde yönetin.
-                Özellikle <span className="font-medium text-white">YILLIK ÇALIŞMA</span> çıktısı,
+                Özellikle <span className="font-medium text-foreground dark:text-white">YILLIK ÇALIŞMA</span> çıktısı,
                 alışık olunan Excel şablon mantığını koruyarak daha temiz ve kurumsal bir formatta dışa aktarılır.
               </p>
             </div>
@@ -932,30 +947,30 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
               {overviewCards.map((card) => (
                 <div
                   key={card.label}
-                  className={`rounded-2xl border border-white/10 bg-gradient-to-br ${card.tone} p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]`}
+                  className={`rounded-2xl border p-4 shadow-sm ${card.cardClass} dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]`}
                 >
                   <div className="mb-4 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-[0.2em] text-slate-400">{card.label}</span>
-                    <card.icon className="h-4 w-4 text-slate-200" />
+                    <span className={`text-xs font-medium uppercase tracking-[0.2em] ${card.titleClass}`}>{card.label}</span>
+                    <card.icon className={`h-4 w-4 ${card.iconClass}`} />
                   </div>
-                  <div className="text-3xl font-semibold text-white">{card.value}</div>
-                  <p className="mt-2 text-xs leading-5 text-slate-400">{card.description}</p>
+                  <div className={`text-3xl font-semibold ${card.valueClass}`}>{card.value}</div>
+                  <p className={`mt-2 text-sm leading-5 ${card.descriptionClass}`}>{card.description}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div className="flex flex-col gap-4 rounded-3xl border border-border bg-card p-5 shadow-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-cyan-200/80">Operasyon özeti</p>
-                <h2 className="mt-2 text-lg font-semibold text-white">Kurum ve çıktı uyumu</h2>
+                <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground dark:text-cyan-200/80">Operasyon özeti</p>
+                <h2 className="mt-2 text-lg font-semibold text-foreground dark:text-white">Kurum ve çıktı uyumu</h2>
               </div>
               <Select
                 value={selectedYear.toString()}
                 onValueChange={(value) => setSelectedYear(parseInt(value))}
               >
-                <SelectTrigger className="w-32 rounded-xl border-white/10 bg-slate-900/80 text-slate-100">
+                <SelectTrigger className="w-32 rounded-xl border-border bg-background text-foreground dark:border-white/10 dark:bg-slate-900/80 dark:text-slate-100">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -968,46 +983,46 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
               </Select>
             </div>
 
-            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
+            <div className="rounded-2xl border border-cyan-200/80 bg-gradient-to-br from-cyan-50 via-cyan-50/90 to-background p-4 dark:border-cyan-400/20 dark:bg-cyan-400/10">
               <div className="flex items-start gap-3">
-                <Building2 className="mt-0.5 h-4 w-4 text-cyan-200" />
+                <Building2 className="mt-0.5 h-4 w-4 text-cyan-700 dark:text-cyan-200" />
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-100/80">Kurum</p>
-                  <p className="mt-1 text-sm font-medium text-white">{organizationName || "İSGVizyon"}</p>
-                  <p className="mt-1 text-xs leading-5 text-cyan-50/80">
-                    Çıktılarda kurum adı üst bilgiye otomatik yerleştirilir.
-                  </p>
-                </div>
+                <p className="text-xs font-medium uppercase tracking-[0.2em] text-cyan-900/80 dark:text-cyan-100/80">Kurum</p>
+                <p className="mt-1 text-sm font-medium text-foreground dark:text-white">{organizationName || "İSGVizyon"}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-700 dark:text-cyan-50/80">
+                  Çıktılarda kurum adı üst bilgiye otomatik yerleştirilir.
+                </p>
+              </div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+            <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/10 dark:bg-slate-900/70">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Çıktı kalitesi</p>
-                  <p className="mt-1 text-sm font-medium text-white">Yıllık çalışma planı hazırlık durumu</p>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-400">Çıktı kalitesi</p>
+                  <p className="mt-1 text-sm font-medium text-foreground dark:text-white">Yıllık çalışma planı hazırlık durumu</p>
                 </div>
-                <TrendingUp className="h-4 w-4 text-emerald-300" />
+                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="h-2 overflow-hidden rounded-full bg-muted dark:bg-white/10">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-sky-400 to-emerald-400 transition-all"
                   style={{ width: `${completionRate}%` }}
                 />
               </div>
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground dark:text-slate-400">
                 <span>Tamamlanma oranı</span>
-                <span className="font-medium text-white">%{completionRate}</span>
+                <span className="font-medium text-foreground dark:text-white">%{completionRate}</span>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+            <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/10 dark:bg-slate-900/70">
               <div className="flex items-start gap-3">
-                <ShieldCheck className="mt-0.5 h-4 w-4 text-violet-300" />
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-violet-600 dark:text-violet-300" />
                 <div>
-                  <p className="text-sm font-medium text-white">Excel şablonuna uygun çıktı</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Kullanıcılar yıllık çalışma planını hem PDF hem de <span className="text-slate-200">YILLIK ÇALIŞMA</span>
+                  <p className="text-sm font-medium text-foreground dark:text-white">Excel şablonuna uygun çıktı</p>
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground dark:text-slate-400">
+                    Kullanıcılar yıllık çalışma planını hem PDF hem de <span className="font-medium text-foreground dark:text-slate-200">YILLIK ÇALIŞMA</span>
                     sayfa mantığına uygun Excel çıktısı olarak indirebilir.
                   </p>
                 </div>
@@ -1018,16 +1033,16 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 px-6 py-6 md:px-8">
-        <TabsList className="grid w-full grid-cols-1 rounded-2xl border border-white/10 bg-white/[0.03] p-2 md:grid-cols-3">
-          <TabsTrigger value="work_plan" className="gap-2 rounded-xl text-slate-300 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+        <TabsList className="grid w-full grid-cols-1 rounded-2xl border border-border bg-card p-2 dark:border-white/10 dark:bg-white/[0.03] md:grid-cols-3">
+          <TabsTrigger value="work_plan" className="gap-2 rounded-xl text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground dark:text-slate-300 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-white">
             <ClipboardList className="h-4 w-4" />
             Yıllık Çalışma
           </TabsTrigger>
-          <TabsTrigger value="training_plan" className="gap-2 rounded-xl text-slate-300 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+          <TabsTrigger value="training_plan" className="gap-2 rounded-xl text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground dark:text-slate-300 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-white">
             <Users className="h-4 w-4" />
             Yıllık Eğitim
           </TabsTrigger>
-          <TabsTrigger value="evaluation" className="gap-2 rounded-xl text-slate-300 data-[state=active]:bg-white/10 data-[state=active]:text-white">
+          <TabsTrigger value="evaluation" className="gap-2 rounded-xl text-muted-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground dark:text-slate-300 dark:data-[state=active]:bg-white/10 dark:data-[state=active]:text-white">
             <FileSpreadsheet className="h-4 w-4" />
             Yıllık Değerlendirme
           </TabsTrigger>
@@ -1039,40 +1054,40 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
         <TabsContent value="work_plan" className="space-y-6">
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="grid gap-4 sm:grid-cols-3">
-              <Card className="border-white/10 bg-white/[0.03] text-slate-100">
+              <Card className="border-border bg-card text-foreground dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100">
                 <CardContent className="p-5">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Şablon uyumu</p>
-                  <p className="mt-3 text-2xl font-semibold text-white">YILLIK ÇALIŞMA</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-slate-400">Şablon uyumu</p>
+                  <p className="mt-3 text-2xl font-semibold text-foreground dark:text-white">YILLIK ÇALIŞMA</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground dark:text-slate-400">
                     Çıktı, Excel çalışma planı düzenine uygun sütun ve ay kurgusuyla hazırlanır.
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-white/10 bg-white/[0.03] text-slate-100">
+              <Card className="border-border bg-card text-foreground dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100">
                 <CardContent className="p-5">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Sorumlu alan</p>
-                  <p className="mt-3 text-2xl font-semibold text-white">{organizationName || "Kurum"}</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-slate-400">Sorumlu alan</p>
+                  <p className="mt-3 text-2xl font-semibold text-foreground dark:text-white">{organizationName || "Kurum"}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground dark:text-slate-400">
                     Üst bilgiye otomatik yazılır ve yıllık çalışma planı çıktısına taşınır.
                   </p>
                 </CardContent>
               </Card>
-              <Card className="border-white/10 bg-white/[0.03] text-slate-100">
+              <Card className="border-border bg-card text-foreground dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100">
                 <CardContent className="p-5">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Hazır aksiyon</p>
-                  <p className="mt-3 text-2xl font-semibold text-white">PDF + Excel</p>
-                  <p className="mt-2 text-xs leading-5 text-slate-400">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground dark:text-slate-400">Hazır aksiyon</p>
+                  <p className="mt-3 text-2xl font-semibold text-foreground dark:text-white">PDF + Excel</p>
+                  <p className="mt-2 text-xs leading-5 text-muted-foreground dark:text-slate-400">
                     Kullanıcı aynı planı iki farklı çıktı formatında indirebilir.
                   </p>
                 </CardContent>
               </Card>
             </div>
 
-            <Card className="border-cyan-400/20 bg-cyan-400/10 text-slate-50">
+            <Card className="border-cyan-400/20 bg-cyan-400/10 text-foreground dark:text-slate-50">
               <CardContent className="p-5">
-                <p className="text-xs uppercase tracking-[0.22em] text-cyan-100/80">Kullanım</p>
-                <h3 className="mt-2 text-lg font-semibold text-white">Takvim ve faaliyet planı çıktısı</h3>
-                <p className="mt-2 text-sm leading-6 text-cyan-50/85">
+                <p className="text-xs uppercase tracking-[0.22em] text-cyan-700/80 dark:text-cyan-100/80">Kullanım</p>
+                <h3 className="mt-2 text-lg font-semibold text-foreground dark:text-white">Takvim ve faaliyet planı çıktısı</h3>
+                <p className="mt-2 text-sm leading-6 text-cyan-800/85 dark:text-cyan-50/85">
                   Buradaki planlama tablosu yıl boyunca yürütülecek faaliyetleri aylara dağıtmak için tasarlandı.
                   Şablon yükle, hücreleri işaretle ve sonra kurumsal çıktı al.
                 </p>
@@ -1080,13 +1095,13 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
             </Card>
           </div>
 
-          <Card className="border-white/10 bg-slate-950/60 text-slate-100 shadow-[0_20px_60px_rgba(2,6,23,0.28)]">
+          <Card className="border-border bg-card text-foreground shadow-sm dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-100 dark:shadow-[0_20px_60px_rgba(2,6,23,0.28)]">
             <CardHeader>
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <CardTitle className="text-xl text-white">Yıllık Çalışma Planı ({selectedYear})</CardTitle>
-                  <CardDescription className="mt-2 max-w-3xl text-slate-400">
-                    Aylık takip için hücrelere tıklayın: <span className="text-slate-200">Boş</span> → <span className="text-amber-300">Planlandı</span> → <span className="text-emerald-300">Tamamlandı</span>.
+                  <CardTitle className="text-xl text-foreground dark:text-white">Yıllık Çalışma Planı ({selectedYear})</CardTitle>
+                  <CardDescription className="mt-2 max-w-3xl text-muted-foreground dark:text-slate-400">
+                    Aylık takip için hücrelere tıklayın: <span className="text-slate-700 dark:text-slate-200">Boş</span> → <span className="text-amber-700 dark:text-amber-300">Planlandı</span> → <span className="text-emerald-700 dark:text-emerald-300">Tamamlandı</span>.
                     İndirilen Excel dosyası kullanıcıların alıştığı yıllık çalışma şablon mantığını korur.
                   </CardDescription>
                 </div>
@@ -1095,7 +1110,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                     variant="outline"
                     size="sm"
                     onClick={loadWorkPlanTemplate}
-                    className="gap-2 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/10"
+                    className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 dark:hover:bg-white/10"
                   >
                     <Sparkles className="h-4 w-4" />
                     Şablon Yükle
@@ -1105,7 +1120,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                     size="sm"
                     onClick={() => savePlan('work_plan')}
                     disabled={saving}
-                    className="gap-2 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/10"
+                    className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 dark:hover:bg-white/10"
                   >
                     <Save className="h-4 w-4" />
                     Kaydet
@@ -1114,7 +1129,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                     variant="outline"
                     size="sm"
                     onClick={() => openTemplatePreview("work_plan")}
-                    className="gap-2 border-white/10 bg-white/[0.03] text-slate-100 hover:bg-white/10"
+                    className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 dark:hover:bg-white/10"
                   >
                     <Eye className="h-4 w-4" />
                     Şablon Önizle
@@ -1123,7 +1138,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                     variant="outline"
                     size="sm"
                     onClick={exportWorkPlanExcel}
-                    className="gap-2 border-cyan-400/30 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/15"
+                    className="gap-2 border-cyan-200/80 bg-cyan-50 text-cyan-800 hover:bg-cyan-100 dark:border-cyan-400/30 dark:bg-cyan-400/10 dark:text-cyan-100 dark:hover:bg-cyan-400/15"
                   >
                     <FileSpreadsheet className="h-4 w-4" />
                     Excel Şablonuna Uygun Çıktı
@@ -1140,14 +1155,14 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
               </div>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-900/80 p-2">
+              <div className="overflow-x-auto rounded-2xl border border-border bg-background p-2 dark:border-white/10 dark:bg-slate-900/80">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-white/10">
-                      <TableHead className="w-[250px] text-slate-300">Faaliyet</TableHead>
-                      <TableHead className="w-[150px] text-slate-300">Sorumlu</TableHead>
+                    <TableRow className="border-border dark:border-white/10">
+                      <TableHead className="w-[250px] text-muted-foreground dark:text-slate-300">Faaliyet</TableHead>
+                      <TableHead className="w-[150px] text-muted-foreground dark:text-slate-300">Sorumlu</TableHead>
                       {MONTH_NAMES.map((month, idx) => (
-                        <TableHead key={idx} className="w-[60px] text-center text-slate-300">
+                        <TableHead key={idx} className="w-[60px] text-center text-muted-foreground dark:text-slate-300">
                           {month.substring(0, 3)}
                         </TableHead>
                       ))}
@@ -1156,13 +1171,13 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                   </TableHeader>
                   <TableBody>
                     {workPlan.map(row => (
-                      <TableRow key={row.id} className="border-white/10">
+                      <TableRow key={row.id} className="border-border dark:border-white/10">
                         <TableCell>
                           <Input
                             value={row.activity_name}
                             onChange={(e) => updateWorkPlanRow(row.id, 'activity_name', e.target.value)}
                             placeholder="Faaliyet adı"
-                            className="h-9 border-white/10 bg-slate-950/60 text-sm text-slate-100 placeholder:text-slate-500"
+                            className="h-9 border-border bg-background text-sm text-foreground placeholder:text-muted-foreground dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-slate-500"
                           />
                         </TableCell>
                         <TableCell>
@@ -1170,7 +1185,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                             value={row.responsible}
                             onChange={(e) => updateWorkPlanRow(row.id, 'responsible', e.target.value)}
                             placeholder="Sorumlu"
-                            className="h-9 border-white/10 bg-slate-950/60 text-sm text-slate-100 placeholder:text-slate-500"
+                            className="h-9 border-border bg-background text-sm text-foreground placeholder:text-muted-foreground dark:border-white/10 dark:bg-slate-950/60 dark:text-slate-100 dark:placeholder:text-slate-500"
                           />
                         </TableCell>
                         {Object.entries(row.months).map(([monthIndex, status]) => (
@@ -1182,7 +1197,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                             <div className={`h-8 w-full rounded flex items-center justify-center transition-all hover:scale-105 ${
                               status === "empty" ? "bg-slate-950/60 text-slate-500 ring-1 ring-white/10" :
                               status === "planned" ? "bg-amber-400 text-amber-950 font-bold" :
-                              "bg-emerald-500 text-white font-bold"
+                              "bg-emerald-500 text-slate-950 dark:text-white font-bold"
                             }`}>
                               {status === "planned" ? "P" : status === "completed" ? "✓" : "-"}
                             </div>
@@ -1207,7 +1222,7 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
               <Button
                 variant="outline"
                 onClick={addWorkPlanRow}
-                className="mt-4 w-full gap-2 border-dashed border-white/15 bg-white/[0.03] text-slate-100 hover:bg-white/10"
+                className="mt-4 w-full gap-2 border-dashed border-border bg-muted/40 text-foreground hover:bg-muted dark:border-white/15 dark:bg-white/[0.03] dark:text-slate-100 dark:hover:bg-white/10"
               >
                 <Plus className="h-4 w-4" />
                 Yeni faaliyet satırı ekle

@@ -976,7 +976,7 @@ export default function BlueprintAnalyzer() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="theme-page-readable space-y-8">
       {/* HEADER */}
       <div className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] px-6 py-7 shadow-[0_24px_80px_rgba(2,6,23,0.42)] lg:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">

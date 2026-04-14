@@ -41,15 +41,15 @@ export function AssignmentTypeCards({ onCreate }: AssignmentTypeCardsProps) {
       {assignmentTypes.map((item) => (
         <Card
           key={item.type}
-          className="border-slate-700/70 bg-gradient-to-br from-slate-950/90 via-slate-900/85 to-slate-900/70 shadow-[0_18px_50px_rgba(2,6,23,0.35)]"
+          className="cardBase shadow-[0_18px_50px_rgba(2,6,23,0.08)] dark:shadow-[0_18px_50px_rgba(2,6,23,0.35)]"
         >
           <CardHeader className="space-y-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300">
               <item.icon className="h-5 w-5" />
             </div>
             <div className="space-y-2">
-              <CardTitle className="text-slate-100">{item.title}</CardTitle>
-              <CardDescription className="text-slate-400">{item.description}</CardDescription>
+              <CardTitle className="cardTitle">{item.title}</CardTitle>
+              <CardDescription className="cardDescription">{item.description}</CardDescription>
             </div>
           </CardHeader>
           <CardContent>
