@@ -78,11 +78,16 @@ interface MenuGroup {
 // ====================================================
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
-  if (badge === "AI") return "border-fuchsia-500/30 bg-fuchsia-500/12 text-fuchsia-800 dark:text-fuchsia-200";
-  if (badge === "Pro") return "border-amber-500/30 bg-amber-500/12 text-amber-900 dark:text-amber-200";
-  if (badge === "Beta") return "border-sky-500/30 bg-sky-500/12 text-sky-900 dark:text-sky-200";
-  if (badge === "NEW") return "border-emerald-500/30 bg-emerald-500/12 text-emerald-900 dark:text-emerald-200";
-  if (typeof badge === "number") return "border-yellow-500/30 bg-yellow-500/12 text-yellow-950 dark:text-yellow-200";
+  if (badge === "AI")
+    return "border-fuchsia-500/30 bg-fuchsia-500/12 text-fuchsia-800 dark:text-fuchsia-200";
+  if (badge === "Pro")
+    return "border-amber-500/30 bg-amber-500/12 text-amber-900 dark:text-amber-200";
+  if (badge === "Beta")
+    return "border-sky-500/30 bg-sky-500/12 text-sky-900 dark:text-sky-200";
+  if (badge === "NEW")
+    return "border-emerald-500/30 bg-emerald-500/12 text-emerald-900 dark:text-emerald-200";
+  if (typeof badge === "number")
+    return "border-yellow-500/30 bg-yellow-500/12 text-yellow-950 dark:text-yellow-200";
   return "border-border/60 bg-muted/35 text-muted-foreground";
 };
 
@@ -106,7 +111,6 @@ const sectionLabel =
 const menuItemBase =
   "group relative flex w-full items-start gap-3 rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
 
-// Light/Dark hover kontrastı yükseltildi
 const menuItemIdle = cn(
   "text-foreground/85 hover:bg-muted/55 hover:text-foreground",
   "hover:shadow-[0_12px_34px_-28px_rgba(15,23,42,0.50)]",
@@ -119,24 +123,24 @@ const menuItemActive = cn(
   "dark:border-primary/22 dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.26),transparent_72%)]",
 );
 
-// İKON KUTUSU: daha büyük + daha görünür
+// İKON KUTUSU: daha büyük + daha görünür (renk ikona verilecek)
 const iconWrapBase =
   "mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border transition-all duration-200";
 
 const iconWrapIdle = cn(
   // light
   "border-sidebar-border/80 bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.70))]",
-  "text-foreground/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.94),0_14px_32px_-26px_rgba(15,23,42,0.55)]",
-  "group-hover:border-primary/25 group-hover:bg-background group-hover:text-foreground",
+  "shadow-[inset_0_1px_0_hsl(var(--background)/0.94),0_14px_32px_-26px_rgba(15,23,42,0.55)]",
+  "group-hover:border-primary/25 group-hover:bg-background",
   // dark
   "dark:border-sidebar-border/80 dark:bg-[linear-gradient(180deg,hsl(var(--background)/0.32),hsl(var(--background)/0.18))]",
-  "dark:text-foreground/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_36px_-28px_rgba(0,0,0,0.85)]",
-  "dark:group-hover:border-primary/30 dark:group-hover:bg-background/40 dark:group-hover:text-foreground",
+  "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_36px_-28px_rgba(0,0,0,0.85)]",
+  "dark:group-hover:border-primary/30 dark:group-hover:bg-background/40",
 );
 
 const iconWrapActive = cn(
   "border-primary/35 bg-[linear-gradient(180deg,hsl(var(--primary)/0.22),hsl(var(--primary)/0.12))]",
-  "text-primary shadow-[0_24px_54px_-36px_hsl(var(--primary)/0.95)]",
+  "shadow-[0_24px_54px_-36px_hsl(var(--primary)/0.95)]",
   "dark:bg-[linear-gradient(180deg,hsl(var(--primary)/0.26),hsl(var(--primary)/0.14))]",
 );
 
@@ -151,9 +155,9 @@ const surfacePanel = cn(
 
 const collapsedUtilityButton = cn(
   "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70",
-  "text-foreground/70 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.45)] backdrop-blur-xl transition",
+  "text-foreground/80 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.45)] backdrop-blur-xl transition",
   "hover:border-primary/30 hover:bg-background hover:text-foreground",
-  "dark:text-foreground/75 dark:shadow-[0_18px_34px_-26px_rgba(0,0,0,0.78)]",
+  "dark:text-foreground/85 dark:shadow-[0_18px_34px_-26px_rgba(0,0,0,0.78)]",
 );
 
 function PillBadge({ value, active }: { value: string | number; active: boolean }) {
@@ -166,6 +170,41 @@ function PillBadge({ value, active }: { value: string | number; active: boolean 
     >
       {value}
     </span>
+  );
+}
+
+// İkonları görünür yapmak için TEK kaynak: ikonun kendi class’ı
+function MenuIcon({
+  Icon,
+  active,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  active: boolean;
+}) {
+  return (
+    <Icon
+      className={cn(
+        "h-[20px] w-[20px] stroke-[2.35]",
+        active ? "text-primary" : "text-foreground/90 dark:text-foreground/90",
+      )}
+    />
+  );
+}
+
+function SubMenuIcon({
+  Icon,
+  active,
+}: {
+  Icon: React.ComponentType<{ className?: string }>;
+  active: boolean;
+}) {
+  return (
+    <Icon
+      className={cn(
+        "mt-0.5 h-[18px] w-[18px] stroke-[2.25]",
+        active ? "text-primary" : "text-foreground/70 dark:text-foreground/80",
+      )}
+    />
   );
 }
 
@@ -412,7 +451,11 @@ export function AppSidebar() {
               title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
               type="button"
             >
-              {collapsed ? <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" /> : <PanelLeftClose className="h-5 w-5 stroke-[2.2]" />}
+              {collapsed ? (
+                <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" />
+              ) : (
+                <PanelLeftClose className="h-5 w-5 stroke-[2.2]" />
+              )}
             </button>
           </div>
 
@@ -491,7 +534,7 @@ export function AppSidebar() {
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[18px] w-[18px] stroke-[2.25]" />
+                              <MenuIcon Icon={item.icon} active={active} />
                             </span>
 
                             {!collapsed && (
@@ -520,18 +563,13 @@ export function AppSidebar() {
                                       to={child.url}
                                       className={cn(
                                         "flex items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
-                                        "text-foreground/75 hover:bg-muted/45 hover:text-foreground",
-                                        "dark:text-foreground/78 dark:hover:bg-muted/30",
+                                        "text-foreground/80 hover:bg-muted/45 hover:text-foreground",
+                                        "dark:text-foreground/80 dark:hover:bg-muted/30",
                                         childActive && "bg-primary/10 text-foreground",
                                       )}
                                       activeClassName=""
                                     >
-                                      <child.icon
-                                        className={cn(
-                                          "mt-0.5 h-[18px] w-[18px] stroke-[2.2]",
-                                          childActive ? "text-primary" : "text-foreground/55 dark:text-foreground/60",
-                                        )}
-                                      />
+                                      <SubMenuIcon Icon={child.icon} active={childActive} />
                                       <span className="min-w-0 flex-1 whitespace-normal leading-5">{child.title}</span>
                                       {child.badge && <PillBadge value={child.badge} active={childActive} />}
                                     </NavLink>
@@ -555,7 +593,7 @@ export function AppSidebar() {
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[18px] w-[18px] stroke-[2.25]" />
+                              <MenuIcon Icon={item.icon} active={active} />
                             </span>
 
                             {!collapsed && (
