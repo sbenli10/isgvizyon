@@ -97,7 +97,7 @@ const sectionLabel =
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex w-full items-start gap-3 rounded-[20px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
+  "group relative flex w-full items-start gap-3 rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle =
   "text-foreground/80 hover:border-border/70 hover:bg-muted/55 hover:text-foreground";
@@ -106,13 +106,13 @@ const menuItemActive =
   "border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_70%)] text-foreground shadow-[0_16px_34px_-26px_hsl(var(--primary)/0.65)]";
 
 const iconWrapBase =
-  "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border transition-all duration-200";
+  "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] border transition-all duration-200";
 
 const iconWrapIdle =
-  "border-border/60 bg-background/65 text-muted-foreground group-hover:bg-background group-hover:text-foreground";
+  "border-border/70 bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.7))] text-muted-foreground shadow-[inset_0_1px_0_hsl(var(--background)/0.85),0_10px_24px_-20px_rgba(15,23,42,0.7)] group-hover:border-primary/20 group-hover:bg-background group-hover:text-foreground";
 
 const iconWrapActive =
-  "border-primary/25 bg-primary/10 text-primary";
+  "border-primary/30 bg-[linear-gradient(180deg,hsl(var(--primary)/0.18),hsl(var(--primary)/0.10))] text-primary shadow-[0_18px_30px_-22px_hsl(var(--primary)/0.95)]";
 
 const leftAccent =
   "absolute left-1 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary/80 opacity-0 transition-opacity";
@@ -120,6 +120,9 @@ const leftAccentActive = "opacity-100";
 
 const surfacePanel =
   "rounded-[24px] border border-sidebar-border/70 bg-background/55 shadow-sm backdrop-blur-xl";
+
+const collapsedUtilityButton =
+  "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70 text-muted-foreground shadow-[0_16px_28px_-24px_rgba(15,23,42,0.85)] backdrop-blur-xl transition hover:border-primary/30 hover:bg-background hover:text-foreground";
 
 function PillBadge({ value, active }: { value: string | number; active: boolean }) {
   return (
@@ -267,7 +270,7 @@ export function AppSidebar() {
         icon: Brain,
         items: [
           { title: "Yapay Zeka Raporları", url: "/reports", icon: Brain, badge: "Beta" },
-          { title: "İSGPratik Bot", url: "/isg-bot", icon: Bot, badge: "NEW" },
+          { title: "İSGBot", url: "/isg-bot", icon: Bot, badge: "NEW" },
         ],
       },
     ],
@@ -333,15 +336,28 @@ export function AppSidebar() {
       collapsible="icon"
       style={
         {
-          "--sidebar-width": "19.75rem",
-          "--sidebar-width-icon": "5rem",
+          "--sidebar-width": "22rem",
+          "--sidebar-width-icon": "5.5rem",
         } as React.CSSProperties
       }
       className={cn("h-svh bg-transparent p-3 md:p-4")}
     >
       <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col overflow-hidden")}>
+        {collapsed && (
+          <div className="flex items-center justify-center border-b border-sidebar-border/80 px-2 py-3">
+            <button
+              onClick={toggleSidebar}
+              className={collapsedUtilityButton}
+              title="Menüyü genişlet"
+              type="button"
+            >
+              <PanelLeftOpen className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        )}
+
         {/* HEADER */}
-        <SidebarHeader className="border-b border-sidebar-border/80 px-3 py-4">
+        <SidebarHeader className={cn("border-b border-sidebar-border/80 px-3 py-4", collapsed && "hidden")}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div
@@ -439,8 +455,8 @@ export function AppSidebar() {
                   </span>
                 </div>
               ) : (
-                <div className="my-2 flex justify-center">
-                  <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                <div className="my-3 flex justify-center">
+                  <div className="h-8 w-px rounded-full bg-gradient-to-b from-transparent via-sidebar-border to-transparent" />
                 </div>
               )}
 
@@ -466,7 +482,7 @@ export function AppSidebar() {
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[16px] w-[16px]" />
+                              <item.icon className="h-[17px] w-[17px] stroke-[2.1]" />
                             </span>
 
                             {!collapsed && (
@@ -506,7 +522,7 @@ export function AppSidebar() {
                                     >
                                       <child.icon
                                         className={cn(
-                                          "mt-0.5 h-4 w-4",
+                                          "mt-0.5 h-[17px] w-[17px] stroke-[2.1]",
                                           childActive ? "text-primary" : "text-muted-foreground",
                                         )}
                                       />
@@ -541,7 +557,7 @@ export function AppSidebar() {
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[16px] w-[16px]" />
+                              <item.icon className="h-[17px] w-[17px] stroke-[2.1]" />
                             </span>
 
                             {!collapsed && (
