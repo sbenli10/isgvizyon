@@ -8,7 +8,6 @@ import {
   Shield,
   ShieldAlert,
   ShieldPlus,
-  ChevronLeft,
   ChevronRight,
   LogOut,
   User,
@@ -25,12 +24,15 @@ import {
   Award,
   Briefcase,
   FileSearch,
-  Map,
   CalendarClock,
   HeartPulse,
   Search,
   CircleHelp,
   Sparkles,
+  Activity,
+  Command,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -85,29 +87,29 @@ const badgeClassNames = (badge: MenuItem["badge"]) => {
 };
 
 const cardShell =
-  "rounded-[22px] border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[0_18px_55px_-35px_rgba(2,6,23,0.30)] dark:shadow-[0_30px_80px_-45px_rgba(0,0,0,0.65)]";
+  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/95 text-sidebar-foreground shadow-[0_24px_65px_-38px_rgba(2,6,23,0.38)] ring-1 ring-black/5 backdrop-blur-2xl dark:shadow-[0_34px_90px_-48px_rgba(0,0,0,0.7)] dark:ring-white/5";
 
 const cardInnerGlow =
-  "bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.10),_transparent_40%)]";
+  "bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.12),_transparent_38%)]";
 
 const sectionLabel =
-  "px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
+  "mb-1 flex items-center justify-between px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex w-full items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-all duration-200";
+  "group relative flex w-full items-start gap-3 rounded-[20px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle =
-  "text-foreground/80 hover:bg-muted/50 hover:text-foreground";
+  "text-foreground/80 hover:border-border/70 hover:bg-muted/55 hover:text-foreground";
 
 const menuItemActive =
-  "border border-primary/20 bg-[linear-gradient(90deg,hsl(var(--primary)/0.16),transparent)] text-foreground shadow-[0_12px_30px_-22px_hsl(var(--primary)/0.55)]";
+  "border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_70%)] text-foreground shadow-[0_16px_34px_-26px_hsl(var(--primary)/0.65)]";
 
 const iconWrapBase =
-  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-all duration-200";
+  "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border transition-all duration-200";
 
 const iconWrapIdle =
-  "border-border/60 bg-background/45 text-muted-foreground group-hover:bg-background group-hover:text-foreground";
+  "border-border/60 bg-background/65 text-muted-foreground group-hover:bg-background group-hover:text-foreground";
 
 const iconWrapActive =
   "border-primary/25 bg-primary/10 text-primary";
@@ -115,6 +117,9 @@ const iconWrapActive =
 const leftAccent =
   "absolute left-1 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary/80 opacity-0 transition-opacity";
 const leftAccentActive = "opacity-100";
+
+const surfacePanel =
+  "rounded-[24px] border border-sidebar-border/70 bg-background/55 shadow-sm backdrop-blur-xl";
 
 function PillBadge({ value, active }: { value: string | number; active: boolean }) {
   return (
@@ -179,9 +184,9 @@ export function AppSidebar() {
         label: "Genel",
         icon: LayoutDashboard,
         items: [
-          { title: "Panel", url: "/", icon: LayoutDashboard, badge: null },
+          { title: "Ana Panel", url: "/", icon: LayoutDashboard, badge: null },
           { title: "Profilim", url: "/profile", icon: User, badge: null },
-          { title: "E-posta Geçmişi", url: "/email-history", icon: Mail, badge: null },
+          { title: "E-posta Arşivi", url: "/email-history", icon: Mail, badge: null },
         ],
       },
       {
@@ -214,11 +219,11 @@ export function AppSidebar() {
             icon: Briefcase,
             badge: "NEW",
             children: [
-              { title: "OSGB Dashboard", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
+              { title: "OSGB Paneli", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
               { title: "Personel Havuzu", url: "/osgb/personnel", icon: Users, badge: null },
               { title: "Personel Görevlendirme", url: "/osgb/assignments", icon: Briefcase, badge: null },
               { title: "Firma Takibi", url: "/osgb/company-tracking", icon: Building2, badge: null },
-              { title: "Süre ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null },
+              { title: "Süreç ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null },
               { title: "Uyarı Merkezi", url: "/osgb/alerts", icon: ShieldAlert, badge: "NEW" },
               { title: "Finans Yönetimi", url: "/osgb/finance", icon: FileText, badge: null },
               { title: "Evrak Takibi", url: "/osgb/documents", icon: FileSearch, badge: null },
@@ -253,15 +258,15 @@ export function AppSidebar() {
         icon: Calendar,
         items: [
           { title: "Yıllık Planlar", url: "/annual-plans", icon: Calendar, badge: null },
-          { title: "NACE Kod Sorgu", url: "/nace-query", icon: Shield, badge: "AI" },
+          { title: "NACE Kod Sorgulama", url: "/nace-query", icon: Shield, badge: "AI" },
           { title: "NACE Sektör Listesi", url: "/nace-query/sectors", icon: BookOpen, badge: null },
         ],
       },
       {
-        label: "AI & Otomasyon",
+        label: "Yapay Zeka & Otomasyon",
         icon: Brain,
         items: [
-          { title: "AI Raporlar", url: "/reports", icon: Brain, badge: "Beta" },
+          { title: "Yapay Zeka Raporları", url: "/reports", icon: Brain, badge: "Beta" },
           { title: "İSGPratik Bot", url: "/isg-bot", icon: Bot, badge: "NEW" },
         ],
       },
@@ -319,23 +324,32 @@ export function AppSidebar() {
       .filter((g): g is MenuGroup => g !== null);
   }, [menuGroups, normalizedSearch]);
 
+  const totalVisibleItems = filteredMenuGroups.reduce((sum, group) => {
+    return sum + group.items.reduce((count, item) => count + 1 + (item.children?.length ?? 0), 0);
+  }, 0);
+
   return (
     <Sidebar
       collapsible="icon"
       style={
         {
-          "--sidebar-width": "18.5rem", // ✅ daha geniş: başlıklar daha rahat sığar
-          "--sidebar-width-icon": "4.75rem",
+          "--sidebar-width": "19.75rem",
+          "--sidebar-width-icon": "5rem",
         } as React.CSSProperties
       }
-      className={cn("bg-transparent p-3", "h-dvh")}
+      className={cn("h-svh bg-transparent p-3 md:p-4")}
     >
-      <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col")}>
+      <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col overflow-hidden")}>
         {/* HEADER */}
-        <SidebarHeader className="border-b border-sidebar-border px-3 py-4">
+        <SidebarHeader className="border-b border-sidebar-border/80 px-3 py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-sidebar-border bg-background/55 shadow-sm">
+              <div
+                className={cn(
+                  surfacePanel,
+                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-[22px] p-1",
+                )}
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 text-white shadow-sm">
                   <Shield className="h-4 w-4" />
                 </div>
@@ -347,7 +361,10 @@ export function AppSidebar() {
                     İSGVİZYON
                   </div>
                   <div className="text-sm font-semibold text-sidebar-foreground">
-                    Premium çalışma alanı
+                    Operasyon merkezi
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Hızlı erişim ve görev takibi
                   </div>
                 </div>
               )}
@@ -356,35 +373,59 @@ export function AppSidebar() {
             <button
               onClick={toggleSidebar}
               className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-xl border border-sidebar-border bg-background/45 text-muted-foreground transition",
-                "hover:bg-muted/45 hover:text-sidebar-foreground",
+                surfacePanel,
+                "flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition",
+                "hover:bg-muted/55 hover:text-sidebar-foreground",
               )}
               title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
               type="button"
             >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
           </div>
 
           {!collapsed && (
-            <div className="relative mt-4">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Menüde ara..."
-                className={cn(
-                  "h-10 rounded-2xl border border-sidebar-border bg-background/45 pl-9 text-sm text-sidebar-foreground shadow-none",
-                  "placeholder:text-muted-foreground",
-                  "focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:border-ring",
-                )}
-              />
-            </div>
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className={cn(surfacePanel, "p-3")}>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <Activity className="h-3.5 w-3.5" />
+                    Görünen
+                  </div>
+                  <div className="mt-2 text-xl font-semibold text-sidebar-foreground">
+                    {totalVisibleItems}
+                  </div>
+                  <div className="text-xs text-muted-foreground">aktif menü bağlantısı</div>
+                </div>
+                <div className={cn(surfacePanel, "p-3")}>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    <Command className="h-3.5 w-3.5" />
+                    Durum
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-sidebar-foreground">Hazır</div>
+                  <div className="text-xs text-muted-foreground">tek panelden hızlı erişim</div>
+                </div>
+              </div>
+
+              <div className="relative mt-3">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Menüde ara..."
+                  className={cn(
+                    "h-11 rounded-[20px] border border-sidebar-border/70 bg-background/55 pl-9 text-sm text-sidebar-foreground shadow-none backdrop-blur-xl",
+                    "placeholder:text-muted-foreground",
+                    "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                  )}
+                />
+              </div>
+            </>
           )}
         </SidebarHeader>
 
         {/* CONTENT */}
-        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 overscroll-contain">
+        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1 overscroll-contain">
           {filteredMenuGroups.map((group) => (
             <SidebarGroup key={group.label} className="px-1">
               {!collapsed ? (
@@ -393,6 +434,9 @@ export function AppSidebar() {
                     <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>{group.label}</span>
                   </div>
+                  <span className="rounded-full border border-sidebar-border/70 bg-background/55 px-2 py-0.5 text-[10px] font-semibold tracking-normal text-muted-foreground">
+                    {group.items.length}
+                  </span>
                 </div>
               ) : (
                 <div className="my-2 flex justify-center">
@@ -454,7 +498,7 @@ export function AppSidebar() {
                                     <NavLink
                                       to={child.url}
                                       className={cn(
-                                        "flex items-start gap-3 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
+                                        "flex items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
                                         "text-foreground/70 hover:bg-muted/45 hover:text-foreground",
                                         childActive && "bg-primary/10 text-foreground",
                                       )}
@@ -524,9 +568,9 @@ export function AppSidebar() {
         </SidebarContent>
 
         {/* FOOTER */}
-        <SidebarFooter className="border-t border-sidebar-border p-3">
+        <SidebarFooter className="border-t border-sidebar-border/80 p-3">
           {!collapsed && user && (
-            <div className="rounded-2xl border border-sidebar-border bg-background/45 p-3 shadow-sm">
+            <div className={cn(surfacePanel, "p-3")}>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-sky-500 text-sm font-bold text-white shadow-sm">
                   {user.email ? user.email.charAt(0).toUpperCase() : "U"}
@@ -544,11 +588,11 @@ export function AppSidebar() {
             </div>
           )}
 
-          <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-sidebar-border bg-background/45 p-2 shadow-sm">
+          <div className={cn(surfacePanel, "mt-2 flex items-center justify-between gap-2 p-2")}>
             <ThemeToggle />
 
             <button
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
               title="Yardım"
               type="button"
             >
@@ -557,7 +601,7 @@ export function AppSidebar() {
 
             <button
               onClick={() => navigate("/settings")}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
               title="Ayarlar"
               type="button"
             >
@@ -566,7 +610,7 @@ export function AppSidebar() {
 
             <button
               onClick={handleSignOut}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
               title="Çıkış yap"
               type="button"
             >
