@@ -1,5 +1,6 @@
 import { Menu, ShieldAlert, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useTheme } from "next-themes";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,25 @@ export function LandingLayout({
 }: LandingLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const activePath = useMemo(() => location.pathname, [location.pathname]);
+
+  useEffect(() => {
+    const previousTheme = theme;
+
+    if (previousTheme !== "dark") {
+      setTheme("dark");
+    }
+
+    return () => {
+      if (previousTheme && previousTheme !== "dark") {
+        setTheme(previousTheme);
+      }
+    };
+    // Landing sayfalari tema seciciden bagimsiz olarak yalnizca dark modda calisir.
+  }, []);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#070b15] text-white">

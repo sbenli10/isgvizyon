@@ -24,6 +24,11 @@ import {
   ImagePlus,
   Bot,
   Activity,
+  KeyRound,
+  UserPlus,
+  Copy,
+  Link as LinkIcon,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +74,31 @@ interface OrganizationData {
   city: string;
   phone: string;
   website: string;
+}
+
+interface OrganizationInviteSummary {
+  invite_id: string;
+  organization_id: string;
+  organization_name: string;
+  code: string;
+  note: string | null;
+  is_active: boolean;
+  max_uses: number;
+  used_count: number;
+  expires_at: string | null;
+  created_at: string;
+}
+
+interface PendingJoinRequestSummary {
+  request_id: string;
+  organization_id: string;
+  requester_id: string;
+  requester_name: string | null;
+  requester_email: string | null;
+  requester_position: string | null;
+  status: string;
+  message: string | null;
+  created_at: string;
 }
 
 const getSettingsCacheKey = (userId: string) => `denetron:settings:${userId}`;
@@ -143,6 +173,12 @@ export default function Settings() {
   const [aiFunctionLogs, setAiFunctionLogs] = useState<AiFunctionLog[]>([]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [animatedSecurityScore, setAnimatedSecurityScore] = useState(0);
+  const [organizationInvites, setOrganizationInvites] = useState<OrganizationInviteSummary[]>([]);
+  const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequestSummary[]>([]);
+  const [creatingInvite, setCreatingInvite] = useState(false);
+  const [reviewingJoinRequestId, setReviewingJoinRequestId] = useState<string | null>(null);
+  const [deactivatingInviteId, setDeactivatingInviteId] = useState<string | null>(null);
+  const [regeneratingInviteId, setRegeneratingInviteId] = useState<string | null>(null);
 
 useEffect(() => {
   if (user) {
@@ -262,6 +298,24 @@ useEffect(() => {
             website: orgData.website || "",
           });
         }
+      }
+
+      if (profileData.organization_id && profileData.role?.toLowerCase() === "admin") {
+        const [{ data: inviteData, error: inviteError }, { data: joinRequestData, error: joinRequestError }] = await Promise.all([
+          (supabase as any).rpc("list_my_organization_invites"),
+          (supabase as any).rpc("list_organization_join_requests"),
+        ]);
+
+        if (!inviteError) {
+          setOrganizationInvites((inviteData || []) as OrganizationInviteSummary[]);
+        }
+
+        if (!joinRequestError) {
+          setPendingJoinRequests((joinRequestData || []) as PendingJoinRequestSummary[]);
+        }
+      } else {
+        setOrganizationInvites([]);
+        setPendingJoinRequests([]);
       }
 
       // Oturum kayıtlarını çek
@@ -942,6 +996,148 @@ const handleForceReset2FA = async () => {
     }
   };
 
+  const handleCreateOrganizationInvite = async () => {
+    if (!profileData?.organization_id) return;
+
+    setCreatingInvite(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("create_organization_invite", {
+        p_expires_in_days: 7,
+        p_max_uses: 1,
+        p_note: "Profil ekranından davet akışı",
+      });
+
+      if (error) throw error;
+
+      const createdInvite = Array.isArray(data) ? data[0] : null;
+      if (createdInvite) {
+        setOrganizationInvites((prev) => [createdInvite as OrganizationInviteSummary, ...prev].slice(0, 10));
+      }
+
+      toast.success("Davet kodu oluşturuldu", {
+        description: createdInvite?.code
+          ? `${createdInvite.code} kodu ekibinizle paylaşılabilir.`
+          : "Yeni katılım kodu hazır.",
+      });
+    } catch (err: any) {
+      toast.error("Davet kodu oluşturulamadı", {
+        description: err.message,
+      });
+    } finally {
+      setCreatingInvite(false);
+    }
+  };
+
+  const handleCopyInviteCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      toast.success("Davet kodu kopyalandı");
+    } catch {
+      toast.error("Davet kodu kopyalanamadı");
+    }
+  };
+
+  const buildInviteLink = (code: string) => {
+    const url = new URL("/profile", window.location.origin);
+    url.searchParams.set("join", "1");
+    url.searchParams.set("invite", code);
+    return url.toString();
+  };
+
+  const handleCopyInviteLink = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(buildInviteLink(code));
+      toast.success("Davet linki kopyalandı");
+    } catch {
+      toast.error("Davet linki kopyalanamadı");
+    }
+  };
+
+  const handleShareInviteOnWhatsApp = (code: string) => {
+    const inviteLink = buildInviteLink(code);
+    const message = `ISG Vizyon organizasyon davetiniz hazir. Bu linkten girip davet kodunu otomatik doldurabilirsiniz: ${inviteLink}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDeactivateInvite = async (inviteId: string) => {
+    setDeactivatingInviteId(inviteId);
+    try {
+      const { error } = await (supabase as any).rpc("deactivate_organization_invite", {
+        p_invite_id: inviteId,
+      });
+
+      if (error) throw error;
+
+      setOrganizationInvites((prev) =>
+        prev.map((invite) => (invite.invite_id === inviteId ? { ...invite, is_active: false } : invite))
+      );
+
+      toast.success("Davet kodu pasifleştirildi");
+    } catch (err: any) {
+      toast.error("Davet kodu pasifleştirilemedi", {
+        description: err.message,
+      });
+    } finally {
+      setDeactivatingInviteId(null);
+    }
+  };
+
+  const handleRegenerateInvite = async (inviteId: string) => {
+    setRegeneratingInviteId(inviteId);
+    try {
+      const { data, error } = await (supabase as any).rpc("regenerate_organization_invite", {
+        p_invite_id: inviteId,
+        p_expires_in_days: 7,
+        p_max_uses: 1,
+      });
+
+      if (error) throw error;
+
+      const regeneratedInvite = Array.isArray(data) ? data[0] : null;
+      if (regeneratedInvite) {
+        setOrganizationInvites((prev) => {
+          const next = prev.map((invite) =>
+            invite.invite_id === inviteId ? { ...invite, is_active: false } : invite
+          );
+          return [regeneratedInvite as OrganizationInviteSummary, ...next].slice(0, 10);
+        });
+      }
+
+      toast.success("Davet kodu yenilendi", {
+        description: regeneratedInvite?.code
+          ? `Yeni kod hazır: ${regeneratedInvite.code}`
+          : "Yeni davet kodu oluşturuldu.",
+      });
+    } catch (err: any) {
+      toast.error("Davet kodu yenilenemedi", {
+        description: err.message,
+      });
+    } finally {
+      setRegeneratingInviteId(null);
+    }
+  };
+
+  const handleReviewJoinRequest = async (requestId: string, decision: "approved" | "rejected") => {
+    setReviewingJoinRequestId(requestId);
+    try {
+      const { error } = await (supabase as any).rpc("review_organization_join_request", {
+        p_request_id: requestId,
+        p_decision: decision,
+      });
+
+      if (error) throw error;
+
+      setPendingJoinRequests((prev) => prev.filter((item) => item.request_id !== requestId));
+      toast.success(decision === "approved" ? "Katılım isteği onaylandı" : "Katılım isteği reddedildi");
+    } catch (err: any) {
+      toast.error("İstek işlenemedi", {
+        description: err.message,
+      });
+    } finally {
+      setReviewingJoinRequestId(null);
+    }
+  };
+
   const handleSyncUsage = async () => {
     if (!isOrganizationAdmin) {
       toast.error("Bu işlemi yalnızca organizasyon yöneticisi çalıştırabilir.");
@@ -965,7 +1161,12 @@ const handleForceReset2FA = async () => {
   };
 
   const tabs = [
-    { id: "general" as const, label: "Genel", icon: <SettingsIcon className="h-4 w-4" /> },
+    {
+      id: "general" as const,
+      label: "Genel",
+      icon: <SettingsIcon className="h-4 w-4" />,
+      badgeCount: pendingJoinRequests.length > 0 ? pendingJoinRequests.length : undefined,
+    },
     { id: "security" as const, label: "Güvenlik", icon: <Shield className="h-4 w-4" /> },
     { id: "billing" as const, label: "Faturalama", icon: <CreditCard className="h-4 w-4" /> },
     { id: "notifications" as const, label: "Bildirimler", icon: <Bell className="h-4 w-4" /> },
@@ -1270,6 +1471,11 @@ const handleForceReset2FA = async () => {
                 >
                   {tab.icon}
                   {tab.label}
+                  {tab.badgeCount ? (
+                    <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-rose-100">
+                      {tab.badgeCount}
+                    </span>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -1470,6 +1676,160 @@ const handleForceReset2FA = async () => {
                           )}
                         </Button>
                       </div>
+
+                      {profileData?.role?.toLowerCase() === "admin" ? (
+                        <>
+                          <div className="h-px bg-border" />
+                          <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
+                            <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-400/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Ekip daveti</p>
+                              <h3 className="mt-2 text-lg font-semibold text-white">Davet kodu ile hızlı katılım</h3>
+                              <p className="mt-2 text-sm leading-6 text-slate-300">
+                                Google ile giriş yapan uzmanlar bu kodu profile ekranına girerek doğrudan organizasyonunuza bağlanabilir.
+                              </p>
+                              <Button
+                                onClick={handleCreateOrganizationInvite}
+                                disabled={creatingInvite}
+                                className={`mt-4 ${premiumPrimaryButtonClassName}`}
+                              >
+                                {creatingInvite ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Kod oluşturuluyor...
+                                  </>
+                                ) : (
+                                  <>
+                                    <KeyRound className="mr-2 h-4 w-4" />
+                                    Yeni Davet Kodu Oluştur
+                                  </>
+                                )}
+                              </Button>
+                              <div className="mt-4 space-y-3">
+                                {organizationInvites.length > 0 ? (
+                                  organizationInvites.map((invite) => (
+                                    <div key={invite.invite_id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                        <div>
+                                          <p className="text-base font-semibold text-white">{invite.code}</p>
+                                          <p className="mt-1 text-xs text-slate-400">
+                                            {invite.expires_at
+                                              ? `Bitiş: ${new Date(invite.expires_at).toLocaleString("tr-TR")}`
+                                              : "Süresiz davet"}{" "}
+                                            · {invite.used_count}/{invite.max_uses} kullanım
+                                          </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Badge className={invite.is_active ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100" : "border-white/10 bg-white/5 text-slate-300"}>
+                                            {invite.is_active ? "Aktif" : "Pasif"}
+                                          </Badge>
+                                          <Button type="button" variant="outline" className={premiumOutlineButtonClassName} onClick={() => void handleCopyInviteCode(invite.code)}>
+                                            <Copy className="mr-2 h-4 w-4" />
+                                            Kopyala
+                                          </Button>
+                                          <Button type="button" variant="outline" className={premiumOutlineButtonClassName} onClick={() => void handleCopyInviteLink(invite.code)}>
+                                            <LinkIcon className="mr-2 h-4 w-4" />
+                                            Link üret
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="border-emerald-400/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15"
+                                            onClick={() => handleShareInviteOnWhatsApp(invite.code)}
+                                          >
+                                            <MessageCircle className="mr-2 h-4 w-4" />
+                                            WhatsApp
+                                          </Button>
+                                          {invite.is_active ? (
+                                            <Button
+                                              type="button"
+                                              variant="outline"
+                                              className="border-amber-400/20 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
+                                              onClick={() => handleDeactivateInvite(invite.invite_id)}
+                                              disabled={deactivatingInviteId === invite.invite_id || regeneratingInviteId === invite.invite_id}
+                                            >
+                                              {deactivatingInviteId === invite.invite_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                              Pasifleştir
+                                            </Button>
+                                          ) : null}
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            className="border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15"
+                                            onClick={() => handleRegenerateInvite(invite.invite_id)}
+                                            disabled={regeneratingInviteId === invite.invite_id || deactivatingInviteId === invite.invite_id}
+                                          >
+                                            {regeneratingInviteId === invite.invite_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                                            Yeniden üret
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-4 text-sm text-slate-400">
+                                    Henüz oluşturulmuş davet kodu yok. İlk kodu üretip ekibinizle paylaşabilirsiniz.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                              <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-300/80">Katılım istekleri</p>
+                              <div className="mt-2 flex items-center gap-3">
+                                <h3 className="text-lg font-semibold text-white">Yönetici onayı bekleyen kullanıcılar</h3>
+                                <Badge className="border-rose-400/20 bg-rose-500/15 text-rose-100">
+                                  {pendingJoinRequests.length} bekleyen
+                                </Badge>
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-slate-400">
+                                Davet kodu kullanmayan uzmanlar liste seçerek size katılım isteği gönderir. Buradan onaylayabilir veya reddedebilirsiniz.
+                              </p>
+                              <div className="mt-4 space-y-3">
+                                {pendingJoinRequests.length > 0 ? (
+                                  pendingJoinRequests.map((request) => (
+                                    <div key={request.request_id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                        <div className="space-y-1">
+                                          <p className="text-base font-semibold text-white">{request.requester_name || "İsimsiz kullanıcı"}</p>
+                                          <p className="text-sm text-slate-300">{request.requester_email || "E-posta yok"}</p>
+                                          <p className="text-xs text-slate-400">
+                                            {[request.requester_position, new Date(request.created_at).toLocaleString("tr-TR")].filter(Boolean).join(" · ")}
+                                          </p>
+                                          {request.message ? <p className="pt-2 text-sm leading-6 text-slate-300">{request.message}</p> : null}
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          <Button
+                                            type="button"
+                                            onClick={() => handleReviewJoinRequest(request.request_id, "approved")}
+                                            disabled={reviewingJoinRequestId === request.request_id}
+                                            className={premiumPrimaryButtonClassName}
+                                          >
+                                            {reviewingJoinRequestId === request.request_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                                            Onayla
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => handleReviewJoinRequest(request.request_id, "rejected")}
+                                            disabled={reviewingJoinRequestId === request.request_id}
+                                            className="border-destructive/20 bg-destructive/5 text-destructive hover:bg-destructive/10"
+                                          >
+                                            Reddet
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-4 text-sm text-slate-400">
+                                    Şu an bekleyen katılım isteği yok.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      ) : null}
                     </>
                   )}
                 </div>

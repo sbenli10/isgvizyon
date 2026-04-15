@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getGoogleModelChain, getGoogleLiteModel } from "../_shared/gemini.ts";
 
 const corsHeaders = {
@@ -661,8 +661,6 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
           context: `photo-${photoNumber}`,
         });
         console.log(`✅ [${requestId}] Yanıt alındı`, { model: resolvedModel });
-        
-        console.log(`📦 [${requestId}] Ham yanıt (ilk 300 kar):`, contentText.substring(0, 300));
         
 
         photoAnalyses.push({

@@ -27,6 +27,9 @@ import {
   CheckCircle2,
   CircleDashed,
   Clock3,
+  PlusCircle,
+  UserPlus,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface ProfileData {
@@ -83,6 +86,28 @@ interface CompanyOption {
   id: string;
   name: string;
 }
+
+interface WorkspaceOrganizationSummary {
+  id: string;
+  name: string;
+  industry: string | null;
+  city: string | null;
+  slug: string;
+}
+
+interface JoinRequestSummary {
+  request_id: string;
+  organization_id: string;
+  organization_name: string;
+  city: string | null;
+  industry: string | null;
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  message: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
+type WorkspaceAction = "create" | "invite" | "request" | null;
 
 const noteCategories = [
   "Genel",
@@ -189,8 +214,9 @@ function createISGVizyonAvatarDataUrl(seed: string, fullName: string): string {
 }
 
 export default function Profile() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [currentTab, setCurrentTab] = useState<ProfileTab>("profile");
@@ -227,6 +253,23 @@ export default function Profile() {
   });
   const [noteSearch, setNoteSearch] = useState("");
   const [noteFilter, setNoteFilter] = useState<NoteStatusFilter>("all");
+  const [workspaceAction, setWorkspaceAction] = useState<WorkspaceAction>(null);
+  const [workspaceSaving, setWorkspaceSaving] = useState(false);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [searchingOrganizations, setSearchingOrganizations] = useState(false);
+  const [organizationSummary, setOrganizationSummary] = useState<WorkspaceOrganizationSummary | null>(null);
+  const [createOrgForm, setCreateOrgForm] = useState({
+    name: "",
+    industry: "",
+    city: "",
+    phone: "",
+    website: "",
+  });
+  const [inviteCode, setInviteCode] = useState("");
+  const [organizationSearch, setOrganizationSearch] = useState("");
+  const [organizationSearchResults, setOrganizationSearchResults] = useState<WorkspaceOrganizationSummary[]>([]);
+  const [joinRequestMessage, setJoinRequestMessage] = useState("");
+  const [myJoinRequests, setMyJoinRequests] = useState<JoinRequestSummary[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -235,6 +278,20 @@ export default function Profile() {
       void loadProfileNotes();
     }
   }, [user]);
+
+  useEffect(() => {
+    const inviteFromUrl = searchParams.get("invite");
+    if (!inviteFromUrl) return;
+
+    setCurrentTab("workspace");
+    setWorkspaceAction("invite");
+    setInviteCode(inviteFromUrl.toUpperCase());
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("invite");
+    nextParams.delete("join");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const loadUserCompanies = async () => {
     if (!user) return;
@@ -347,6 +404,162 @@ export default function Profile() {
       toast.error("Not silinemedi", { description: err.message });
     }
   };
+
+  const loadWorkspaceData = async (organizationId: string | null) => {
+    if (!user) return;
+
+    setWorkspaceLoading(true);
+    try {
+      const requestsPromise = (supabase as any).rpc("list_my_join_requests");
+      const organizationPromise = organizationId
+        ? supabase
+            .from("organizations")
+            .select("id, name, industry, city, slug")
+            .eq("id", organizationId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null });
+
+      const [{ data: requestData, error: requestError }, { data: organizationData, error: organizationError }] =
+        await Promise.all([requestsPromise, organizationPromise]);
+
+      if (requestError) throw requestError;
+      if (organizationError) throw organizationError;
+
+      setMyJoinRequests((requestData || []) as JoinRequestSummary[]);
+      setOrganizationSummary((organizationData as WorkspaceOrganizationSummary | null) ?? null);
+    } catch (err: any) {
+      toast.error("Çalışma alanı verileri yüklenemedi", {
+        description: err.message,
+      });
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  };
+
+  const handleCreateOrganization = async () => {
+    if (!createOrgForm.name.trim()) {
+      toast.error("Organizasyon adı zorunlu");
+      return;
+    }
+
+    setWorkspaceSaving(true);
+    try {
+      const { error } = await (supabase as any).rpc("create_workspace_organization", {
+        p_name: createOrgForm.name.trim(),
+        p_industry: createOrgForm.industry.trim() || null,
+        p_city: createOrgForm.city.trim() || null,
+        p_phone: createOrgForm.phone.trim() || null,
+        p_website: createOrgForm.website.trim() || null,
+      });
+
+      if (error) throw error;
+
+      toast.success("Organizasyon oluşturuldu", {
+        description: "Çalışma alanınız hazır. Kurumsal modüller artık aktif hale geliyor.",
+      });
+
+      setWorkspaceAction(null);
+      setCreateOrgForm({
+        name: "",
+        industry: "",
+        city: "",
+        phone: "",
+        website: "",
+      });
+
+      await refreshProfile();
+      await fetchProfileData();
+    } catch (err: any) {
+      toast.error("Organizasyon oluşturulamadı", {
+        description: err.message,
+      });
+    } finally {
+      setWorkspaceSaving(false);
+    }
+  };
+
+  const handleJoinWithInvite = async () => {
+    if (!inviteCode.trim()) {
+      toast.error("Davet kodunu girin");
+      return;
+    }
+
+    setWorkspaceSaving(true);
+    try {
+      const { error } = await (supabase as any).rpc("redeem_organization_invite", {
+        p_code: inviteCode.trim(),
+      });
+
+      if (error) throw error;
+
+      toast.success("Organizasyona katıldınız", {
+        description: "Profiliniz kurumsal çalışma alanına bağlandı.",
+      });
+
+      setInviteCode("");
+      setWorkspaceAction(null);
+      await refreshProfile();
+      await fetchProfileData();
+    } catch (err: any) {
+      toast.error("Katılım başarısız", {
+        description: err.message,
+      });
+    } finally {
+      setWorkspaceSaving(false);
+    }
+  };
+
+  const handleSearchOrganizations = async () => {
+    setSearchingOrganizations(true);
+    try {
+      const { data, error } = await (supabase as any).rpc("search_joinable_organizations", {
+        p_query: organizationSearch.trim() || null,
+      });
+
+      if (error) throw error;
+      setOrganizationSearchResults(
+        ((data || []) as any[]).map((item) => ({
+          id: item.organization_id,
+          name: item.name,
+          industry: item.industry,
+          city: item.city,
+          slug: item.slug,
+        }))
+      );
+    } catch (err: any) {
+      toast.error("Organizasyonlar aranamadı", {
+        description: err.message,
+      });
+    } finally {
+      setSearchingOrganizations(false);
+    }
+  };
+
+  const handleSubmitJoinRequest = async (organizationId: string) => {
+    setWorkspaceSaving(true);
+    try {
+      const { error } = await (supabase as any).rpc("submit_organization_join_request", {
+        p_organization_id: organizationId,
+        p_message: joinRequestMessage.trim() || null,
+      });
+
+      if (error) throw error;
+
+      toast.success("Katılma isteği gönderildi", {
+        description: "Yönetici onayı sonrasında organizasyona dahil olacaksınız.",
+      });
+
+      setJoinRequestMessage("");
+      await loadWorkspaceData(profile?.organization_id || null);
+    } catch (err: any) {
+      toast.error("İstek gönderilemedi", {
+        description: err.message,
+      });
+    } finally {
+      setWorkspaceSaving(false);
+    }
+  };
+
   const fetchProfileData = async () => {
     if (!user) return;
 
@@ -385,6 +598,7 @@ export default function Profile() {
         position: mappedProfile.position || "",
         department: mappedProfile.department || "",
       });
+      await loadWorkspaceData(mappedProfile.organization_id);
 
       const { count: companyCount } = await supabase
         .from("companies")
@@ -850,6 +1064,227 @@ export default function Profile() {
         </TabsContent>
 
         <TabsContent value="workspace" className="mt-4 space-y-4">
+          {!profile?.organization_id ? (
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card">
+              <CardHeader className="space-y-4">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <Badge variant="secondary" className="w-fit border-primary/20 bg-primary/10 text-primary">
+                      Çalışma Alanını Tamamla
+                    </Badge>
+                    <CardTitle className="text-2xl">Henüz bir organizasyona bağlı değilsiniz</CardTitle>
+                    <CardDescription className="max-w-2xl text-sm leading-6">
+                      Google ile hızlı giriş yapan uzmanlar burada akışı tamamlayabilir. İsterseniz yeni bir organizasyon oluşturun,
+                      isterseniz davet koduyla veya liste seçerek mevcut bir kuruma katılın.
+                    </CardDescription>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[24rem]">
+                    <Button className="justify-start" onClick={() => setWorkspaceAction("create")}>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Yeni organizasyon oluştur
+                    </Button>
+                    <Button variant="outline" className="justify-start" onClick={() => setWorkspaceAction("invite")}>
+                      <KeyRound className="mr-2 h-4 w-4" />
+                      Davet kodu kullan
+                    </Button>
+                    <Button variant="outline" className="justify-start sm:col-span-2" onClick={() => setWorkspaceAction("request")}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Mevcut organizasyona katıl
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {workspaceAction === "create" ? (
+                  <div className="rounded-2xl border bg-card/80 p-5">
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold">Yeni organizasyon oluştur</p>
+                      <p className="text-sm text-muted-foreground">Kurumsal modülleri, ekip erişimini ve davet akışını başlatmak için çalışma alanınızı açın.</p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Organizasyon adı</Label>
+                        <Input value={createOrgForm.name} onChange={(e) => setCreateOrgForm((prev) => ({ ...prev, name: e.target.value }))} placeholder="Örn. Yıldız OSGB" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Sektör</Label>
+                        <Input value={createOrgForm.industry} onChange={(e) => setCreateOrgForm((prev) => ({ ...prev, industry: e.target.value }))} placeholder="İSG, OSGB, üretim..." />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Şehir</Label>
+                        <Input value={createOrgForm.city} onChange={(e) => setCreateOrgForm((prev) => ({ ...prev, city: e.target.value }))} placeholder="İstanbul" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Telefon</Label>
+                        <Input value={createOrgForm.phone} onChange={(e) => setCreateOrgForm((prev) => ({ ...prev, phone: e.target.value }))} placeholder="+90 212 ..." />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Website</Label>
+                        <Input value={createOrgForm.website} onChange={(e) => setCreateOrgForm((prev) => ({ ...prev, website: e.target.value }))} placeholder="https://firma.com" />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button onClick={handleCreateOrganization} disabled={workspaceSaving}>
+                        {workspaceSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        Organizasyonu Oluştur
+                      </Button>
+                      <Button variant="outline" onClick={() => setWorkspaceAction(null)} disabled={workspaceSaving}>
+                        Vazgeç
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {workspaceAction === "invite" ? (
+                  <div className="rounded-2xl border bg-card/80 p-5">
+                    <div className="mb-4">
+                      <p className="text-sm font-semibold">Davet kodu ile kuruma katıl</p>
+                      <p className="text-sm text-muted-foreground">Organizasyon yöneticinizin paylaştığı davet kodunu girin. Onay beklemeden doğrudan ekibe dahil olursunuz.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                      <Input value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} placeholder="Örn. A1B2C-D3E4F" />
+                      <Button onClick={handleJoinWithInvite} disabled={workspaceSaving}>
+                        {workspaceSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+                        Kodu Kullan
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {workspaceAction === "request" ? (
+                  <div className="rounded-2xl border bg-card/80 p-5 space-y-4">
+                    <div>
+                      <p className="text-sm font-semibold">Organizasyon ara ve katılma isteği gönder</p>
+                      <p className="text-sm text-muted-foreground">Davet kodu yoksa organizasyon adını aratın. Yöneticinin onayı sonrası çalışma alanına dahil olursunuz.</p>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                      <Input value={organizationSearch} onChange={(e) => setOrganizationSearch(e.target.value)} placeholder="Organizasyon adı veya kısa adı" />
+                      <Button variant="outline" onClick={handleSearchOrganizations} disabled={searchingOrganizations}>
+                        {searchingOrganizations ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                        Ara
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Yöneticilere kısa not</Label>
+                      <Textarea value={joinRequestMessage} onChange={(e) => setJoinRequestMessage(e.target.value)} placeholder="Merhaba, ekibinize İSG uzmanı olarak katılmak istiyorum." className="min-h-[96px]" />
+                    </div>
+                    <div className="space-y-3">
+                      {organizationSearchResults.length > 0 ? (
+                        organizationSearchResults.map((organization) => (
+                          <div key={organization.id} className="flex flex-col gap-3 rounded-2xl border bg-background/70 p-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                              <p className="font-medium">{organization.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {[organization.industry, organization.city, organization.slug].filter(Boolean).join(" · ") || "Kurumsal çalışma alanı"}
+                              </p>
+                            </div>
+                            <Button onClick={() => handleSubmitJoinRequest(organization.id)} disabled={workspaceSaving}>
+                              {workspaceSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                              Katılma isteği gönder
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                          Arama yaptıktan sonra eşleşen organizasyonlar burada listelenecek.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-emerald-500/20 bg-gradient-to-br from-emerald-500/10 via-card to-card">
+              <CardHeader className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div className="space-y-2">
+                  <Badge variant="secondary" className="w-fit border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+                    Kurumsal Çalışma Alanı Aktif
+                  </Badge>
+                  <CardTitle className="text-2xl">{organizationSummary?.name || "Organizasyonunuz bağlı"}</CardTitle>
+                  <CardDescription className="text-sm leading-6">
+                    {[
+                      organizationSummary?.industry,
+                      organizationSummary?.city,
+                      `Rol: ${profile?.role || "staff"}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </CardDescription>
+                </div>
+                <Button variant="outline" onClick={() => navigate("/settings")}>
+                  Kurumsal ayarları aç
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardHeader>
+            </Card>
+          )}
+
+          {workspaceLoading ? (
+            <Card>
+              <CardContent className="flex items-center gap-3 p-4 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Çalışma alanı bilgileri yükleniyor...
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {myJoinRequests.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Gönderdiğiniz Katılım İstekleri</CardTitle>
+                <CardDescription>Bekleyen veya sonuçlanmış kurumsal katılım taleplerinizi buradan takip edebilirsiniz.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {myJoinRequests.map((request) => (
+                  <div key={request.request_id} className="rounded-2xl border p-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="space-y-1">
+                        <p className="font-medium">{request.organization_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {[request.industry, request.city].filter(Boolean).join(" · ") || "Kurumsal çalışma alanı"}
+                        </p>
+                        {request.message ? <p className="text-sm text-muted-foreground">Notunuz: {request.message}</p> : null}
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={
+                          request.status === "approved"
+                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                            : request.status === "rejected"
+                              ? "border-destructive/30 bg-destructive/10 text-destructive"
+                              : request.status === "cancelled"
+                                ? "border-border bg-muted text-muted-foreground"
+                                : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        }
+                      >
+                        {request.status === "approved"
+                          ? "Onaylandı"
+                          : request.status === "rejected"
+                            ? "Reddedildi"
+                            : request.status === "cancelled"
+                              ? "İptal edildi"
+                              : "Onay bekliyor"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {new Date(request.created_at).toLocaleString("tr-TR")}
+                      </span>
+                      {request.reviewed_at ? (
+                        <span className="inline-flex items-center gap-1">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {new Date(request.reviewed_at).toLocaleString("tr-TR")}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>Profil Tamamlanma Skoru</CardTitle>

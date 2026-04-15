@@ -9,6 +9,53 @@ import {
 import { completeNamedFlow } from "@/lib/perfTiming";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
+
+async function ensureOAuthProfile(user: any) {
+  const metadata = user?.user_metadata ?? {};
+  const oauthIntentRaw = window.localStorage.getItem(OAUTH_INTENT_STORAGE_KEY);
+  const oauthIntent = oauthIntentRaw ? JSON.parse(oauthIntentRaw) : null;
+
+  const fullName =
+    metadata.full_name ||
+    metadata.name ||
+    metadata.display_name ||
+    user?.email?.split("@")[0] ||
+    "Kullanıcı";
+
+  const avatarUrl = metadata.avatar_url || metadata.picture || null;
+
+  const { data: existingProfile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, organization_id, full_name, email, avatar_url, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  const shouldRedirectToProfile = !existingProfile?.organization_id;
+
+  const { error: upsertError } = await supabase
+    .from("profiles")
+    .upsert({
+      id: user.id,
+      full_name: existingProfile?.full_name || fullName,
+      email: existingProfile?.email || user.email || null,
+      avatar_url: existingProfile?.avatar_url || avatarUrl,
+      role: existingProfile?.role || (oauthIntent?.accountType === "individual" ? "staff" : "viewer"),
+      organization_id: existingProfile?.organization_id || null,
+      is_active: true,
+    });
+
+  if (upsertError) {
+    throw upsertError;
+  }
+
+  window.localStorage.removeItem(OAUTH_INTENT_STORAGE_KEY);
+  return { shouldRedirectToProfile };
+}
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -51,6 +98,8 @@ export default function AuthCallback() {
         }
 
         if (data.session) {
+          const oauthProfileState = await ensureOAuthProfile(data.session.user);
+
           if (isExtension) {
             completeNamedFlow("login", {
               method: "extension",
@@ -78,9 +127,9 @@ export default function AuthCallback() {
           setStatus("Oturum hazır. Yönlendiriliyorsunuz...");
           completeNamedFlow("login", {
             method: code ? "oauth-or-callback" : "password",
-            target: "/",
+            target: oauthProfileState.shouldRedirectToProfile ? "/profile" : "/",
           });
-          navigate("/", { replace: true });
+          navigate(oauthProfileState.shouldRedirectToProfile ? "/profile" : "/", { replace: true });
           return;
         }
 

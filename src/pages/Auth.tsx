@@ -31,6 +31,8 @@ import { isDeviceTrusted, trustCurrentDevice } from "@/utils/deviceFingerprint";
 
 type AuthMode = "login" | "register" | "wait" | "mfa";
 type NoticeType = "info" | "success" | "warning" | "error";
+type AccountType = "individual" | "osgb";
+const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
 
 interface FormData {
   email: string;
@@ -38,6 +40,7 @@ interface FormData {
   passwordConfirm: string;
   fullName: string;
   orgName: string;
+  accountType: AccountType;
 }
 
 type FieldErrors = Partial<Record<keyof FormData | "mfaCode" | "forgotEmail", string>>;
@@ -276,6 +279,7 @@ export default function Auth() {
     passwordConfirm: "",
     fullName: "",
     orgName: "",
+    accountType: "individual",
   });
 
   // ✅ 2FA
@@ -369,6 +373,14 @@ export default function Auth() {
     setNotice({ type: "info", title: "Google ile giriş", description: "Google hesabınıza yönlendiriliyorsunuz..." });
 
     try {
+      window.localStorage.setItem(
+        OAUTH_INTENT_STORAGE_KEY,
+        JSON.stringify({
+          accountType: "individual",
+          email: formData.email.trim() || null,
+        }),
+      );
+
       const redirectTo = `${window.location.origin}${callbackUrl}`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -436,7 +448,7 @@ export default function Auth() {
       ok = false;
     }
 
-    if (!formData.orgName.trim()) {
+    if (formData.accountType === "osgb" && !formData.orgName.trim()) {
       setFieldError("orgName", "Organizasyon adı gerekli.");
       ok = false;
     }
@@ -586,22 +598,43 @@ export default function Auth() {
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
-        options: { data: { full_name: formData.fullName.trim() } },
+        options: {
+          data: {
+            full_name: formData.fullName.trim(),
+            account_type: formData.accountType,
+            organization_name: formData.orgName.trim() || null,
+          },
+        },
       });
 
       if (authError) throw new Error(`Hesap oluşturulamadı: ${authError.message}`);
       if (!authData?.user?.id) throw new Error("Kullanıcı oluşturulamadı");
 
-      const { error: bootstrapError } = await supabase.rpc("bootstrap_signup_organization", {
-        p_user_id: authData.user.id,
-        p_full_name: formData.fullName.trim(),
-        p_email: formData.email.trim(),
-        p_org_name: formData.orgName.trim(),
-        p_org_slug: orgSlug,
-        p_country: "Türkiye",
-      });
+      if (formData.accountType === "osgb") {
+        const { error: bootstrapError } = await supabase.rpc("bootstrap_signup_organization", {
+          p_user_id: authData.user.id,
+          p_full_name: formData.fullName.trim(),
+          p_email: formData.email.trim(),
+          p_org_name: formData.orgName.trim(),
+          p_org_slug: orgSlug,
+          p_country: "Türkiye",
+        });
 
-      if (bootstrapError) throw new Error(`Organizasyon oluşturulamadı: ${bootstrapError.message}`);
+        if (bootstrapError) throw new Error(`Organizasyon oluşturulamadı: ${bootstrapError.message}`);
+      } else {
+        const { error: profileBootstrapError } = await supabase
+          .from("profiles")
+          .upsert({
+            id: authData.user.id,
+            full_name: formData.fullName.trim(),
+            email: formData.email.trim(),
+            role: "staff",
+            organization_id: null,
+            is_active: true,
+          });
+
+        if (profileBootstrapError) throw new Error(`Profil oluşturulamadı: ${profileBootstrapError.message}`);
+      }
 
       setVerifyEmail(formData.email.trim());
       setMode("wait");
@@ -1002,16 +1035,62 @@ export default function Auth() {
                         <div>
                           <h3 className="text-white font-semibold text-sm">Kurumsal Kurulum</h3>
                           <p className="text-slate-200/90 text-xs mt-1 leading-5">
-                            Organizasyonunuzu oluşturun, ekip üyelerinizi ekleyin ve tüm İSG süreçlerini tek panelden yönetin.
+                            İSG uzmanı olarak şirketsiz devam edebilir veya OSGB/Kurum hesabı için organizasyon oluşturabilirsiniz.
                           </p>
                         </div>
                       </div>
                     </div>
 
                     <div className="space-y-2">
+                      <Label className="text-white text-sm">Hesap Tipi</Label>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, accountType: "individual" }));
+                            setFieldError("orgName", undefined);
+                          }}
+                          className={cn(
+                            "rounded-2xl border p-4 text-left transition",
+                            formData.accountType === "individual"
+                              ? "border-cyan-400/40 bg-cyan-400/10 shadow-[0_20px_60px_-40px_rgba(34,211,238,0.65)]"
+                              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 text-white">
+                            <User className="h-4 w-4 text-cyan-300" />
+                            <span className="font-semibold">İSG Uzmanı</span>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-slate-300">
+                            Şirket alanı opsiyoneldir. Google ile direkt giriş bu akışa göre çalışır.
+                          </p>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFormData((prev) => ({ ...prev, accountType: "osgb" }))}
+                          className={cn(
+                            "rounded-2xl border p-4 text-left transition",
+                            formData.accountType === "osgb"
+                              ? "border-violet-400/40 bg-violet-500/10 shadow-[0_20px_60px_-40px_rgba(139,92,246,0.65)]"
+                              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 text-white">
+                            <Building2 className="h-4 w-4 text-violet-300" />
+                            <span className="font-semibold">OSGB / Kurum</span>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-slate-300">
+                            Organizasyon alanı zorunludur; ekip ve abonelik yapısı bu kuruma bağlanır.
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
                       <Label className="text-white text-sm flex items-center gap-2">
                         <User className="h-4 w-4 text-cyan-300" />
-                        Ad Soyad
+                          Ad Soyad
                       </Label>
                       <FancyInput icon={<User className="h-4 w-4" />} error={fieldErrors.fullName}>
                         <Input
@@ -1032,6 +1111,9 @@ export default function Auth() {
                       <Label className="text-white text-sm flex items-center gap-2">
                         <Building2 className="h-4 w-4 text-cyan-300" />
                         Şirket / Organizasyon
+                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                          {formData.accountType === "osgb" ? "Zorunlu" : "Opsiyonel"}
+                        </span>
                       </Label>
                       <FancyInput icon={<Building2 className="h-4 w-4" />} error={fieldErrors.orgName}>
                         <Input
@@ -1039,10 +1121,10 @@ export default function Auth() {
                           name="orgName"
                           value={formData.orgName}
                           onChange={handleInputChange}
-                          placeholder="Örn: İSGVizyon OSGB"
+                          placeholder={formData.accountType === "osgb" ? "Örn: İSGVizyon OSGB" : "Çalıştığınız kurum adı varsa yazın"}
                           className="bg-transparent border-0 text-white h-11 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-slate-500"
                           disabled={isBusy}
-                          required
+                          required={formData.accountType === "osgb"}
                           autoComplete="organization"
                         />
                       </FancyInput>
