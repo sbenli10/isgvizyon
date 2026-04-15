@@ -1055,7 +1055,12 @@ const handleForceReset2FA = async () => {
 
   const handleShareInviteOnWhatsApp = (code: string) => {
     const inviteLink = buildInviteLink(code);
-    const message = `ISG Vizyon organizasyon davetiniz hazir. Bu linkten girip davet kodunu otomatik doldurabilirsiniz: ${inviteLink}`;
+    const organizationName = organizationData?.name || "İSG Vizyon çalışma alanı";
+    const message =
+      `${organizationName} için İSG Vizyon çalışma alanı davetiniz oluşturuldu.\n\n` +
+      `Aşağıdaki bağlantı üzerinden giriş yaparak davet kodunu otomatik doldurabilir ve ekibe katılabilirsiniz:\n` +
+      `${inviteLink}\n\n` +
+      `Bağlantı çalışmazsa profil ekranındaki "Davet kodu kullan" alanına şu kodu girin: ${code}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
   };
 
