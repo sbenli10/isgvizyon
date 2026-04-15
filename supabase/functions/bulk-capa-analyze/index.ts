@@ -1,7 +1,8 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
   GeminiHttpError,
-  callGemini,
+  callGeminiWithRetryAndFallback,
+  getGoogleModelChain,
   cleanJsonText,
   extractTextFromGeminiResponse,
   getGoogleModel,
@@ -56,80 +57,9 @@ function getApproxPayloadSize(images: string[], prompt: string) {
   return images.reduce((total, image) => total + image.length, prompt.length);
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function getModelCandidates(primaryModel: string) {
-  const configuredFallback = Deno.env.get("GOOGLE_MODEL_FALLBACK")?.trim();
-  return [primaryModel, configuredFallback || "gemini-1.5-flash", "gemini-2.0-flash-exp"]
+  return [primaryModel, ...getGoogleModelChain("lite")]
     .filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
-}
-
-function shouldRetryGeminiError(error: GeminiHttpError) {
-  return ["provider_error", "rate_limited"].includes(error.code);
-}
-
-async function callGeminiWithRetryAndFallback({
-  apiKey,
-  models,
-  body,
-  requestSummary,
-}: {
-  apiKey: string;
-  models: string[];
-  body: Record<string, unknown>;
-  requestSummary: Record<string, unknown>;
-}) {
-  let lastError: GeminiHttpError | null = null;
-
-  for (const model of models) {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        console.info("bulk-capa-analyze gemini attempt:", {
-          ...requestSummary,
-          model,
-          attempt,
-        });
-
-        const payload = await callGemini({
-          apiKey,
-          model,
-          body,
-        });
-
-        return { payload, model };
-      } catch (error) {
-        if (!(error instanceof GeminiHttpError)) {
-          throw error;
-        }
-
-        lastError = error;
-
-        console.warn("bulk-capa-analyze gemini retryable error:", {
-          ...requestSummary,
-          model,
-          attempt,
-          status: error.status,
-          code: error.code,
-          message: error.message,
-          details: error.details,
-        });
-
-        if (!shouldRetryGeminiError(error) || attempt === 3) {
-          break;
-        }
-
-        await sleep(600 * attempt);
-      }
-    }
-  }
-
-  if (lastError) {
-    throw lastError;
-  }
-
-  throw new GeminiHttpError(502, "provider_error", "Yapay zeka saglayicisinda gecici bir hata olustu.");
 }
 
 function parseAnalysis(text: string): BulkCapaAnalysis {
@@ -225,7 +155,8 @@ Deno.serve(async (req) => {
       apiKey,
       models: modelCandidates,
       body: requestBody,
-      requestSummary,
+      requestLabel: "bulk-capa-analyze",
+      logMeta: requestSummary,
     });
 
     const text = extractTextFromGeminiResponse(payload);

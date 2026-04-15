@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { getGoogleModelChain, getGoogleLiteModel } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,8 +14,7 @@ const DELAY_BETWEEN_PHOTOS_MS = 1500;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const getModelCandidates = (primaryModel: string) => {
-  const configuredFallback = Deno.env.get("GOOGLE_MODEL_FALLBACK")?.trim();
-  return [primaryModel, configuredFallback || "gemini-1.5-flash", "gemini-2.0-flash-exp"]
+  return [primaryModel, ...getGoogleModelChain("lite")]
     .filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
 };
 
@@ -333,7 +333,7 @@ serve(async (req) => {
 
     // ✅ Environment Variables
     const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    const GOOGLE_MODEL = Deno.env.get("GOOGLE_MODEL") || "gemini-2.5-flash";
+    const GOOGLE_MODEL = getGoogleLiteModel();
     const MODEL_CANDIDATES = getModelCandidates(GOOGLE_MODEL);
 
     if (!GOOGLE_API_KEY) {

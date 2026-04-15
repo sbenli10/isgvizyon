@@ -22,6 +22,8 @@ import {
   Clock,
   Upload,
   ImagePlus,
+  Bot,
+  Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,8 +42,10 @@ import { terminateSession, recordSession } from "@/utils/sessionManager";
 import type { BillingHistory, UserSession } from "@/types/subscription";
 import { TwoFactorSetupModal } from '@/components/TwoFactorSetupModal';
 import { untrustDevice } from '@/utils/deviceFingerprint';
+import type { Database } from "@/integrations/supabase/types";
 
-type TabType = "general" | "security" | "billing" | "notifications";
+type TabType = "general" | "security" | "billing" | "notifications" | "ai-health";
+type AiFunctionLog = Database["public"]["Tables"]["ai_function_logs"]["Row"];
 
 interface ProfileData {
   id: string;
@@ -136,6 +140,7 @@ export default function Settings() {
   // Sessions & Billing
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [billingHistory, setBillingHistory] = useState<BillingHistory[]>([]);
+  const [aiFunctionLogs, setAiFunctionLogs] = useState<AiFunctionLog[]>([]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [animatedSecurityScore, setAnimatedSecurityScore] = useState(0);
 
@@ -175,6 +180,7 @@ useEffect(() => {
         );
         setSessions(parsed.sessions ?? []);
         setBillingHistory(parsed.billingHistory ?? []);
+        setAiFunctionLogs(parsed.aiFunctionLogs ?? []);
         setTwoFactorEnabled(parsed.twoFactorEnabled ?? false);
         setTrustedDevices(parsed.trustedDevices ?? []);
         setLoading(false);
@@ -206,6 +212,7 @@ useEffect(() => {
       let loadedOrganizationData: OrganizationData | null = null;
       let typedSessions: UserSession[] = [];
       let typedBilling: BillingHistory[] = [];
+      let typedAiLogs: AiFunctionLog[] = [];
 
       // Profil verisini çek
       const { data: profileData, error: profileError } = await supabase
@@ -308,6 +315,17 @@ useEffect(() => {
         setBillingHistory(typedBilling);
       }
 
+      const { data: aiLogData, error: aiLogError } = await supabase
+        .from("ai_function_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(40);
+
+      if (!aiLogError && aiLogData) {
+        typedAiLogs = aiLogData;
+        setAiFunctionLogs(aiLogData);
+      }
+
       // Bildirim tercihlerini localStorage'dan yükle
       const savedNotifications = localStorage.getItem("userNotifications");
       if (savedNotifications) {
@@ -335,6 +353,7 @@ useEffect(() => {
           notifications: savedNotifications ? JSON.parse(savedNotifications) : notifications,
           sessions: typedSessions ?? [],
           billingHistory: typedBilling ?? [],
+          aiFunctionLogs: typedAiLogs ?? [],
           twoFactorEnabled: profileData.two_factor_enabled || false,
           trustedDevices: trustedDevicesData ?? [],
         })
@@ -950,6 +969,7 @@ const handleForceReset2FA = async () => {
     { id: "security" as const, label: "Güvenlik", icon: <Shield className="h-4 w-4" /> },
     { id: "billing" as const, label: "Faturalama", icon: <CreditCard className="h-4 w-4" /> },
     { id: "notifications" as const, label: "Bildirimler", icon: <Bell className="h-4 w-4" /> },
+    { id: "ai-health" as const, label: "AI Sağlık", icon: <Bot className="h-4 w-4" /> },
   ];
 
   const getDeviceIcon = (deviceType: string) => {
@@ -1052,6 +1072,22 @@ const handleForceReset2FA = async () => {
       detail: "Planınızla oluşturabileceğiniz toplam firma sayısı.",
     },
   ];
+
+  const aiSuccessCount = aiFunctionLogs.filter((log) => log.status === "success").length;
+  const aiErrorCount = aiFunctionLogs.filter((log) => log.status === "error").length;
+  const aiFallbackCount = aiFunctionLogs.filter((log) => (log.attempted_models?.length || 0) > 1).length;
+  const latestAiLog = aiFunctionLogs[0] ?? null;
+  const aiHealthTone =
+    aiErrorCount === 0
+      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+      : aiErrorCount <= Math.max(1, Math.round(aiFunctionLogs.length * 0.2))
+        ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
+        : "border-rose-400/20 bg-rose-400/10 text-rose-100";
+
+  const handleRefreshAiLogs = async () => {
+    await fetchSettingsData(true);
+    toast.success("AI sağlık verileri yenilendi");
+  };
 
   useEffect(() => {
     const duration = 700;
@@ -2202,6 +2238,134 @@ const handleForceReset2FA = async () => {
                     <Save className="h-4 w-4 mr-2" />
                     Bildirimleri Kaydet
                   </Button>
+                </div>
+              )}
+
+              {currentTab === "ai-health" && (
+                <div className="space-y-6">
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <div className={`rounded-[24px] border p-5 ${aiHealthTone}`}>
+                      <p className={microCardEyebrowClassName}>Genel durum</p>
+                      <p className="mt-2 text-xl font-semibold text-white">
+                        {aiErrorCount === 0 ? "Stabil" : aiErrorCount <= Math.max(1, Math.round(aiFunctionLogs.length * 0.2)) ? "Dikkat" : "Yoğun hata"}
+                      </p>
+                      <p className={microCardBodyClassName}>Edge function AI akışlarının son görünümü.</p>
+                    </div>
+                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                      <p className={microCardEyebrowClassName}>Başarılı istek</p>
+                      <p className="mt-2 text-xl font-semibold text-white">{aiSuccessCount}</p>
+                      <p className={microCardBodyClassName}>Son 40 log içinde başarıyla tamamlanan çağrılar.</p>
+                    </div>
+                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                      <p className={microCardEyebrowClassName}>Fallback kullanılan</p>
+                      <p className="mt-2 text-xl font-semibold text-white">{aiFallbackCount}</p>
+                      <p className={microCardBodyClassName}>Birden fazla modele düşen istek sayısı.</p>
+                    </div>
+                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                      <p className={microCardEyebrowClassName}>Son model</p>
+                      <p className="mt-2 text-lg font-semibold text-white">
+                        {latestAiLog?.resolved_model || "Henüz veri yok"}
+                      </p>
+                      <p className={microCardBodyClassName}>En son çalışan isteğin çözülen modeli.</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Edge function görünürlüğü</p>
+                        <h2 className="mt-2 text-lg font-semibold text-white">AI Sağlık ve Model Logları</h2>
+                        <p className="mt-1 text-sm text-slate-400">
+                          Hangi isteğin hangi modele düştüğünü, fallback zincirine girip girmediğini ve hata oranını buradan takip edin.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => void handleRefreshAiLogs()}
+                        className={premiumOutlineButtonClassName}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Logları Yenile
+                      </Button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {aiFunctionLogs.length === 0 ? (
+                        <Card className="border-white/10 bg-slate-950/50">
+                          <CardContent className="p-8 text-center">
+                            <Activity className="mx-auto mb-4 h-12 w-12 text-slate-500" />
+                            <p className="text-sm text-slate-300">Henüz AI log kaydı oluşmadı.</p>
+                            <p className="mt-2 text-xs text-slate-500">İlk edge function çağrısından sonra model sağlık verileri burada görünecek.</p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        aiFunctionLogs.map((log) => {
+                          const metadata =
+                            log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)
+                              ? (log.metadata as Record<string, unknown>)
+                              : {};
+                          const usedFallback = (log.attempted_models?.length || 0) > 1;
+
+                          return (
+                            <Card key={log.id} className="border-white/10 bg-slate-950/50">
+                              <CardContent className="p-4">
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                  <div className="space-y-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Badge className="rounded-full bg-cyan-500/15 text-cyan-100">
+                                        {log.function_name}
+                                      </Badge>
+                                      <Badge
+                                        className={`rounded-full ${
+                                          log.status === "success"
+                                            ? "bg-emerald-500/15 text-emerald-100"
+                                            : "bg-rose-500/15 text-rose-100"
+                                        }`}
+                                      >
+                                        {log.status === "success" ? "Başarılı" : "Hata"}
+                                      </Badge>
+                                      {usedFallback && (
+                                        <Badge className="rounded-full bg-amber-500/15 text-amber-100">
+                                          Fallback kullanıldı
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <p className="text-sm font-semibold text-white">
+                                        {log.request_label || "Adsız istek"}
+                                      </p>
+                                      <p className="mt-1 text-xs text-slate-400">
+                                        {new Date(log.created_at).toLocaleString("tr-TR")} · {log.duration_ms ?? 0} ms
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid gap-2 text-sm text-slate-300 md:grid-cols-2 lg:min-w-[360px]">
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Çözülen model</p>
+                                      <p className="mt-2 font-medium text-white">{log.resolved_model || "-"}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Denenen zincir</p>
+                                      <p className="mt-2 font-medium text-white">{(log.attempted_models || []).join(" → ") || "-"}</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                                  <span>Toplam deneme: {log.attempts_count}</span>
+                                  {log.error_code && <span>Hata kodu: {log.error_code}</span>}
+                                  {typeof metadata.imageCount === "number" && <span>Görsel: {metadata.imageCount}</span>}
+                                  {typeof metadata.promptLength === "number" && <span>Prompt: {metadata.promptLength} karakter</span>}
+                                  {typeof metadata.hasPrompt === "boolean" && <span>{metadata.hasPrompt ? "Prompt var" : "Prompt yok"}</span>}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

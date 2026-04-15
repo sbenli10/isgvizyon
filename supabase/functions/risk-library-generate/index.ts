@@ -1,10 +1,10 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
   GeminiHttpError,
-  callGemini,
+  callGeminiWithRetryAndFallback,
   cleanJsonText,
   extractTextFromGeminiResponse,
-  getGoogleModel,
+  getGoogleLiteModel,
   getRequiredGoogleApiKey,
 } from "../_shared/gemini.ts";
 
@@ -116,9 +116,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    const payload = await callGemini({
+    const { payload } = await callGeminiWithRetryAndFallback({
       apiKey: getRequiredGoogleApiKey(),
-      model: getGoogleModel(),
+      model: getGoogleLiteModel(),
+      modelPreference: "lite",
+      requestLabel: "risk-library-generate",
       body: {
         contents: [
           {

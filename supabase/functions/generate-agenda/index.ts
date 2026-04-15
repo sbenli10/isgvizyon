@@ -1,5 +1,10 @@
-//supabase\functions\generate-agenda\index.ts
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  callGeminiWithRetryAndFallback,
+  extractTextFromGeminiResponse,
+  getGoogleLiteModel,
+  getRequiredGoogleApiKey,
+} from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,93 +23,54 @@ interface RequestBody {
   industry: string;
 }
 
-/**
- * 🛡️ Extract JSON with full response handling
- */
-function extractJSON(content: string): any[] {
-  console.log("🔍 Starting JSON extraction...");
-  console.log("📝 Content length:", content.length);
-  console.log("📝 Full content:", content); // ✅ LOG FULL CONTENT
-
+function extractJSON(content: string): unknown[] {
   let cleaned = content.trim();
+  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
 
-  // Remove markdown code blocks
-  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (codeBlockMatch) {
     cleaned = codeBlockMatch[1].trim();
-    console.log("✅ Extracted from markdown block");
   }
 
-  // Remove remaining backticks
   cleaned = cleaned.replace(/`/g, "");
 
-  // Find array boundaries
   const firstBracket = cleaned.indexOf("[");
   const lastBracket = cleaned.lastIndexOf("]");
 
   if (firstBracket === -1 || lastBracket === -1 || lastBracket <= firstBracket) {
-    console.error("❌ Invalid JSON array boundaries:", {
-      firstBracket,
-      lastBracket,
-      content: cleaned,
-    });
-    throw new Error(
-      `No valid JSON array found. First bracket: ${firstBracket}, Last bracket: ${lastBracket}`
-    );
+    throw new Error("No valid JSON array found.");
   }
 
   cleaned = cleaned.substring(firstBracket, lastBracket + 1);
-  console.log("📦 Extracted JSON array (length:", cleaned.length, ")");
-
-  // Fix common issues
   cleaned = cleaned.replace(/,(\s*[}\]])/g, "$1");
 
-  // Parse attempts
-  let parsed: any;
-
   try {
-    parsed = JSON.parse(cleaned);
-  } catch (firstError) {
-    console.warn("⚠️ First parse failed, trying cleanup...");
-    try {
-      const aggressive = cleaned
-        .replace(/[\n\r\t]/g, " ")
-        .replace(/\s+/g, " ")
-        .replace(/,\s*}/g, "}")
-        .replace(/,\s*]/g, "]");
-      parsed = JSON.parse(aggressive);
-    } catch (secondError) {
-      console.error("❌ All parse attempts failed");
-      throw new Error(
-        `JSON parse failed: ${
-          secondError instanceof Error ? secondError.message : "Unknown"
-        }`
-      );
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Response is not a JSON array.");
     }
-  }
+    return parsed;
+  } catch {
+    const aggressive = cleaned
+      .replace(/[\n\r\t]/g, " ")
+      .replace(/\s+/g, " ")
+      .replace(/,\s*}/g, "}")
+      .replace(/,\s*]/g, "]");
 
-  if (!Array.isArray(parsed)) {
-    throw new Error("Response is not a JSON array");
+    const parsed = JSON.parse(aggressive);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Response is not a JSON array.");
+    }
+    return parsed;
   }
-
-  console.log(`✅ Successfully parsed array with ${parsed.length} items`);
-  return parsed;
 }
 
-/**
- * 🛡️ Clean agenda item
- */
-function cleanAgendaItem(item: any, index: number): AgendaItem | null {
-  if (!item || typeof item !== "object") {
-    return null;
-  }
+function cleanAgendaItem(item: any): AgendaItem | null {
+  if (!item || typeof item !== "object") return null;
 
   const topic = item.topic || item.title || "";
   const description = item.description || item.details || "";
 
-  if (!topic || !description) {
-    return null;
-  }
+  if (!topic || !description) return null;
 
   return {
     topic: String(topic).trim().substring(0, 100),
@@ -112,205 +78,114 @@ function cleanAgendaItem(item: any, index: number): AgendaItem | null {
   };
 }
 
-/**
- * 🛡️ Fallback agenda when AI fails
- */
 function getFallbackAgenda(): AgendaItem[] {
   return [
     {
-      topic: "Açılış ve Yoklama",
-      description: "Kurul üyelerinin katılım kontrolü ve toplantı açılışı",
+      topic: "Acilis ve Yoklama",
+      description: "Kurul uyelerinin katilim kontrolu ve toplanti acilisi",
     },
     {
-      topic: "Önceki Kararların Takibi",
-      description: "Bir önceki toplantıda alınan kararların uygulama durumu",
+      topic: "Onceki Kararlarin Takibi",
+      description: "Bir onceki toplantida alinan kararlarin uygulama durumu",
     },
     {
-      topic: "İş Kazaları ve Ramak Kala Olaylar",
-      description: "Son dönemde meydana gelen kazaların incelenmesi",
+      topic: "Is Kazalari ve Ramak Kala Olaylar",
+      description: "Son donemde meydana gelen kazalarin incelenmesi",
     },
     {
-      topic: "Risk Değerlendirmesi Güncelleme",
-      description: "Mevcut risk değerlendirmelerinin gözden geçirilmesi",
+      topic: "Risk Degerlendirmesi Guncelleme",
+      description: "Mevcut risk degerlendirmelerinin gozden gecirilmesi",
     },
     {
-      topic: "Acil Durum Planları",
-      description: "Acil durum senaryolarının kontrolü ve tatbikat planlaması",
+      topic: "Acil Durum Planlari",
+      description: "Acil durum senaryolarinin kontrolu ve tatbikat planlamasi",
     },
     {
-      topic: "KKD Kullanım Kontrolü",
-      description: "Kişisel koruyucu donanım kullanımının denetimi",
+      topic: "KKD Kullanim Kontrolu",
+      description: "Kisisel koruyucu donanim kullanimina iliskin denetim basliklari",
     },
     {
-      topic: "İSG Eğitim Programları",
-      description: "Çalışanlara verilecek İSG eğitimlerinin planlanması",
+      topic: "ISG Egitim Programlari",
+      description: "Calisanlara verilecek ISG egitimlerinin planlanmasi",
     },
     {
-      topic: "Sağlık Gözetimi",
-      description: "Periyodik sağlık muayenelerinin takibi",
+      topic: "Saglik Gozetimi",
+      description: "Periyodik saglik muayenelerinin takibi",
     },
     {
       topic: "Dilek ve Temenniler",
-      description: "Çalışan temsilcilerinin ve kurul üyelerinin önerileri",
+      description: "Calisan temsilcilerinin ve kurul uyelerinin onerileri",
     },
     {
-      topic: "Kapanış",
-      description: "Toplantının sona erdirilmesi ve gelecek toplantı tarihi",
+      topic: "Kapanis",
+      description: "Toplantinin sonlandirilmasi ve bir sonraki tarih",
     },
   ];
 }
 
-/**
- * 🛡️ Main Handler
- */
+function buildFallbackResponse(note: string, error?: string) {
+  return {
+    success: true,
+    agenda: getFallbackAgenda(),
+    metadata: {
+      companyName: "Unknown",
+      industry: "Unknown",
+      itemCount: 10,
+      model: "fallback",
+      note,
+      error,
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   const startTime = Date.now();
-  console.log("🚀 Request started at:", new Date().toISOString());
 
   try {
     const body = (await req.json()) as RequestBody;
     const { prompt, companyName, industry } = body;
 
-    console.log("📋 Request:", { companyName, industry });
-
     if (!prompt || !companyName || !industry) {
       throw new Error("Missing required fields");
     }
 
-    const googleApiKey = Deno.env.get("GOOGLE_API_KEY");
-    const googleModel = Deno.env.get("GOOGLE_MODEL") || "gemini-1.5-flash";
+    const googleApiKey = getRequiredGoogleApiKey();
+    const googleModel = getGoogleLiteModel();
 
-    if (!googleApiKey) {
-      throw new Error("GOOGLE_API_KEY not configured");
-    }
-
-    console.log(`🤖 Using model: ${googleModel}`);
-
-    // ✅ Gemini API call with increased maxOutputTokens
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${googleModel}:generateContent?key=${googleApiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    const { payload, model } = await callGeminiWithRetryAndFallback({
+      apiKey: googleApiKey,
+      model: googleModel,
+      modelPreference: "lite",
+      requestLabel: "generate-agenda",
+      body: {
+        contents: [
+          {
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 8192,
+          topP: 0.8,
+          topK: 40,
         },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-            topP: 0.8,
-            topK: 40,
-          },
-        }),
-      }
-    );
+      },
+    });
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text();
-      console.error("❌ Gemini API error:", errorText);
-      
-      // ✅ Return fallback on API error
-      console.log("⚠️ Using fallback agenda due to API error");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          agenda: getFallbackAgenda(),
-          metadata: {
-            companyName,
-            industry,
-            itemCount: 10,
-            model: "fallback",
-            note: "Varsayılan gündem kullanıldı (API hatası)",
-          },
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const rawContent = extractTextFromGeminiResponse(payload);
+    const agenda = extractJSON(rawContent)
+      .map((item) => cleanAgendaItem(item))
+      .filter((item): item is AgendaItem => item !== null);
 
-    const data = await geminiResponse.json();
-    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawContent) {
-      console.error("❌ No content in response");
-      
-      // ✅ Return fallback
-      return new Response(
-        JSON.stringify({
-          success: true,
-          agenda: getFallbackAgenda(),
-          metadata: {
-            companyName,
-            industry,
-            itemCount: 10,
-            model: "fallback",
-            note: "Varsayılan gündem kullanıldı (boş yanıt)",
-          },
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
-    console.log("✅ Gemini response received");
-    console.log("📊 Response length:", rawContent.length);
-
-    // Extract and parse
-    let agenda: AgendaItem[];
-    try {
-      const parsedArray = extractJSON(rawContent);
-      agenda = parsedArray
-        .map((item, index) => cleanAgendaItem(item, index))
-        .filter((item): item is AgendaItem => item !== null);
-
-      if (agenda.length === 0) {
-        throw new Error("No valid agenda items");
-      }
-
-      console.log(`✅ Parsed ${agenda.length} items`);
-    } catch (parseError) {
-      console.error("❌ Parse failed:", parseError);
-      
-      // ✅ Return fallback on parse error
-      console.log("⚠️ Using fallback agenda due to parse error");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          agenda: getFallbackAgenda(),
-          metadata: {
-            companyName,
-            industry,
-            itemCount: 10,
-            model: "fallback",
-            note: "Varsayılan gündem kullanıldı (parse hatası)",
-          },
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+    if (agenda.length === 0) {
+      throw new Error("No valid agenda items");
     }
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Success in ${duration}ms`);
 
     return new Response(
       JSON.stringify({
@@ -320,42 +195,32 @@ serve(async (req) => {
           companyName,
           industry,
           itemCount: agenda.length,
-          model: googleModel,
+          model,
           processingTimeMs: duration,
         },
       }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
-  } catch (error: unknown) {
+  } catch (error) {
     const duration = Date.now() - startTime;
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const fallbackPayload = buildFallbackResponse("Varsayilan gundem kullanildi (hata).", errorMessage);
 
-    console.error("❌ Request failed:", errorMessage);
-
-    // ✅ Always return fallback on error
     return new Response(
       JSON.stringify({
-        success: true,
-        agenda: getFallbackAgenda(),
+        ...fallbackPayload,
         metadata: {
-          companyName: "Unknown",
-          industry: "Unknown",
-          itemCount: 10,
-          model: "fallback",
-          note: "Varsayılan gündem kullanıldı (hata)",
-          error: errorMessage,
+          ...fallbackPayload.metadata,
+          processingTimeMs: duration,
         },
       }),
       {
-        status: 200, // ✅ Return 200 even on error
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });
-
-console.log("🟢 Edge Function loaded");

@@ -2,9 +2,11 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
   GeminiHttpError,
   callGemini,
+  callGeminiWithRetryAndFallback,
   cleanJsonText,
   extractTextFromGeminiResponse,
-  getGoogleModel,
+  getGoogleLiteModel,
+  getGoogleRobustModel,
   getRequiredGoogleApiKey,
 } from "../_shared/gemini.ts";
 
@@ -250,9 +252,12 @@ Deno.serve(async (req) => {
         ? `${PLAN_SYSTEM_PROMPT}\n\nMevcut plan JSON:\n${currentPlan}\n\nGuncelleme istegi:\n${prompt}\n\nYanit olarak guncellenmis tum JSON plani dondur.`
         : `${PLAN_SYSTEM_PROMPT}\n\nKullanici aciklamasi:\n${prompt}`;
 
-    const planPayload = await callGemini({
+    const preferredModel = action === "improve" ? getGoogleRobustModel() : getGoogleLiteModel();
+    const { payload: planPayload } = await callGeminiWithRetryAndFallback({
       apiKey,
-      model: getGoogleModel(action === "improve" ? "gemini-2.5-pro" : "gemini-2.5-flash"),
+      model: preferredModel,
+      modelPreference: action === "improve" ? "robust" : "lite",
+      requestLabel: `evacuation-ai:${action}`,
       body: {
         contents: [
           {

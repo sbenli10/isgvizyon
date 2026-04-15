@@ -78,58 +78,90 @@ interface MenuGroup {
 // ====================================================
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
-  if (badge === "AI") return "border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-200";
-  if (badge === "Pro") return "border-amber-500/25 bg-amber-500/10 text-amber-800 dark:text-amber-200";
-  if (badge === "Beta") return "border-sky-500/25 bg-sky-500/10 text-sky-800 dark:text-sky-200";
-  if (badge === "NEW") return "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200";
-  if (typeof badge === "number") return "border-yellow-500/25 bg-yellow-500/10 text-yellow-900 dark:text-yellow-200";
+  if (badge === "AI") return "border-fuchsia-500/30 bg-fuchsia-500/12 text-fuchsia-800 dark:text-fuchsia-200";
+  if (badge === "Pro") return "border-amber-500/30 bg-amber-500/12 text-amber-900 dark:text-amber-200";
+  if (badge === "Beta") return "border-sky-500/30 bg-sky-500/12 text-sky-900 dark:text-sky-200";
+  if (badge === "NEW") return "border-emerald-500/30 bg-emerald-500/12 text-emerald-900 dark:text-emerald-200";
+  if (typeof badge === "number") return "border-yellow-500/30 bg-yellow-500/12 text-yellow-950 dark:text-yellow-200";
   return "border-border/60 bg-muted/35 text-muted-foreground";
 };
 
-const cardShell =
-  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/95 text-sidebar-foreground shadow-[0_24px_65px_-38px_rgba(2,6,23,0.38)] ring-1 ring-black/5 backdrop-blur-2xl dark:shadow-[0_34px_90px_-48px_rgba(0,0,0,0.7)] dark:ring-white/5";
+const cardShell = cn(
+  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/92 text-sidebar-foreground backdrop-blur-2xl",
+  "ring-1 ring-black/5 dark:ring-white/5",
+  "shadow-[0_28px_80px_-42px_rgba(2,6,23,0.40)] dark:shadow-[0_44px_120px_-62px_rgba(0,0,0,0.82)]",
+);
 
-const cardInnerGlow =
-  "bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.12),_transparent_38%)]";
+const cardInnerGlow = cn(
+  // light
+  "bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.10),_transparent_45%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.07),_transparent_40%)]",
+  // dark
+  "dark:bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.18),_transparent_45%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.12),_transparent_40%)]",
+);
 
 const sectionLabel =
-  "mb-1 flex items-center justify-between px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground";
+  "mb-1 flex items-center justify-between px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.20em] text-muted-foreground/90";
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
   "group relative flex w-full items-start gap-3 rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
 
-const menuItemIdle =
-  "text-foreground/80 hover:border-border/70 hover:bg-muted/55 hover:text-foreground";
+// Light/Dark hover kontrastı yükseltildi
+const menuItemIdle = cn(
+  "text-foreground/85 hover:bg-muted/55 hover:text-foreground",
+  "hover:shadow-[0_12px_34px_-28px_rgba(15,23,42,0.50)]",
+  "dark:text-foreground/80 dark:hover:bg-muted/35 dark:hover:shadow-[0_18px_44px_-32px_rgba(0,0,0,0.70)]",
+);
 
-const menuItemActive =
-  "border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_70%)] text-foreground shadow-[0_16px_34px_-26px_hsl(var(--primary)/0.65)]";
+const menuItemActive = cn(
+  "border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.22),transparent_72%)]",
+  "text-foreground shadow-[0_18px_44px_-30px_hsl(var(--primary)/0.75)]",
+  "dark:border-primary/22 dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.26),transparent_72%)]",
+);
 
+// İKON KUTUSU: daha büyük + daha görünür
 const iconWrapBase =
-  "mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] border transition-all duration-200";
+  "mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border transition-all duration-200";
 
-const iconWrapIdle =
-  "border-border/70 bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.7))] text-muted-foreground shadow-[inset_0_1px_0_hsl(var(--background)/0.85),0_10px_24px_-20px_rgba(15,23,42,0.7)] group-hover:border-primary/20 group-hover:bg-background group-hover:text-foreground";
+const iconWrapIdle = cn(
+  // light
+  "border-sidebar-border/80 bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.70))]",
+  "text-foreground/70 shadow-[inset_0_1px_0_hsl(var(--background)/0.94),0_14px_32px_-26px_rgba(15,23,42,0.55)]",
+  "group-hover:border-primary/25 group-hover:bg-background group-hover:text-foreground",
+  // dark
+  "dark:border-sidebar-border/80 dark:bg-[linear-gradient(180deg,hsl(var(--background)/0.32),hsl(var(--background)/0.18))]",
+  "dark:text-foreground/80 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_36px_-28px_rgba(0,0,0,0.85)]",
+  "dark:group-hover:border-primary/30 dark:group-hover:bg-background/40 dark:group-hover:text-foreground",
+);
 
-const iconWrapActive =
-  "border-primary/30 bg-[linear-gradient(180deg,hsl(var(--primary)/0.18),hsl(var(--primary)/0.10))] text-primary shadow-[0_18px_30px_-22px_hsl(var(--primary)/0.95)]";
+const iconWrapActive = cn(
+  "border-primary/35 bg-[linear-gradient(180deg,hsl(var(--primary)/0.22),hsl(var(--primary)/0.12))]",
+  "text-primary shadow-[0_24px_54px_-36px_hsl(var(--primary)/0.95)]",
+  "dark:bg-[linear-gradient(180deg,hsl(var(--primary)/0.26),hsl(var(--primary)/0.14))]",
+);
 
 const leftAccent =
-  "absolute left-1 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary/80 opacity-0 transition-opacity";
+  "absolute left-1 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-primary/85 opacity-0 transition-opacity";
 const leftAccentActive = "opacity-100";
 
-const surfacePanel =
-  "rounded-[24px] border border-sidebar-border/70 bg-background/55 shadow-sm backdrop-blur-xl";
+const surfacePanel = cn(
+  "rounded-[24px] border border-sidebar-border/70 bg-background/55 backdrop-blur-xl",
+  "shadow-[0_10px_24px_-18px_rgba(15,23,42,0.18)] dark:shadow-[0_14px_30px_-20px_rgba(0,0,0,0.55)]",
+);
 
-const collapsedUtilityButton =
-  "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70 text-muted-foreground shadow-[0_16px_28px_-24px_rgba(15,23,42,0.85)] backdrop-blur-xl transition hover:border-primary/30 hover:bg-background hover:text-foreground";
+const collapsedUtilityButton = cn(
+  "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70",
+  "text-foreground/70 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.45)] backdrop-blur-xl transition",
+  "hover:border-primary/30 hover:bg-background hover:text-foreground",
+  "dark:text-foreground/75 dark:shadow-[0_18px_34px_-26px_rgba(0,0,0,0.78)]",
+);
 
 function PillBadge({ value, active }: { value: string | number; active: boolean }) {
   return (
     <span
       className={cn(
         "ml-auto mt-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
-        active ? "border-primary/25 bg-primary/10 text-primary" : badgeClassNames(value),
+        active ? "border-primary/30 bg-primary/12 text-primary" : badgeClassNames(value),
       )}
     >
       {value}
@@ -284,9 +316,7 @@ export function AppSidebar() {
 
   const toggleSubmenu = (label: string) => {
     if (collapsed) return;
-    setCollapsedSubmenus((prev) =>
-      prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
-    );
+    setCollapsedSubmenus((prev) => (prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label]));
   };
 
   const isSubmenuOpen = (item: MenuItem) => {
@@ -345,13 +375,8 @@ export function AppSidebar() {
       <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col overflow-hidden")}>
         {collapsed && (
           <div className="flex items-center justify-center border-b border-sidebar-border/80 px-2 py-3">
-            <button
-              onClick={toggleSidebar}
-              className={collapsedUtilityButton}
-              title="Menüyü genişlet"
-              type="button"
-            >
-              <PanelLeftOpen className="h-4.5 w-4.5" />
+            <button onClick={toggleSidebar} className={collapsedUtilityButton} title="Menüyü genişlet" type="button">
+              <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" />
             </button>
           </div>
         )}
@@ -360,14 +385,9 @@ export function AppSidebar() {
         <SidebarHeader className={cn("border-b border-sidebar-border/80 px-3 py-4", collapsed && "hidden")}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div
-                className={cn(
-                  surfacePanel,
-                  "flex h-12 w-12 shrink-0 items-center justify-center rounded-[22px] p-1",
-                )}
-              >
+              <div className={cn(surfacePanel, "flex h-12 w-12 shrink-0 items-center justify-center rounded-[22px] p-1")}>
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 text-white shadow-sm">
-                  <Shield className="h-4 w-4" />
+                  <Shield className="h-4 w-4 stroke-[2.2]" />
                 </div>
               </div>
 
@@ -376,12 +396,8 @@ export function AppSidebar() {
                   <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                     İSGVİZYON
                   </div>
-                  <div className="text-sm font-semibold text-sidebar-foreground">
-                    Operasyon merkezi
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Hızlı erişim ve görev takibi
-                  </div>
+                  <div className="text-sm font-semibold text-sidebar-foreground">Operasyon merkezi</div>
+                  <div className="text-xs text-muted-foreground">Hızlı erişim ve görev takibi</div>
                 </div>
               )}
             </div>
@@ -396,7 +412,7 @@ export function AppSidebar() {
               title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
               type="button"
             >
-              {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+              {collapsed ? <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" /> : <PanelLeftClose className="h-5 w-5 stroke-[2.2]" />}
             </button>
           </div>
 
@@ -408,9 +424,7 @@ export function AppSidebar() {
                     <Activity className="h-3.5 w-3.5" />
                     Görünen
                   </div>
-                  <div className="mt-2 text-xl font-semibold text-sidebar-foreground">
-                    {totalVisibleItems}
-                  </div>
+                  <div className="mt-2 text-xl font-semibold text-sidebar-foreground">{totalVisibleItems}</div>
                   <div className="text-xs text-muted-foreground">aktif menü bağlantısı</div>
                 </div>
                 <div className={cn(surfacePanel, "p-3")}>
@@ -473,25 +487,16 @@ export function AppSidebar() {
                           <button
                             type="button"
                             onClick={() => toggleSubmenu(item.title)}
-                            className={cn(
-                              menuItemBase,
-                              "border border-transparent",
-                              menuItemIdle,
-                              active && menuItemActive,
-                            )}
+                            className={cn(menuItemBase, "border border-transparent", menuItemIdle, active && menuItemActive)}
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[17px] w-[17px] stroke-[2.1]" />
+                              <item.icon className="h-[18px] w-[18px] stroke-[2.25]" />
                             </span>
 
                             {!collapsed && (
                               <>
-                                {/* ✅ truncate yok: tam görünür (wrap) */}
-                                <span className="min-w-0 flex-1 whitespace-normal leading-5">
-                                  {item.title}
-                                </span>
-
+                                <span className="min-w-0 flex-1 whitespace-normal leading-5">{item.title}</span>
                                 {item.badge && <PillBadge value={item.badge} active={active} />}
 
                                 <ChevronDown
@@ -515,21 +520,19 @@ export function AppSidebar() {
                                       to={child.url}
                                       className={cn(
                                         "flex items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
-                                        "text-foreground/70 hover:bg-muted/45 hover:text-foreground",
+                                        "text-foreground/75 hover:bg-muted/45 hover:text-foreground",
+                                        "dark:text-foreground/78 dark:hover:bg-muted/30",
                                         childActive && "bg-primary/10 text-foreground",
                                       )}
                                       activeClassName=""
                                     >
                                       <child.icon
                                         className={cn(
-                                          "mt-0.5 h-[17px] w-[17px] stroke-[2.1]",
-                                          childActive ? "text-primary" : "text-muted-foreground",
+                                          "mt-0.5 h-[18px] w-[18px] stroke-[2.2]",
+                                          childActive ? "text-primary" : "text-foreground/55 dark:text-foreground/60",
                                         )}
                                       />
-                                      {/* ✅ truncate yok */}
-                                      <span className="min-w-0 flex-1 whitespace-normal leading-5">
-                                        {child.title}
-                                      </span>
+                                      <span className="min-w-0 flex-1 whitespace-normal leading-5">{child.title}</span>
                                       {child.badge && <PillBadge value={child.badge} active={childActive} />}
                                     </NavLink>
                                   </SidebarMenuButton>
@@ -547,28 +550,18 @@ export function AppSidebar() {
                           <NavLink
                             to={item.url}
                             end={item.url === "/"}
-                            className={cn(
-                              menuItemBase,
-                              "border border-transparent",
-                              menuItemIdle,
-                              active && menuItemActive,
-                            )}
+                            className={cn(menuItemBase, "border border-transparent", menuItemIdle, active && menuItemActive)}
                             activeClassName=""
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <item.icon className="h-[17px] w-[17px] stroke-[2.1]" />
+                              <item.icon className="h-[18px] w-[18px] stroke-[2.25]" />
                             </span>
 
                             {!collapsed && (
                               <>
-                                {/* ✅ truncate yok */}
-                                <span className="min-w-0 flex-1 whitespace-normal leading-5">
-                                  {item.title}
-                                </span>
-
+                                <span className="min-w-0 flex-1 whitespace-normal leading-5">{item.title}</span>
                                 {item.badge && <PillBadge value={item.badge} active={active} />}
-
                                 <ChevronRight className="ml-auto mt-1 h-4 w-4 text-muted-foreground/70" />
                               </>
                             )}
@@ -592,12 +585,8 @@ export function AppSidebar() {
                   {user.email ? user.email.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-sidebar-foreground">
-                    {user.email?.split("@")[0]}
-                  </div>
-                  <div className="text-[10px] font-medium text-muted-foreground">
-                    {user.email}
-                  </div>
+                  <div className="text-sm font-semibold text-sidebar-foreground">{user.email?.split("@")[0]}</div>
+                  <div className="text-[10px] font-medium text-muted-foreground">{user.email}</div>
                 </div>
                 <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
               </div>
@@ -608,7 +597,7 @@ export function AppSidebar() {
             <ThemeToggle />
 
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
               title="Yardım"
               type="button"
             >
@@ -617,7 +606,7 @@ export function AppSidebar() {
 
             <button
               onClick={() => navigate("/settings")}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
               title="Ayarlar"
               type="button"
             >

@@ -1,10 +1,11 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import {
   GeminiHttpError,
-  callGemini,
+  callGeminiWithRetryAndFallback,
   cleanJsonText,
   extractTextFromGeminiResponse,
-  getGoogleModel,
+  getGoogleLiteModel,
+  getGoogleRobustModel,
   getRequiredGoogleApiKey,
 } from "../_shared/gemini.ts";
 
@@ -21,7 +22,10 @@ interface RequestBody {
   naceTitle?: string;
 }
 
-function buildPrompt(body: Required<Pick<RequestBody, "naceCode" | "sector" | "hazardClass">> & Pick<RequestBody, "naceTitle">) {
+function buildPrompt(
+  body: Required<Pick<RequestBody, "naceCode" | "sector" | "hazardClass">> &
+    Pick<RequestBody, "naceTitle">,
+) {
   return `Sen Turkiye'deki is sagligi ve guvenligi mevzuatina hakim bir uzmansin.
 
 Asagidaki NACE bilgilerine gore en yaygin 5 mesleki tehlikeyi analiz et:
@@ -111,9 +115,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    const payload = await callGemini({
+    const preferredModel =
+      hazardClass === "Cok Tehlikeli" || hazardClass === "Çok Tehlikeli"
+        ? getGoogleRobustModel()
+        : getGoogleLiteModel();
+
+    const { payload } = await callGeminiWithRetryAndFallback({
       apiKey: getRequiredGoogleApiKey(),
-      model: getGoogleModel(hazardClass === "Çok Tehlikeli" ? "gemini-2.5-pro" : "gemini-2.5-flash"),
+      model: preferredModel,
+      modelPreference:
+        hazardClass === "Cok Tehlikeli" || hazardClass === "Çok Tehlikeli" ? "robust" : "lite",
+      requestLabel: "nace-risk-analyze",
       body: {
         contents: [
           {
@@ -129,7 +141,10 @@ Deno.serve(async (req) => {
       },
     });
 
-    return jsonResponse(200, { success: true, ...parseResponse(extractTextFromGeminiResponse(payload)) });
+    return jsonResponse(200, {
+      success: true,
+      ...parseResponse(extractTextFromGeminiResponse(payload)),
+    });
   } catch (error) {
     if (error instanceof GeminiHttpError) {
       return jsonResponse(error.status, {

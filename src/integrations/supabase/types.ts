@@ -612,6 +612,51 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_function_logs: {
+        Row: {
+          attempted_models: string[]
+          attempts_count: number
+          created_at: string
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          function_name: string
+          id: string
+          metadata: Json
+          request_label: string | null
+          resolved_model: string | null
+          status: string
+        }
+        Insert: {
+          attempted_models?: string[]
+          attempts_count?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          function_name: string
+          id?: string
+          metadata?: Json
+          request_label?: string | null
+          resolved_model?: string | null
+          status: string
+        }
+        Update: {
+          attempted_models?: string[]
+          attempts_count?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          function_name?: string
+          id?: string
+          metadata?: Json
+          request_label?: string | null
+          resolved_model?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: string

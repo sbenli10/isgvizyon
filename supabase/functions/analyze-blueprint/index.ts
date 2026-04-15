@@ -1,4 +1,10 @@
-﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  callGeminiWithRetryAndFallback,
+  extractTextFromGeminiResponse,
+  getGoogleRobustModel,
+  getRequiredGoogleApiKey,
+} from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,7 +88,7 @@ function parseAIResponse(contentText: string): any {
   const firstBrace = cleaned.indexOf("{");
   const lastBrace = cleaned.lastIndexOf("}");
   if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    throw new Error("JSON içeriği bulunamadı");
+    throw new Error("JSON icerigi bulunamadi");
   }
 
   return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
@@ -92,9 +98,7 @@ function normalizeResult(parsed: any): BlueprintAnalysisResult {
   const safeProjectInfo: ProjectInfo = {
     area_type: parsed?.project_info?.area_type ?? "Planda görünmüyor.",
     detected_floor:
-      typeof parsed?.project_info?.detected_floor === "number"
-        ? parsed.project_info.detected_floor
-        : null,
+      typeof parsed?.project_info?.detected_floor === "number" ? parsed.project_info.detected_floor : null,
     building_category: parsed?.project_info?.building_category ?? "Planda görünmüyor.",
     estimated_area_sqm:
       typeof parsed?.project_info?.estimated_area_sqm === "number"
@@ -102,13 +106,9 @@ function normalizeResult(parsed: any): BlueprintAnalysisResult {
         : null,
     usage_type: parsed?.project_info?.usage_type ?? "Planda görünmüyor.",
     construction_year:
-      typeof parsed?.project_info?.construction_year === "number"
-        ? parsed.project_info.construction_year
-        : null,
+      typeof parsed?.project_info?.construction_year === "number" ? parsed.project_info.construction_year : null,
     occupancy_count:
-      typeof parsed?.project_info?.occupancy_count === "number"
-        ? parsed.project_info.occupancy_count
-        : null,
+      typeof parsed?.project_info?.occupancy_count === "number" ? parsed.project_info.occupancy_count : null,
   };
 
   const equipmentInventory: Equipment[] = Array.isArray(parsed?.equipment_inventory)
@@ -116,17 +116,14 @@ function normalizeResult(parsed: any): BlueprintAnalysisResult {
         type: eq?.type ?? "extinguisher",
         count: typeof eq?.count === "number" ? eq.count : 0,
         locations:
-          Array.isArray(eq?.locations) && eq.locations.length > 0
-            ? eq.locations
-            : ["Planda görünmüyor."],
+          Array.isArray(eq?.locations) && eq.locations.length > 0 ? eq.locations : ["Planda görünmüyor."],
         adequacy_status:
           eq?.adequacy_status === "insufficient" || eq?.adequacy_status === "excessive"
             ? eq.adequacy_status
             : eq?.adequacy_status === "sufficient"
             ? "sufficient"
             : "unknown",
-        recommended_count:
-          typeof eq?.recommended_count === "number" ? eq.recommended_count : null,
+        recommended_count: typeof eq?.recommended_count === "number" ? eq.recommended_count : null,
         notes: eq?.notes ?? "Planda görünmüyor.",
       }))
     : [];
@@ -178,10 +175,10 @@ function safeFallback(): BlueprintAnalysisResult {
     equipment_inventory: [],
     safety_violations: [
       {
-        issue: "Uygunluk hesabı yapılamıyor çünkü gerekli bilgiler planda görünmüyor.",
+        issue: "Uygunluk hesabi yapilamiyor cunku gerekli bilgiler planda görünmüyor.",
         regulation_reference: "Planda görünmüyor.",
         severity: "info",
-        recommended_action: "Daha net ve detaylı plan yükleyin.",
+        recommended_action: "Daha net ve detayli plan yukleyin.",
       },
     ],
     expert_suggestions: ["Planda görünmüyor."],
@@ -203,7 +200,7 @@ function safeFallback(): BlueprintAnalysisResult {
         yonlendirme_oklari: "Planda görünmüyor.",
       },
       yonetmelik_uygunluk_kontrolu: {
-        durum: "Uygunluk hesabı yapılamıyor çünkü gerekli bilgiler planda görünmüyor.",
+        durum: "Uygunluk hesabi yapilamiyor cunku gerekli bilgiler planda görünmüyor.",
       },
       iyilestirme_onerileri: ["Planda görünmüyor."],
       guven_seviyesi: "Düşük",
@@ -211,96 +208,21 @@ function safeFallback(): BlueprintAnalysisResult {
   };
 }
 
-const SYSTEM_PROMPT = `Sen bir bina yangın güvenliği ve tahliye planı analiz uzmanısın.
+const SYSTEM_PROMPT = `Sen bir bina yangin guvenligi ve tahliye plani analiz uzmansin.
 
-Görevin: Verilen yangın tahliye planı / acil durum krokisi görselini analiz etmek ve yalnızca görselde açıkça bulunan bilgileri raporlamaktır.
+Gorevin: Verilen yangin tahliye plani veya acil durum krokisi gorselini analiz etmek ve yalnizca gorselde acikca bulunan bilgileri raporlamaktir.
 
-KESİN KURALLAR:
-1) Görselde yazmayan veya açıkça görünmeyen hiçbir bilgiyi tahmin etme.
-2) Bina alanını, kat alanını veya ölçüleri tahmin etme.
-3) Görselde belirtilmeyen ekipmanları varmış gibi kabul etme.
-4) Bir bilgi yoksa tam olarak şu ifadeyi yaz: "Planda görünmüyor."
-5) Sadece sembol veya yazı olarak açıkça görülen ekipmanları say.
-6) Plan bir kata aitse tüm bina için genelleme yapma.
-7) Yönetmelik hesapları için gerekli veriler yoksa hesap yapma ve şu ifadeyi yaz:
-"Uygunluk hesabı yapılamıyor çünkü gerekli bilgiler planda görünmüyor."
-8) Bir ekipman görselde bulunmuyorsa bunun mevcut olmadığı sonucunu çıkarma.
-Bu durumda "Bu plandan doğrulanamaz." yaz.
-ÇIKTIYI SADECE GEÇERLİ JSON VER.
-
-JSON ŞEMASI (zorunlu):
-{
-  "project_info": {
-    "area_type": "string",
-    "detected_floor": null,
-    "building_category": "string",
-    "estimated_area_sqm": null,
-    "usage_type": "string",
-    "occupancy_count": null
-  },
-  "equipment_inventory": [
-    {
-      "type": "extinguisher|exit|hydrant|first_aid|assembly_point|alarm|emergency_light|fire_hose|smoke_detector",
-      "count": 0,
-      "locations": ["string"],
-      "adequacy_status": "sufficient|insufficient|excessive|unknown",
-      "recommended_count": null,
-      "notes": "string"
-    }
-  ],
-  "safety_violations": [
-    {
-      "issue": "string",
-      "regulation_reference": "string",
-      "severity": "critical|warning|info",
-      "recommended_action": "string"
-    }
-  ],
-  "expert_suggestions": ["string"],
-  "compliance_score": null,
-  "analysis_report": {
-    "plan_bilgileri": {
-      "kat_bilgisi": "string",
-      "acil_durum_telefonu": "string",
-      "plan_basligi": "string",
-      "lejant": "string",
-      "gorunen_oda_isimleri": ["string"]
-    },
-    "oda_ve_alan_listesi": [
-      {
-        "oda_adi": "string",
-        "baglantili_alanlar": ["string"],
-        "tahliye_yon_oklari": "string"
-      }
-    ],
-    "guvenlik_ekipmanlari_tespiti": [
-      {
-        "ekipman_turu": "string",
-        "konum": "string",
-        "adet": 0
-      }
-    ],
-    "tahliye_yollari_analizi": {
-      "ana_tahliye_yonleri": "string",
-      "cikis_kapilari": "string",
-      "yangin_merdivenleri": "string",
-      "yonlendirme_oklari": "string",
-      "odalarin_cikisa_yonlendirilmesi": "string"
-    },
-    "yonetmelik_uygunluk_kontrolu": {
-      "durum": "string"
-    },
-    "iyilestirme_onerileri": ["string"],
-    "guven_seviyesi": "Yüksek|Orta|Düşük"
-  }
-}
-
-ÇOK ÖNEMLİ:
-- Eksik metinsel bilgi için "Planda görünmüyor." yaz.
-- Eksik sayısal/hesap gerektiren bilgi için null kullan.
-- Uydurma veri üretme.
-- Markdown yazma.
-- Sadece JSON döndür.`;
+Kesin kurallar:
+1) Gorselde yazmayan veya acikca gorunmeyen hicbir bilgiyi tahmin etme.
+2) Bina alani, kat alani veya olculeri tahmin etme.
+3) Gorselde belirtilmeyen ekipmanlari varmis gibi kabul etme.
+4) Bir bilgi yoksa tam olarak su ifadeyi yaz: "Planda görünmüyor."
+5) Sadece sembol veya yazi olarak acikca gorulen ekipmanlari say.
+6) Plan bir kata aitse tum bina icin genelleme yapma.
+7) Yonetmelik hesaplari icin gerekli veriler yoksa hesap yapma ve "Uygunluk hesabi yapilamiyor cunku gerekli bilgiler planda görünmüyor." yaz.
+8) Bir ekipman gorselde bulunmuyorsa bunun mevcut olmadigi sonucunu cikarma. Bu durumda "Bu plandan dogrulanamaz." yaz.
+9) Cikti olarak sadece gecerli JSON ver.
+`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -315,7 +237,7 @@ serve(async (req) => {
     const { image, project_name, user_notes } = body;
 
     if (!image) {
-      return new Response(JSON.stringify({ error: "Kroki görseli zorunludur" }), {
+      return new Response(JSON.stringify({ error: "Kroki gorseli zorunludur" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -325,30 +247,22 @@ serve(async (req) => {
     if (imageSizeKB > 3072) {
       return new Response(
         JSON.stringify({
-          error: `Görsel çok büyük (${(imageSizeKB / 1024).toFixed(2)} MB). Maksimum 3MB olmalı.`,
+          error: `Gorsel cok buyuk (${(imageSizeKB / 1024).toFixed(2)} MB). Maksimum 3MB olmali.`,
         }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        },
       );
-    }
-
-    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    const GOOGLE_MODEL = Deno.env.get("GOOGLE_MODEL") || "gemini-2.0-flash-exp";
-
-    if (!GOOGLE_API_KEY) {
-      throw new Error("GOOGLE_API_KEY yapılandırması eksik");
     }
 
     const base64Match = image.match(/^data:(image\/\w+);base64,(.+)$/);
     if (!base64Match) {
-      throw new Error("Geçersiz görsel formatı. Base64 encoded image gerekli.");
+      throw new Error("Gecersiz gorsel formati. Base64 encoded image gerekli.");
     }
 
     const mimeType = base64Match[1];
     const base64Data = base64Match[2];
-
     const requestBody = {
       contents: [
         {
@@ -357,8 +271,8 @@ serve(async (req) => {
             { text: SYSTEM_PROMPT },
             {
               text: `${project_name ? `Proje: ${project_name}\n` : ""}${
-                user_notes ? `Kullanıcı notu: ${user_notes}\n` : ""
-              }\nLütfen görseli analiz et.`,
+                user_notes ? `Kullanici notu: ${user_notes}\n` : ""
+              }\nLutfen gorseli analiz et ve sadece JSON dondur.`,
             },
             {
               inline_data: {
@@ -379,27 +293,18 @@ serve(async (req) => {
     };
 
     const apiStart = Date.now();
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      }
-    );
+    const { payload, model } = await callGeminiWithRetryAndFallback({
+      apiKey: getRequiredGoogleApiKey(),
+      model: getGoogleRobustModel(),
+      modelPreference: "robust",
+      requestLabel: "analyze-blueprint",
+      body: requestBody,
+    });
     const apiDuration = Date.now() - apiStart;
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error (${response.status}): ${errorText.substring(0, 300)}`);
-    }
-
-    const data = await response.json();
-    const contentText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
     let parsedResult: BlueprintAnalysisResult;
     try {
-      parsedResult = normalizeResult(parseAIResponse(contentText));
+      parsedResult = normalizeResult(parseAIResponse(extractTextFromGeminiResponse(payload)));
     } catch {
       parsedResult = safeFallback();
     }
@@ -415,7 +320,7 @@ serve(async (req) => {
           image_size_kb: Math.round(imageSizeKB),
           api_duration_ms: apiDuration,
           total_duration_ms: totalDuration,
-          model: GOOGLE_MODEL,
+          model,
           processed_at: new Date().toISOString(),
           project_name: project_name || null,
           user_notes: user_notes || null,
@@ -424,14 +329,14 @@ serve(async (req) => {
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (error: any) {
     const errorDuration = Date.now() - startTime;
 
     return new Response(
       JSON.stringify({
-        error: error?.message || "Kroki analizi sırasında beklenmeyen bir hata oluştu",
+        error: error?.message || "Kroki analizi sirasinda beklenmeyen bir hata olustu",
         request_id: requestId,
         duration_ms: errorDuration,
         timestamp: new Date().toISOString(),
@@ -439,7 +344,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   }
 });
