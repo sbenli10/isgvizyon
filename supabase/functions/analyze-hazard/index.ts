@@ -10,6 +10,7 @@ const corsHeaders = {
 const MAX_PHOTOS = 3;
 const TIMEOUT_MS = 55000;
 const DELAY_BETWEEN_PHOTOS_MS = 1500;
+const MAX_INCOMPLETE_RESPONSE_RETRIES = 2;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -19,6 +20,20 @@ const getModelCandidates = (primaryModel: string) => {
 };
 
 const shouldRetryProviderStatus = (status: number) => status === 429 || status === 503;
+
+const calculateRiskScore = (probability: number, frequency: number, severity: number) =>
+  Number(probability || 0) * Number(frequency || 0) * Number(severity || 0);
+
+const getRiskLevel = (score: number) => {
+  if (score >= 400) return "Kritik";
+  if (score >= 200) return "Yüksek";
+  if (score >= 70) return "Önemli";
+  if (score >= 20) return "Düşük";
+  return "Kabul Edilebilir";
+};
+
+const hasEnoughDetail = (value: unknown, minLength = 40) =>
+  typeof value === "string" && value.trim().length >= minLength;
 
 async function invokeGoogleAIWithRetry({
   requestId,
@@ -90,9 +105,55 @@ async function invokeGoogleAIWithRetry({
 /**
  * ✅ JSON Parse Helper - Son versiyon (truncated property name desteği)
  */
+async function invokeGoogleAIUntilParsed({
+  requestId,
+  apiKey,
+  models,
+  requestBody,
+  context,
+}: {
+  requestId: string;
+  apiKey: string;
+  models: string[];
+  requestBody: Record<string, unknown>;
+  context: string;
+}) {
+  let lastError: unknown = null;
+
+  for (let parseAttempt = 1; parseAttempt <= MAX_INCOMPLETE_RESPONSE_RETRIES + 1; parseAttempt++) {
+    const { data, model } = await invokeGoogleAIWithRetry({
+      requestId,
+      apiKey,
+      models,
+      requestBody,
+      context: `${context}-attempt-${parseAttempt}`,
+    });
+
+    console.log(`âœ… [${requestId}] YanÄ±t alÄ±ndÄ±`, { context, model, parseAttempt });
+    const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+
+    try {
+      const parsed = parseAIResponse(contentText, requestId);
+      return { parsed, model };
+    } catch (parseError) {
+      lastError = parseError;
+      console.warn(`âš ï¸ [${requestId}] Eksik/yetersiz yanÄ±t, yeniden denenecek...`, {
+        context,
+        parseAttempt,
+        reason: parseError instanceof Error ? parseError.message : String(parseError),
+      });
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("AI yanÄ±tÄ± parse edilemedi");
+}
+
 function parseAIResponse(contentText: string, requestId: string): any {
   try {
     let cleaned = contentText;
+    let responseWasRecovered = false;
     
     // 1. Markdown temizliği
     cleaned = cleaned.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -117,6 +178,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
         const lastCommaBeforeQuote = cleaned.lastIndexOf(',', lastQuoteIndex);
         if (lastCommaBeforeQuote > 0) {
           cleaned = cleaned.substring(0, lastCommaBeforeQuote);
+          responseWasRecovered = true;
         }
       }
     }
@@ -126,6 +188,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
     if (quoteCount % 2 !== 0) {
       console.warn(`⚠️  [${requestId}] Açık tırnak bulundu, kapatılıyor...`);
       cleaned += '"';
+      responseWasRecovered = true;
     }
     
     // ✅ 5. Son karakteri kontrol et (tekrar)
@@ -134,6 +197,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
     // Virgül ile bitiyorsa sil
     if (lastChar === ',') {
       cleaned = cleaned.trim().slice(0, -1);
+      responseWasRecovered = true;
     }
     
     // Başlangıç karakterleriyle bitiyorsa sil
@@ -141,6 +205,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
       const lastComma = cleaned.lastIndexOf(',');
       if (lastComma > 0) {
         cleaned = cleaned.substring(0, lastComma);
+        responseWasRecovered = true;
       }
     }
     
@@ -187,6 +252,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
       
       // Kapanış parantezi ekle
       cleaned += ' }';
+      responseWasRecovered = true;
     } else {
       // JSON zaten kapalıysa son } karakterini bul
       const jsonEnd = cleaned.lastIndexOf('}');
@@ -234,6 +300,23 @@ function parseAIResponse(contentText: string, requestId: string): any {
     parsedResult.severity = typeof parsedResult.severity === 'number' 
       ? parsedResult.severity 
       : parseFloat(parsedResult.severity) || 15;
+    
+    parsedResult.riskScore = calculateRiskScore(
+      parsedResult.probability,
+      parsedResult.frequency,
+      parsedResult.severity,
+    );
+    parsedResult.riskLevel = getRiskLevel(parsedResult.riskScore);
+    
+    if (
+      responseWasRecovered ||
+      !hasEnoughDetail(parsedResult.hazardDescription, 80) ||
+      !hasEnoughDetail(parsedResult.immediateAction, 60) ||
+      !hasEnoughDetail(parsedResult.preventiveAction, 60) ||
+      !hasEnoughDetail(parsedResult.justification, 60)
+    ) {
+      throw new Error("AI yanıtı eksik veya yetersiz detayda geldi");
+    }
     
     // 12. Risk seviyesi hesapla (eksikse)
     if (!parsedResult.riskLevel) {
@@ -287,7 +370,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
       if (!desperate.justification) desperate.justification = "Risk analizi yapılmıştır";
       
       console.log(`✅ [${requestId}] Son çare başarılı!`);
-      return desperate;
+      throw new Error("AI yanıtı kesik geldi; varsayılan metinle kabul edilmeyecek");
       
     } catch (desperateError) {
       throw new Error(`JSON parse hatası: ${parseError.message}`);
@@ -409,22 +492,28 @@ Analizinde şu mevzuatlardan uygun olanını kullan:
    - Hemen = Bugün yapılacak geçici önlem
    - Kalıcı = Sistemsel, mühendislik çözümü
 5. **Yasal atfı doğru yap**: Tehlikenin türüne uygun mevzuatı belirt
+6. **Detay seviyesi yüksek olsun**:
+   - hazardDescription en az 2 cümle ve sahadaki kök riski açıkça anlatsın
+   - immediateAction en az 3 somut adım içersin
+   - preventiveAction en az 3 kalıcı/kurumsal önlem içersin
+   - justification yalnızca skor açıklaması değil, maruziyet biçimi ve olası sonuç zincirini de anlatsın
+7. **Kopya ve kısa cevap verme**: Genel cümleler yerine sahaya uyarlanmış teknik ifade kullan
 
 ## ⚠️ KRİTİK: SADECE JSON DÖNDÜR
 
 Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
 
 {
-  "hazardDescription": "Somut, teknik tehlike tanımı (ne, nerede, nasıl)",
+  "hazardDescription": "Somut, teknik tehlike tanımı (ne, nerede, nasıl). En az 2 cümle.",
   "probability": 6,
   "frequency": 6,
   "severity": 40,
   "riskScore": 1440,
   "riskLevel": "Kritik",
   "legalReference": "Elektrik İç Tesisleri Yönetmeliği Md. 34",
-  "immediateAction": "Enerji kesilerek pano kapatılmalı, uyarı levhası asılmalı, erişim engellenmelidir.",
-  "preventiveAction": "Elektrik panoları tip onaylı kapak ile kapatılmalı, boş modül yuvaları kapatılmalı, periyodik bakım planı oluşturulmalıdır.",
-  "justification": "380V gerilime günlük maruz kalma (F=6), kesin temas ihtimali (O=6), ölüm riski (Ş=40) nedeniyle Risk Skoru = 6×6×40 = 1440 (Kritik seviye)"
+  "immediateAction": "Enerji kesilerek alan izole edilmeli. Yetkisiz erişim fiziksel bariyer ile durdurulmalı. Uyarı/etiketleme hemen yapılmalıdır.",
+  "preventiveAction": "Mühendislik kontrolü ile güvenli ekipman kurulmalı. Periyodik kontrol ve bakım planı yazılı hale getirilmeli. Sorumlu personel ve termin atanmalıdır.",
+  "justification": "Maruziyet biçimi, olası yaralanma senaryosu ve Fine-Kinney hesabı birlikte açıklanmalıdır. Örnek: günlük maruz kalma (F=6), muhtemel temas (O=6), ölümcül sonuç (Ş=40) nedeniyle Risk Skoru = 6×6×40 = 1440 (Kritik)."
 }
 
 🚫 YAPMA: Markdown kullanma,"İşte analiz:" gibi açıklama yazma,Birden fazla JSON dönme,Tahmin yürütme, net olmayan ifadeler kullanma
@@ -469,7 +558,7 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
         }
       };
 
-      const { data, model: resolvedModel } = await invokeGoogleAIWithRetry({
+      const { parsed: parsedResult, model: resolvedModel } = await invokeGoogleAIUntilParsed({
         requestId,
         apiKey: GOOGLE_API_KEY,
         models: MODEL_CANDIDATES,
@@ -478,8 +567,6 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
       });
       console.log(`✅ [${requestId}] Google AI yanıtı alındı`, { model: resolvedModel });
 
-      const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-      const parsedResult = parseAIResponse(contentText, requestId);
 
       console.log(`🎉 [${requestId}] Tek analiz tamamlandı - Risk: ${parsedResult.riskScore}`);
 
@@ -566,7 +653,7 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
           }
         };
 
-        const { data, model: resolvedModel } = await invokeGoogleAIWithRetry({
+        const { parsed: parsedResult, model: resolvedModel } = await invokeGoogleAIUntilParsed({
           requestId,
           apiKey: GOOGLE_API_KEY,
           models: MODEL_CANDIDATES,
@@ -574,11 +661,9 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
           context: `photo-${photoNumber}`,
         });
         console.log(`✅ [${requestId}] Yanıt alındı`, { model: resolvedModel });
-        const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
         
         console.log(`📦 [${requestId}] Ham yanıt (ilk 300 kar):`, contentText.substring(0, 300));
         
-        const parsedResult = parseAIResponse(contentText, requestId);
 
         photoAnalyses.push({
           photoNumber,

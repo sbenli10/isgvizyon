@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
+import { generateHazardAnalysisPdf } from "@/lib/reportsPdfExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -54,6 +55,27 @@ interface AnalysisHistory {
 
  const MAX_PHOTOS = 3;
 const MAX_DOCUMENTS = 3;
+
+function calculateRiskScore(probability: number, frequency: number, severity: number) {
+  return Number(probability || 0) * Number(frequency || 0) * Number(severity || 0);
+}
+
+function getRiskLevelFromScore(score: number): FineKinneyAiResult["riskLevel"] {
+  if (score >= 400) return "Kritik";
+  if (score >= 200) return "Yüksek";
+  if (score >= 70) return "Önemli";
+  if (score >= 20) return "Düşük";
+  return "Kabul Edilebilir";
+}
+
+function normalizeAiResult<T extends FineKinneyAiResult>(result: T): T {
+  const normalizedScore = calculateRiskScore(result.probability, result.frequency, result.severity);
+  return {
+    ...result,
+    riskScore: normalizedScore,
+    riskLevel: getRiskLevelFromScore(normalizedScore),
+  };
+}
 
 const riskColors: Record<string, string> = {
   "Kabul Edilebilir": "bg-success/15 text-success border-success/30",
@@ -355,10 +377,13 @@ export default function Reports() {
 
       // ✅ Çoklu fotoğraf analizi durumu
       if (data.photoAnalyses && Array.isArray(data.photoAnalyses) && data.photoAnalyses.length > 0) {
-        setAiResults(data.photoAnalyses);
+        const normalizedAnalyses = data.photoAnalyses.map((analysis: FineKinneyAiResult & { photoNumber: number }) =>
+          normalizeAiResult(analysis),
+        );
+        setAiResults(normalizedAnalyses);
         
         // Her fotoğraf analizini veritabanına kaydet
-        const insertPromises = data.photoAnalyses.map((analysis: FineKinneyAiResult & { photoNumber: number }) => 
+        const insertPromises = normalizedAnalyses.map((analysis: FineKinneyAiResult & { photoNumber: number }) => 
           supabase.from("hazard_analyses").insert({
             user_id: user?.id,
             hazard_description: `📷 Fotoğraf ${analysis.photoNumber}: ${analysis.hazardDescription}`,
@@ -384,7 +409,7 @@ export default function Reports() {
       } 
       // ✅ Tek sonuç durumu (geriye dönük uyumluluk)
       else {
-        const resultData = data as FineKinneyAiResult;
+        const resultData = normalizeAiResult(data as FineKinneyAiResult);
         setAiResults([{ ...resultData, photoNumber: 1 }]);
         
         await supabase.from("hazard_analyses").insert({
@@ -668,6 +693,43 @@ export default function Reports() {
   doc.save(`denetron-isg-rapor-${Date.now()}.pdf`);
   toast.success("✅ Rapor PDF olarak indirildi!");
 };
+
+  const generateRichPDF = async (
+    analysis: FineKinneyAiResult,
+    originalDescription: string,
+    imageUrl?: string,
+  ) => {
+    await generateHazardAnalysisPdf({
+      analyses: [
+        {
+          ...analysis,
+          hazardDescription: analysis.hazardDescription || originalDescription,
+          imageUrl,
+          sourceLabel: analysis.photoNumber ? `Fotoğraf ${analysis.photoNumber} Analizi` : "Analiz Raporu",
+        },
+      ],
+      title: "Profesyonel Fine-Kinney Risk Analizi",
+      subtitle: "Görsel, bulgu, mevzuat dayanağı ve aksiyon planı birlikte sunulur",
+      fileName: `isg-analiz-raporu-${Date.now()}.pdf`,
+    });
+    toast.success("✅ Rapor PDF olarak indirildi!");
+  };
+
+  const generateCombinedPDF = async () => {
+    if (!aiResults.length) return;
+
+    await generateHazardAnalysisPdf({
+      analyses: aiResults.map((result, idx) => ({
+        ...result,
+        imageUrl: imageUrls[idx],
+        sourceLabel: `Fotoğraf ${result.photoNumber || idx + 1} Analizi`,
+      })),
+      title: "Toplu Fotoğraf Risk Analiz Raporu",
+      subtitle: `${aiResults.length} fotoğraf için tek dosyada kurumsal saha raporu`,
+      fileName: `isg-toplu-analiz-raporu-${Date.now()}.pdf`,
+    });
+    toast.success("✅ Toplu PDF raporu indirildi!");
+  };
 
   const deleteAnalysis = async (id: string) => {
     if (!confirm("Bu analizi silmek istediğinize emin misiniz?")) return;
@@ -983,7 +1045,11 @@ export default function Reports() {
                   <Button 
                     size="sm" 
                     variant="outline"
-                    onClick={() => generatePDF(result, `Fotoğraf ${result.photoNumber}: ${result.hazardDescription}`)}
+                    onClick={() => generateRichPDF(
+                      result,
+                      `Fotoğraf ${result.photoNumber}: ${result.hazardDescription}`,
+                      imageUrls[idx],
+                    )}
                     className="gap-2 flex-1 h-11 border-2"
                   >
                     <Download className="h-4 w-4" /> PDF İndir
@@ -1015,6 +1081,14 @@ export default function Reports() {
                       {Math.round(aiResults.reduce((sum, r) => sum + r.riskScore, 0) / aiResults.length)}
                     </p>
                   </div>
+                </div>
+                <div className="mt-6 flex justify-end">
+                  <Button
+                    onClick={generateCombinedPDF}
+                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <Download className="h-4 w-4" /> Toplu PDF İndir
+                  </Button>
                 </div>
               </div>
             )}
@@ -1087,7 +1161,7 @@ export default function Reports() {
                             <p className="text-blue-700 dark:text-blue-300 font-medium bg-blue-500/10 p-3 rounded border border-blue-500/20">{aiData.legalReference}</p>
                           </div>
                           <div className="flex justify-end pt-2">
-                            <Button size="sm" variant="outline" className="gap-2" onClick={() => generatePDF(aiData, aiData.hazardDescription)}>
+                            <Button size="sm" variant="outline" className="gap-2" onClick={() => generateRichPDF(aiData, aiData.hazardDescription)}>
                               <Download className="h-4 w-4" /> PDF Rapor
                             </Button>
                           </div>

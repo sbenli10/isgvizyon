@@ -6,6 +6,22 @@
 
 @layer base {
   :root {
+    /* Sidebar yüzeyi (light) */
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 222.2 84% 4.9%;
+    --sidebar-border: 214.3 31.8% 91.4%;
+  }
+
+  .dark {
+    /* Sidebar yüzeyi (dark) */
+    --sidebar: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+  }
+}
+
+@layer base {
+  :root {
     --background: 222 47% 11%;
     --foreground: 210 40% 98%;
 

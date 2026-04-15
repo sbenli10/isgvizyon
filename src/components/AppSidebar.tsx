@@ -109,7 +109,7 @@ const sectionLabel =
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex w-full items-start gap-3 rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
+  "group relative flex h-auto min-h-[4.5rem] w-full items-start gap-3 overflow-visible rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle = cn(
   "text-foreground/85 hover:bg-muted/55 hover:text-foreground",
@@ -124,18 +124,13 @@ const menuItemActive = cn(
 );
 
 // İKON KUTUSU: daha büyük + daha görünür (renk ikona verilecek)
-const iconWrapBase =
-  "mt-0.5 flex h-12 w-12 shrink-0 items-center justify-center rounded-[20px] border transition-all duration-200";
+const iconWrapBase = 
+  "relative mt-0.5 flex h-12 w-12 min-w-12 basis-12 shrink-0 items-center justify-center overflow-visible rounded-[20px] border transition-all duration-200";
 
 const iconWrapIdle = cn(
-  // light
-  "border-sidebar-border/80 bg-[linear-gradient(180deg,hsl(var(--background)/0.96),hsl(var(--background)/0.70))]",
-  "shadow-[inset_0_1px_0_hsl(var(--background)/0.94),0_14px_32px_-26px_rgba(15,23,42,0.55)]",
-  "group-hover:border-primary/25 group-hover:bg-background",
-  // dark
-  "dark:border-sidebar-border/80 dark:bg-[linear-gradient(180deg,hsl(var(--background)/0.32),hsl(var(--background)/0.18))]",
-  "dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_18px_36px_-28px_rgba(0,0,0,0.85)]",
-  "dark:group-hover:border-primary/30 dark:group-hover:bg-background/40",
+  "border-sidebar-border/80 bg-background/55",
+  "shadow-sm group-hover:border-primary/45 group-hover:bg-background/80",
+  "dark:border-white/10 dark:bg-white/5"
 );
 
 const iconWrapActive = cn(
@@ -174,18 +169,14 @@ function PillBadge({ value, active }: { value: string | number; active: boolean 
 }
 
 // İkonları görünür yapmak için TEK kaynak: ikonun kendi class’ı
-function MenuIcon({
-  Icon,
-  active,
-}: {
-  Icon: React.ComponentType<{ className?: string }>;
-  active: boolean;
-}) {
+function MenuIcon({ Icon, active }: { Icon: any; active: boolean }) {
   return (
     <Icon
       className={cn(
-        "h-[20px] w-[20px] stroke-[2.35]",
-        active ? "text-primary" : "text-foreground/90 dark:text-foreground/90",
+        "relative z-20 h-6 w-6 stroke-[2.5] transition-all duration-200",
+        active
+          ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)] dark:text-white"
+          : "text-foreground/90 dark:text-white/70"
       )}
     />
   );
@@ -530,7 +521,12 @@ export function AppSidebar() {
                           <button
                             type="button"
                             onClick={() => toggleSubmenu(item.title)}
-                            className={cn(menuItemBase, "border border-transparent", menuItemIdle, active && menuItemActive)}
+                            className={cn(
+                              menuItemBase,
+                              "border border-transparent",
+                              menuItemIdle,
+                              active && menuItemActive,
+                            )}
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
                             <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
@@ -544,7 +540,7 @@ export function AppSidebar() {
 
                                 <ChevronDown
                                   className={cn(
-                                    "ml-1 mt-1 h-4 w-4 text-muted-foreground transition-transform",
+                                    "ml-1 mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out",
                                     submenuOpen && "rotate-180",
                                   )}
                                 />
@@ -553,7 +549,7 @@ export function AppSidebar() {
                           </button>
 
                           {!collapsed && submenuOpen && (
-                            <div className="ml-4 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                            <div className="ml-6 mt-2 space-y-1 border-l border-sidebar-border/80 pl-4">
                               {item.children?.map((child) => {
                                 const childActive = isItemActive(child);
 
@@ -562,7 +558,7 @@ export function AppSidebar() {
                                     <NavLink
                                       to={child.url}
                                       className={cn(
-                                        "flex items-start gap-3 rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
+                                        "flex h-auto min-h-[3rem] items-start gap-3 overflow-visible rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
                                         "text-foreground/80 hover:bg-muted/45 hover:text-foreground",
                                         "dark:text-foreground/80 dark:hover:bg-muted/30",
                                         childActive && "bg-primary/10 text-foreground",
@@ -588,7 +584,12 @@ export function AppSidebar() {
                           <NavLink
                             to={item.url}
                             end={item.url === "/"}
-                            className={cn(menuItemBase, "border border-transparent", menuItemIdle, active && menuItemActive)}
+                            className={cn(
+                              menuItemBase,
+                              "border border-transparent",
+                              menuItemIdle,
+                              active && menuItemActive,
+                            )}
                             activeClassName=""
                           >
                             <span className={cn(leftAccent, active && leftAccentActive)} />
@@ -600,7 +601,7 @@ export function AppSidebar() {
                               <>
                                 <span className="min-w-0 flex-1 whitespace-normal leading-5">{item.title}</span>
                                 {item.badge && <PillBadge value={item.badge} active={active} />}
-                                <ChevronRight className="ml-auto mt-1 h-4 w-4 text-muted-foreground/70" />
+                                <ChevronRight className="ml-auto mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-0.5" />
                               </>
                             )}
                           </NavLink>
