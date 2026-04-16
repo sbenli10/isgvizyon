@@ -6,7 +6,6 @@ import {
   ArrowRight,
   BadgeCheck,
   Briefcase,
-  Clock3,
   Building2,
   ClipboardList,
   CreditCard,
@@ -16,6 +15,8 @@ import {
   LineChart,
   ShieldAlert,
   Users,
+  Globe2,
+  Bot,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,9 +66,15 @@ const featureCards = [
     icon: Link2,
   },
   {
+    title: "Müşteri Portalı",
+    description: "Firma ile paylaşılabilir belge, saha hizmeti ve cari görünümünü tek link üzerinden sunun.",
+    icon: Globe2,
+    badge: "NEW",
+  },
+  {
     title: "Görev ve Otomasyon",
     description: "Evrak ve belge yenileme görevlerini otomatik üretin, operasyon görevlerini merkezi olarak yönetin.",
-    icon: Clock3,
+    icon: Bot,
     badge: "Otomasyon",
   },
 ];
@@ -77,8 +84,8 @@ const benefitItems = [
   "Uzman başına düşen firma ve dakika yükünü ölçün.",
   "Sözleşme, kurul ve uyumsuzluk takibini tek panelde toplayın.",
   "İSG-KATİP verisini operasyon kararına dönüştürün.",
-  "İlerleyen fazlarda evrak ve finans takibini aynı modüle ekleyin.",
-  "OSGB yöneticisi ve operasyon sorumlusu için gerçek çalışma ekranı oluşturun.",
+  "Görev ve bildirim otomasyonunu açık baskılardan otomatik üretin.",
+  "Firma ile paylaşılabilir müşteri portalı üzerinden hizmet şeffaflığı sağlayın.",
 ];
 
 const workflowSteps = [
@@ -124,6 +131,24 @@ const launchCards = [
     description: "Cari görünüm, kârlılık ve yükümlülük bazlı evrak",
     icon: CreditCard,
     href: "/osgb/finance",
+  },
+  {
+    title: "İSG-KATİP Merkezi",
+    description: "Senkron sağlık durumu ve uyum bayrakları",
+    icon: Link2,
+    href: "/osgb/isgkatip",
+  },
+  {
+    title: "Otomasyon Merkezi",
+    description: "Görev ve bildirim üretim merkezi",
+    icon: Bot,
+    href: "/osgb/automation",
+  },
+  {
+    title: "Müşteri Portalı",
+    description: "Firma ile paylaşılan görünüm ve link yönetimi",
+    icon: Globe2,
+    href: "/osgb/client-portal",
   },
   {
     title: "Trend Analizi",

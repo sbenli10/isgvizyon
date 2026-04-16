@@ -34,6 +34,8 @@ import {
   Command,
   PanelLeftClose,
   PanelLeftOpen,
+  Link2,
+  Globe2,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -170,7 +172,7 @@ function PillBadge({ value, active }: { value: string | number; active: boolean 
 }
 
 // İkonları görünür yapmak için TEK kaynak: ikonun kendi class’ı
-function MenuIcon({ Icon, active }: { Icon: any; active: boolean }) {
+function MenuIcon({ Icon, active }: { Icon: React.ComponentType<{ className?: string }>; active: boolean }) {
   return (
     <Icon
       className={cn(
@@ -292,8 +294,11 @@ export function AppSidebar() {
               { title: "Süreç ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null },
               { title: "Uyarı Merkezi", url: "/osgb/alerts", icon: ShieldAlert, badge: "NEW" },
               { title: "Saha Ziyaretleri", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" },
+              { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" },
+              { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" },
               { title: "Cari ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null },
               { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null },
+              { title: "Musteri Portali", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" },
               { title: "Görev Motoru", url: "/osgb/tasks", icon: ClipboardCheck, badge: null },
               { title: "Operasyon Notları", url: "/osgb/notes", icon: BookOpen, badge: null },
               { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null },

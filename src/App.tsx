@@ -71,6 +71,10 @@ const OSGBDocuments = lazyWithRetry("osgb-documents", () => import("./pages/Obli
 const OSGBTasks = lazyWithRetry("osgb-tasks", () => import("./pages/OSGBTasks"));
 const OSGBNotes = lazyWithRetry("osgb-notes", () => import("./pages/OSGBNotes"));
 const OSGBAnalytics = lazyWithRetry("osgb-analytics", () => import("./pages/OSGBAnalytics"));
+const OsgbKatipSyncCenter = lazyWithRetry("osgb-katip-center", () => import("./pages/OsgbKatipSyncCenter"));
+const OsgbAutomationCenter = lazyWithRetry("osgb-automation-center", () => import("./pages/OsgbAutomationCenter"));
+const OsgbClientPortal = lazyWithRetry("osgb-client-portal", () => import("./pages/OsgbClientPortal"));
+const ClientCompanyPortal = lazyWithRetry("client-company-portal", () => import("./pages/ClientCompanyPortal"));
 const CertificatesDashboard = lazyWithRetry("certificates-dashboard", () => import("./pages/CertificatesDashboard"));
 const CertificatesHistory = lazyWithRetry("certificates-history", () => import("./pages/CertificatesHistory"));
 const CertificateJobDetail = lazyWithRetry("certificate-job-detail", () => import("./pages/CertificateJobDetail"));
@@ -214,6 +218,9 @@ const ProtectedShell = () => {
             <Route path="/osgb/alerts" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB uyarı merkezi premium planda açılır" description="Portföy bazlı OSGB uyarıları ve takip akışları premium üyelikle açılır."><OsgbAccessGate><OSGBAlerts /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/finance" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB finans ekranı premium planda açılır" description="Cari, tahsilat ve kârlılık görünümü premium OSGB modülünün parçasıdır."><OsgbAccessGate><OSGBFinance /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/documents" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB belge ekranı premium planda açılır" description="Yasal yükümlülükten türeyen evrak takibi ve hızlı aksiyonlar premium OSGB modülüne dahildir."><OsgbAccessGate><OSGBDocuments /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/isgkatip" element={<FeatureAccessGate featureKey="osgb.access" title="ISG-KATIP merkezi premium planda açılır" description="Senkronizasyon, uyum bayrakları ve kaynak firma görünümü premium OSGB modülüne dahildir."><OsgbAccessGate><OsgbKatipSyncCenter /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/automation" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB otomasyon merkezi premium planda açılır" description="Gorev, bildirim ve operasyon otomasyonlari premium OSGB modulunde yer alir."><OsgbAccessGate><OsgbAutomationCenter /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/client-portal" element={<FeatureAccessGate featureKey="osgb.access" title="Musteri portali premium planda açılır" description="Firma ile paylasilan portal linkleri ve dis gorunum premium OSGB modulune dahildir."><OsgbAccessGate><OsgbClientPortal /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/tasks" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB görev takibi premium planda açılır" description="OSGB görev takibi, iş dağılımı ve ekip operasyonları premium plana dahildir."><OsgbAccessGate><OSGBTasks /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/notes" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB notları premium planda açılır" description="OSGB not akışları ve operasyon içi koordinasyon ekranı premium üyelikle kullanılabilir."><OsgbAccessGate><OSGBNotes /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/analytics" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB analitik ekranı premium planda açılır" description="OSGB performans, kapasite ve portföy analitikleri premium modüle dahildir."><OsgbAccessGate><OSGBAnalytics /></OsgbAccessGate></FeatureAccessGate>} />
@@ -366,6 +373,14 @@ const App = () => (
               <Route path="/landing/trust" element={<LandingTrust />} />
               <Route path="/landing/pricing" element={<LandingPricing />} />
               <Route
+                path="/portal/company/:token"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ClientCompanyPortal />
+                  </Suspense>
+                }
+              />
+              <Route
                 path="/certificate-verify/:code"
                 element={
                   <Suspense fallback={<PageLoader />}>
@@ -399,4 +414,3 @@ const App = () => (
 );
 
 export default App;
-
