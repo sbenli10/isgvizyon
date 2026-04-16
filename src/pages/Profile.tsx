@@ -1073,10 +1073,20 @@ export default function Profile() {
                       Çalışma Alanını Tamamla
                     </Badge>
                     <CardTitle className="text-2xl">Henüz bir organizasyona bağlı değilsiniz</CardTitle>
-                    <CardDescription className="max-w-2xl text-sm leading-6">
+                  <CardDescription className="max-w-2xl text-sm leading-6">
                       Google ile hızlı giriş yapan uzmanlar burada akışı tamamlayabilir. İsterseniz yeni bir organizasyon oluşturun,
                       isterseniz davet koduyla veya liste seçerek mevcut bir kuruma katılın.
                     </CardDescription>
+                    <div className="grid gap-3 pt-2 md:grid-cols-2">
+                      <div className="rounded-2xl border bg-background/60 p-4">
+                        <p className="text-sm font-semibold">Organizasyon yoksa</p>
+                        <p className="mt-1 text-sm text-muted-foreground">ISGBot ile bireysel uzman akışında devam edebilir, extension üzerinden İSG-KATİP verisini kullanabilirsiniz.</p>
+                      </div>
+                      <div className="rounded-2xl border bg-background/60 p-4">
+                        <p className="text-sm font-semibold">Organizasyon kurarsanız</p>
+                        <p className="mt-1 text-sm text-muted-foreground">OSGB modülü; ekip, saha, evrak, finans ve müşteri portalı operasyonlarını açar.</p>
+                      </div>
+                    </div>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 lg:w-[24rem]">
                     <Button className="justify-start" onClick={() => setWorkspaceAction("create")}>

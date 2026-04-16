@@ -1035,7 +1035,7 @@ export default function Auth() {
                         <div>
                           <h3 className="text-white font-semibold text-sm">Kurumsal Kurulum</h3>
                           <p className="text-slate-200/90 text-xs mt-1 leading-5">
-                            İSG uzmanı olarak şirketsiz devam edebilir veya OSGB/Kurum hesabı için organizasyon oluşturabilirsiniz.
+                            Bireysel uzmanlar ISGBot ile hemen başlayabilir; ekipli OSGB/Kurum hesabı için organizasyon oluşturabilirsiniz.
                           </p>
                         </div>
                       </div>
@@ -1062,7 +1062,7 @@ export default function Auth() {
                             <span className="font-semibold">İSG Uzmanı</span>
                           </div>
                           <p className="mt-2 text-xs leading-5 text-slate-300">
-                            Şirket alanı opsiyoneldir. Google ile direkt giriş bu akışa göre çalışır.
+                            Şirket alanı opsiyoneldir. Google ile direkt giriş bu akışa göre çalışır ve kullanıcı önce ISGBot deneyimine uygundur.
                           </p>
                         </button>
 
@@ -1081,7 +1081,7 @@ export default function Auth() {
                             <span className="font-semibold">OSGB / Kurum</span>
                           </div>
                           <p className="mt-2 text-xs leading-5 text-slate-300">
-                            Organizasyon alanı zorunludur; ekip ve abonelik yapısı bu kuruma bağlanır.
+                            Organizasyon alanı zorunludur; ekip, saha, portal ve finans operasyonu bu kuruma bağlanır.
                           </p>
                         </button>
                       </div>

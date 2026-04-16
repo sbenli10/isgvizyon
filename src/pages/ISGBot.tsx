@@ -65,7 +65,7 @@ export default function ISGBot() {
             Akıllı İSG Operasyon Botu
           </h1>
           <p className="max-w-3xl text-muted-foreground">
-            Uzmanlar için operasyon, firmalar için karar desteği, OSGB için portföy görünümü.
+            Bireysel iş güvenliği uzmanı için operasyon asistanı, mevzuat görünümü ve hızlı karar desteği.
             İSG-KATİP verilerini aksiyona, mevzuat takibine ve görev üretimine çevirir.
           </p>
         </div>
@@ -109,7 +109,7 @@ export default function ISGBot() {
           </CardHeader>
           <CardContent>
             <h3 className="font-semibold">Operasyon dashboard</h3>
-            <p className="text-sm text-muted-foreground">Firma durumu, senkron verisi ve genel görünüm.</p>
+            <p className="text-sm text-muted-foreground">Uzmanın kendi firma listesi, senkron verisi ve genel görünüm.</p>
           </CardContent>
         </Card>
 
@@ -148,7 +148,7 @@ export default function ISGBot() {
           </CardHeader>
           <CardContent>
             <h3 className="font-semibold">Portföy görünümü</h3>
-            <p className="text-sm text-muted-foreground">Riskli firmalar, uzman yoğunluğu ve açık dağılımı.</p>
+            <p className="text-sm text-muted-foreground">OSGB tarafına geçişte kullanılacak portföy görünümünün uzman odaklı özeti.</p>
           </CardContent>
         </Card>
       </div>
@@ -157,7 +157,7 @@ export default function ISGBot() {
         <CardHeader>
           <CardTitle>Araç seti</CardTitle>
           <CardDescription>
-            Komuta merkezindeki özetlerin arkasındaki operasyon ekranları burada yer alır.
+            Bu alan bireysel uzman akışıdır. Ekip, saha, cari ve portal operasyonu için OSGB modülü kullanılır.
           </CardDescription>
         </CardHeader>
         <CardContent>

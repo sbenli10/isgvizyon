@@ -62,7 +62,7 @@ const featureCards = [
   },
   {
     title: "İSG-KATİP Entegrasyonu",
-    description: "Mevcut entegrasyondan gelen firma, süre ve uyum verilerini operasyon panelinde doğrudan kullanın.",
+    description: "ISGBot Chrome Extension kaynağından gelen firma, süre ve uyum verilerini kurumsal operasyon panelinde kullanın.",
     icon: Link2,
   },
   {
@@ -83,7 +83,7 @@ const benefitItems = [
   "Portföyünüzdeki riskli firmaları tek bakışta görün.",
   "Uzman başına düşen firma ve dakika yükünü ölçün.",
   "Sözleşme, kurul ve uyumsuzluk takibini tek panelde toplayın.",
-  "İSG-KATİP verisini operasyon kararına dönüştürün.",
+  "ISGBot kaynağından gelen İSG-KATİP verisini operasyon kararına dönüştürün.",
   "Görev ve bildirim otomasyonunu açık baskılardan otomatik üretin.",
   "Firma ile paylaşılabilir müşteri portalı üzerinden hizmet şeffaflığı sağlayın.",
 ];
@@ -110,7 +110,7 @@ const workflowSteps = [
 const launchCards = [
   {
     title: "Portföy Dashboard",
-    description: "Riskli firmalar, uzman yoğunluğu ve trendler",
+    description: "Kurumsal ekip, portföy, kapasite ve trendler",
     icon: Layers3,
     href: "/osgb/dashboard",
   },
@@ -134,7 +134,7 @@ const launchCards = [
   },
   {
     title: "İSG-KATİP Merkezi",
-    description: "Senkron sağlık durumu ve uyum bayrakları",
+    description: "ISGBot extension kaynağını organizasyon havuzuna taşıyan merkez",
     icon: Link2,
     href: "/osgb/isgkatip",
   },
@@ -183,9 +183,8 @@ export default function OSGBModule() {
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tight text-white">OSGB Yönetim Modülü</h1>
               <p className="max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-                Firma, personel, atama ve sözleşme operasyonunu tek bir yönetim katmanında toplayın.
-                Mevcut İSG-KATİP verilerini kullanarak portföy görünümü, uzman yoğunluğu ve kritik açıkları
-                operasyon ekranına dönüştürün.
+                Firma, personel, atama, saha, evrak ve finans operasyonunu tek bir kurumsal yönetim katmanında toplayın.
+                Bu modül bireysel uzman ekranı değildir; ekipli OSGB çalışma düzeni ve organizasyon scope'u için tasarlanmıştır.
               </p>
             </div>
             <div className="grid gap-3 text-sm text-slate-300 sm:grid-cols-3">
@@ -219,7 +218,7 @@ export default function OSGBModule() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate("/isg-bot")}>
-              Akıllı İSG Operasyon Botu'na Git
+              Bireysel uzman ekranı: İSGBot
             </Button>
           </div>
         </div>
@@ -259,7 +258,7 @@ export default function OSGBModule() {
         <Card className="border-slate-800 bg-slate-900/70">
           <CardHeader>
             <CardTitle className="text-white">OSGB modülü ile ne kazanırsınız?</CardTitle>
-            <CardDescription>Bu modül mevcut İSG-KATİP entegrasyonunu operasyon ekranına çevirir.</CardDescription>
+            <CardDescription>Bu modül ISGBot kaynak verisini ekipli operasyon ekranına çevirir.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {benefitItems.map((item) => (
@@ -324,7 +323,7 @@ export default function OSGBModule() {
             <ClipboardList className="h-5 w-5 text-cyan-300" />
             Operasyon paketi kapsamı
           </CardTitle>
-          <CardDescription>OSGB modülü artık gerçek operasyon ekranları ve kendi veri tabloları ile çalışır.</CardDescription>
+          <CardDescription>OSGB modülü kurumsal operasyon tabloları ile çalışır; bireysel uzman akışı İSGBot tarafında kalır.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
@@ -336,7 +335,7 @@ export default function OSGBModule() {
           <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
             <div className="text-sm font-semibold text-white">Mevcut veri kaynağı</div>
             <p className="mt-2 text-sm leading-6 text-slate-400">
-              `isgkatip_companies`, `isgkatip_compliance_flags`, `isgkatip_predictive_alerts` ve OSGB operasyon tabloları birlikte kullanılır.
+              ISGBot extension kaynağından gelen `isgkatip_*` verileri ve OSGB operasyon tabloları birlikte kullanılır.
             </p>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
