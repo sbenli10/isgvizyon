@@ -45,30 +45,31 @@ import {
 } from "@/components/ui/table";
 import {
   deleteOsgbAssignment,
-  getAssignmentRecommendation,
-  getOsgbCompanyAssignedMinutesTotal,
-  getOsgbCompanyOptions,
-  getOsgbPersonnelAssignedMinutesTotal,
-  listActiveOsgbPersonnel,
-  listOsgbAssignmentsPage,
-  type OsgbAssignmentInput,
-  type OsgbAssignmentRecord,
-  type OsgbCompanyOption,
-  type OsgbPersonnelRecord,
-  upsertOsgbAssignment,
 } from "@/lib/osgbOperations";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useAccessRole } from "@/hooks/useAccessRole";
 import { downloadCsv } from "@/lib/csvExport";
+import {
+  getOsgbWorkspaceAssignmentRecommendation,
+  getOsgbWorkspaceCompanyAssignedMinutesTotal,
+  getOsgbWorkspacePersonnelAssignedMinutesTotal,
+  listOsgbWorkspaceAssignmentsPage,
+  listOsgbWorkspaceCompanies,
+  listOsgbWorkspacePersonnel,
+  type OsgbWorkspaceAssignmentRecord,
+  type OsgbWorkspaceCompanyOption,
+  type OsgbWorkspacePersonnelRecord,
+  upsertOsgbAssignmentWorkspace,
+} from "@/lib/osgbPlatform";
 
 type AssignmentFormState = {
   companyId: string;
   personnelId: string;
-  assignedRole: OsgbAssignmentRecord["assigned_role"];
+  assignedRole: OsgbWorkspaceAssignmentRecord["assigned_role"];
   assignedMinutes: string;
   startDate: string;
   endDate: string;
-  status: OsgbAssignmentRecord["status"];
+  status: OsgbWorkspaceAssignmentRecord["status"];
   notes: string;
 };
 
@@ -83,20 +84,20 @@ const emptyForm: AssignmentFormState = {
   notes: "",
 };
 
-const statusLabel: Record<OsgbAssignmentRecord["status"], string> = {
+const statusLabel: Record<OsgbWorkspaceAssignmentRecord["status"], string> = {
   active: "Aktif",
   passive: "Pasif",
   completed: "Tamamlandı",
   cancelled: "İptal",
 };
 
-const roleLabel: Record<OsgbAssignmentRecord["assigned_role"], string> = {
+const roleLabel: Record<OsgbWorkspaceAssignmentRecord["assigned_role"], string> = {
   igu: "İGU",
   hekim: "İşyeri Hekimi",
   dsp: "DSP",
 };
 
-const statusClass: Record<OsgbAssignmentRecord["status"], string> = {
+const statusClass: Record<OsgbWorkspaceAssignmentRecord["status"], string> = {
   active: "bg-emerald-500/15 text-emerald-200 border-emerald-400/20",
   passive: "bg-slate-500/15 text-slate-200 border-slate-400/20",
   completed: "bg-cyan-500/15 text-cyan-200 border-cyan-400/20",
@@ -111,21 +112,22 @@ const formatDate = (value: string | null) => {
 };
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const getCacheKey = (userId: string) => `assignments:${userId}`;
+const getCacheKey = (organizationId: string) => `assignments:${organizationId}`;
 const ASSIGNMENT_PAGE_SIZE = 20;
 
 export default function OSGBAssignments() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const organizationId = profile?.organization_id || null;
   const { canManage } = useAccessRole();
-  const [records, setRecords] = useState<OsgbAssignmentRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbCompanyOption[]>([]);
-  const [personnel, setPersonnel] = useState<OsgbPersonnelRecord[]>([]);
+  const [records, setRecords] = useState<OsgbWorkspaceAssignmentRecord[]>([]);
+  const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
+  const [personnel, setPersonnel] = useState<OsgbWorkspacePersonnelRecord[]>([]);
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
   const [personnelLoading, setPersonnelLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<OsgbAssignmentRecord | null>(null);
+  const [editing, setEditing] = useState<OsgbWorkspaceAssignmentRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -136,18 +138,21 @@ export default function OSGBAssignments() {
   const [companyAssignedMinutes, setCompanyAssignedMinutes] = useState(0);
 
   const loadData = async (silent = false) => {
-    if (!user?.id) return;
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
     if (!silent) setLoading(true);
     try {
-      const cacheKey = `${getCacheKey(user.id)}:${statusFilter}:${search}:${page}`;
+      const cacheKey = `${getCacheKey(organizationId)}:${statusFilter}:${search}:${page}`;
       const [assignmentResult, companyRows] = await Promise.all([
-        listOsgbAssignmentsPage(user.id, {
+        listOsgbWorkspaceAssignmentsPage(organizationId, {
           page,
           pageSize: ASSIGNMENT_PAGE_SIZE,
           status: statusFilter,
           search,
         }),
-        companies.length > 0 ? Promise.resolve(companies) : getOsgbCompanyOptions(user.id),
+        companies.length > 0 ? Promise.resolve(companies) : listOsgbWorkspaceCompanies(organizationId),
       ]);
       setRecords(assignmentResult.rows);
       setTotalCount(assignmentResult.count);
@@ -166,12 +171,15 @@ export default function OSGBAssignments() {
   };
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
     const cached = readOsgbPageCache<{
-      records: OsgbAssignmentRecord[];
-      companies: OsgbCompanyOption[];
+      records: OsgbWorkspaceAssignmentRecord[];
+      companies: OsgbWorkspaceCompanyOption[];
       totalCount: number;
-    }>(`${getCacheKey(user.id)}:${statusFilter}:${search}:${page}`, CACHE_TTL_MS);
+    }>(`${getCacheKey(organizationId)}:${statusFilter}:${search}:${page}`, CACHE_TTL_MS);
     if (cached) {
       setRecords(cached.records);
       setCompanies(cached.companies);
@@ -181,7 +189,7 @@ export default function OSGBAssignments() {
       return;
     }
     void loadData();
-  }, [page, search, statusFilter, user?.id]);
+  }, [organizationId, page, search, statusFilter]);
 
   useEffect(() => {
     setPage(1);
@@ -196,10 +204,10 @@ export default function OSGBAssignments() {
   }, [page, totalPages]);
 
   const ensurePersonnelOptions = async () => {
-    if (!user?.id || personnel.length > 0) return;
+    if (!organizationId || personnel.length > 0) return;
     setPersonnelLoading(true);
     try {
-      const personnelRows = await listActiveOsgbPersonnel(user.id);
+      const personnelRows = await listOsgbWorkspacePersonnel(organizationId, true);
       setPersonnel(personnelRows);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Aktif personel listesi yüklenemedi.");
@@ -209,13 +217,13 @@ export default function OSGBAssignments() {
   };
 
   useEffect(() => {
-    if (!user?.id || !form.personnelId) {
+    if (!organizationId || !form.personnelId) {
       setPersonnelAssignedMinutes(0);
       return;
     }
 
     let active = true;
-    void getOsgbPersonnelAssignedMinutesTotal(user.id, form.personnelId, editing?.id)
+    void getOsgbWorkspacePersonnelAssignedMinutesTotal(organizationId, form.personnelId, editing?.id)
       .then((value) => {
         if (active) {
           setPersonnelAssignedMinutes(value);
@@ -230,16 +238,16 @@ export default function OSGBAssignments() {
     return () => {
       active = false;
     };
-  }, [editing?.id, form.personnelId, user?.id]);
+  }, [editing?.id, form.personnelId, organizationId]);
 
   useEffect(() => {
-    if (!user?.id || !form.companyId) {
+    if (!organizationId || !form.companyId) {
       setCompanyAssignedMinutes(0);
       return;
     }
 
     let active = true;
-    void getOsgbCompanyAssignedMinutesTotal(user.id, form.companyId, editing?.id)
+    void getOsgbWorkspaceCompanyAssignedMinutesTotal(organizationId, form.companyId, form.assignedRole, editing?.id)
       .then((value) => {
         if (active) {
           setCompanyAssignedMinutes(value);
@@ -254,7 +262,7 @@ export default function OSGBAssignments() {
     return () => {
       active = false;
     };
-  }, [editing?.id, form.companyId, user?.id]);
+  }, [editing?.id, form.companyId, form.assignedRole, organizationId]);
 
   const livePersonnelCapacity = useMemo(() => {
     if (!form.personnelId) return null;
@@ -285,7 +293,7 @@ export default function OSGBAssignments() {
 
     const requested = Number(form.assignedMinutes || 0);
     const totalProjected = companyAssignedMinutes + requested;
-    const required = selected.requiredMinutes || 0;
+    const required = selected.requiredMinutesByRole[form.assignedRole] || 0;
     const gap = Math.max(0, required - totalProjected);
     const ratio = required > 0 ? Math.round((totalProjected / required) * 100) : 0;
 
@@ -298,11 +306,11 @@ export default function OSGBAssignments() {
       ratio,
       stillInsufficient: gap > 0,
     };
-  }, [companies, companyAssignedMinutes, form.assignedMinutes, form.companyId]);
+  }, [companies, companyAssignedMinutes, form.assignedMinutes, form.companyId, form.assignedRole]);
 
   const regulationRecommendation = useMemo(() => {
     const selectedCompany = companies.find((item) => item.id === form.companyId);
-    return getAssignmentRecommendation(
+    return getOsgbWorkspaceAssignmentRecommendation(
       selectedCompany,
       form.assignedRole,
       liveCompanyRequirement?.currentAssigned ?? 0,
@@ -337,7 +345,7 @@ export default function OSGBAssignments() {
     setDialogOpen(true);
   };
 
-  const openEdit = async (record: OsgbAssignmentRecord) => {
+  const openEdit = async (record: OsgbWorkspaceAssignmentRecord) => {
     if (!canManage) {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
       return;
@@ -362,7 +370,7 @@ export default function OSGBAssignments() {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
       return;
     }
-    if (!user?.id || !form.companyId || !form.personnelId || !form.assignedMinutes) {
+    if (!user?.id || !organizationId || !form.companyId || !form.personnelId || !form.assignedMinutes) {
       toast.error("Firma, personel ve dakika alanları zorunludur.");
       return;
     }
@@ -381,7 +389,7 @@ export default function OSGBAssignments() {
 
     setSaving(true);
     try {
-      const payload: OsgbAssignmentInput = {
+      const payload = {
         companyId: form.companyId,
         personnelId: form.personnelId,
         assignedRole: form.assignedRole,
@@ -391,7 +399,7 @@ export default function OSGBAssignments() {
         status: form.status,
         notes: form.notes,
       };
-      await upsertOsgbAssignment(user.id, payload, editing?.id);
+      await upsertOsgbAssignmentWorkspace(user.id, organizationId, payload, editing?.id);
       await loadData(true);
       setDialogOpen(false);
       setEditing(null);
@@ -418,6 +426,19 @@ export default function OSGBAssignments() {
       toast.error(err instanceof Error ? err.message : "Görevlendirme silinemedi.");
     }
   };
+
+  if (!organizationId) {
+    return (
+      <div className="container mx-auto py-6">
+        <Alert>
+          <AlertTitle>Organizasyon bağlantısı gerekli</AlertTitle>
+          <AlertDescription>
+            Personel görevlendirme ekranı yeni organization-scope modeliyle çalışır. Önce profilinizden bir organizasyona bağlanın.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto space-y-6 py-6">
@@ -646,7 +667,7 @@ export default function OSGBAssignments() {
                   <AlertDescription className="space-y-2">
                     <div>{regulationRecommendation.summary}</div>
                     <div className="text-xs text-slate-400">
-                      Kişi başı öneri: {regulationRecommendation.perEmployeeMinutes} dk • Toplam öneri: {regulationRecommendation.recommendedMinutes} dk • Mevcut aktif toplam: {regulationRecommendation.currentAssignedMinutes} dk
+                      Rol bazlı hedef: {regulationRecommendation.recommendedMinutes} dk • Mevcut aktif toplam: {regulationRecommendation.currentAssignedMinutes} dk
                     </div>
                     <div className="text-xs text-slate-400">
                       Kalan mevzuat açığı: {regulationRecommendation.remainingGapMinutes} dk • Dayanak: {regulationRecommendation.legalReference}

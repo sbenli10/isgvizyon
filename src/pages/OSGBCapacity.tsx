@@ -1,7 +1,6 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
-  Briefcase,
   Gauge,
   RefreshCcw,
   ShieldAlert,
@@ -22,75 +21,40 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { getOsgbDashboardData, type OsgbDashboardData } from "@/lib/osgbData";
-import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
+import { getOsgbPlatformDashboard, type OsgbPlatformDashboardData } from "@/lib/osgbPlatform";
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const getCacheKey = (userId: string) => `osgb:capacity:${userId}`;
 
-function buildCapacityView(data: OsgbDashboardData) {
-  const uncoveredCompanies = data.companies.filter((company) => company.assignedMinutes < company.requiredMinutes);
-  const balancedCompanies = data.companies.filter((company) => company.assignedMinutes >= company.requiredMinutes);
-  const totalRequired = data.companies.reduce((sum, company) => sum + company.requiredMinutes, 0);
-  const totalAssigned = data.companies.reduce((sum, company) => sum + company.assignedMinutes, 0);
-  const gap = Math.max(0, totalRequired - totalAssigned);
-  const overloadedExperts = data.expertLoads.filter((expert) => expert.overloaded);
-  const unassignedCompanies = data.companies.filter((company) => !company.assignedPersonName);
-
-  const hazardSummary = ["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].map((hazardClass) => {
-    const companies = data.companies.filter((company) => company.hazardClass === hazardClass);
-    return {
-      hazardClass,
-      companyCount: companies.length,
-      employeeCount: companies.reduce((sum, company) => sum + company.employeeCount, 0),
-      requiredMinutes: companies.reduce((sum, company) => sum + company.requiredMinutes, 0),
-      assignedMinutes: companies.reduce((sum, company) => sum + company.assignedMinutes, 0),
-    };
-  });
-
-  return {
-    uncoveredCompanies,
-    balancedCompanies,
-    totalRequired,
-    totalAssigned,
-    gap,
-    overloadedExperts,
-    unassignedCompanies,
-    hazardSummary,
-  };
-}
+const getCacheKey = (organizationId: string) => `osgb:capacity-v2:${organizationId}`;
 
 export default function OSGBCapacity() {
-  const { user } = useAuth();
-  const [data, setData] = useState<OsgbDashboardData | null>(null);
+  const { profile } = useAuth();
+  const organizationId = profile?.organization_id || null;
+  const [data, setData] = useState<OsgbPlatformDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  usePageDataTiming(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  usePageDataTiming(loading);
 
   const loadCapacity = async (forceRefresh = false) => {
-    if (!user?.id) return;
-
-    const cacheKey = getCacheKey(user.id);
-    const cached = readOsgbPageCache<OsgbDashboardData>(cacheKey, CACHE_TTL_MS);
-
-    if (!forceRefresh && cached) {
-      setData(cached);
+    if (!organizationId) {
       setLoading(false);
+      return;
+    }
+
+    if (forceRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
     }
 
     try {
-      if (forceRefresh) {
-        setRefreshing(true);
-      } else if (!data) {
-        setLoading(true);
-      }
-
-      const result = await getOsgbDashboardData(user.id);
+      const result = await getOsgbPlatformDashboard(organizationId, { refreshCompliance: true });
       setData(result);
+      writeOsgbPageCache(getCacheKey(organizationId), result);
       setError(null);
-      writeOsgbPageCache(cacheKey, result);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Süre ve kapasite görünümü yüklenemedi.");
     } finally {
@@ -100,10 +64,46 @@ export default function OSGBCapacity() {
   };
 
   useEffect(() => {
-    void loadCapacity(false);
-  }, [user?.id]);
+    if (!organizationId) {
+      setLoading(false);
+      return;
+    }
 
-  const capacity = useMemo(() => (data ? buildCapacityView(data) : null), [data]);
+    const cached = readOsgbPageCache<OsgbPlatformDashboardData>(getCacheKey(organizationId), CACHE_TTL_MS);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      void loadCapacity(true);
+      return;
+    }
+
+    void loadCapacity();
+  }, [organizationId]);
+
+  const uncoveredCompanies = useMemo(
+    () => (data?.complianceRows ?? []).filter((company) => company.deficitMinutes > 0),
+    [data],
+  );
+  const balancedCompanies = useMemo(
+    () => (data?.complianceRows ?? []).filter((company) => company.deficitMinutes <= 0 && company.complianceStatus === "compliant"),
+    [data],
+  );
+  const unassignedCompanies = useMemo(
+    () =>
+      (data?.complianceRows ?? []).filter(
+        (company) => company.assignedMinutesByRole.igu + company.assignedMinutesByRole.hekim + company.assignedMinutesByRole.dsp === 0,
+      ),
+    [data],
+  );
+  const totalRequired = useMemo(
+    () => (data?.complianceRows ?? []).reduce((sum, company) => sum + company.totalRequiredMinutes, 0),
+    [data],
+  );
+  const totalAssigned = useMemo(
+    () => (data?.complianceRows ?? []).reduce((sum, company) => sum + company.totalAssignedMinutes, 0),
+    [data],
+  );
+  const gap = Math.max(0, totalRequired - totalAssigned);
 
   if (loading && !data) {
     return (
@@ -114,10 +114,17 @@ export default function OSGBCapacity() {
             <div key={index} className="h-32 animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />
           ))}
         </div>
-        <div className="grid gap-6 xl:grid-cols-2">
-          <div className="h-[360px] animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />
-          <div className="h-[360px] animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />
-        </div>
+      </div>
+    );
+  }
+
+  if (!organizationId) {
+    return (
+      <div className="container mx-auto py-6">
+        <Alert>
+          <AlertTitle>Organizasyon bağlantısı gerekli</AlertTitle>
+          <AlertDescription>Süre ve kapasite ekranı organization scope ile çalışır. Önce profilinizden organizasyon bağlayın.</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -131,9 +138,9 @@ export default function OSGBCapacity() {
               <Gauge className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">Süre ve Kapasite Analizi</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-white">Dakika ve Kapasite Paneli</h1>
               <p className="text-sm text-slate-400">
-                Atanmış dakika, gerekli süre, uzman yoğunluğu ve eksik kapasite görünümü.
+                Gerçek mevzuat motorundan gelen açık dakika, rol bazlı yük ve personel kapasitesi görünümü.
               </p>
             </div>
           </div>
@@ -153,36 +160,36 @@ export default function OSGBCapacity() {
         </Alert>
       ) : null}
 
-      {capacity && data ? (
+      {data ? (
         <>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader className="pb-3">
                 <CardDescription>Toplam gerekli süre</CardDescription>
-                <CardTitle className="mt-2 text-3xl text-white">{capacity.totalRequired} dk</CardTitle>
+                <CardTitle className="mt-2 text-3xl text-white">{totalRequired} dk</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-slate-400">İSG-KATİP verisinden hesaplanan toplam ihtiyaç.</CardContent>
+              <CardContent className="text-sm text-slate-400">Bu ay tüm roller için gereken toplam mevzuat süresi.</CardContent>
             </Card>
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader className="pb-3">
                 <CardDescription>Toplam atanmış süre</CardDescription>
-                <CardTitle className="mt-2 text-3xl text-white">{capacity.totalAssigned} dk</CardTitle>
+                <CardTitle className="mt-2 text-3xl text-white">{totalAssigned} dk</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-slate-400">Portföyde uzmanlara atanmış toplam dakika.</CardContent>
+              <CardContent className="text-sm text-slate-400">Aktif atamalardan hesaplanan gerçek toplam dakika.</CardContent>
             </Card>
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader className="pb-3">
-                <CardDescription>Kapasite açığı</CardDescription>
-                <CardTitle className="mt-2 text-3xl text-white">{capacity.gap} dk</CardTitle>
+                <CardDescription>Kalan açık</CardDescription>
+                <CardTitle className="mt-2 text-3xl text-white">{gap} dk</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-slate-400">Eksik süre bulunan firmalar için kapanması gereken fark.</CardContent>
+              <CardContent className="text-sm text-slate-400">Açık dakika bulunan firmalar için kapanması gereken fark.</CardContent>
             </Card>
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader className="pb-3">
-                <CardDescription>Dengesiz uzman</CardDescription>
-                <CardTitle className="mt-2 text-3xl text-white">{capacity.overloadedExperts.length}</CardTitle>
+                <CardDescription>Aşırı yüklü personel</CardDescription>
+                <CardTitle className="mt-2 text-3xl text-white">{data.personnelLoads.filter((item) => item.overloaded).length}</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-slate-400">Atanan süresi, gereken sürenin altında kalan uzman sayısı.</CardContent>
+              <CardContent className="text-sm text-slate-400">Aylık dakika kapasitesini aşan veya yüzde 100’e dayanan ekip üyeleri.</CardContent>
             </Card>
           </div>
 
@@ -190,23 +197,24 @@ export default function OSGBCapacity() {
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader>
                 <CardTitle className="text-white">Eksik kapasite bulunan firmalar</CardTitle>
-                <CardDescription>Gerekli süreyi karşılamayan firmalar öncelik sırasıyla listelenir.</CardDescription>
+                <CardDescription>Rol bazlı gereken dakika ile aktif atamayı karşılaştırır.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {capacity.uncoveredCompanies.length === 0 ? (
+                {uncoveredCompanies.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-sm text-slate-400">
                     Eksik kapasite görünen firma bulunmuyor.
                   </div>
                 ) : (
-                  capacity.uncoveredCompanies.slice(0, 8).map((company) => {
-                    const coverage = company.requiredMinutes > 0 ? Math.min(100, Math.round((company.assignedMinutes / company.requiredMinutes) * 100)) : 0;
-                    const gap = Math.max(0, company.requiredMinutes - company.assignedMinutes);
+                  uncoveredCompanies.slice(0, 8).map((company) => {
+                    const coverage = company.totalRequiredMinutes > 0
+                      ? Math.min(100, Math.round((company.totalAssignedMinutes / company.totalRequiredMinutes) * 100))
+                      : 0;
                     return (
-                      <div key={company.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                      <div key={company.companyId} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                         <div className="mb-3 flex flex-wrap items-center gap-2">
                           <div className="text-base font-medium text-white">{company.companyName}</div>
                           <Badge variant="outline">{company.hazardClass}</Badge>
-                          <Badge className="border bg-red-500/15 text-red-200 border-red-400/20">Açık {gap} dk</Badge>
+                          <Badge className="border border-red-400/20 bg-red-500/15 text-red-200">Açık {company.deficitMinutes} dk</Badge>
                         </div>
                         <div className="mb-2 flex items-center justify-between text-xs text-slate-400">
                           <span>Karşılama oranı</span>
@@ -214,9 +222,14 @@ export default function OSGBCapacity() {
                         </div>
                         <Progress value={coverage} className="h-2 bg-slate-800" />
                         <div className="mt-3 grid gap-2 text-sm text-slate-400 sm:grid-cols-3">
-                          <div>Gerekli: <span className="text-slate-200">{company.requiredMinutes} dk</span></div>
-                          <div>Atanan: <span className="text-slate-200">{company.assignedMinutes} dk</span></div>
-                          <div>Uzman: <span className="text-slate-200">{company.assignedPersonName || "Atanmamış"}</span></div>
+                          <div>Toplam gerekli: <span className="text-slate-200">{company.totalRequiredMinutes} dk</span></div>
+                          <div>Toplam atanan: <span className="text-slate-200">{company.totalAssignedMinutes} dk</span></div>
+                          <div>Fazla mesai: <span className="text-slate-200">{company.overtimeMinutes} dk</span></div>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-xs text-slate-500 sm:grid-cols-3">
+                          <div>İGU {company.assignedMinutesByRole.igu}/{company.requiredMinutesByRole.igu}</div>
+                          <div>Hekim {company.assignedMinutesByRole.hekim}/{company.requiredMinutesByRole.hekim}</div>
+                          <div>DSP {company.assignedMinutesByRole.dsp}/{company.requiredMinutesByRole.dsp}</div>
                         </div>
                       </div>
                     );
@@ -228,29 +241,29 @@ export default function OSGBCapacity() {
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader>
                 <CardTitle className="text-white">Kapasite özeti</CardTitle>
-                <CardDescription>Portföy yapısının yönetim düzeyi görünümü.</CardDescription>
+                <CardDescription>Portföyün genel yük ve açık özetini yönetim bakışıyla verir.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="mb-2 flex items-center gap-2 text-white">
                     <ShieldAlert className="h-4 w-4 text-red-300" />
-                    Eksik kapasite firmaları
+                    Süre açığı olan firma
                   </div>
-                  <p className="text-sm text-slate-400">{capacity.uncoveredCompanies.length} firma gerekli süreyi karşılamıyor.</p>
+                  <p className="text-sm text-slate-400">{uncoveredCompanies.length} firma gerekli süreyi karşılamıyor.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="mb-2 flex items-center gap-2 text-white">
                     <Users className="h-4 w-4 text-cyan-300" />
-                    Atanmamış kayıtlar
+                    Ataması olmayan firma
                   </div>
-                  <p className="text-sm text-slate-400">{capacity.unassignedCompanies.length} firma henüz bir uzmana bağlanmamış görünüyor.</p>
+                  <p className="text-sm text-slate-400">{unassignedCompanies.length} firma henüz hiçbir role bağlanmamış görünüyor.</p>
                 </div>
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="mb-2 flex items-center gap-2 text-white">
-                    <Briefcase className="h-4 w-4 text-amber-300" />
+                    <Gauge className="h-4 w-4 text-emerald-300" />
                     Dengeli portföy
                   </div>
-                  <p className="text-sm text-slate-400">{capacity.balancedCompanies.length} firma gerekli süreyi karşılıyor.</p>
+                  <p className="text-sm text-slate-400">{balancedCompanies.length} firma şu ay uyumlu ve açık dakikasız ilerliyor.</p>
                 </div>
               </CardContent>
             </Card>
@@ -260,7 +273,7 @@ export default function OSGBCapacity() {
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader>
                 <CardTitle className="text-white">Tehlike sınıfı kırılımı</CardTitle>
-                <CardDescription>Tehlike sınıfına göre şirket ve dakika dağılımı.</CardDescription>
+                <CardDescription>Tehlike sınıfına göre gerekli ve atanan dakika dağılımı.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -270,17 +283,22 @@ export default function OSGBCapacity() {
                       <TableHead>Firma</TableHead>
                       <TableHead>Çalışan</TableHead>
                       <TableHead>Gerekli</TableHead>
+                      <TableHead>Atanan</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {capacity.hazardSummary.map((row) => (
-                      <TableRow key={row.hazardClass} className="border-slate-800">
-                        <TableCell className="font-medium text-white">{row.hazardClass}</TableCell>
-                        <TableCell>{row.companyCount}</TableCell>
-                        <TableCell>{row.employeeCount}</TableCell>
-                        <TableCell>{row.requiredMinutes} dk</TableCell>
-                      </TableRow>
-                    ))}
+                    {["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].map((hazardClass) => {
+                      const rows = data.complianceRows.filter((item) => item.hazardClass === hazardClass);
+                      return (
+                        <TableRow key={hazardClass} className="border-slate-800">
+                          <TableCell className="font-medium text-white">{hazardClass}</TableCell>
+                          <TableCell>{rows.length}</TableCell>
+                          <TableCell>{rows.reduce((sum, row) => sum + row.employeeCount, 0)}</TableCell>
+                          <TableCell>{rows.reduce((sum, row) => sum + row.totalRequiredMinutes, 0)} dk</TableCell>
+                          <TableCell>{rows.reduce((sum, row) => sum + row.totalAssignedMinutes, 0)} dk</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>
@@ -288,30 +306,32 @@ export default function OSGBCapacity() {
 
             <Card className="border-slate-800 bg-slate-900/70">
               <CardHeader>
-                <CardTitle className="text-white">Uzman bazlı kapasite görünümü</CardTitle>
-                <CardDescription>Eksik süre kalan uzmanlar üstte listelenir.</CardDescription>
+                <CardTitle className="text-white">Personel bazlı kapasite görünümü</CardTitle>
+                <CardDescription>Kapasiteye yaklaşan veya aşan ekip üyeleri üstte listelenir.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow className="border-slate-800 hover:bg-transparent">
-                      <TableHead>Uzman</TableHead>
+                      <TableHead>Personel</TableHead>
+                      <TableHead>Rol</TableHead>
                       <TableHead>Firma</TableHead>
                       <TableHead>Atanan</TableHead>
-                      <TableHead>Gerekli</TableHead>
+                      <TableHead>Kapasite</TableHead>
                       <TableHead>Durum</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.expertLoads.map((expert) => (
-                      <TableRow key={expert.expertName} className="border-slate-800">
-                        <TableCell className="font-medium text-white">{expert.expertName}</TableCell>
-                        <TableCell>{expert.companyCount}</TableCell>
-                        <TableCell>{expert.totalAssignedMinutes} dk</TableCell>
-                        <TableCell>{expert.totalRequiredMinutes} dk</TableCell>
+                    {data.personnelLoads.map((person) => (
+                      <TableRow key={person.personnelId} className="border-slate-800">
+                        <TableCell className="font-medium text-white">{person.fullName}</TableCell>
+                        <TableCell>{person.role.toUpperCase()}</TableCell>
+                        <TableCell>{person.activeCompanyCount}</TableCell>
+                        <TableCell>{person.assignedMinutes} dk</TableCell>
+                        <TableCell>{person.monthlyCapacityMinutes} dk</TableCell>
                         <TableCell>
-                          <Badge className={cn("border", expert.overloaded ? "bg-red-500/15 text-red-200 border-red-400/20" : "bg-emerald-500/15 text-emerald-200 border-emerald-400/20")}>
-                            {expert.overloaded ? "Açık var" : "Dengeli"}
+                          <Badge className={cn("border", person.overloaded ? "border-red-400/20 bg-red-500/15 text-red-200" : "border-emerald-400/20 bg-emerald-500/15 text-emerald-200")}>
+                            %{person.utilizationRatio}
                           </Badge>
                         </TableCell>
                       </TableRow>

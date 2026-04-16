@@ -114,8 +114,14 @@ const launchCards = [
     href: "/osgb/assignments",
   },
   {
+    title: "Saha Ziyareti",
+    description: "Ziyaret planı, hizmet ispatı ve kanıt düzeyi",
+    icon: ClipboardList,
+    href: "/osgb/field-visits",
+  },
+  {
     title: "Finans ve Evrak",
-    description: "Tahsilat planı ve evrak yenileme takibi",
+    description: "Cari görünüm, kârlılık ve yükümlülük bazlı evrak",
     icon: CreditCard,
     href: "/osgb/finance",
   },

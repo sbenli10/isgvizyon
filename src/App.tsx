@@ -65,8 +65,9 @@ const OSGBAssignments = lazyWithRetry("osgb-assignments", () => import("./pages/
 const OSGBCompanyTracking = lazyWithRetry("osgb-company-tracking", () => import("./pages/OSGBCompanyTracking"));
 const OSGBCapacity = lazyWithRetry("osgb-capacity", () => import("./pages/OSGBCapacity"));
 const OSGBAlerts = lazyWithRetry("osgb-alerts", () => import("./pages/OSGBAlerts"));
-const OSGBFinance = lazyWithRetry("osgb-finance", () => import("./pages/OSGBFinance"));
-const OSGBDocuments = lazyWithRetry("osgb-documents", () => import("./pages/OSGBDocuments"));
+const OSGBFieldVisits = lazyWithRetry("osgb-field-visits", () => import("./pages/FieldVisits"));
+const OSGBFinance = lazyWithRetry("osgb-finance", () => import("./pages/Finance"));
+const OSGBDocuments = lazyWithRetry("osgb-documents", () => import("./pages/ObligationsDocuments"));
 const OSGBTasks = lazyWithRetry("osgb-tasks", () => import("./pages/OSGBTasks"));
 const OSGBNotes = lazyWithRetry("osgb-notes", () => import("./pages/OSGBNotes"));
 const OSGBAnalytics = lazyWithRetry("osgb-analytics", () => import("./pages/OSGBAnalytics"));
@@ -209,9 +210,10 @@ const ProtectedShell = () => {
             <Route path="/osgb/assignments" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB görevlendirme ekranı premium planda açılır" description="OSGB görevlendirme, uzman atama ve takip akışları premium üyelikle kullanılabilir."><OsgbAccessGate><OSGBAssignments /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/company-tracking" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB firma takibi premium planda açılır" description="Çoklu firma takibi, sözleşme ve portföy yönetimi premium OSGB modülüne dahildir."><OsgbAccessGate><OSGBCompanyTracking /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/capacity" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB kapasite ekranı premium planda açılır" description="Uzman kapasitesi, doluluk ve atama baskısı görünümü premium OSGB modülünde yer alır."><OsgbAccessGate><OSGBCapacity /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/field-visits" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB saha hizmet ekranı premium planda açılır" description="Saha ziyaretleri, hizmet ispatı ve kanıt takibi premium OSGB modülüne dahildir."><OsgbAccessGate><OSGBFieldVisits /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/alerts" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB uyarı merkezi premium planda açılır" description="Portföy bazlı OSGB uyarıları ve takip akışları premium üyelikle açılır."><OsgbAccessGate><OSGBAlerts /></OsgbAccessGate></FeatureAccessGate>} />
-            <Route path="/osgb/finance" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB finans ekranı premium planda açılır" description="Finans, tahsilat ve operasyonel gelir görünümü OSGB premium modülünün parçasıdır."><OsgbAccessGate><OSGBFinance /></OsgbAccessGate></FeatureAccessGate>} />
-            <Route path="/osgb/documents" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB belge ekranı premium planda açılır" description="Belge operasyonları ve kurum bazlı OSGB doküman yönetimi premium üyelikle kullanılabilir."><OsgbAccessGate><OSGBDocuments /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/finance" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB finans ekranı premium planda açılır" description="Cari, tahsilat ve kârlılık görünümü premium OSGB modülünün parçasıdır."><OsgbAccessGate><OSGBFinance /></OsgbAccessGate></FeatureAccessGate>} />
+            <Route path="/osgb/documents" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB belge ekranı premium planda açılır" description="Yasal yükümlülükten türeyen evrak takibi ve hızlı aksiyonlar premium OSGB modülüne dahildir."><OsgbAccessGate><OSGBDocuments /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/tasks" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB görev takibi premium planda açılır" description="OSGB görev takibi, iş dağılımı ve ekip operasyonları premium plana dahildir."><OsgbAccessGate><OSGBTasks /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/notes" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB notları premium planda açılır" description="OSGB not akışları ve operasyon içi koordinasyon ekranı premium üyelikle kullanılabilir."><OsgbAccessGate><OSGBNotes /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/analytics" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB analitik ekranı premium planda açılır" description="OSGB performans, kapasite ve portföy analitikleri premium modüle dahildir."><OsgbAccessGate><OSGBAnalytics /></OsgbAccessGate></FeatureAccessGate>} />
@@ -397,5 +399,4 @@ const App = () => (
 );
 
 export default App;
-
 
