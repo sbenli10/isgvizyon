@@ -8,7 +8,7 @@ import {
   Search,
   Wallet,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
@@ -54,6 +54,7 @@ import {
   listCompanyOsgbAssignments,
   listCompanyOsgbDocuments,
   listCompanyOsgbFinance,
+  seedOsgbCompanyDocuments,
   type OsgbAssignmentInput,
   type OsgbAssignmentRecord,
   type OsgbCompanyTrackingRecord,
@@ -164,7 +165,16 @@ const safeFin = (record: OsgbCompanyTrackingRecord | null | undefined): FinSumma
   overdueAmount: record?.financeSummary?.overdueAmount ?? 0,
 });
 
+const getDaysUntil = (value: string | null) => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const diffMs = date.getTime() - Date.now();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+};
+
 export default function OSGBCompanyTracking() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { canManage } = useAccessRole();
 
@@ -179,6 +189,7 @@ export default function OSGBCompanyTracking() {
   usePageDataTiming(loading);
 
   const [saving, setSaving] = useState(false);
+  const [seedingDocuments, setSeedingDocuments] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
@@ -357,6 +368,11 @@ export default function OSGBCompanyTracking() {
       rows[0] ||
       null
     );
+  }, [documentRecords, selectedCompany]);
+
+  const selectedCompanyDocuments = useMemo(() => {
+    if (!selectedCompany) return [];
+    return documentRecords.filter((item) => item.company_id === selectedCompany.companyId);
   }, [documentRecords, selectedCompany]);
 
   const openQuickAssignment = () => {
@@ -548,6 +564,43 @@ export default function OSGBCompanyTracking() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSeedDocuments = async () => {
+    if (!canManage) {
+      toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
+      return;
+    }
+    if (!user?.id || !selectedCompany) return;
+
+    setSeedingDocuments(true);
+    try {
+      const result = await seedOsgbCompanyDocuments(
+        user.id,
+        selectedCompany.companyId,
+        selectedCompany.companyName,
+        selectedCompany.hazardClass,
+        selectedCompany.employeeCount,
+      );
+
+      await loadData(true);
+      await loadCompanyDetails(selectedCompany.companyId);
+
+      if (result.seeded) {
+        toast.success(`${result.seededCount} standart evrak kaydı oluşturuldu.`);
+      } else {
+        toast.success("Bu firma için evrak takibi zaten başlatılmış.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Evrak seed işlemi başarısız oldu.");
+    } finally {
+      setSeedingDocuments(false);
+    }
+  };
+
+  const handleContractRenewalAction = () => {
+    navigate("/osgb/tasks");
+    toast.success("Sözleşme yenileme görevi için görev motoruna yönlendirildiniz.");
   };
 
   return (
@@ -838,6 +891,12 @@ export default function OSGBCompanyTracking() {
               {(() => {
                 const doc = safeDoc(selectedCompany);
                 const fin = safeFin(selectedCompany);
+                const contractDaysLeft = getDaysUntil(selectedCompany.contractEnd);
+                const contractRenewalNeeded = contractDaysLeft !== null && contractDaysLeft < 30;
+                const contractRenewalLabel =
+                  contractDaysLeft !== null && contractDaysLeft < 0
+                    ? `${Math.abs(contractDaysLeft)} gün geçti`
+                    : `${contractDaysLeft ?? 0} gün kaldı`;
 
                 const assignedSum = selectedCompanyAssignments.reduce(
                   (sum, item) => sum + (item.assigned_minutes ?? 0),
@@ -901,6 +960,70 @@ export default function OSGBCompanyTracking() {
                         </CardContent>
                       </Card>
                     </div>
+
+                    <Card className="border-slate-800 bg-slate-950/70">
+                      <CardHeader>
+                        <CardTitle className="text-base text-white">Önerilen Aksiyonlar</CardTitle>
+                        <CardDescription>Bu firmada bir sonraki en anlamlı adımı tek tıkla başlatın.</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {selectedCompany.assignmentStatus !== "atandi" ? (
+                          <Button variant="outline" className="w-full justify-start" onClick={openQuickAssignment}>
+                            Assignment aç (eksik/atanmamış)
+                          </Button>
+                        ) : null}
+
+                        {selectedCompanyDocuments.length === 0 ? (
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => void handleSeedDocuments()}
+                            disabled={seedingDocuments || detailLoading}
+                          >
+                            {seedingDocuments ? "Evrak takibi başlatılıyor..." : "Evrak takibini başlat"}
+                          </Button>
+                        ) : null}
+
+                        {doc.expired > 0 ? (
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => navigate("/osgb/documents?status=expired")}
+                          >
+                            Süresi dolan evraklara git
+                          </Button>
+                        ) : null}
+
+                        {fin.overdueAmount > 0 ? (
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => navigate("/osgb/finance?status=overdue")}
+                          >
+                            Gecikmiş finans kayıtlarına git
+                          </Button>
+                        ) : null}
+
+                        {contractRenewalNeeded ? (
+                          <Button variant="outline" className="w-full justify-start" onClick={handleContractRenewalAction}>
+                            Sözleşme yenileme görevi oluştur
+                            <span className="ml-2 text-xs text-slate-400">
+                              ({contractRenewalLabel})
+                            </span>
+                          </Button>
+                        ) : null}
+
+                        {selectedCompany.assignmentStatus === "atandi" &&
+                        selectedCompanyDocuments.length > 0 &&
+                        doc.expired === 0 &&
+                        fin.overdueAmount === 0 &&
+                        !contractRenewalNeeded ? (
+                          <div className="text-sm text-emerald-300">
+                            Kritik aksiyon görünmüyor. Periyodik kontrol için evrak ve finans panellerini izleyin.
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
 
                     <div className="flex flex-wrap gap-2">
                       <Button onClick={openQuickAssignment} disabled={detailLoading}>
