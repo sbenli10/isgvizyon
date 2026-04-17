@@ -1,4 +1,5 @@
-﻿import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client";
+import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
 
 export interface OsgbCompanyOption {
   id: string;
@@ -379,10 +380,11 @@ const assignmentLegalReference: Record<OsgbAssignmentRecord["assigned_role"], st
 };
 
 export const getOsgbCompanyOptions = async (userId: string): Promise<OsgbCompanyOption[]> => {
+  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
   const { data, error } = await supabase
     .from("isgkatip_companies")
     .select("id, company_name, hazard_class, contract_end, employee_count, required_minutes, assigned_minutes")
-    .eq("org_id", userId)
+    .eq("org_id", orgId)
     .eq("is_deleted", false)
     .order("company_name", { ascending: true });
 
@@ -520,6 +522,7 @@ export const listOsgbAssignmentsPage = async (
   userId: string,
   params: OsgbAssignmentPageParams,
 ): Promise<PagedResult<OsgbAssignmentRecord>> => {
+  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
   const { page, pageSize, status, search } = params;
   const from = Math.max(0, (page - 1) * pageSize);
   const to = from + pageSize - 1;
@@ -539,7 +542,7 @@ export const listOsgbAssignmentsPage = async (
       supabase
         .from("isgkatip_companies")
         .select("id")
-        .eq("org_id", userId)
+        .eq("org_id", orgId)
         .eq("is_deleted", false)
         .ilike("company_name", `%${term}%`)
         .limit(100),
@@ -755,6 +758,7 @@ export const listOsgbFinancePage = async (
   userId: string,
   params: OsgbFinancePageParams,
 ): Promise<PagedResult<OsgbFinanceRecord>> => {
+  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
   const { page, pageSize, status, companyId, search } = params;
   const from = Math.max(0, (page - 1) * pageSize);
   const to = from + pageSize - 1;
@@ -777,7 +781,7 @@ export const listOsgbFinancePage = async (
     const companyResult = await supabase
       .from("isgkatip_companies")
       .select("id")
-      .eq("org_id", userId)
+      .eq("org_id", orgId)
       .eq("is_deleted", false)
       .ilike("company_name", `%${term}%`)
       .limit(100);
@@ -934,6 +938,7 @@ export const listOsgbDocumentsPage = async (
   userId: string,
   params: OsgbDocumentPageParams,
 ): Promise<PagedResult<OsgbDocumentRecord>> => {
+  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
   const { page, pageSize, status, companyId, search } = params;
   const from = Math.max(0, (page - 1) * pageSize);
   const to = from + pageSize - 1;
@@ -956,7 +961,7 @@ export const listOsgbDocumentsPage = async (
     const companyResult = await supabase
       .from("isgkatip_companies")
       .select("id")
-      .eq("org_id", userId)
+      .eq("org_id", orgId)
       .eq("is_deleted", false)
       .ilike("company_name", `%${term}%`)
       .limit(100);
@@ -1219,11 +1224,12 @@ export const getOsgbDashboardOperationalSummary = async (userId: string): Promis
 };
 
 export const getOsgbCompanyTracking = async (userId: string): Promise<OsgbCompanyTrackingRecord[]> => {
+  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
   const [companies, assignments, documents, finance, tasks, notes] = await Promise.all([
     supabase
       .from("isgkatip_companies")
       .select("id, company_name, hazard_class, employee_count, contract_end, required_minutes, assigned_minutes")
-      .eq("org_id", userId)
+      .eq("org_id", orgId)
       .eq("is_deleted", false)
       .order("company_name", { ascending: true }),
     listOsgbAssignments(userId),

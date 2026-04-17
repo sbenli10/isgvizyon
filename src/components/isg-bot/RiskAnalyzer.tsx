@@ -5,6 +5,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  listIsgkatipCompanies,
+  listIsgkatipPredictiveAlerts,
+} from "@/domain/isgkatip/isgkatipQueries";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -120,23 +124,20 @@ export default function RiskAnalyzer() {
       if (!user) throw new Error("Not authenticated");
 
       // Load companies
-      const { data: companiesData, error: companiesError } = await supabase
-        .from("isgkatip_companies")
-        .select("*")
-        .eq("org_id", user.id);
-
-      if (companiesError) throw companiesError;
+      const companiesData = await listIsgkatipCompanies({
+        userId: user.id,
+        select: "*",
+        includeDeleted: true,
+      });
       setCompanies(companiesData || []);
 
       // Load predictive alerts
-      const { data: alertsData, error: alertsError } = await supabase
-        .from("isgkatip_predictive_alerts")
-        .select("*")
-        .eq("org_id", user.id)
-        .eq("status", "ACTIVE")
-        .order("severity", { ascending: false });
-
-      if (alertsError) throw alertsError;
+      const alertsData = await listIsgkatipPredictiveAlerts({
+        userId: user.id,
+        select: "*",
+        status: "ACTIVE",
+        orderBy: "severity",
+      });
       setPredictiveAlerts(alertsData || []);
 
       // Generate trend data

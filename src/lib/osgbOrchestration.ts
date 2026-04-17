@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from "@/integrations/supabase/client";
 import {
+  listIsgkatipCompanies,
+  listIsgkatipComplianceFlags,
+  listIsgkatipSyncLogs,
+} from "@/domain/isgkatip/isgkatipQueries";
+import {
   getOsgbPlatformDashboard,
   listOsgbFieldVisitsWorkspace,
   listOsgbFinanceWorkspace,
@@ -219,47 +224,32 @@ const mapDocumentAutomation = (document: OsgbRequiredDocumentRecord): OsgbAutoma
   actionUrl: "/osgb/documents",
 });
 
-const getOsgbKatipSourceIds = async (organizationId: string) => {
-  const { data: members, error } = await (supabase as any)
-    .from("profiles")
-    .select("id")
-    .eq("organization_id", organizationId);
-
-  if (error) throw error;
-
-  const memberIds = (members ?? []).map((row: any) => row.id as string);
-  return Array.from(new Set([organizationId, ...memberIds]));
-};
-
 export const listOsgbIsgKatipWorkspace = async (
   organizationId: string,
 ): Promise<OsgbIsgKatipWorkspace> => {
-  const sourceOrgIds = await getOsgbKatipSourceIds(organizationId);
   const [companiesResponse, flagsResponse, logsResponse] = await Promise.all([
-    (supabase as any)
-      .from("isgkatip_companies")
-      .select("id, org_id, company_name, sgk_no, employee_count, hazard_class, contract_end, assigned_minutes, required_minutes, last_synced_at")
-      .in("org_id", sourceOrgIds)
-      .order("company_name", { ascending: true }),
-    (supabase as any)
-      .from("isgkatip_compliance_flags")
-      .select("id, company_id, severity, status")
-      .in("org_id", sourceOrgIds)
-      .eq("status", "OPEN"),
-    (supabase as any)
-      .from("isgkatip_sync_logs")
-      .select("id, action, status, source, created_at, details")
-      .in("org_id", sourceOrgIds)
-      .order("created_at", { ascending: false })
-      .limit(12),
+    listIsgkatipCompanies({
+      organizationId,
+      select:
+        "id, org_id, company_name, sgk_no, employee_count, hazard_class, contract_end, assigned_minutes, required_minutes, last_synced_at",
+      includeDeleted: true,
+      orderBy: "company_name",
+    }),
+    listIsgkatipComplianceFlags({
+      organizationId,
+      select: "id, company_id, severity, status",
+      status: "OPEN",
+      orderByCreatedAtDesc: false,
+    }),
+    listIsgkatipSyncLogs({
+      organizationId,
+      select: "id, action, status, source, created_at, details",
+      limit: 12,
+    }),
   ]);
 
-  if (companiesResponse.error) throw companiesResponse.error;
-  if (flagsResponse.error) throw flagsResponse.error;
-  if (logsResponse.error) throw logsResponse.error;
-
   const flagCounts = new Map<string, { total: number; critical: number }>();
-  for (const row of flagsResponse.data ?? []) {
+  for (const row of flagsResponse ?? []) {
     const current = flagCounts.get(row.company_id) || { total: 0, critical: 0 };
     current.total += 1;
     if (String(row.severity || "").toUpperCase() === "CRITICAL") current.critical += 1;
@@ -267,7 +257,7 @@ export const listOsgbIsgKatipWorkspace = async (
   }
 
   const dedupedRows = new Map<string, any>();
-  for (const row of companiesResponse.data ?? []) {
+  for (const row of companiesResponse ?? []) {
     const key = row.sgk_no || `${row.company_name}-${row.id}`;
     const current = dedupedRows.get(key);
     if (!current) {
@@ -307,7 +297,7 @@ export const listOsgbIsgKatipWorkspace = async (
     };
   });
 
-  const logs: OsgbIsgKatipSyncLog[] = (logsResponse.data ?? []).map((row: any) => ({
+  const logs: OsgbIsgKatipSyncLog[] = (logsResponse ?? []).map((row: any) => ({
     id: row.id,
     action: row.action,
     status: row.status,
@@ -316,20 +306,19 @@ export const listOsgbIsgKatipWorkspace = async (
     details: row.details || {},
   }));
 
-  const hasLegacyMemberData = Array.from(dedupedRows.values()).some((row: any) => row.org_id !== organizationId);
   const lastSyncAt = logs[0]?.createdAt || companies.map((company) => company.lastSyncedAt).filter(Boolean).sort().at(-1) || null;
 
   return {
     summary: {
       companyCount: companies.length,
       criticalCompanies: companies.filter((company) => company.needsAttention).length,
-      openFlags: (flagsResponse.data ?? []).length,
+      openFlags: (flagsResponse ?? []).length,
       lastSyncAt,
     },
     extension: {
       isConnected: companies.length > 0 || logs.length > 0,
-      sourceMode: hasLegacyMemberData ? "member_extension" : companies.length > 0 || logs.length > 0 ? "organization" : "none",
-      sourceMemberCount: Math.max(0, sourceOrgIds.length - 1),
+      sourceMode: companies.length > 0 || logs.length > 0 ? "organization" : "none",
+      sourceMemberCount: 0,
       lastSyncAt,
       companyCount: companies.length,
     },
@@ -342,13 +331,12 @@ export const runOsgbIsgKatipSyncRefresh = async (
   organizationId: string,
   userId: string,
 ) => {
-  const sourceOrgIds = await getOsgbKatipSourceIds(organizationId);
-  const { data: companies, error: companiesError } = await (supabase as any)
-    .from("isgkatip_companies")
-    .select("sgk_no, company_name, employee_count, hazard_class, contract_start, contract_end, assigned_minutes")
-    .in("org_id", sourceOrgIds);
-
-  if (companiesError) throw companiesError;
+  const companies = await listIsgkatipCompanies({
+    organizationId,
+    select: "sgk_no, company_name, employee_count, hazard_class, contract_start, contract_end, assigned_minutes",
+    includeDeleted: true,
+    orderBy: "company_name",
+  });
   if (!(companies ?? []).length) {
     throw new Error("Senkronizasyon icin once ISGBot Chrome Extension ile firma verisi alinmis olmali.");
   }

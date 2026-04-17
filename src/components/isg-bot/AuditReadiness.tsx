@@ -5,6 +5,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  listIsgkatipCompanies,
+  listIsgkatipComplianceFlags,
+} from "@/domain/isgkatip/isgkatipQueries";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -65,10 +69,11 @@ export default function AuditReadiness() {
       const auditChecks: AuditCheck[] = [];
 
       // 1. Check for missing contracts
-      const { data: companies } = await supabase
-        .from("isgkatip_companies")
-        .select("*")
-        .eq("org_id", user.id);
+      const companies = await listIsgkatipCompanies({
+        userId: user.id,
+        select: "*",
+        includeDeleted: true,
+      });
 
       if (companies) {
         const missingContracts = companies.filter((c) => !c.contract_end);
@@ -132,12 +137,12 @@ export default function AuditReadiness() {
       }
 
       // 5. Check for critical compliance flags
-      const { data: criticalFlags } = await supabase
-        .from("isgkatip_compliance_flags")
-        .select("*")
-        .eq("org_id", user.id)
-        .eq("status", "OPEN")
-        .eq("severity", "CRITICAL");
+      const criticalFlags = await listIsgkatipComplianceFlags({
+        userId: user.id,
+        select: "*",
+        status: "OPEN",
+        severity: "CRITICAL",
+      });
 
       auditChecks.push({
         id: "critical_flags",

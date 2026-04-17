@@ -430,7 +430,7 @@ const buildActivityFeed = (record: CAPARecord): CAPAActivityItem[] => {
       title: "Operasyon notu güncellendi",
       description: "Kapanış veya takip notları kayıt içine işlendi.",
       timestamp: record.updated_at || record.created_at,
-      tone: "border-white/10 bg-white/5 text-slate-200",
+      tone: "border-white/10 bg-white/5 text-foreground",
       actorName: "İSGVİZYON",
     });
   }
@@ -475,7 +475,7 @@ const mapLogsToFeed = (logs: CAPAActivityLogRow[]): CAPAActivityItem[] =>
           ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
           : log.action_type === "created"
             ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-100"
-            : "border-white/10 bg-white/5 text-slate-200",
+            : "border-white/10 bg-white/5 text-foreground",
     actorName:
       typeof log.metadata?.actor_name === "string" && log.metadata.actor_name.trim().length > 0
         ? log.metadata.actor_name
@@ -1421,14 +1421,14 @@ export default function CAPA() {
               <ShieldCheck className="h-3.5 w-3.5" /> CAPA operasyon merkezi
             </div>
             <div className="space-y-3">
-              <h1 className="text-3xl font-semibold tracking-tight text-white lg:text-4xl">Aksiyonları ata, takip et ve kapanışı standart bir akışla yönet.</h1>
-              <p className="max-w-3xl text-sm leading-6 text-slate-300 lg:text-base">Bu alan denetim bulgularını aksiyona dönüştürmek için var. DÖF kayıtlarını sorumlu kişi, termin, öncelik ve kapanış kalitesi üzerinden tek panelde yönetiyoruz.</p>
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground lg:text-4xl">Aksiyonları ata, takip et ve kapanışı standart bir akışla yönet.</h1>
+              <p className="max-w-3xl text-sm leading-6 text-foreground lg:text-base">Bu alan denetim bulgularını aksiyona dönüştürmek için var. DÖF kayıtlarını sorumlu kişi, termin, öncelik ve kapanış kalitesi üzerinden tek panelde yönetiyoruz.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">Toplam kayıt</p><p className="mt-3 text-3xl font-semibold text-white">{stats.total}</p><p className="mt-1 text-xs text-slate-400">Aksiyon havuzu</p></div>
-              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-rose-200/80">Açık + kritik</p><p className="mt-3 text-3xl font-semibold text-white">{stats.open + stats.critical}</p><p className="mt-1 text-xs text-rose-100/70">Öncelikli müdahale</p></div>
-              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-amber-100/80">Geciken kayıt</p><p className="mt-3 text-3xl font-semibold text-white">{stats.overdue}</p><p className="mt-1 text-xs text-amber-100/70">Termin baskısı</p></div>
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-emerald-100/80">Kapanış oranı</p><p className="mt-3 text-3xl font-semibold text-white">%{stats.completionRate}</p><p className="mt-1 text-xs text-emerald-100/70">Tamamlanan iş akışı</p></div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Toplam kayıt</p><p className="mt-3 text-3xl font-semibold text-foreground">{stats.total}</p><p className="mt-1 text-xs text-muted-foreground">Aksiyon havuzu</p></div>
+              <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-rose-200/80">Açık + kritik</p><p className="mt-3 text-3xl font-semibold text-foreground">{stats.open + stats.critical}</p><p className="mt-1 text-xs text-rose-100/70">Öncelikli müdahale</p></div>
+              <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-amber-100/80">Geciken kayıt</p><p className="mt-3 text-3xl font-semibold text-foreground">{stats.overdue}</p><p className="mt-1 text-xs text-amber-100/70">Termin baskısı</p></div>
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 backdrop-blur"><p className="text-xs uppercase tracking-[0.2em] text-emerald-100/80">Kapanış oranı</p><p className="mt-3 text-3xl font-semibold text-foreground">%{stats.completionRate}</p><p className="mt-1 text-xs text-emerald-100/70">Tamamlanan iş akışı</p></div>
             </div>
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
               <DialogTrigger asChild>
@@ -1437,7 +1437,7 @@ export default function CAPA() {
               <DialogContent className="max-h-[90vh] overflow-y-auto border border-slate-700 bg-slate-950/95 sm:max-w-3xl">
                 <DialogHeader className="space-y-3 border-b border-white/10 pb-4">
                   <div className="inline-flex w-fit items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200"><Sparkles className="h-3.5 w-3.5" />{editingId ? "Aksiyon kaydı düzenleme" : "Yeni aksiyon planı"}</div>
-                  <DialogTitle className="text-xl font-semibold text-white">{editingId ? "DÖF kaydını güncelle" : "Yeni DÖF / CAPA kaydı oluştur"}</DialogTitle>
+                  <DialogTitle className="text-xl font-semibold text-foreground">{editingId ? "DÖF kaydını güncelle" : "Yeni DÖF / CAPA kaydı oluştur"}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-5 pt-2">
                   <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
@@ -1447,9 +1447,9 @@ export default function CAPA() {
                       <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Düzeltici faaliyet</Label><Textarea placeholder="Sorumlu ekibin yapacağı somut aksiyonları listeleyin." value={correctiveAction} onChange={(e) => setCorrectiveAction(e.target.value)} rows={4} className="border-white/10 bg-slate-900/80 text-slate-100" /></div>
                     </div>
                     <div className="space-y-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5">
-                      <div className="space-y-1"><p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Aksiyon mantığı</p><p className="text-sm text-slate-200">Bu ekran denetim kaydı tutmak için değil, kapatılacak işi yönetmek için tasarlandı.</p></div>
-                      <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/70 p-4"><p className="text-xs text-slate-400">Zorunlu alanlar</p><ul className="space-y-2 text-sm text-slate-200"><li>• Uygunsuzluk tanımı</li><li>• Kök neden</li><li>• Düzeltici faaliyet</li><li>• Sorumlu kişi ve termin</li></ul></div>
-                      <div className="rounded-xl border border-white/10 bg-slate-900/70 p-4 text-sm text-slate-300">Öncelik ve termin burada aksiyon baskısını belirler. Detaylı denetim bağlamı gerekiyorsa yine Denetimler sayfasından geliyoruz.</div>
+                      <div className="space-y-1"><p className="text-xs uppercase tracking-[0.2em] text-cyan-200/70">Aksiyon mantığı</p><p className="text-sm text-foreground">Bu ekran denetim kaydı tutmak için değil, kapatılacak işi yönetmek için tasarlandı.</p></div>
+                      <div className="space-y-2 rounded-xl border border-white/10 bg-slate-900/70 p-4"><p className="text-xs text-muted-foreground">Zorunlu alanlar</p><ul className="space-y-2 text-sm text-foreground"><li>• Uygunsuzluk tanımı</li><li>• Kök neden</li><li>• Düzeltici faaliyet</li><li>• Sorumlu kişi ve termin</li></ul></div>
+                      <div className="rounded-xl border border-white/10 bg-slate-900/70 p-4 text-sm text-foreground">Öncelik ve termin burada aksiyon baskısını belirler. Detaylı denetim bağlamı gerekiyorsa yine Denetimler sayfasından geliyoruz.</div>
                     </div>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1462,7 +1462,7 @@ export default function CAPA() {
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <Label className="text-sm font-semibold text-slate-100">Kapanış kanıtları</Label>
-                        <p className="mt-1 text-sm text-slate-400">Dosya, belge ve fotoğraf kanıtlarını aynı kayda bağlayarak kapanış kalitesini güçlendirin.</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Dosya, belge ve fotoğraf kanıtlarını aynı kayda bağlayarak kapanış kalitesini güçlendirin.</p>
                       </div>
                       {editingRecord?.source === "findings" && (
                         <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs text-amber-100">
@@ -1495,13 +1495,13 @@ export default function CAPA() {
                         },
                       ].map((item) => (
                         <div key={item.key} className="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
-                          <div className="flex items-center gap-2 text-sm font-medium text-white">
+                          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                             {item.icon}
                             {item.label}
                           </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">{item.hint}</p>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">{item.hint}</p>
                           <label
-                            className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-4 text-sm text-slate-200 transition hover:border-cyan-400/30 hover:bg-cyan-400/5"
+                            className="mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/15 bg-white/5 px-3 py-4 text-sm text-foreground transition hover:border-cyan-400/30 hover:bg-cyan-400/5"
                             onDragOver={(event) => event.preventDefault()}
                             onDrop={(event) => handleDropSelection(event, item.key)}
                           >
@@ -1517,7 +1517,7 @@ export default function CAPA() {
                             />
                           </label>
                           {editingRecord && (
-                            <p className="mt-2 text-[11px] text-slate-500">
+                            <p className="mt-2 text-[11px] text-muted-foreground">
                               Mevcut kayıt:
                               {" "}
                               {item.key === "media"
@@ -1530,27 +1530,27 @@ export default function CAPA() {
                           <div className="mt-3 space-y-2">
                             {item.files.length > 0 ? (
                               item.files.map((file, index) => (
-                                <div key={`${item.key}-${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
+                                <div key={`${item.key}-${file.name}-${index}`} className="flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-foreground">
                                   <div className="min-w-0">
-                                    <div className="truncate font-medium text-slate-200">{file.name}</div>
-                                    <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                                    <div className="truncate font-medium text-foreground">{file.name}</div>
+                                    <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                                       <span>{getFileKind(file.name, file.type)}</span>
                                       <span>•</span>
                                       <span>{formatBytes(file.size)}</span>
                                     </div>
                                   </div>
-                                  <button type="button" className="text-slate-400 transition hover:text-white" onClick={() => removeSelectedFile(item.key, index)}>
+                                  <button type="button" className="text-muted-foreground transition hover:text-foreground" onClick={() => removeSelectedFile(item.key, index)}>
                                     Kaldır
                                   </button>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-xs text-slate-500">Henüz yeni dosya seçilmedi.</p>
+                              <p className="text-xs text-muted-foreground">Henüz yeni dosya seçilmedi.</p>
                             )}
                           </div>
                           {uploadProgress[item.key] > 0 && (
                             <div className="mt-3 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
-                              <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400">
+                              <div className="flex items-center justify-between gap-3 text-[11px] text-muted-foreground">
                                 <span>Yükleme ilerlemesi</span>
                                 <div className="flex items-center gap-2">
                                   <span className={`rounded-full border px-2 py-0.5 ${uploadProgress[item.key] >= 100 ? "border-emerald-400/30 bg-emerald-400/15 text-emerald-100" : "border-cyan-400/30 bg-cyan-400/15 text-cyan-100"}`}>
@@ -1571,37 +1571,37 @@ export default function CAPA() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="border-white/10 bg-transparent text-slate-200 hover:bg-white/5">Vazgeç</Button><Button onClick={handleSubmit} className="gap-2 rounded-xl border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-300"><CheckCircle2 className="h-4 w-4" />{editingId ? "Aksiyon kaydını güncelle" : "Aksiyon kaydını oluştur"}</Button></div>
+                  <div className="flex flex-col-reverse gap-3 border-t border-white/10 pt-4 sm:flex-row sm:justify-end"><Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="border-white/10 bg-transparent text-foreground hover:bg-white/5">Vazgeç</Button><Button onClick={handleSubmit} className="gap-2 rounded-xl border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-300"><CheckCircle2 className="h-4 w-4" />{editingId ? "Aksiyon kaydını güncelle" : "Aksiyon kaydını oluştur"}</Button></div>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
           <div className="rounded-[24px] border border-white/10 bg-slate-950/60 p-5 backdrop-blur">
-            <div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.2em] text-slate-400">Operasyon özeti</p><h2 className="mt-2 text-lg font-semibold text-white">Takip baskısını gösteren özet</h2></div><TrendingUp className="h-5 w-5 text-cyan-300" /></div>
+            <div className="flex items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Operasyon özeti</p><h2 className="mt-2 text-lg font-semibold text-foreground">Takip baskısını gösteren özet</h2></div><TrendingUp className="h-5 w-5 text-cyan-300" /></div>
             <div className="mt-5 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex items-center justify-between text-sm text-slate-300"><span>Aktif iş yükü</span><span>{stats.open + stats.inProgress} kayıt</span></div><div className="mt-3 h-2 rounded-full bg-white/10"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" style={{ width: `${Math.min(100, Math.max(12, stats.total ? ((stats.open + stats.inProgress) / stats.total) * 100 : 12))}%` }} /></div></div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.2em] text-slate-400">En yüksek baskı</p>{stats.highestPressure ? <div className="mt-3 space-y-2"><p className="text-sm font-medium text-white">{stats.highestPressure.non_conformity}</p><div className="flex flex-wrap gap-2 text-xs"><span className={`rounded-full border px-2 py-1 ${priorityConfig[stats.highestPressure.priority].color}`}>{stats.highestPressure.priority}</span><span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-slate-300">{getDeadlineLabel(stats.highestPressure)}</span></div></div> : <p className="mt-3 text-sm text-slate-400">Şu anda öne çıkan açık kayıt yok.</p>}</div>
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-slate-200">CAPA sayfasını denetim ekranından ayıran şey burada: bu ekran sorumlu, termin, ilerleme ve kapanış kalitesini yönetir.</div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex items-center justify-between text-sm text-foreground"><span>Aktif iş yükü</span><span>{stats.open + stats.inProgress} kayıt</span></div><div className="mt-3 h-2 rounded-full bg-white/10"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-400" style={{ width: `${Math.min(100, Math.max(12, stats.total ? ((stats.open + stats.inProgress) / stats.total) * 100 : 12))}%` }} /></div></div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">En yüksek baskı</p>{stats.highestPressure ? <div className="mt-3 space-y-2"><p className="text-sm font-medium text-foreground">{stats.highestPressure.non_conformity}</p><div className="flex flex-wrap gap-2 text-xs"><span className={`rounded-full border px-2 py-1 ${priorityConfig[stats.highestPressure.priority].color}`}>{stats.highestPressure.priority}</span><span className="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-foreground">{getDeadlineLabel(stats.highestPressure)}</span></div></div> : <p className="mt-3 text-sm text-muted-foreground">Şu anda öne çıkan açık kayıt yok.</p>}</div>
+              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-foreground">CAPA sayfasını denetim ekranından ayıran şey burada: bu ekran sorumlu, termin, ilerleme ve kapanış kalitesini yönetir.</div>
             </div>
           </div>
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {[{ label: "Toplam kayıt", value: stats.total, hint: "Aksiyon havuzu", icon: <FileText className="h-4 w-4 text-cyan-300" />, tone: "border-white/10 bg-white/5" }, { label: "Açık kayıt", value: stats.open, hint: "İlk müdahale bekliyor", icon: <AlertTriangle className="h-4 w-4 text-rose-300" />, tone: "border-rose-500/20 bg-rose-500/5" }, { label: "Takipte", value: stats.inProgress, hint: "Devam eden aksiyon", icon: <Clock className="h-4 w-4 text-amber-300" />, tone: "border-amber-500/20 bg-amber-500/5" }, { label: "Tamamlandı", value: stats.completed, hint: "Kapanan kayıt", icon: <CheckCircle2 className="h-4 w-4 text-emerald-300" />, tone: "border-emerald-500/20 bg-emerald-500/5" }, { label: "Geciken", value: stats.overdue, hint: "Takvim baskısı", icon: <TimerReset className="h-4 w-4 text-orange-300" />, tone: "border-orange-500/20 bg-orange-500/5" }].map((item) => <div key={item.label} className={`glass-card rounded-3xl border p-5 ${item.tone}`}><div className="flex items-center justify-between"><p className="text-sm text-slate-300">{item.label}</p>{item.icon}</div><p className="mt-4 text-3xl font-semibold text-white">{item.value}</p><p className="mt-1 text-xs text-slate-400">{item.hint}</p></div>)}
+        {[{ label: "Toplam kayıt", value: stats.total, hint: "Aksiyon havuzu", icon: <FileText className="h-4 w-4 text-cyan-300" />, tone: "border-white/10 bg-white/5" }, { label: "Açık kayıt", value: stats.open, hint: "İlk müdahale bekliyor", icon: <AlertTriangle className="h-4 w-4 text-rose-300" />, tone: "border-rose-500/20 bg-rose-500/5" }, { label: "Takipte", value: stats.inProgress, hint: "Devam eden aksiyon", icon: <Clock className="h-4 w-4 text-amber-300" />, tone: "border-amber-500/20 bg-amber-500/5" }, { label: "Tamamlandı", value: stats.completed, hint: "Kapanan kayıt", icon: <CheckCircle2 className="h-4 w-4 text-emerald-300" />, tone: "border-emerald-500/20 bg-emerald-500/5" }, { label: "Geciken", value: stats.overdue, hint: "Takvim baskısı", icon: <TimerReset className="h-4 w-4 text-orange-300" />, tone: "border-orange-500/20 bg-orange-500/5" }].map((item) => <div key={item.label} className={`glass-card rounded-3xl border p-5 ${item.tone}`}><div className="flex items-center justify-between"><p className="text-sm text-foreground">{item.label}</p>{item.icon}</div><p className="mt-4 text-3xl font-semibold text-foreground">{item.value}</p><p className="mt-1 text-xs text-muted-foreground">{item.hint}</p></div>)}
       </section>
 
       <section className="glass-card rounded-[28px] border border-white/10 p-5 lg:p-6">
         <div className="grid gap-4 lg:grid-cols-[1.4fr_0.9fr]">
-          <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Kayıt ara</Label><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><Input placeholder="Uygunsuzluk, sorumlu kişi, kök neden..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="h-11 border-white/10 bg-slate-950/70 pl-10 text-slate-100" /></div></div>
+          <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Kayıt ara</Label><div className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Uygunsuzluk, sorumlu kişi, kök neden..." value={searchText} onChange={(e) => setSearchText(e.target.value)} className="h-11 border-white/10 bg-slate-950/70 pl-10 text-slate-100" /></div></div>
           <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Durum filtresi</Label><Select value={filterStatus} onValueChange={(value: "all" | CAPAStatus) => setFilterStatus(value)}><SelectTrigger className="h-11 border-white/10 bg-slate-950/70 text-slate-100"><SelectValue /></SelectTrigger><SelectContent className="border-slate-700 bg-slate-950 text-slate-100"><SelectItem value="all">Tüm durumlar</SelectItem><SelectItem value="Açık">🔴 Açık</SelectItem><SelectItem value="Devam Ediyor">🟡 Devam Ediyor</SelectItem><SelectItem value="Tamamlandı">✅ Tamamlandı</SelectItem></SelectContent></Select></div>
         </div>
       </section>
 
       {loading ? (
-        <div className="py-16 text-center"><Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-cyan-300" /><p className="text-sm text-slate-400">CAPA kayıtları yükleniyor...</p></div>
+        <div className="py-16 text-center"><Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-cyan-300" /><p className="text-sm text-muted-foreground">CAPA kayıtları yükleniyor...</p></div>
       ) : filteredRecords.length === 0 ? (
-        <div className="glass-card rounded-[28px] border border-white/10 p-12 text-center"><FileText className="mx-auto h-12 w-12 text-slate-500" /><h3 className="mt-4 text-lg font-semibold text-white">Gösterilecek aksiyon kaydı yok</h3><p className="mt-2 text-sm text-slate-400">Yeni bir CAPA kaydı oluşturarak atama ve takip akışını başlatabiliriz.</p></div>
+        <div className="glass-card rounded-[28px] border border-white/10 p-12 text-center"><FileText className="mx-auto h-12 w-12 text-muted-foreground" /><h3 className="mt-4 text-lg font-semibold text-foreground">Gösterilecek aksiyon kaydı yok</h3><p className="mt-2 text-sm text-muted-foreground">Yeni bir CAPA kaydı oluşturarak atama ve takip akışını başlatabiliriz.</p></div>
       ) : (
         <section className="grid gap-5 xl:grid-cols-2">
           {filteredRecords.map((record) => {
@@ -1622,31 +1622,31 @@ export default function CAPA() {
                         <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${priorityInfo.color}`}>{priorityInfo.icon} {priorityInfo.label}</span>
                         {record.priority === "Kritik" && record.status !== "Tamamlandı" && <span className="rounded-full border border-rose-400/20 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-100">Eskalasyon gerekli</span>}
                         {record.priority === "Kritik" && record.status !== "Tamamlandı" && <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-medium text-amber-100">Kritik izleme aktif</span>}
-                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">{record.source === "findings" ? "Toplu DÖF kaynağı" : "Manuel CAPA"}</span>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-foreground">{record.source === "findings" ? "Toplu DÖF kaynağı" : "Manuel CAPA"}</span>
                       </div>
                       <div>
-                        <h3 className="max-w-2xl text-lg font-semibold text-white">{record.non_conformity}</h3>
-                        <p className="mt-1 text-sm text-slate-400">{getNextActionLabel(record)}</p>
+                        <h3 className="max-w-2xl text-lg font-semibold text-foreground">{record.non_conformity}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{getNextActionLabel(record)}</p>
                       </div>
                     </div>
                     <Button variant="outline" onClick={() => { setDetailRecord(record); setDetailsOpen(true); }} className="h-10 rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"><Eye className="mr-2 h-4 w-4" />Detayı aç</Button>
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Sorumlu</p><p className="mt-2 text-sm font-medium text-white">{record.assigned_person}</p></div>
-                    <div className={`rounded-2xl border p-4 ${isOverdue ? "border-destructive/25 bg-destructive/10" : "border-white/10 bg-white/5"}`}><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Termin</p><p className="mt-2 text-sm font-medium text-white">{formatDateLabel(record.deadline)}</p><p className={`mt-1 text-xs ${isOverdue ? "text-destructive" : "text-slate-400"}`}>{getDeadlineLabel(record)}</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Aksiyon odağı</p><p className="mt-2 text-sm font-medium text-white">{getFocusLabel(record)}</p></div>
-                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Oluşturulma</p><p className="mt-2 text-sm font-medium text-white">{formatDateLabel(record.created_at)}</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Sorumlu</p><p className="mt-2 text-sm font-medium text-foreground">{record.assigned_person}</p></div>
+                    <div className={`rounded-2xl border p-4 ${isOverdue ? "border-destructive/25 bg-destructive/10" : "border-white/10 bg-white/5"}`}><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Termin</p><p className="mt-2 text-sm font-medium text-foreground">{formatDateLabel(record.deadline)}</p><p className={`mt-1 text-xs ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>{getDeadlineLabel(record)}</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Aksiyon odağı</p><p className="mt-2 text-sm font-medium text-foreground">{getFocusLabel(record)}</p></div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Oluşturulma</p><p className="mt-2 text-sm font-medium text-foreground">{formatDateLabel(record.created_at)}</p></div>
                   </div>
 
                   <div className="mt-5 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Kök neden özeti</p>
-                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-300">{record.root_cause}</p>
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Kök neden özeti</p>
+                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-foreground">{record.root_cause}</p>
                     </div>
                     <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
                       <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Sonraki önerilen aksiyon</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-200">{getNextActionLabel(record)}</p>
+                      <p className="mt-2 text-sm leading-6 text-foreground">{getNextActionLabel(record)}</p>
                       <Button onClick={() => { setDetailRecord(record); setDetailsOpen(true); }} className="mt-4 h-10 rounded-xl border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-300">
                         {getActionButtonLabel(record)}
                         <ArrowRight className="ml-2 h-4 w-4" />
@@ -1656,39 +1656,39 @@ export default function CAPA() {
 
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Kapanış kanıtı</p>
-                      <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3 text-sm text-slate-200">
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Kapanış kanıtı</p>
+                      <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3 text-sm text-foreground">
                         <span>Kanıt seviyesi</span>
                         <span>{getClosureEvidence(record).quality}</span>
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                         <div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3">
-                          <div className="flex items-center gap-2 text-slate-300">
+                          <div className="flex items-center gap-2 text-foreground">
                             <CheckCheck className="h-4 w-4 text-emerald-300" />
                             Not
                           </div>
-                          <p className="mt-2 text-white">{getClosureEvidence(record).hasNotes ? "Var" : "Eksik"}</p>
+                          <p className="mt-2 text-foreground">{getClosureEvidence(record).hasNotes ? "Var" : "Eksik"}</p>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3">
-                          <div className="flex items-center gap-2 text-slate-300">
+                          <div className="flex items-center gap-2 text-foreground">
                             <Camera className="h-4 w-4 text-sky-300" />
                             Fotoğraf
                           </div>
-                          <p className="mt-2 text-white">{getClosureEvidence(record).mediaCount} adet</p>
+                          <p className="mt-2 text-foreground">{getClosureEvidence(record).mediaCount} adet</p>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3">
-                          <div className="flex items-center gap-2 text-slate-300">
+                          <div className="flex items-center gap-2 text-foreground">
                             <FileText className="h-4 w-4 text-violet-300" />
                             Belge
                           </div>
-                          <p className="mt-2 text-white">{getClosureEvidence(record).documentCount} adet</p>
+                          <p className="mt-2 text-foreground">{getClosureEvidence(record).documentCount} adet</p>
                         </div>
                         <div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3">
-                          <div className="flex items-center gap-2 text-slate-300">
+                          <div className="flex items-center gap-2 text-foreground">
                             <Briefcase className="h-4 w-4 text-amber-300" />
                             Dosya
                           </div>
-                          <p className="mt-2 text-white">{getClosureEvidence(record).fileCount} adet</p>
+                          <p className="mt-2 text-foreground">{getClosureEvidence(record).fileCount} adet</p>
                         </div>
                       </div>
                     </div>
@@ -1710,7 +1710,7 @@ export default function CAPA() {
                   </div>
 
                   <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">{record.media_urls && record.media_urls.length > 0 && <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">📷 {record.media_urls.length} görsel</span>}<span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">ID: {record.id.slice(0, 8)}</span></div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{record.media_urls && record.media_urls.length > 0 && <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">📷 {record.media_urls.length} görsel</span>}<span className="rounded-full border border-white/10 bg-white/5 px-3 py-1">ID: {record.id.slice(0, 8)}</span></div>
                     <div className="flex flex-wrap items-center gap-2">
                       <Select value={record.status} onValueChange={(value: CAPAStatus) => updateStatus(record.id, value)}><SelectTrigger className="h-10 w-[180px] rounded-xl border-white/10 bg-slate-900/80 text-slate-100"><SelectValue /></SelectTrigger><SelectContent className="border-slate-700 bg-slate-950 text-slate-100"><SelectItem value="Açık">🔴 Açık</SelectItem><SelectItem value="Devam Ediyor">🟡 Devam Ediyor</SelectItem><SelectItem value="Tamamlandı">✅ Tamamlandı</SelectItem></SelectContent></Select>
                       <Button variant="outline" onClick={() => handleEdit(record)} className="h-10 rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"><Edit2 className="mr-2 h-4 w-4" />Düzenle</Button>
@@ -1731,24 +1731,24 @@ export default function CAPA() {
               <DialogHeader className="space-y-3 border-b border-white/10 pb-5">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2"><span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${statusConfig[detailRecord.status].color}`}>{statusConfig[detailRecord.status].icon} {statusConfig[detailRecord.status].label}</span><span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${priorityConfig[detailRecord.priority].color}`}>{priorityConfig[detailRecord.priority].icon} {priorityConfig[detailRecord.priority].label}</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">{detailRecord.source === "findings" ? "Toplu DÖF / bulgu kaynağı" : "Manuel CAPA kaydı"}</span></div>
-                    <DialogTitle className="max-w-3xl text-2xl font-semibold text-white">{detailRecord.non_conformity}</DialogTitle>
-                    <p className="text-sm leading-6 text-slate-400">{getNextActionLabel(detailRecord)}</p>
+                    <div className="flex flex-wrap gap-2"><span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${statusConfig[detailRecord.status].color}`}>{statusConfig[detailRecord.status].icon} {statusConfig[detailRecord.status].label}</span><span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${priorityConfig[detailRecord.priority].color}`}>{priorityConfig[detailRecord.priority].icon} {priorityConfig[detailRecord.priority].label}</span><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-foreground">{detailRecord.source === "findings" ? "Toplu DÖF / bulgu kaynağı" : "Manuel CAPA kaydı"}</span></div>
+                    <DialogTitle className="max-w-3xl text-2xl font-semibold text-foreground">{detailRecord.non_conformity}</DialogTitle>
+                    <p className="text-sm leading-6 text-muted-foreground">{getNextActionLabel(detailRecord)}</p>
                   </div>
-                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-right text-xs text-slate-200"><p className="font-medium text-cyan-200">Kayıt ID</p><p className="mt-1 font-mono text-sm text-white">{detailRecord.id}</p></div>
+                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-right text-xs text-foreground"><p className="font-medium text-cyan-200">Kayıt ID</p><p className="mt-1 font-mono text-sm text-foreground">{detailRecord.id}</p></div>
                 </div>
               </DialogHeader>
               <div className="grid gap-6 pt-2 xl:grid-cols-[1.15fr_0.85fr]">
                 <div className="space-y-5">
-                  <div className="grid gap-4 md:grid-cols-3">{detailSummary.map((item) => <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex items-center justify-between"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">{item.label}</p>{item.icon}</div><p className="mt-3 text-sm font-medium leading-6 text-white">{item.value}</p></div>)}</div>
-                  <div className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Sorumlu kişi</p><p className="mt-3 text-base font-medium text-white">{detailRecord.assigned_person}</p></div><div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Termin</p><p className="mt-3 text-base font-medium text-white">{formatDateLabel(detailRecord.deadline)}</p></div></div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Kök neden</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-300">{detailRecord.root_cause}</p></div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Düzeltici faaliyet planı</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-300">{detailRecord.corrective_action}</p></div>
-                  {detailRecord.notes && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Operasyon notu</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-300">{detailRecord.notes}</p></div>}
+                  <div className="grid gap-4 md:grid-cols-3">{detailSummary.map((item) => <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex items-center justify-between"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{item.label}</p>{item.icon}</div><p className="mt-3 text-sm font-medium leading-6 text-foreground">{item.value}</p></div>)}</div>
+                  <div className="grid gap-4 md:grid-cols-2"><div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Sorumlu kişi</p><p className="mt-3 text-base font-medium text-foreground">{detailRecord.assigned_person}</p></div><div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Termin</p><p className="mt-3 text-base font-medium text-foreground">{formatDateLabel(detailRecord.deadline)}</p></div></div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Kök neden</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground">{detailRecord.root_cause}</p></div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Düzeltici faaliyet planı</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground">{detailRecord.corrective_action}</p></div>
+                  {detailRecord.notes && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Operasyon notu</p><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-foreground">{detailRecord.notes}</p></div>}
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Zaman çizelgesi</p>
-                      <Clock className="h-4 w-4 text-slate-400" />
+                      <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Zaman çizelgesi</p>
+                      <Clock className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="mt-4 space-y-3">
                       {detailActivity.map((item) => (
@@ -1763,14 +1763,14 @@ export default function CAPA() {
                       ))}
                     </div>
                   </div>
-                  {detailRecord.media_urls && detailRecord.media_urls.length > 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Fotoğraf kanıtları</p><span className="text-xs text-slate-400">{detailRecord.media_urls.length} medya</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{detailRecord.media_urls.map((url, idx) => { const isBase64 = url.startsWith("data:image"); const isHttpUrl = url.startsWith("http"); if (!isBase64 && !isHttpUrl) return null; return <div key={idx} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 text-left"><button type="button" className="block w-full text-left" onClick={() => openEvidenceUrl(url)}><img src={url} alt={`Fotoğraf ${idx + 1}`} className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105" onError={(event) => { (event.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Crect fill='%23111827' width='240' height='240'/%3E%3Ctext fill='%2394a3b8' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EYüklenemedi%3C/text%3E%3C/svg%3E"; }} /><div className="absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/35" /><span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-xs text-white">{idx + 1}/{detailRecord.media_urls.length}</span></button><div className="flex items-center justify-end gap-2 border-t border-white/10 bg-slate-950/80 px-3 py-2"><Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div>; })}</div></div>}
+                  {detailRecord.media_urls && detailRecord.media_urls.length > 0 && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Fotoğraf kanıtları</p><span className="text-xs text-muted-foreground">{detailRecord.media_urls.length} medya</span></div><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{detailRecord.media_urls.map((url, idx) => { const isBase64 = url.startsWith("data:image"); const isHttpUrl = url.startsWith("http"); if (!isBase64 && !isHttpUrl) return null; return <div key={idx} className="group relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 text-left"><button type="button" className="block w-full text-left" onClick={() => openEvidenceUrl(url)}><img src={url} alt={`Fotoğraf ${idx + 1}`} className="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105" onError={(event) => { (event.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Crect fill='%23111827' width='240' height='240'/%3E%3Ctext fill='%2394a3b8' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EYüklenemedi%3C/text%3E%3C/svg%3E"; }} /><div className="absolute inset-0 bg-black/10 transition-colors group-hover:bg-black/35" /><span className="absolute bottom-3 right-3 rounded-full bg-black/70 px-2.5 py-1 text-xs text-foreground">{idx + 1}/{detailRecord.media_urls.length}</span></button><div className="flex items-center justify-end gap-2 border-t border-white/10 bg-slate-950/80 px-3 py-2"><Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div>; })}</div></div>}
                 </div>
                 <div className="space-y-5">
-                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Önerilen sonraki adım</p><h3 className="mt-2 text-lg font-semibold text-white">{getActionButtonLabel(detailRecord)}</h3></div><ShieldCheck className="h-5 w-5 text-cyan-300" /></div><p className="mt-3 text-sm leading-6 text-slate-200">{getNextActionLabel(detailRecord)}</p><Button onClick={() => handleEdit(detailRecord)} className="mt-4 h-10 w-full rounded-xl border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-300"><Edit3 className="mr-2 h-4 w-4" />Kaydı düzenle</Button></div>
+                  <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-5"><div className="flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.18em] text-cyan-200/80">Önerilen sonraki adım</p><h3 className="mt-2 text-lg font-semibold text-foreground">{getActionButtonLabel(detailRecord)}</h3></div><ShieldCheck className="h-5 w-5 text-cyan-300" /></div><p className="mt-3 text-sm leading-6 text-foreground">{getNextActionLabel(detailRecord)}</p><Button onClick={() => handleEdit(detailRecord)} className="mt-4 h-10 w-full rounded-xl border-0 bg-cyan-400 text-slate-950 hover:bg-cyan-300"><Edit3 className="mr-2 h-4 w-4" />Kaydı düzenle</Button></div>
                   {detailReminder && <div className={`rounded-2xl border p-5 ${detailReminder.tone}`}><div className="flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.18em] opacity-80">Otomatik hatırlatma</p><h3 className="mt-2 text-lg font-semibold">{detailReminder.title}</h3></div><BellRing className="h-5 w-5" /></div><p className="mt-3 text-sm leading-6 opacity-90">{detailReminder.body}</p><span className="mt-4 inline-flex rounded-full border border-current/20 px-2.5 py-1 text-xs">{detailReminder.badge}</span>{detailEscalationTimeline.length > 0 ? <div className="mt-4 rounded-xl border border-current/20 bg-black/10 px-3 py-3"><div className="flex items-center justify-between gap-3"><p className="text-xs font-medium uppercase tracking-[0.16em]">Eskalasyon geçmişi</p><span className="rounded-full border border-current/20 px-2 py-0.5 text-[11px]">Toplam {detailEscalationTimeline.length} uyarı</span></div><div className="mt-3 space-y-3">{detailEscalationTimeline.map((item, index) => <div key={item.id} className="flex gap-3 text-xs"><div className="flex flex-col items-center"><span className="h-2.5 w-2.5 rounded-full bg-current" />{index !== detailEscalationTimeline.length - 1 && <span className="mt-1 h-full w-px bg-current/30" />}</div><div className="min-w-0 pb-2"><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{item.title}</p><span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${item.severity.className}`}>{item.severity.label}</span></div><p className="mt-1 opacity-90">{item.description}</p><p className="mt-1 opacity-70">{formatDateLabel(item.timestamp)} · {formatTimeLabel(item.timestamp)} · {item.actorName}</p></div></div>)}</div></div> : getEscalationLine(detailRecord, escalationMap[detailRecord.id]) ? <div className="mt-4 rounded-xl border border-current/20 bg-black/10 px-3 py-3 text-xs leading-5"><span className="font-medium">Eskalasyon geçmişi:</span> {getEscalationLine(detailRecord, escalationMap[detailRecord.id])}{(escalationCountMap[detailRecord.id] || 0) > 0 && <span className="ml-2 rounded-full border border-current/20 px-2 py-0.5 text-[11px]">Toplam {escalationCountMap[detailRecord.id]} uyarı</span>}</div> : null}</div>}
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Risk özeti</p><div className="mt-4 space-y-3 text-sm text-slate-300"><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Öncelik seviyesi</span><span className={`rounded-full border px-2 py-1 text-xs ${priorityConfig[detailRecord.priority].color}`}>{detailRecord.priority}</span></div><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Termin baskısı</span><span>{getDeadlineLabel(detailRecord)}</span></div><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Kayıt kaynağı</span><span>{detailRecord.source === "findings" ? "Toplu DÖF" : "Manuel"}</span></div></div></div>
-                  {detailEvidence && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Kapanış kanıtı</p><div className="mt-4 space-y-3 text-sm text-slate-300"><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Kanıt seviyesi</span><span>{detailEvidence.quality}</span></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-slate-400">Dosya</p><p className="mt-2 text-white">{detailEvidence.fileCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-slate-400">Belge</p><p className="mt-2 text-white">{detailEvidence.documentCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-slate-400">Fotoğraf</p><p className="mt-2 text-white">{detailEvidence.mediaCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-slate-400">Kapanış notu</p><p className="mt-2 text-white">{detailEvidence.hasNotes ? "Var" : "Eksik"}</p></div></div><div className="grid gap-3"><div className="rounded-xl border border-white/10 bg-slate-900/70 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.16em] text-slate-500">Belge bağlantıları</p><span className="text-xs text-slate-500">{detailRecord.document_urls?.length || 0}</span></div><div className="mt-3 space-y-2">{detailRecord.document_urls && detailRecord.document_urls.length > 0 ? detailRecord.document_urls.map((url, index) => { const meta = getEvidenceMetaByUrl(url); return <div key={`document-${index}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"><div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-slate-200">{meta?.name || url.split('/').pop()}</p><p className="mt-1 text-[11px] text-slate-500">{getFileKind(meta?.name || url, meta?.mime)} • {formatBytes(meta?.size)}</p></div><div className="flex items-center gap-1">{isPreviewableEvidence(url) && <Button type="button" size="sm" variant="ghost" onClick={() => setPreviewEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10">Önizle</Button>}<Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div></div>; }) : <p className="text-xs text-slate-500">Henüz belge eklenmedi.</p>}</div></div><div className="rounded-xl border border-white/10 bg-slate-900/70 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.16em] text-slate-500">Ek dosyalar</p><span className="text-xs text-slate-500">{detailRecord.file_urls?.length || 0}</span></div><div className="mt-3 space-y-2">{detailRecord.file_urls && detailRecord.file_urls.length > 0 ? detailRecord.file_urls.map((url, index) => { const meta = getEvidenceMetaByUrl(url); return <div key={`file-${index}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"><div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-slate-200">{meta?.name || url.split('/').pop()}</p><p className="mt-1 text-[11px] text-slate-500">{getFileKind(meta?.name || url, meta?.mime)} • {formatBytes(meta?.size)}</p></div><div className="flex items-center gap-1"><Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-slate-200 hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div></div>; }) : <p className="text-xs text-slate-500">Henüz ek dosya bulunmuyor.</p>}</div></div></div></div></div>}
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Kurumsal aksiyonlar</p><div className="mt-4 space-y-2 text-sm text-slate-300"><p>• Termin yaklaşınca sorumlu kişiyi yeniden bilgilendir.</p><p>• Kritik kayıtlarda kapanış kanıtı olmadan tamamlandıya alma.</p><p>• Kapanan maddeleri aylık DÖF özet raporuna ekle.</p></div></div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Risk özeti</p><div className="mt-4 space-y-3 text-sm text-foreground"><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Öncelik seviyesi</span><span className={`rounded-full border px-2 py-1 text-xs ${priorityConfig[detailRecord.priority].color}`}>{detailRecord.priority}</span></div><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Termin baskısı</span><span>{getDeadlineLabel(detailRecord)}</span></div><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Kayıt kaynağı</span><span>{detailRecord.source === "findings" ? "Toplu DÖF" : "Manuel"}</span></div></div></div>
+                  {detailEvidence && <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Kapanış kanıtı</p><div className="mt-4 space-y-3 text-sm text-foreground"><div className="flex items-center justify-between rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><span>Kanıt seviyesi</span><span>{detailEvidence.quality}</span></div><div className="grid grid-cols-2 gap-3"><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-muted-foreground">Dosya</p><p className="mt-2 text-foreground">{detailEvidence.fileCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-muted-foreground">Belge</p><p className="mt-2 text-foreground">{detailEvidence.documentCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-muted-foreground">Fotoğraf</p><p className="mt-2 text-foreground">{detailEvidence.mediaCount} adet</p></div><div className="rounded-xl border border-white/10 bg-slate-900/70 px-3 py-3"><p className="text-xs text-muted-foreground">Kapanış notu</p><p className="mt-2 text-foreground">{detailEvidence.hasNotes ? "Var" : "Eksik"}</p></div></div><div className="grid gap-3"><div className="rounded-xl border border-white/10 bg-slate-900/70 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Belge bağlantıları</p><span className="text-xs text-muted-foreground">{detailRecord.document_urls?.length || 0}</span></div><div className="mt-3 space-y-2">{detailRecord.document_urls && detailRecord.document_urls.length > 0 ? detailRecord.document_urls.map((url, index) => { const meta = getEvidenceMetaByUrl(url); return <div key={`document-${index}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"><div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-foreground">{meta?.name || url.split('/').pop()}</p><p className="mt-1 text-[11px] text-muted-foreground">{getFileKind(meta?.name || url, meta?.mime)} • {formatBytes(meta?.size)}</p></div><div className="flex items-center gap-1">{isPreviewableEvidence(url) && <Button type="button" size="sm" variant="ghost" onClick={() => setPreviewEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10">Önizle</Button>}<Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div></div>; }) : <p className="text-xs text-muted-foreground">Henüz belge eklenmedi.</p>}</div></div><div className="rounded-xl border border-white/10 bg-slate-900/70 p-3"><div className="flex items-center justify-between gap-3"><p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Ek dosyalar</p><span className="text-xs text-muted-foreground">{detailRecord.file_urls?.length || 0}</span></div><div className="mt-3 space-y-2">{detailRecord.file_urls && detailRecord.file_urls.length > 0 ? detailRecord.file_urls.map((url, index) => { const meta = getEvidenceMetaByUrl(url); return <div key={`file-${index}`} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2"><div className="flex items-center justify-between gap-2"><div className="min-w-0"><p className="truncate text-xs font-medium text-foreground">{meta?.name || url.split('/').pop()}</p><p className="mt-1 text-[11px] text-muted-foreground">{getFileKind(meta?.name || url, meta?.mime)} • {formatBytes(meta?.size)}</p></div><div className="flex items-center gap-1"><Button type="button" size="sm" variant="ghost" onClick={() => openEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><ExternalLink className="h-3.5 w-3.5" /></Button><Button type="button" size="sm" variant="ghost" onClick={() => void downloadEvidenceUrl(url)} className="h-8 px-2 text-foreground hover:bg-white/10"><Download className="h-3.5 w-3.5" /></Button></div></div></div>; }) : <p className="text-xs text-muted-foreground">Henüz ek dosya bulunmuyor.</p>}</div></div></div></div></div>}
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-5"><p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Kurumsal aksiyonlar</p><div className="mt-4 space-y-2 text-sm text-foreground"><p>• Termin yaklaşınca sorumlu kişiyi yeniden bilgilendir.</p><p>• Kritik kayıtlarda kapanış kanıtı olmadan tamamlandıya alma.</p><p>• Kapanan maddeleri aylık DÖF özet raporuna ekle.</p></div></div>
                   <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-5"><Button variant="outline" onClick={() => handleEdit(detailRecord)} className="h-11 rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"><Edit2 className="mr-2 h-4 w-4" />Düzenle</Button><Button variant="ghost" onClick={() => handleDelete(detailRecord.id)} className="h-11 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Sil</Button></div>
                 </div>
               </div>
@@ -1779,22 +1779,22 @@ export default function CAPA() {
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(previewEvidenceUrl)} onOpenChange={(open) => { if (!open) setPreviewEvidenceUrl(null); }}>
-        <DialogContent className="border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.14),_transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.97))] p-0 text-white sm:max-w-4xl">
+        <DialogContent className="border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.14),_transparent_30%),linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.97))] p-0 text-foreground sm:max-w-4xl">
           <div className="border-b border-white/10 px-6 py-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-cyan-200/70">Belge önizleme</p>
-                <h3 className="mt-2 text-xl font-semibold text-white">Kanıt dosyasını uygulama içinde inceleyin</h3>
-                <p className="mt-2 text-sm text-slate-300">PDF ve görseller ayrı sekmeye gitmeden kontrol edilebilir. Gerekirse buradan açabilir veya indirebilirsiniz.</p>
+                <h3 className="mt-2 text-xl font-semibold text-foreground">Kanıt dosyasını uygulama içinde inceleyin</h3>
+                <p className="mt-2 text-sm text-foreground">PDF ve görseller ayrı sekmeye gitmeden kontrol edilebilir. Gerekirse buradan açabilir veya indirebilirsiniz.</p>
                 {previewEvidenceUrl && (
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-foreground">
                       {previewEvidenceMeta?.name || previewEvidenceUrl.split("/").pop() || "Kanıt dosyası"}
                     </span>
                     <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">
                       {getFileKind(previewEvidenceMeta?.name || previewEvidenceUrl, previewEvidenceMeta?.mime)}
                     </span>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-300">
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-foreground">
                       {formatBytes(previewEvidenceMeta?.size)}
                     </span>
                   </div>

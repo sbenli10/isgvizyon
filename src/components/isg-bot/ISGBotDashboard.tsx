@@ -5,6 +5,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
+import {
+  listIsgkatipCompanies,
+  listIsgkatipComplianceFlags,
+} from "@/domain/isgkatip/isgkatipQueries";
 import {
   Card,
   CardContent,
@@ -311,7 +316,9 @@ export default function ISGBotDashboard() {
     toast.info("Senkronizasyon sonlandırılıyor...");
 
     try {
-      const orgId = user!.id;
+      const { organizationId: orgId } = await getIsgkatipOrgScope({
+        userId: user!.id,
+      });
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("🔴 SENKRON SONLANDIRMA BAŞLADI");
@@ -488,7 +495,9 @@ export default function ISGBotDashboard() {
     setError(null);
 
     try {
-      const orgId = user.id;
+      const { organizationId: orgId } = await getIsgkatipOrgScope({
+        userId: user.id,
+      });
 
       console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
       console.log("🔄 DASHBOARD YÜKLEME BAŞLADI");
@@ -496,31 +505,24 @@ export default function ISGBotDashboard() {
       console.log("📍 Org ID:", orgId);
 
       // Fetch companies
-      const { data: companiesData, error: companiesError } = await supabase
-        .from("isgkatip_companies")
-        .select("*")
-        .eq("org_id", orgId)
-        .eq("is_deleted", false)
-        .order("risk_score", { ascending: false });
-
-      if (companiesError) throw companiesError;
+      const companiesData = await listIsgkatipCompanies({
+        organizationId: orgId,
+        select: "*",
+      });
 
       setCompanies(companiesData || []);
       console.log("✅ Firmalar yüklendi:", companiesData?.length || 0);
 
       // Fetch flags
-      const { data: flagsData } = await supabase
-        .from("isgkatip_compliance_flags")
-        .select(
-          `
+      const flagsData = await listIsgkatipComplianceFlags({
+        organizationId: orgId,
+        select: `
           *,
           company:isgkatip_companies!inner(company_name)
-        `
-        )
-        .eq("org_id", orgId)
-        .eq("status", "OPEN")
-        .order("created_at", { ascending: false })
-        .limit(10);
+        `,
+        status: "OPEN",
+        limit: 10,
+      });
 
       setFlags(flagsData || []);
       console.log("✅ Bayraklar yüklendi:", flagsData?.length || 0);
@@ -654,7 +656,9 @@ export default function ISGBotDashboard() {
     toast.info("Compliance kontrol ediliyor...");
 
     try {
-      const orgId = user!.id;
+      const { organizationId: orgId } = await getIsgkatipOrgScope({
+        userId: user!.id,
+      });
       let flagsCreated = 0;
 
       for (const company of companies) {

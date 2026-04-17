@@ -80,7 +80,7 @@ function buildAlertView(data: OsgbDashboardData) {
 }
 
 export default function OSGBAlerts() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [data, setData] = useState<OsgbDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
@@ -90,6 +90,11 @@ export default function OSGBAlerts() {
 
   const loadAlerts = async (forceRefresh = false) => {
     if (!user?.id) return;
+    if (!profile?.organization_id) {
+      setError("Organizasyon bilgisi bulunamadı. Lütfen profilinizi güncelleyin.");
+      setLoading(false);
+      return;
+    }
 
     const cacheKey = getCacheKey(user.id);
     const cached = readOsgbPageCache<OsgbDashboardData>(cacheKey, CACHE_TTL_MS);
@@ -106,7 +111,7 @@ export default function OSGBAlerts() {
         setLoading(true);
       }
 
-      const result = await getOsgbDashboardData(user.id);
+      const result = await getOsgbDashboardData(profile.organization_id);
       setData(result);
       setError(null);
       writeOsgbPageCache(cacheKey, result);
@@ -120,7 +125,7 @@ export default function OSGBAlerts() {
 
   useEffect(() => {
     void loadAlerts(false);
-  }, [user?.id]);
+  }, [user?.id, profile?.organization_id]);
 
   const alertView = useMemo(() => (data ? buildAlertView(data) : null), [data]);
 

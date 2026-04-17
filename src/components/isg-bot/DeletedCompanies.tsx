@@ -5,6 +5,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
+import { listIsgkatipDeletedCompaniesView } from "@/domain/isgkatip/isgkatipQueries";
 import {
   Card,
   CardContent,
@@ -100,22 +102,16 @@ export default function DeletedCompanies() {
     setLoading(true);
 
     try {
-      const orgId = user.id;
+      const { organizationId: orgId } = await getIsgkatipOrgScope({
+        userId: user.id,
+      });
 
       console.log("🔄 Loading deleted companies...");
       console.log("📍 Org ID:", orgId);
 
-      const { data, error } = await supabase
-        .from("isgkatip_deleted_companies_view")
-        .select("*")
-        .eq("org_id", orgId)
-        .is("restored_at", null)
-        .order("deleted_at", { ascending: false });
-
-      if (error) {
-        console.error("❌ Load error:", error);
-        throw error;
-      }
+      const data = await listIsgkatipDeletedCompaniesView({
+        organizationId: orgId,
+      });
 
       console.log("✅ Deleted companies loaded:", data?.length || 0);
 
