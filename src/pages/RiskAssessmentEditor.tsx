@@ -1603,8 +1603,8 @@ useLayoutEffect(() => {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] uppercase tracking-[0.24em] text-fuchsia-200/75">AI Risk Asistanı</p>
-              <h3 className="mt-2 text-lg font-bold text-white">Sektöre özel yeni risk üret</h3>
-              <p className="mt-2 text-xs leading-5 text-slate-400">
+              <h3 className="mt-2 text-lg font-bold text-foreground">Sektöre özel yeni risk üret</h3>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 Gemini destekli önerilerle sektörünüze uygun risk maddelerini, önlemleri ve başlangıç skorlarını hazır hale getirin.
               </p>
             </div>
@@ -1615,19 +1615,19 @@ useLayoutEffect(() => {
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Model</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Model</p>
               <p className="mt-2 text-sm font-semibold text-slate-100">
                 {selectedSectorOption ? `${selectedSectorOption.name} Paketi` : "Gemini 2.5 Flash"}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Kapsam</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Kapsam</p>
               <p className="mt-2 text-sm font-semibold text-slate-100">
                 {selectedSectorOption ? `${selectedSectorRiskPreview.length} hazır risk + önlem` : "Risk + Önlem + Skor"}
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Durum</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Durum</p>
               <p className="mt-2 text-sm font-semibold text-slate-100">
                 {selectedSectorOption
                   ? `${selectedSectorDistribution.critical} kritik · ${selectedSectorDistribution.high} yüksek`
@@ -1639,7 +1639,7 @@ useLayoutEffect(() => {
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Sektör</Label>
+            <Label className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Sektör</Label>
             <Select value={aiSector} onValueChange={setAiSector}>
               <SelectTrigger className="h-12 rounded-2xl border-cyan-400/20 bg-gradient-to-r from-slate-950/90 via-slate-900 to-slate-950/90 text-slate-100 shadow-[0_12px_28px_rgba(15,23,42,0.28)]">
                 {selectedSectorOption && selectedSectorMeta ? (
@@ -1654,7 +1654,7 @@ useLayoutEffect(() => {
                           Aktif sektör
                         </Badge>
                       </div>
-                      <p className="truncate text-[11px] text-slate-400">{selectedSectorMeta.hint}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{selectedSectorMeta.hint}</p>
                     </div>
                   </div>
                 ) : (
@@ -1676,7 +1676,7 @@ useLayoutEffect(() => {
                   <SelectItem
                     key={sector.id}
                     value={sector.name.toLowerCase()}
-                    className="rounded-xl px-3 py-3 text-slate-100 focus:bg-white/[0.08] focus:text-white"
+                    className="rounded-xl px-3 py-3 text-slate-100 focus:bg-white/[0.08] focus:text-foreground"
                   >
                     <div className="flex min-w-[220px] max-w-full items-center gap-3">
                       <div className={`flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br ${meta.accent} text-base`}>
@@ -1684,7 +1684,7 @@ useLayoutEffect(() => {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-slate-100">{sector.name}</p>
-                        <p className="text-xs text-slate-400">{meta.hint}</p>
+                        <p className="text-xs text-muted-foreground">{meta.hint}</p>
                       </div>
                       <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-[10px] text-cyan-200">
                         Hazır Paket
@@ -1696,7 +1696,7 @@ useLayoutEffect(() => {
             </Select>
           </div>
 
-          <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/5 p-3 text-xs text-slate-300">
+          <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/5 p-3 text-xs text-foreground">
             <div className="flex items-start gap-2">
               <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-fuchsia-300" />
               <div>
@@ -1716,18 +1716,18 @@ useLayoutEffect(() => {
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-red-400/15 bg-red-500/5 p-3">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/70">Kritik Risk</p>
-                <p className="mt-2 text-lg font-black text-white">{selectedSectorDistribution.critical}</p>
-                <p className="mt-1 text-[11px] text-slate-400">Anında aksiyon gerektiren başlıklar</p>
+                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.critical}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Anında aksiyon gerektiren başlıklar</p>
               </div>
               <div className="rounded-2xl border border-amber-400/15 bg-amber-500/5 p-3">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-amber-200/70">Yüksek Risk</p>
-                <p className="mt-2 text-lg font-black text-white">{selectedSectorDistribution.high}</p>
-                <p className="mt-1 text-[11px] text-slate-400">Kontrol planı gerektiren başlıklar</p>
+                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.high}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Kontrol planı gerektiren başlıklar</p>
               </div>
               <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-3">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/70">Risk Havuzu</p>
-                <p className="mt-2 text-lg font-black text-white">{selectedSectorRiskPreview.length}</p>
-                <p className="mt-1 text-[11px] text-slate-400">Seçili sektör için hazır öneri havuzu</p>
+                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorRiskPreview.length}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">Seçili sektör için hazır öneri havuzu</p>
               </div>
             </div>
           ) : null}
@@ -1735,7 +1735,7 @@ useLayoutEffect(() => {
           <Button
             onClick={() => onGenerate(aiSector)}
             disabled={!isAssessmentActive || aiGenerating}
-            className="h-11 w-full gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 text-white shadow-[0_18px_40px_rgba(168,85,247,0.28)] hover:from-fuchsia-400 hover:via-violet-400 hover:to-indigo-400"
+            className="h-11 w-full gap-2 rounded-2xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 text-foreground shadow-[0_18px_40px_rgba(168,85,247,0.28)] hover:from-fuchsia-400 hover:via-violet-400 hover:to-indigo-400"
           >
             {aiGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             {aiGenerating ? "AI riskleri üretiyor..." : "AI ile risk üret"}
@@ -1756,27 +1756,27 @@ useLayoutEffect(() => {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-100">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-[0_14px_30px_rgba(99,102,241,0.3)]">
-                <BookOpen className="h-5 w-5 text-white" />
+                <BookOpen className="h-5 w-5 text-foreground" />
               </div>
               Risk Analiz Editörü • Kullanım Kılavuzu
             </DialogTitle>
-            <DialogDescription className="text-slate-400">
+            <DialogDescription className="text-muted-foreground">
               İki aşamalı Fine-Kinney yaklaşımıyla profesyonel risk değerlendirmesi.
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="basics" className="mt-4">
             <TabsList className="grid w-full grid-cols-4 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-              <TabsTrigger value="basics" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white">Temel Bilgiler</TabsTrigger>
-              <TabsTrigger value="scoring" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white">Skorlama</TabsTrigger>
-              <TabsTrigger value="shortcuts" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white">Kısayollar</TabsTrigger>
-              <TabsTrigger value="tips" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white">İpuçları</TabsTrigger>
+              <TabsTrigger value="basics" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-foreground">Temel Bilgiler</TabsTrigger>
+              <TabsTrigger value="scoring" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-foreground">Skorlama</TabsTrigger>
+              <TabsTrigger value="shortcuts" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-foreground">Kısayollar</TabsTrigger>
+              <TabsTrigger value="tips" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-foreground">İpuçları</TabsTrigger>
             </TabsList>
 
             <TabsContent value="basics" className="mt-4 space-y-4">
               <Card className="border border-white/10 bg-white/[0.04]"><CardContent className="space-y-3 p-4">
                 <h3 className="flex items-center gap-2 text-lg font-semibold text-slate-100"><MousePointer className="h-5 w-5 text-indigo-400" />1. Başlangıç</h3>
-                <ul className="space-y-2 text-sm text-slate-300">
+                <ul className="space-y-2 text-sm text-foreground">
                   <li className="flex items-start gap-2"><Badge className="shrink-0 bg-indigo-600">1</Badge><span>Üst bölümden <strong>firma seçin</strong> ve <strong>Yeni Değerlendirme Başlat</strong> ile oturumu açın.</span></li>
                   <li className="flex items-start gap-2"><Badge className="shrink-0 bg-indigo-600">2</Badge><span><strong>Sol panelden</strong> sektörünüze uygun risk paketini seçin veya AI ile yeni risk üretin.</span></li>
                   <li className="flex items-start gap-2"><Badge className="shrink-0 bg-indigo-600">3</Badge><span>Paket yanındaki <strong>+</strong> butonuyla tüm maddeleri tabloya ekleyin.</span></li>
@@ -1786,7 +1786,7 @@ useLayoutEffect(() => {
 
               <Card className="border border-white/10 bg-white/[0.04]"><CardContent className="space-y-3 p-4">
                 <h3 className="text-lg font-semibold text-slate-100">Tabloda Düzenleme</h3>
-                <ul className="space-y-2 text-sm text-slate-300">
+                <ul className="space-y-2 text-sm text-foreground">
                   <li className="flex items-start gap-2"><span className="text-indigo-400">→</span><span><strong>Tehlike, Risk ve Önlemler</strong> alanlarına doğrudan tıklayarak düzenleme yapabilirsiniz.</span></li>
                   <li className="flex items-start gap-2"><span className="text-indigo-400">→</span><span><strong>Enter</strong> ile kaydedin, <strong>ESC</strong> ile düzenlemeyi iptal edin.</span></li>
                   <li className="flex items-start gap-2"><span className="text-indigo-400">→</span><span><strong>O, F, Ş</strong> seçimlerinden değer girin; skorlar otomatik hesaplanır.</span></li>
@@ -1795,7 +1795,7 @@ useLayoutEffect(() => {
 
               <Card className="border border-white/10 bg-white/[0.04]"><CardContent className="space-y-3 p-4">
                 <h3 className="text-lg font-semibold text-slate-100">Dışa Aktarma</h3>
-                <ul className="space-y-2 text-sm text-slate-300">
+                <ul className="space-y-2 text-sm text-foreground">
                   <li className="flex items-start gap-2"><Download className="mt-0.5 h-4 w-4 shrink-0 text-green-400" /><span><strong>PDF İndir:</strong> profesyonel rapor formatında (landscape, A4).</span></li>
                   <li className="flex items-start gap-2"><Download className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" /><span><strong>Excel:</strong> Microsoft Excel üzerinde düzenlenebilir format.</span></li>
                 </ul>
@@ -1807,21 +1807,21 @@ useLayoutEffect(() => {
                 <h3 className="text-lg font-semibold text-slate-100">Fine-Kinney Formülü</h3>
                 <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                   <p className="mb-2 text-center font-mono text-xl text-indigo-300">R = O × F × Ş</p>
-                  <p className="text-center text-sm text-slate-400">Risk skoru = Olasılık × Frekans × Şiddet</p>
+                  <p className="text-center text-sm text-muted-foreground">Risk skoru = Olasılık × Frekans × Şiddet</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <h4 className="font-semibold text-red-300">1. Aşama (Mevcut Durum)</h4>
-                    <p className="text-xs text-slate-400">Hiçbir önlem alınmadan, mevcut durumda riskin büyüklüğü.</p>
+                    <p className="text-xs text-muted-foreground">Hiçbir önlem alınmadan, mevcut durumda riskin büyüklüğü.</p>
                     <div className="space-y-1 text-xs">
-                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>O (Olasılık)</span><span className="text-slate-300">0.2 - 10</span></div>
-                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>F (Frekans)</span><span className="text-slate-300">0.5 - 10</span></div>
-                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>Ş (Şiddet)</span><span className="text-slate-300">1 - 100</span></div>
+                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>O (Olasılık)</span><span className="text-foreground">0.2 - 10</span></div>
+                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>F (Frekans)</span><span className="text-foreground">0.5 - 10</span></div>
+                      <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>Ş (Şiddet)</span><span className="text-foreground">1 - 100</span></div>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <h4 className="font-semibold text-green-300">2. Aşama (Kalıntı Risk)</h4>
-                    <p className="text-xs text-slate-400">Önlemler alındıktan sonra kalan risk. Hedef kabul edilebilir seviyedir.</p>
+                    <p className="text-xs text-muted-foreground">Önlemler alındıktan sonra kalan risk. Hedef kabul edilebilir seviyedir.</p>
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>Hedef</span><span className="text-green-300">R &lt; 20</span></div>
                       <div className="flex justify-between rounded-xl bg-slate-950/70 p-2"><span>İdeal</span><span className="text-green-300">R &lt; 10</span></div>
@@ -1830,11 +1830,11 @@ useLayoutEffect(() => {
                 </div>
                 <div className="mt-4 space-y-2">
                   <h4 className="font-semibold text-slate-100">Risk Sınıfları</h4>
-                  <div className="flex items-center justify-between rounded border border-red-600 bg-red-600/20 p-2"><span className="text-sm font-semibold text-red-300">Çok Yüksek (Esaslı)</span><Badge className="bg-red-600 text-white">R &gt; 400</Badge></div>
-                  <div className="flex items-center justify-between rounded border border-orange-600 bg-orange-600/20 p-2"><span className="text-sm font-semibold text-orange-300">Yüksek (Tolerans)</span><Badge className="bg-orange-600 text-white">200 ≤ R ≤ 400</Badge></div>
-                  <div className="flex items-center justify-between rounded border border-yellow-600 bg-yellow-600/20 p-2"><span className="text-sm font-semibold text-yellow-300">Önemli (Olası)</span><Badge className="bg-yellow-600 text-black">70 ≤ R &lt; 200</Badge></div>
-                  <div className="flex items-center justify-between rounded border border-blue-600 bg-blue-600/20 p-2"><span className="text-sm font-semibold text-blue-300">Olası</span><Badge className="bg-blue-600 text-white">20 ≤ R &lt; 70</Badge></div>
-                  <div className="flex items-center justify-between rounded border border-green-600 bg-green-600/20 p-2"><span className="text-sm font-semibold text-green-300">Kabul Edilebilir</span><Badge className="bg-green-600 text-white">R &lt; 20</Badge></div>
+                  <div className="flex items-center justify-between rounded border border-red-600 bg-red-600/20 p-2"><span className="text-sm font-semibold text-red-300">Çok Yüksek (Esaslı)</span><Badge className="bg-red-600 text-foreground">R &gt; 400</Badge></div>
+                  <div className="flex items-center justify-between rounded border border-orange-600 bg-orange-600/20 p-2"><span className="text-sm font-semibold text-orange-300">Yüksek (Tolerans)</span><Badge className="bg-orange-600 text-foreground">200 ≤ R ≤ 400</Badge></div>
+                  <div className="flex items-center justify-between rounded border border-yellow-600 bg-yellow-600/20 p-2"><span className="text-sm font-semibold text-yellow-300">Önemli (Olası)</span><Badge className="bg-yellow-600 text-foreground">70 ≤ R &lt; 200</Badge></div>
+                  <div className="flex items-center justify-between rounded border border-blue-600 bg-blue-600/20 p-2"><span className="text-sm font-semibold text-blue-300">Olası</span><Badge className="bg-blue-600 text-foreground">20 ≤ R &lt; 70</Badge></div>
+                  <div className="flex items-center justify-between rounded border border-green-600 bg-green-600/20 p-2"><span className="text-sm font-semibold text-green-300">Kabul Edilebilir</span><Badge className="bg-green-600 text-foreground">R &lt; 20</Badge></div>
                 </div>
               </CardContent></Card>
             </TabsContent>
@@ -1852,7 +1852,7 @@ useLayoutEffect(() => {
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between rounded-xl bg-slate-950/70 p-3">
                       <kbd className="rounded border border-slate-600 bg-slate-800 px-3 py-1 font-mono text-sm">{item.keys}</kbd>
-                      <span className="text-sm text-slate-300">{item.desc}</span>
+                      <span className="text-sm text-foreground">{item.desc}</span>
                     </div>
                   ))}
                 </div>
@@ -1860,7 +1860,7 @@ useLayoutEffect(() => {
 
               <Card className="border border-white/10 bg-white/[0.04]"><CardContent className="p-4">
                 <h3 className="mb-4 text-lg font-semibold text-slate-100">Fare İşlemleri</h3>
-                <div className="space-y-2 text-sm text-slate-300">
+                <div className="space-y-2 text-sm text-foreground">
                   <p>Hücreye tek tıklama → düzenleme modu</p>
                   <p>Risk paketine tıklama → detayları göster</p>
                   <p>+ butonu → paketi tabloya ekle</p>
@@ -1873,9 +1873,9 @@ useLayoutEffect(() => {
               <Card className="border border-white/10 bg-white/[0.04]"><CardContent className="p-4">
                 <div className="space-y-4">
                   <div className="mb-4 flex items-center gap-2"><Lightbulb className="h-5 w-5 text-yellow-400" /><h3 className="text-lg font-semibold text-slate-100">Profesyonel İpuçları</h3></div>
-                  <div className="rounded-lg border border-green-700 bg-green-900/30 p-3"><p className="mb-1 text-sm font-semibold text-green-300">Etkili Önlemler Yazın</p><p className="text-xs text-slate-400">Önlemler spesifik ve uygulanabilir olmalı. Örnek: “KKE kullanılmalı” yerine “Cut Level 5 eldiven ve koruyucu gözlük kullanılmalı”.</p></div>
-                  <div className="rounded-lg border border-blue-700 bg-blue-900/30 p-3"><p className="mb-1 text-sm font-semibold text-blue-300">Kalıntı Riski Düşürün</p><p className="text-xs text-slate-400">2. aşamada risk skorunu 20'nin altına indirmeyi hedefleyin. Bu kabul edilebilir seviyedir.</p></div>
-                  <div className="rounded-lg border border-red-700 bg-red-900/30 p-3"><p className="mb-1 text-sm font-semibold text-red-300">Kritik Riskler Öncelikli</p><p className="text-xs text-slate-400">Kırmızı ve turuncu riskler (R &gt; 200) acil eylem gerektirir. Bu kayıtları öncelikli olarak ele alın.</p></div>
+                  <div className="rounded-lg border border-green-700 bg-green-900/30 p-3"><p className="mb-1 text-sm font-semibold text-green-300">Etkili Önlemler Yazın</p><p className="text-xs text-muted-foreground">Önlemler spesifik ve uygulanabilir olmalı. Örnek: “KKE kullanılmalı” yerine “Cut Level 5 eldiven ve koruyucu gözlük kullanılmalı”.</p></div>
+                  <div className="rounded-lg border border-blue-700 bg-blue-900/30 p-3"><p className="mb-1 text-sm font-semibold text-blue-300">Kalıntı Riski Düşürün</p><p className="text-xs text-muted-foreground">2. aşamada risk skorunu 20'nin altına indirmeyi hedefleyin. Bu kabul edilebilir seviyedir.</p></div>
+                  <div className="rounded-lg border border-red-700 bg-red-900/30 p-3"><p className="mb-1 text-sm font-semibold text-red-300">Kritik Riskler Öncelikli</p><p className="text-xs text-muted-foreground">Kırmızı ve turuncu riskler (R &gt; 200) acil eylem gerektirir. Bu kayıtları öncelikli olarak ele alın.</p></div>
                 </div>
               </CardContent></Card>
             </TabsContent>
@@ -1910,11 +1910,11 @@ useLayoutEffect(() => {
           <DialogHeader className="shrink-0 border-b border-white/10 px-6 pb-4 pt-6">
             <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-100">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-violet-500 to-indigo-500 shadow-[0_18px_35px_rgba(168,85,247,0.28)]">
-                <Sparkles className="h-6 w-6 text-white" />
+                <Sparkles className="h-6 w-6 text-foreground" />
               </div>
               <div>
                 <span>AI Tarafından Üretilen Riskler · {aiSector}</span>
-                <p className="mt-1 text-sm font-normal text-slate-400">{aiRisks.length} risk maddesi • {selectedCount} seçili</p>
+                <p className="mt-1 text-sm font-normal text-muted-foreground">{aiRisks.length} risk maddesi • {selectedCount} seçili</p>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -1923,11 +1923,11 @@ useLayoutEffect(() => {
           <div className="shrink-0 flex flex-col gap-3">
           <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={selectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]">
+              <Button size="sm" variant="outline" onClick={selectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
                 <CheckCircle2 className="h-4 w-4 text-green-400" />
                 Tümünü Seç
               </Button>
-              <Button size="sm" variant="outline" onClick={deselectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]">
+              <Button size="sm" variant="outline" onClick={deselectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
                 <X className="h-4 w-4 text-red-400" />
                 Seçimi Temizle
               </Button>
@@ -1938,17 +1938,17 @@ useLayoutEffect(() => {
           <div className="grid shrink-0 gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/75">Kritik Risk</p>
-              <p className="mt-2 text-2xl font-black text-white">{aiRiskSummary.critical}</p>
+              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.critical}</p>
               <p className="mt-1 text-xs text-red-100/70">Acil değerlendirme gerektiren maddeler</p>
             </div>
             <div className="rounded-2xl border border-orange-400/20 bg-orange-500/10 p-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-orange-200/75">Yüksek Risk</p>
-              <p className="mt-2 text-2xl font-black text-white">{aiRiskSummary.high}</p>
+              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.high}</p>
               <p className="mt-1 text-xs text-orange-100/70">Önlem planı öncelikli maddeler</p>
             </div>
             <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
               <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/75">İzleme Havuzu</p>
-              <p className="mt-2 text-2xl font-black text-white">{aiRiskSummary.notable}</p>
+              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.notable}</p>
               <p className="mt-1 text-xs text-cyan-100/70">Kontrolle kabul edilebilir seviyeye indirilebilecek maddeler</p>
             </div>
           </div>
@@ -1956,10 +1956,10 @@ useLayoutEffect(() => {
           <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Kategori Filtreleri</p>
-                <p className="mt-1 text-xs text-slate-500">İlgili risk grubuna odaklanmak için filtreleyin.</p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Kategori Filtreleri</p>
+                <p className="mt-1 text-xs text-muted-foreground">İlgili risk grubuna odaklanmak için filtreleyin.</p>
               </div>
-              <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-slate-300">
+              <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
                 {filteredRisks.length} görünür kayıt
               </Badge>
             </div>
@@ -1968,7 +1968,7 @@ useLayoutEffect(() => {
                 size="sm"
                 variant={aiCategoryFilter === "all" ? "default" : "outline"}
                 onClick={() => setAiCategoryFilter("all")}
-                className={aiCategoryFilter === "all" ? "bg-fuchsia-500 text-white hover:bg-fuchsia-400" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"}
+                className={aiCategoryFilter === "all" ? "bg-fuchsia-500 text-foreground hover:bg-fuchsia-400" : "border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"}
               >
                 <Sparkles className="mr-1 h-3.5 w-3.5" />
                 Tümü
@@ -1982,7 +1982,7 @@ useLayoutEffect(() => {
                   size="sm"
                   variant={aiCategoryFilter === category ? "default" : "outline"}
                   onClick={() => setAiCategoryFilter(category)}
-                  className={aiCategoryFilter === category ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"}
+                  className={aiCategoryFilter === category ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400" : "border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"}
                 >
                   <Library className="mr-1 h-3.5 w-3.5" />
                   {category}
@@ -2007,7 +2007,7 @@ useLayoutEffect(() => {
                   <div className="flex items-start gap-3">
                     <div className="mt-1">
                       <div className={`flex h-5 w-5 items-center justify-center rounded border-2 ${risk.selected ? "border-fuchsia-500 bg-fuchsia-500" : "border-slate-600"}`}>
-                        {risk.selected && <Check className="h-3 w-3 text-white" />}
+                        {risk.selected && <Check className="h-3 w-3 text-foreground" />}
                       </div>
                     </div>
 
@@ -2016,22 +2016,22 @@ useLayoutEffect(() => {
                         <div>
                           <Badge variant="outline" className="mb-2 border-fuchsia-400/20 text-fuchsia-200 text-xs">{risk.category}</Badge>
                           <h4 className="text-sm font-semibold text-slate-100">{risk.hazard}</h4>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">{risk.risk}</p>
+                          <p className="mt-2 text-xs leading-5 text-muted-foreground">{risk.risk}</p>
                         </div>
                         <Badge className={`${getRiskClassColor(risk.riskClass)} shrink-0`}>{risk.score}</Badge>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-slate-300">O: {risk.probability}</Badge>
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-slate-300">F: {risk.frequency}</Badge>
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-slate-300">Ş: {risk.severity}</Badge>
+                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">O: {risk.probability}</Badge>
+                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">F: {risk.frequency}</Badge>
+                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">Ş: {risk.severity}</Badge>
                       </div>
 
                       <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-                        <p className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">Önerilen Önlemler</p>
+                        <p className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">Önerilen Önlemler</p>
                         <ul className="space-y-1.5">
                           {risk.controls.map((control, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-xs text-slate-300">
+                            <li key={idx} className="flex items-start gap-2 text-xs text-foreground">
                               <span className="text-fuchsia-300">→</span>
                               <span>{control}</span>
                             </li>
@@ -2046,7 +2046,7 @@ useLayoutEffect(() => {
           </ScrollArea>
 
           <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" onClick={() => setShowAiDialog(false)} className="border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]">
+            <Button variant="outline" onClick={() => setShowAiDialog(false)} className="border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
               İptal
             </Button>
 
@@ -2086,7 +2086,7 @@ useLayoutEffect(() => {
                 <Library className="h-5 w-5 text-cyan-300" />
                 <h2 className="text-sm font-black uppercase tracking-[0.18em] text-slate-100">Risk Kütüphanesi</h2>
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-400">
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">
                 Hazır sektör paketleri ve AI önerileriyle tabloyu hızlıca doldurun.
               </p>
             </div>
@@ -2094,12 +2094,12 @@ useLayoutEffect(() => {
           </div>
 
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Risk paketi ara..."
-              className="h-10 rounded-xl border-white/10 bg-slate-950/70 pl-9 text-slate-100 placeholder:text-slate-500"
+              className="h-10 rounded-xl border-white/10 bg-slate-950/70 pl-9 text-slate-100 placeholder:text-muted-foreground"
             />
           </div>
         </div>
@@ -2117,10 +2117,10 @@ useLayoutEffect(() => {
             {filteredPackages.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-5 py-10 text-center">
                 <Library className="mx-auto mb-3 h-12 w-12 text-slate-600" />
-                <p className="text-sm font-semibold text-slate-200">
+                <p className="text-sm font-semibold text-foreground">
                   {searchQuery ? "Sonuç bulunamadı" : "Henüz risk paketi görünmüyor"}
                 </p>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
                   {searchQuery ? "Arama terimini değiştirerek daha fazla paket görüntüleyebilirsiniz." : "Kütüphane yüklendiğinde sektör bazlı paketler burada listelenir."}
                 </p>
               </div>
@@ -2138,7 +2138,7 @@ useLayoutEffect(() => {
                         </div>
                         <div className="text-left">
                           <p className="text-sm font-semibold text-slate-100">{pkg.name}</p>
-                          <p className="text-xs text-slate-400">{pkg.item_count} risk maddesi</p>
+                          <p className="text-xs text-muted-foreground">{pkg.item_count} risk maddesi</p>
                         </div>
                       </div>
                       <Button
@@ -2160,11 +2160,11 @@ useLayoutEffect(() => {
                     <div className="space-y-2 pl-12 pr-1">
                       {pkg.items.slice(0, 3).map((item) => (
                         <div key={item.id} className="rounded-xl border border-white/10 bg-slate-950/60 p-3">
-                          <p className="line-clamp-2 text-xs text-slate-300">{item.hazard}</p>
+                          <p className="line-clamp-2 text-xs text-foreground">{item.hazard}</p>
                         </div>
                       ))}
                       {pkg.items.length > 3 && (
-                        <p className="py-1 text-center text-xs text-slate-500">+{pkg.items.length - 3} madde daha</p>
+                        <p className="py-1 text-center text-xs text-muted-foreground">+{pkg.items.length - 3} madde daha</p>
                       )}
                     </div>
                   </CollapsibleContent>
@@ -2175,7 +2175,7 @@ useLayoutEffect(() => {
         </ScrollArea>
 
         <div className="border-t border-white/10 bg-slate-950/85 p-4">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 text-xs text-foreground">
             <p>• Seçilen sektöre uygun riskler listelenir.</p>
             <p className="mt-1">• İSG mevzuatına uyumlu başlangıç kurgusu sunar.</p>
           </div>
@@ -2190,10 +2190,10 @@ useLayoutEffect(() => {
         <div className="flex h-96 items-center justify-center">
           <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-8 py-10 text-center shadow-[0_20px_45px_rgba(15,23,42,0.28)]">
             <FileText className="mx-auto mb-4 h-20 w-20 text-slate-600" />
-            <p className="mb-2 text-lg font-semibold text-slate-200">
+            <p className="mb-2 text-lg font-semibold text-foreground">
               Henüz risk eklenmedi
             </p>
-            <p className="mb-4 text-sm text-slate-400">
+            <p className="mb-4 text-sm text-muted-foreground">
               Sol panelden risk paketi seçin veya manuel risk ekleyin.
             </p>
             <Button
@@ -2216,22 +2216,22 @@ useLayoutEffect(() => {
             {/* Ana Başlık Satırı */}
             <tr className="bg-[linear-gradient(90deg,rgba(2,6,23,0.98),rgba(15,23,42,0.98),rgba(30,41,59,0.96))] shadow-[inset_0_-1px_0_rgba(255,255,255,0.07)]">
               <th rowSpan={2} className="sticky left-0 z-20 w-16 border border-slate-700/80 bg-slate-950 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-300">No</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">No</div>
               </th>
               <th rowSpan={2} className="min-w-[152px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Bölüm / Ortam</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Bölüm / Ortam</div>
               </th>
               <th rowSpan={2} className="min-w-[112px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Foto</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Foto</div>
               </th>
               <th rowSpan={2} className="min-w-[280px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Tehlike</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Tehlike</div>
               </th>
               <th rowSpan={2} className="min-w-[300px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Risk</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Risk</div>
               </th>
               <th rowSpan={2} className="min-w-[152px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Etkilenen</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Etkilenen</div>
               </th>
                 
               <th colSpan={5} className="border border-slate-700/80 bg-red-500/10 px-2 py-3">
@@ -2247,13 +2247,13 @@ useLayoutEffect(() => {
               </th>
 
               <th rowSpan={2} className="min-w-[160px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Sorumlu</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Sorumlu</div>
               </th>
               <th rowSpan={2} className="min-w-[132px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">Termin</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Termin</div>
               </th>
               <th rowSpan={2} className="w-20 border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-200">İşlem</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">İşlem</div>
               </th>
             </tr>
 
@@ -2301,7 +2301,7 @@ useLayoutEffect(() => {
               >
                 {/* NO */}
                 <td className="sticky left-0 z-10 border border-slate-800/80 bg-slate-950 px-2 py-3 text-center">
-                  <Badge variant="outline" className="border-slate-600 bg-slate-900/80 font-mono text-slate-200">
+                  <Badge variant="outline" className="border-slate-600 bg-slate-900/80 font-mono text-foreground">
                     {String(idx + 1).padStart(2, '0')}
                   </Badge>
                 </td>
@@ -2313,7 +2313,7 @@ useLayoutEffect(() => {
                       <Input
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="h-9 rounded-xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-9 rounded-xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') saveEdit();
@@ -2332,7 +2332,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'department', item.department)}
                       className="min-h-[40px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
                     >
-                      <p className="text-xs text-slate-300">
+                      <p className="text-xs text-foreground">
                         {item.department || "—"}
                       </p>
                     </div>
@@ -2381,7 +2381,7 @@ useLayoutEffect(() => {
                         {photoUploadingItemId === item.id ? (
                           <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />
                         ) : (
-                          <Camera className="h-5 w-5 text-slate-500" />
+                          <Camera className="h-5 w-5 text-muted-foreground" />
                         )}
                       </Button>
                     )}
@@ -2393,7 +2393,7 @@ useLayoutEffect(() => {
                         variant="ghost"
                         onClick={() => riskPhotoInputRefs.current[item.id]?.click()}
                         disabled={photoUploadingItemId === item.id}
-                        className="h-7 rounded-full px-2 text-[10px] text-slate-300 hover:bg-white/10"
+                        className="h-7 rounded-full px-2 text-[10px] text-foreground hover:bg-white/10"
                       >
                         {item.photo_url ? "Değiştir" : "Yükle"}
                       </Button>
@@ -2419,7 +2419,7 @@ useLayoutEffect(() => {
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-slate-500 resize-none"
+                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground resize-none"
                         autoFocus
                       />
                       <div className="flex flex-col gap-1">
@@ -2436,7 +2436,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'hazard', item.hazard)}
                       className="min-h-[72px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
                     >
-                      <p className="text-xs text-slate-300 whitespace-pre-wrap">
+                      <p className="text-xs text-foreground whitespace-pre-wrap">
                         {item.hazard}
                       </p>
                     </div>
@@ -2450,7 +2450,7 @@ useLayoutEffect(() => {
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-slate-500 resize-none"
+                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground resize-none"
                         autoFocus
                       />
                       <div className="flex flex-col gap-1">
@@ -2467,7 +2467,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'risk', item.risk)}
                       className="min-h-[72px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
                     >
-                      <p className="text-xs text-slate-300 whitespace-pre-wrap">
+                      <p className="text-xs text-foreground whitespace-pre-wrap">
                         {item.risk}
                       </p>
                     </div>
@@ -2481,7 +2481,7 @@ useLayoutEffect(() => {
                       <Input
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="h-9 rounded-xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-slate-500"
+                        className="h-9 rounded-xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground"
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') saveEdit();
@@ -2500,7 +2500,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'affected_people', item.affected_people)}
                       className="min-h-[40px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
                     >
-                      <p className="text-xs text-slate-300">
+                      <p className="text-xs text-foreground">
                         {item.affected_people || "—"}
                       </p>
                     </div>
@@ -2575,7 +2575,7 @@ useLayoutEffect(() => {
 
                 {/* 1. AŞAMA - Skor */}
                 <td className="border border-slate-800/80 bg-red-900/10 p-2 text-center">
-                  <Badge className="bg-red-600 text-white font-mono font-bold text-xs">
+                  <Badge className="bg-red-600 text-foreground font-mono font-bold text-xs">
                     {item.score_1}
                   </Badge>
                 </td>
@@ -2594,7 +2594,7 @@ useLayoutEffect(() => {
                       <Textarea
                         value={editValue}
                         onChange={(e) => setEditValue(e.target.value)}
-                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-slate-500 resize-none"
+                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground resize-none"
                         autoFocus
                       />
                       <div className="flex flex-col gap-1">
@@ -2611,7 +2611,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'proposed_controls', item.proposed_controls)}
                       className="min-h-[72px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
                     >
-                      <p className="text-xs text-slate-300 whitespace-pre-wrap">
+                      <p className="text-xs text-foreground whitespace-pre-wrap">
                         {item.proposed_controls || "—"}
                       </p>
                     </div>
@@ -2686,7 +2686,7 @@ useLayoutEffect(() => {
 
                 {/* 2. AŞAMA - Skor */}
                 <td className="border border-slate-700 p-1 bg-green-900/10 text-center">
-                  <Badge className="bg-green-600 text-white font-mono font-bold text-xs">
+                  <Badge className="bg-green-600 text-foreground font-mono font-bold text-xs">
                     {item.score_2 || 0}
                   </Badge>
                 </td>
@@ -2724,7 +2724,7 @@ useLayoutEffect(() => {
                       onClick={() => startEdit(item.id, 'responsible_person', item.responsible_person)}
                       className="cursor-pointer hover:bg-slate-800 p-2 rounded min-h-[32px]"
                     >
-                      <p className="text-xs text-slate-300">
+                      <p className="text-xs text-foreground">
                         {item.responsible_person || "—"}
                       </p>
                     </div>
@@ -3429,12 +3429,12 @@ const exportToPDFAndShare = async () => {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-indigo-400/20 bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-500 shadow-[0_18px_45px_rgba(99,102,241,0.35)]">
-              <FileText className="h-7 w-7 text-white" />
+              <FileText className="h-7 w-7 text-foreground" />
             </div>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="border border-cyan-400/30 bg-cyan-400/10 text-cyan-200">Risk Operasyon Merkezi</Badge>
-                <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-300">
+                <Badge variant="outline" className="border-white/10 bg-white/5 text-foreground">
                   2 Aşamalı Fine-Kinney
                 </Badge>
                 {saving && (
@@ -3445,10 +3445,10 @@ const exportToPDFAndShare = async () => {
                 )}
               </div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-white xl:text-3xl">
+                <h1 className="text-2xl font-black tracking-tight text-foreground xl:text-3xl">
                   Risk Analiz Editörü
                 </h1>
-                <p className="mt-1 max-w-3xl text-sm text-slate-300 xl:text-base">
+                <p className="mt-1 max-w-3xl text-sm text-foreground xl:text-base">
                   Risk maddelerini kurumsal bir editör deneyimiyle yönetin, AI desteğiyle yeni riskler üretin ve profesyonel PDF/Excel çıktıları alın.
                 </p>
               </div>
@@ -3457,8 +3457,8 @@ const exportToPDFAndShare = async () => {
 
           <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[520px] xl:grid-cols-4">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 shadow-[0_16px_40px_rgba(15,23,42,0.28)]">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Aktif Firma</p>
-              <p className="mt-2 line-clamp-1 text-sm font-semibold text-white">{activeCompanyName}</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Aktif Firma</p>
+              <p className="mt-2 line-clamp-1 text-sm font-semibold text-foreground">{activeCompanyName}</p>
             </div>
             <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-3 shadow-[0_16px_40px_rgba(248,113,113,0.12)]">
               <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/80">Kritik Risk</p>
@@ -3501,7 +3501,7 @@ const exportToPDFAndShare = async () => {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+              className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
               onClick={() => setShowHelp(true)}
             >
               <HelpCircle className="h-4 w-4" />
@@ -3511,7 +3511,7 @@ const exportToPDFAndShare = async () => {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+              className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
               onClick={toggleFullScreen}
             >
               {isFullScreen ? (
@@ -3529,11 +3529,11 @@ const exportToPDFAndShare = async () => {
 
             {assessment && (
               <>
-                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] text-slate-300">
+                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] text-foreground">
                   <Building2 className="h-3 w-3" />
                   {activeCompanyName}
                 </Badge>
-                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] font-mono text-slate-300">
+                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] font-mono text-foreground">
                   <FileText className="h-3 w-3" />
                   {assessment.id.substring(0, 8).toUpperCase()}
                 </Badge>
@@ -3545,7 +3545,7 @@ const exportToPDFAndShare = async () => {
             <Button
               variant="outline"
               size="sm"
-              className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+              className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
               onClick={exportToExcel}
               disabled={!assessment || riskItems.length === 0}
             >
@@ -3555,7 +3555,7 @@ const exportToPDFAndShare = async () => {
 
             <Button
               size="sm"
-              className="gap-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-[0_14px_30px_rgba(16,185,129,0.28)] hover:from-emerald-400 hover:to-cyan-400"
+              className="gap-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-foreground shadow-[0_14px_30px_rgba(16,185,129,0.28)] hover:from-emerald-400 hover:to-cyan-400"
               onClick={exportToPDFAndShare}
               disabled={!assessment || riskItems.length === 0}
             >
@@ -3574,32 +3574,32 @@ const exportToPDFAndShare = async () => {
                 <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-xl">
                     <Badge className="border border-indigo-400/30 bg-indigo-500/10 text-indigo-200">Adım 1 · Kurulum</Badge>
-                    <h2 className="mt-4 text-3xl font-black tracking-tight text-white">
+                    <h2 className="mt-4 text-3xl font-black tracking-tight text-foreground">
                       Firma ve değerlendirme oturumunu başlatın
                     </h2>
-                    <p className="mt-3 text-sm leading-6 text-slate-300">
+                    <p className="mt-3 text-sm leading-6 text-foreground">
                       Risk tablolarını, AI önerilerini ve profesyonel çıktı akışını tek bir değerlendirme oturumu içinde yönetin. İlk adımda şirketi seçin ve çalışma alanını açın.
                     </p>
                   </div>
                   <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-sm lg:grid-cols-1">
                     <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
                       <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/80">Firma</p>
-                      <p className="mt-2 text-sm font-semibold text-white">{companies.length} kayıtlı şirket</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">{companies.length} kayıtlı şirket</p>
                     </div>
                     <div className="rounded-2xl border border-violet-400/20 bg-violet-500/10 p-4">
                       <p className="text-[11px] uppercase tracking-[0.24em] text-violet-200/80">Hazırlık</p>
-                      <p className="mt-2 text-sm font-semibold text-white">AI destekli analiz akışı hazır</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">AI destekli analiz akışı hazır</p>
                     </div>
                     <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
                       <p className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/80">Çıktı</p>
-                      <p className="mt-2 text-sm font-semibold text-white">PDF ve Excel rapor merkezi</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">PDF ve Excel rapor merkezi</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-5">
                   <div>
-                    <Label className="mb-2 block text-slate-200">Firma Seçin</Label>
+                    <Label className="mb-2 block text-foreground">Firma Seçin</Label>
                     <Select value={selectedCompany} onValueChange={setSelectedCompany}>
                       <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-slate-950/60 text-slate-100">
                         <SelectValue placeholder="Firma seçiniz..." />
@@ -3623,7 +3623,7 @@ const exportToPDFAndShare = async () => {
                   <Button
                     onClick={createAssessment}
                     disabled={!selectedCompany || loading}
-                    className="h-12 w-full gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 text-white shadow-[0_18px_40px_rgba(99,102,241,0.35)] hover:from-indigo-400 hover:via-violet-400 hover:to-fuchsia-400"
+                    className="h-12 w-full gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 text-foreground shadow-[0_18px_40px_rgba(99,102,241,0.35)] hover:from-indigo-400 hover:via-violet-400 hover:to-fuchsia-400"
                     size="lg"
                   >
                     {loading ? (
@@ -3646,21 +3646,21 @@ const exportToPDFAndShare = async () => {
               <Card className="border border-white/10 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
                 <CardContent className="p-6">
                   <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-300/80">Operasyon Özeti</p>
-                  <h3 className="mt-3 text-xl font-bold text-white">Kullanıcıyı zorlamayan başlangıç akışı</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <h3 className="mt-3 text-xl font-bold text-foreground">Kullanıcıyı zorlamayan başlangıç akışı</h3>
+                  <p className="mt-2 text-sm leading-6 text-foreground">
                     Firma seçimi sonrası risk kütüphanesi, AI üretim paneli ve iki aşamalı skor tablosu tek bir merkezde aktif olur.
                   </p>
                   <div className="mt-5 space-y-3">
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-xs text-slate-400">Hazırlık durumu</p>
+                      <p className="text-xs text-muted-foreground">Hazırlık durumu</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-white">Analiz motoru hazır</span>
+                        <span className="text-sm font-semibold text-foreground">Analiz motoru hazır</span>
                         <Badge className="bg-emerald-500/15 text-emerald-200">Canlı</Badge>
                       </div>
                     </div>
                     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <p className="text-xs text-slate-400">Masaüstü deneyimi</p>
-                      <p className="mt-2 text-sm font-semibold text-white">Geniş tablo, sol kütüphane ve yardım akışı optimize</p>
+                      <p className="text-xs text-muted-foreground">Masaüstü deneyimi</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">Geniş tablo, sol kütüphane ve yardım akışı optimize</p>
                     </div>
                     <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
                       <p className="text-xs text-cyan-100/80">Bu modül neden güçlü?</p>
@@ -3688,17 +3688,17 @@ const exportToPDFAndShare = async () => {
                 <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_50px_rgba(15,23,42,0.35)]">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge className="border border-indigo-400/30 bg-indigo-500/10 text-indigo-200">Aktif Değerlendirme</Badge>
-                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-slate-300">{activeCompanyName}</Badge>
+                    <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">{activeCompanyName}</Badge>
                   </div>
-                  <h2 className="mt-3 text-2xl font-black tracking-tight text-white">Risk tablosunu kurum standardında yönetin</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <h2 className="mt-3 text-2xl font-black tracking-tight text-foreground">Risk tablosunu kurum standardında yönetin</h2>
+                  <p className="mt-2 text-sm leading-6 text-foreground">
                     Sol panelden paket ekleyin, AI ile yeni risk maddeleri oluşturun ve iki aşamalı Fine-Kinney skoru ile kalıntı riski hedef seviyeye indirin.
                   </p>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Toplam Madde</p>
-                    <p className="mt-3 text-3xl font-black text-white">{riskMetrics.total}</p>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Toplam Madde</p>
+                    <p className="mt-3 text-3xl font-black text-foreground">{riskMetrics.total}</p>
                   </div>
                   <div className="rounded-3xl border border-red-400/20 bg-red-500/10 p-4">
                     <p className="text-[11px] uppercase tracking-[0.24em] text-red-200/80">Kritik Baskı</p>
@@ -3713,7 +3713,7 @@ const exportToPDFAndShare = async () => {
             </div>
             <div className="border-b border-white/10 bg-slate-950/60 px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] text-slate-200">
+                <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] text-foreground">
                   <FileText className="h-3 w-3" />
                   {riskItems.length} Risk Maddesi
                 </Badge>
@@ -3738,7 +3738,7 @@ const exportToPDFAndShare = async () => {
                 onClick={addEmptyRisk}
                 size="sm"
                 variant="outline"
-                className="gap-2 border-white/10 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]"
+                className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
                 disabled={!assessment}
               >
                 <Plus className="h-4 w-4" />
@@ -3761,11 +3761,11 @@ const exportToPDFAndShare = async () => {
           <DialogContent className="max-w-4xl border border-cyan-400/20 bg-slate-950/95 p-0 shadow-[0_30px_80px_rgba(15,23,42,0.55)] backdrop-blur-xl">
             <div className="border-b border-white/10 bg-[linear-gradient(90deg,rgba(8,47,73,0.95),rgba(15,23,42,0.98),rgba(17,24,39,0.95))] px-6 py-4">
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-white">
+                <DialogTitle className="flex items-center gap-2 text-foreground">
                   <Camera className="h-4 w-4 text-cyan-300" />
                   Risk Maddesi Fotoğraf Önizlemesi
                 </DialogTitle>
-                <DialogDescription className="text-slate-300">
+                <DialogDescription className="text-foreground">
                   Yüklenen görselin büyük görünümünü buradan kontrol edebilirsiniz.
                 </DialogDescription>
               </DialogHeader>

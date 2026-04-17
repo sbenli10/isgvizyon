@@ -5,6 +5,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  listIsgkatipCompanies,
+  listIsgkatipComplianceFlags,
+} from "@/domain/isgkatip/isgkatipQueries";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -150,28 +154,23 @@ export default function ComplianceReport() {
         // --------------------------------------------------
         // 1️⃣ Companies
         // --------------------------------------------------
-        const { data: companiesData, error: companiesError } = await supabase
-        .from("isgkatip_companies")
-        .select(
-            "id, company_name, sgk_no, employee_count, hazard_class, compliance_status, risk_score"
-        )
-        .eq("org_id", user.id);
-
-        if (companiesError) throw companiesError;
-
-        const companies = companiesData ?? [];
+        const companies = await listIsgkatipCompanies({
+          userId: user.id,
+          select:
+            "id, company_name, sgk_no, employee_count, hazard_class, compliance_status, risk_score",
+          includeDeleted: true,
+          orderBy: "company_name",
+          ascending: true,
+        });
         setCompanies(companies);
 
         // --------------------------------------------------
         // 2️⃣ Compliance Flags
         // --------------------------------------------------
-        const { data: flagsData, error: flagsError } = await supabase
-        .from("isgkatip_compliance_flags")
-        .select("*")
-        .eq("org_id", user.id)
-        .order("created_at", { ascending: false });
-
-        if (flagsError) throw flagsError;
+        const flagsData = await listIsgkatipComplianceFlags({
+          userId: user.id,
+          select: "*",
+        });
 
         // --------------------------------------------------
         // 3️⃣ Normalize + Enrich

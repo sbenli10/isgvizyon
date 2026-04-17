@@ -26,6 +26,11 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  listIsgkatipCompanies,
+  listIsgkatipComplianceFlags,
+  listIsgkatipPredictiveAlerts,
+} from "@/domain/isgkatip/isgkatipQueries";
 import { createOsgbTask } from "@/lib/osgbOperations";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { Badge } from "@/components/ui/badge";
@@ -327,26 +332,24 @@ export default function ISGBotCommandCenter() {
     if (!user) return;
     setLoading(true);
     try {
-      const orgId = user.id;
       const [companiesResponse, flagsResponse, alertsResponse, meetingsResponse, tasksResponse] =
         await Promise.all([
-          supabase
-            .from("isgkatip_companies")
-            .select(
-              "id, company_name, sgk_no, employee_count, hazard_class, assigned_minutes, required_minutes, compliance_status, risk_score, contract_end, contract_start, assigned_person_name, service_provider_name"
-            )
-            .eq("org_id", orgId)
-            .eq("is_deleted", false),
-          supabase
-            .from("isgkatip_compliance_flags")
-            .select("id, company_id, rule_name, severity, message, status, created_at")
-            .eq("org_id", orgId)
-            .eq("status", "OPEN"),
-          supabase
-            .from("isgkatip_predictive_alerts")
-            .select("id, company_id, alert_type, severity, message, predicted_date, status")
-            .eq("org_id", orgId)
-            .eq("status", "ACTIVE"),
+          listIsgkatipCompanies({
+            userId: user.id,
+            select:
+              "id, company_name, sgk_no, employee_count, hazard_class, assigned_minutes, required_minutes, compliance_status, risk_score, contract_end, contract_start, assigned_person_name, service_provider_name",
+          }),
+          listIsgkatipComplianceFlags({
+            userId: user.id,
+            select: "id, company_id, rule_name, severity, message, status, created_at",
+            status: "OPEN",
+            orderByCreatedAtDesc: false,
+          }),
+          listIsgkatipPredictiveAlerts({
+            userId: user.id,
+            select: "id, company_id, alert_type, severity, message, predicted_date, status",
+            status: "ACTIVE",
+          }),
           supabase
             .from("board_meetings")
             .select("id, company_id, meeting_date, status")
@@ -357,16 +360,13 @@ export default function ISGBotCommandCenter() {
             .eq("user_id", user.id),
         ]);
 
-      if (companiesResponse.error) throw companiesResponse.error;
-      if (flagsResponse.error) throw flagsResponse.error;
-      if (alertsResponse.error) throw alertsResponse.error;
       if (meetingsResponse.error) throw meetingsResponse.error;
       if (tasksResponse.error) throw tasksResponse.error;
 
-      const companyRows = (companiesResponse.data ?? []) as CompanyRecord[];
+      const companyRows = (companiesResponse ?? []) as CompanyRecord[];
       setCompanies(companyRows);
-      setFlags((flagsResponse.data ?? []) as ComplianceFlagRecord[]);
-      setAlerts((alertsResponse.data ?? []) as PredictiveAlertRecord[]);
+      setFlags((flagsResponse ?? []) as ComplianceFlagRecord[]);
+      setAlerts((alertsResponse ?? []) as PredictiveAlertRecord[]);
       setMeetings((meetingsResponse.data ?? []) as BoardMeetingRecord[]);
       setTasks(
         ((tasksResponse.data ?? []) as any[]).map((task) => ({
