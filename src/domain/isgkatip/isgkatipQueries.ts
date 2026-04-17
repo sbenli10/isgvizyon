@@ -1,14 +1,38 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { getIsgkatipOrgScope } from "./isgkatipOrgScope";
 
-interface ScopeParams {
+type Tables = Database["public"]["Tables"];
+type Views = Database["public"]["Views"];
+
+export type IsgkatipCompanyRow = Tables["isgkatip_companies"]["Row"];
+export type IsgkatipFlagRow = Tables["isgkatip_compliance_flags"]["Row"];
+export type IsgkatipAlertRow = Tables["isgkatip_predictive_alerts"]["Row"];
+export type IsgkatipSyncLogRow = Tables["isgkatip_sync_logs"]["Row"];
+export type IsgkatipDeletedCompanyViewRow = Record<string, any>;
+export interface ScopeParams {
   userId?: string;
   organizationId?: string;
 }
 
-const resolveOrganizationId = async (params?: ScopeParams) => {
+const resolveOrganizationId = async (params?: ScopeParams): Promise<string> => {
   const scope = await getIsgkatipOrgScope(params);
+
+  if (!scope?.organizationId) {
+    throw new Error(
+      "Organization scope bulunamadı. profiles.organization_id boş olabilir veya kullanıcı organization'a bağlı değildir.",
+    );
+  }
+
   return scope.organizationId;
+};
+
+// Dinamik select kullandığımız için Supabase'in otomatik tip inference'ı bazen bozuluyor.
+// Bu helper ile tüm query fonksiyonları “data ?? []” döndürür ve TS2352'yi engelleriz.
+const castRows = <TRow>(data: unknown): TRow[] => {
+  if (!data) return [];
+  if (Array.isArray(data)) return data as TRow[];
+  return [];
 };
 
 export const listIsgkatipCompanies = async (
@@ -19,7 +43,7 @@ export const listIsgkatipCompanies = async (
     ascending?: boolean;
     limit?: number;
   },
-) => {
+): Promise<IsgkatipCompanyRow[]> => {
   const organizationId = await resolveOrganizationId(params);
   const {
     select = "*",
@@ -29,7 +53,10 @@ export const listIsgkatipCompanies = async (
     limit,
   } = params || {};
 
-  let query = supabase.from("isgkatip_companies").select(select).eq("org_id", organizationId);
+  let query = supabase
+    .from("isgkatip_companies")
+    .select(select)
+    .eq("org_id", organizationId);
 
   if (!includeDeleted) {
     query = query.eq("is_deleted", false);
@@ -43,7 +70,8 @@ export const listIsgkatipCompanies = async (
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  return castRows<IsgkatipCompanyRow>(data as unknown);
 };
 
 export const listIsgkatipComplianceFlags = async (
@@ -54,19 +82,23 @@ export const listIsgkatipComplianceFlags = async (
     orderByCreatedAtDesc?: boolean;
     limit?: number;
   },
-) => {
+): Promise<IsgkatipFlagRow[]> => {
   const organizationId = await resolveOrganizationId(params);
-  const { select = "*", status, severity, orderByCreatedAtDesc = true, limit } = params || {};
+  const {
+    select = "*",
+    status,
+    severity,
+    orderByCreatedAtDesc = true,
+    limit,
+  } = params || {};
 
-  let query = supabase.from("isgkatip_compliance_flags").select(select).eq("org_id", organizationId);
+  let query = supabase
+    .from("isgkatip_compliance_flags")
+    .select(select)
+    .eq("org_id", organizationId);
 
-  if (status) {
-    query = query.eq("status", status);
-  }
-
-  if (severity) {
-    query = query.eq("severity", severity);
-  }
+  if (status) query = query.eq("status", status);
+  if (severity) query = query.eq("severity", severity);
 
   if (orderByCreatedAtDesc) {
     query = query.order("created_at", { ascending: false });
@@ -78,7 +110,8 @@ export const listIsgkatipComplianceFlags = async (
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  return castRows<IsgkatipFlagRow>(data as unknown);
 };
 
 export const listIsgkatipPredictiveAlerts = async (
@@ -89,7 +122,7 @@ export const listIsgkatipPredictiveAlerts = async (
     ascending?: boolean;
     limit?: number;
   },
-) => {
+): Promise<IsgkatipAlertRow[]> => {
   const organizationId = await resolveOrganizationId(params);
   const {
     select = "*",
@@ -99,11 +132,12 @@ export const listIsgkatipPredictiveAlerts = async (
     limit,
   } = params || {};
 
-  let query = supabase.from("isgkatip_predictive_alerts").select(select).eq("org_id", organizationId);
+  let query = supabase
+    .from("isgkatip_predictive_alerts")
+    .select(select)
+    .eq("org_id", organizationId);
 
-  if (status) {
-    query = query.eq("status", status);
-  }
+  if (status) query = query.eq("status", status);
 
   query = query.order(orderBy, { ascending });
 
@@ -113,7 +147,8 @@ export const listIsgkatipPredictiveAlerts = async (
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  return castRows<IsgkatipAlertRow>(data as unknown);
 };
 
 export const listIsgkatipSyncLogs = async (
@@ -121,7 +156,7 @@ export const listIsgkatipSyncLogs = async (
     select?: string;
     limit?: number;
   },
-) => {
+): Promise<IsgkatipSyncLogRow[]> => {
   const organizationId = await resolveOrganizationId(params);
   const { select = "*", limit = 12 } = params || {};
 
@@ -133,7 +168,8 @@ export const listIsgkatipSyncLogs = async (
     .limit(limit);
 
   if (error) throw error;
-  return data ?? [];
+
+  return castRows<IsgkatipSyncLogRow>(data as unknown);
 };
 
 export const listIsgkatipDeletedCompaniesView = async (
@@ -141,7 +177,7 @@ export const listIsgkatipDeletedCompaniesView = async (
     select?: string;
     restoredOnly?: boolean;
   },
-) => {
+): Promise<IsgkatipDeletedCompanyViewRow[]> => {
   const organizationId = await resolveOrganizationId(params);
   const { select = "*", restoredOnly = false } = params || {};
 
@@ -150,10 +186,15 @@ export const listIsgkatipDeletedCompaniesView = async (
     .select(select)
     .eq("org_id", organizationId);
 
-  query = restoredOnly ? query.not("restored_at", "is", null) : query.is("restored_at", null);
+  query = restoredOnly
+    ? query.not("restored_at", "is", null)
+    : query.is("restored_at", null);
 
-  const { data, error } = await query.order("deleted_at", { ascending: false });
+  const { data, error } = await query.order("deleted_at", {
+    ascending: false,
+  });
+
   if (error) throw error;
-  return data ?? [];
-};
 
+  return castRows<IsgkatipDeletedCompanyViewRow>(data as unknown);
+};

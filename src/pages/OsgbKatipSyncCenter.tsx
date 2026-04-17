@@ -217,7 +217,7 @@ export default function OsgbKatipSyncCenter() {
               {workspace?.logs.length ? workspace.logs.map((log) => (
                 <div key={log.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-white">{log.action}</div>
+                    <div className="text-sm font-medium text-white">{log.metadata.action}</div>
                     <Badge variant="outline">{log.status}</Badge>
                   </div>
                   <div className="mt-2 text-xs text-slate-400">{formatDateTime(log.createdAt)} • {log.source || "manuel"}</div>

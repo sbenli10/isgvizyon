@@ -831,29 +831,44 @@ export const listCompanyOsgbFinance = async (
 export const getOsgbFinanceOverview = async (userId: string): Promise<OsgbFinanceOverview> => {
   const { data, error } = await supabase
     .from("osgb_finance")
-    .select("id, due_date, invoice_date, amount, status, currency, invoice_no, service_period, company:isgkatip_companies(company_name)")
+    .select(
+      "id, due_date, invoice_date, amount, status, currency, invoice_no, service_period, company:isgkatip_companies(company_name)",
+    )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
 
-  const financeRows = (data ?? []) as Array<{
-    id: string;
-    due_date: string | null;
-    invoice_date: string | null;
-    amount: number;
-    currency: string;
-    status: OsgbFinanceRecord["status"];
-    invoice_no: string | null;
-    service_period: string | null;
-    company?: { company_name: string | null } | null;
-  }>;
+  // PostgREST ilişkiler bazen object bazen array döndürebiliyor, normalize edelim.
+  const rows = ((data ?? []) as unknown[]).map((row: any) => {
+    const companyValue = row.company;
+
+    // company alanını {company_name} | null olacak şekilde normalize et
+    const company =
+      Array.isArray(companyValue)
+        ? (companyValue[0] ?? null)
+        : companyValue ?? null;
+
+    return {
+      id: String(row.id),
+      due_date: row.due_date ?? null,
+      invoice_date: row.invoice_date ?? null,
+      amount: Number(row.amount ?? 0),
+      currency: String(row.currency ?? "TRY"),
+      status: row.status as OsgbFinanceRecord["status"],
+      invoice_no: row.invoice_no ?? null,
+      service_period: row.service_period ?? null,
+      company: company
+        ? { company_name: company.company_name ?? null }
+        : null,
+    };
+  });
 
   const now = new Date();
   const nextWindow = new Date();
   nextWindow.setDate(nextWindow.getDate() + 60);
 
-  const calendarItems = financeRows
+  const calendarItems = rows
     .filter((record) => {
       if (!record.due_date) return false;
       const dueDate = new Date(record.due_date);
@@ -884,9 +899,9 @@ export const getOsgbFinanceOverview = async (userId: string): Promise<OsgbFinanc
     });
 
   return {
-    pendingAmount: financeRows.filter((item) => item.status === "pending").reduce((sum, item) => sum + item.amount, 0),
-    paidAmount: financeRows.filter((item) => item.status === "paid").reduce((sum, item) => sum + item.amount, 0),
-    overdueAmount: financeRows.filter((item) => item.status === "overdue").reduce((sum, item) => sum + item.amount, 0),
+    pendingAmount: rows.filter((item) => item.status === "pending").reduce((sum, item) => sum + item.amount, 0),
+    paidAmount: rows.filter((item) => item.status === "paid").reduce((sum, item) => sum + item.amount, 0),
+    overdueAmount: rows.filter((item) => item.status === "overdue").reduce((sum, item) => sum + item.amount, 0),
     calendarItems,
   };
 };

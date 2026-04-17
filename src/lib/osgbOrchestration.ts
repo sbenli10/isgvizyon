@@ -29,13 +29,15 @@ export interface OsgbIsgKatipCompanyHealth {
   needsAttention: boolean;
 }
 
+// 1) Tipi düzelt
 export interface OsgbIsgKatipSyncLog {
   id: string;
-  action: string;
-  status: string;
   source: string | null;
   createdAt: string;
-  details: Record<string, any>;
+  totalCompanies: number;
+  successCount: number;
+  errorCount: number;
+  metadata: Record<string, any> | null;
 }
 
 export interface OsgbIsgKatipWorkspace {
@@ -243,7 +245,7 @@ export const listOsgbIsgKatipWorkspace = async (
     }),
     listIsgkatipSyncLogs({
       organizationId,
-      select: "id, action, status, source, created_at, details",
+      select: "id, source, created_at, total_companies, success_count, error_count, metadata",
       limit: 12,
     }),
   ]);
@@ -299,11 +301,12 @@ export const listOsgbIsgKatipWorkspace = async (
 
   const logs: OsgbIsgKatipSyncLog[] = (logsResponse ?? []).map((row: any) => ({
     id: row.id,
-    action: row.action,
-    status: row.status,
     source: row.source || null,
     createdAt: row.created_at,
-    details: row.details || {},
+    totalCompanies: Number(row.total_companies || 0),
+    successCount: Number(row.success_count || 0),
+    errorCount: Number(row.error_count || 0),
+    metadata: row.metadata ?? null,
   }));
 
   const lastSyncAt = logs[0]?.createdAt || companies.map((company) => company.lastSyncedAt).filter(Boolean).sort().at(-1) || null;
