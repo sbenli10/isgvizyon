@@ -55,7 +55,10 @@ export default function OsgbKatipSyncCenter() {
     try {
       const summary = await runOsgbIsgKatipSyncRefresh(organizationId, user.id);
       await loadData();
-      toast.success(`${summary.success || 0} firma kaydi organizasyon havuzuna alindi.`);
+      const total = Number(summary?.total || 0);
+      const success = Number(summary?.success || 0);
+      const errors = Number(summary?.errors || 0);
+      toast.success(`Senkron tamamlandı: ${success} başarılı, ${errors} hatalı, ${total} toplam firma işlendi.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "ISG-KATIP senkronizasyonu basarisiz oldu.");
     } finally {
@@ -76,6 +79,7 @@ export default function OsgbKatipSyncCenter() {
   }
 
   const extension = workspace?.extension;
+  const hasCompanies = (workspace?.summary.companyCount || 0) > 0;
 
   return (
     <div className="container mx-auto space-y-6 py-6">
@@ -138,6 +142,31 @@ export default function OsgbKatipSyncCenter() {
           bu merkez veriyi organizasyon scope'una tasir ve OSGB operasyon ekranlarinda kullanir.
         </AlertDescription>
       </Alert>
+
+      {hasCompanies ? (
+        <Card className="border-emerald-500/20 bg-emerald-500/5">
+          <CardHeader>
+            <CardTitle className="text-white">Sonraki Adım: Operasyon Ekranlarına Geçin</CardTitle>
+            <CardDescription>ISG-KATIP firmaları hazır. Operasyonu aşağıdaki modüllerden başlatın.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            <Button variant="outline" onClick={() => navigate("/osgb/company-tracking")}>OSGB Firma Takibi</Button>
+            <Button variant="outline" onClick={() => navigate("/osgb/assignments")}>Görevlendirme</Button>
+            <Button variant="outline" onClick={() => navigate("/osgb/field-visits")}>Saha Ziyaretleri</Button>
+            <Button variant="outline" onClick={() => navigate("/osgb/finance")}>Cari / Karlılık</Button>
+            <Button variant="outline" onClick={() => navigate("/osgb/documents")}>Yasal Evraklar</Button>
+            <Button variant="outline" onClick={() => navigate("/osgb/tasks")}>Görev Motoru</Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Alert className="border-amber-500/20 bg-amber-500/10 text-amber-100">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Önce kurulum ve ilk senkronu tamamlayın</AlertTitle>
+          <AlertDescription>
+            Henüz firma bulunmuyor. ISGBot kurulumunu tamamlayıp ilk veriyi alın, ardından "Veriyi organizasyona al" ile operasyon ekranlarını aktifleştirin.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-slate-800 bg-slate-900/70">
@@ -217,10 +246,18 @@ export default function OsgbKatipSyncCenter() {
               {workspace?.logs.length ? workspace.logs.map((log) => (
                 <div key={log.id} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-medium text-white">{log.metadata.action}</div>
-                    <Badge variant="outline">{log.status}</Badge>
+                    <div className="text-sm font-medium text-white">
+                      {typeof log.metadata?.action === "string" && log.metadata.action.trim().length > 0
+                        ? log.metadata.action
+                        : (log.source || "ISG-KATIP Sync")}
+                    </div>
+                    <Badge className={log.errorCount > 0 ? "bg-rose-500/15 text-rose-200" : "bg-emerald-500/15 text-emerald-200"}>
+                      {log.errorCount > 0 ? "Hata" : "Başarılı"}
+                    </Badge>
                   </div>
-                  <div className="mt-2 text-xs text-slate-400">{formatDateTime(log.createdAt)} • {log.source || "manuel"}</div>
+                  <div className="mt-2 text-xs text-slate-400">
+                    {log.successCount}/{log.totalCompanies} başarılı • {formatDateTime(log.createdAt)}
+                  </div>
                 </div>
               )) : (
                 <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-4 text-sm text-slate-400">

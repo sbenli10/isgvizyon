@@ -1051,6 +1051,99 @@ export const listCompanyOsgbDocuments = async (
   return (data ?? []) as OsgbDocumentRecord[];
 };
 
+export const seedOsgbCompanyDocuments = async (
+  userId: string,
+  companyId: string,
+  companyName?: string,
+  hazardClass?: string | null,
+  employeeCount?: number | null,
+): Promise<{ seeded: boolean; seededCount: number; records: OsgbDocumentRecord[] }> => {
+  const { data: existing, error: existingError } = await supabase
+    .from("osgb_document_tracking")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("company_id", companyId)
+    .limit(1);
+
+  if (existingError) throw existingError;
+  if ((existing ?? []).length > 0) {
+    return { seeded: false, seededCount: 0, records: [] };
+  }
+
+  const now = new Date();
+  const isoToday = now.toISOString().slice(0, 10);
+  const withMonths = (monthOffset: number) => {
+    const date = new Date(now);
+    date.setMonth(date.getMonth() + monthOffset);
+    return date.toISOString().slice(0, 10);
+  };
+
+  const normalizedCompanyName = companyName || "Firma";
+  const normalizedHazardClass = hazardClass || "Bilinmiyor";
+  const normalizedEmployeeCount = Number.isFinite(employeeCount) ? Number(employeeCount) : null;
+  const complianceNote = [
+    "ISG-KATIP sync sonrası otomatik seed.",
+    `Tehlike sınıfı: ${normalizedHazardClass}.`,
+    normalizedEmployeeCount !== null ? `Çalışan sayısı: ${normalizedEmployeeCount}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const seedPayload = [
+    {
+      document_type: "risk_assessment",
+      document_name: `${normalizedCompanyName} Risk Değerlendirmesi`,
+      issue_date: isoToday,
+      expiry_date: withMonths(12),
+    },
+    {
+      document_type: "emergency_plan",
+      document_name: `${normalizedCompanyName} Acil Durum Planı`,
+      issue_date: isoToday,
+      expiry_date: withMonths(12),
+    },
+    {
+      document_type: "training_records",
+      document_name: `${normalizedCompanyName} Eğitim Kayıtları`,
+      issue_date: isoToday,
+      expiry_date: withMonths(6),
+    },
+    {
+      document_type: "periodic_controls",
+      document_name: `${normalizedCompanyName} Periyodik Kontrol Kayıtları`,
+      issue_date: isoToday,
+      expiry_date: withMonths(12),
+    },
+    {
+      document_type: "health_surveillance",
+      document_name: `${normalizedCompanyName} Sağlık Gözetimi Evrakları`,
+      issue_date: isoToday,
+      expiry_date: withMonths(12),
+    },
+  ].map((item) => ({
+    user_id: userId,
+    company_id: companyId,
+    document_type: item.document_type,
+    document_name: item.document_name,
+    issue_date: item.issue_date,
+    expiry_date: item.expiry_date,
+    status: "active" as const,
+    file_url: null,
+    notes: complianceNote,
+    updated_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await supabase
+    .from("osgb_document_tracking")
+    .insert(seedPayload)
+    .select("*, company:isgkatip_companies(company_name)");
+
+  if (error) throw error;
+
+  const records = (data ?? []) as OsgbDocumentRecord[];
+  return { seeded: true, seededCount: records.length, records };
+};
+
 export const upsertOsgbDocument = async (userId: string, input: OsgbDocumentInput, id?: string) => {
   const payload = {
     user_id: userId,
