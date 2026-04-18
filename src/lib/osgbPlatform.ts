@@ -433,6 +433,18 @@ const legalReferences: Record<OsgbRole, string> = {
   dsp: "6331 sayılı Kanun ve diğer sağlık personeli görevlendirme süreleri",
 };
 
+const listManagedOsgbCompanyIds = async (organizationId: string): Promise<string[]> => {
+  const { data, error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .select("id")
+    .eq("org_id", organizationId)
+    .eq("is_deleted", false)
+    .eq("is_osgb_managed", true);
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.id).filter(Boolean);
+};
+
 export const refreshOsgbMonthlyCompliance = async (organizationId: string, serviceMonth = getServiceMonth()) => {
   const { error } = await (supabase as any).rpc("refresh_osgb_monthly_compliance", {
     p_organization_id: organizationId,
@@ -446,6 +458,11 @@ export const listOsgbWorkspaceCompanies = async (
   organizationId: string,
   serviceMonth = getServiceMonth(),
 ): Promise<OsgbWorkspaceCompanyOption[]> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return [];
+  }
+
   const [complianceResponse, contractsResponse] = await Promise.all([
     (supabase as any)
       .from("osgb_monthly_company_compliance")
@@ -465,12 +482,14 @@ export const listOsgbWorkspaceCompanies = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .eq("service_month", serviceMonth)
       .order("deficit_minutes", { ascending: false }),
     (supabase as any)
       .from("osgb_service_contracts")
       .select("company_id, ends_on, contract_status")
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .in("contract_status", ["active", "paused"])
       .order("updated_at", { ascending: false }),
   ]);
@@ -711,15 +730,30 @@ export const getOsgbPersonnelCapacityPanel = async (
   organizationId: string,
   serviceMonth = getServiceMonth(),
 ): Promise<OsgbPersonnelCapacityRecord[]> => {
-  const [personnelResponse, assignmentsResponse] = await Promise.all([
-    listOsgbWorkspacePersonnel(organizationId, true),
-    (supabase as any)
-      .from("osgb_assignments")
-      .select("personnel_id, assigned_minutes, company_id")
-      .eq("organization_id", organizationId)
-      .eq("status", "active")
-      .eq("service_month", serviceMonth),
-  ]);
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  const personnelResponse = await listOsgbWorkspacePersonnel(organizationId, true);
+
+  if (managedCompanyIds.length === 0) {
+    return personnelResponse.map((person) => ({
+      personnelId: person.id,
+      fullName: person.full_name,
+      role: person.role,
+      monthlyCapacityMinutes: person.monthly_capacity_minutes,
+      assignedMinutes: 0,
+      remainingMinutes: person.monthly_capacity_minutes,
+      utilizationRatio: 0,
+      activeCompanyCount: 0,
+      overloaded: false,
+    }));
+  }
+
+  const assignmentsResponse = await (supabase as any)
+    .from("osgb_assignments")
+    .select("personnel_id, assigned_minutes, company_id")
+    .eq("organization_id", organizationId)
+    .eq("status", "active")
+    .eq("service_month", serviceMonth)
+    .in("company_id", managedCompanyIds);
 
   if (assignmentsResponse.error) throw assignmentsResponse.error;
 
@@ -785,9 +819,34 @@ export const getOsgbPlatformDashboard = async (
   options?: { refreshCompliance?: boolean; serviceMonth?: string },
 ): Promise<OsgbPlatformDashboardData> => {
   const serviceMonth = options?.serviceMonth || getServiceMonth();
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
 
   if (options?.refreshCompliance !== false) {
     await refreshOsgbMonthlyCompliance(organizationId, serviceMonth);
+  }
+
+  if (managedCompanyIds.length === 0) {
+    const personnelLoads = await getOsgbPersonnelCapacityPanel(organizationId, serviceMonth);
+    return {
+      serviceMonth,
+      summary: {
+        totalCompanies: 0,
+        compliantCompanies: 0,
+        companiesWithGap: 0,
+        totalDeficitMinutes: 0,
+        totalOvertimeMinutes: 0,
+        activeContracts: 0,
+        expiringContracts: 0,
+        overdueObligations: 0,
+        warningObligations: 0,
+        overdueBalance: 0,
+        averageMargin: 0,
+      },
+      complianceRows: [],
+      obligationRows: [],
+      contractRows: [],
+      personnelLoads,
+    };
   }
 
   const [complianceResponse, obligationsResponse, contractsResponse, profitabilityResponse, personnelLoads] = await Promise.all([
@@ -809,6 +868,7 @@ export const getOsgbPlatformDashboard = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .eq("service_month", serviceMonth)
       .order("deficit_minutes", { ascending: false }),
     (supabase as any)
@@ -825,6 +885,7 @@ export const getOsgbPlatformDashboard = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .in("obligation_status", ["warning", "overdue", "missing"])
       .order("due_date", { ascending: true }),
     (supabase as any)
@@ -840,12 +901,14 @@ export const getOsgbPlatformDashboard = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .in("contract_status", ["active", "paused", "expired"])
       .order("ends_on", { ascending: true }),
     (supabase as any)
       .from("v_osgb_company_profitability")
       .select("*")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     getOsgbPersonnelCapacityPanel(organizationId, serviceMonth),
   ]);
 
@@ -958,9 +1021,31 @@ export const listOsgbFieldVisitsWorkspace = async (
 ): Promise<OsgbFieldVisitWorkspaceData> => {
   const serviceMonth = options?.serviceMonth || getServiceMonth();
   const serviceMonthEnd = getServiceMonthEnd(serviceMonth);
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
 
   if (options?.refreshCompliance !== false) {
     await refreshOsgbMonthlyCompliance(organizationId, serviceMonth);
+  }
+
+  if (managedCompanyIds.length === 0) {
+    const [companies, personnel] = await Promise.all([
+      listOsgbWorkspaceCompanies(organizationId, serviceMonth),
+      listOsgbWorkspacePersonnel(organizationId, true),
+    ]);
+
+    return {
+      serviceMonth,
+      summary: {
+        totalVisits: 0,
+        completedVisits: 0,
+        inProgressVisits: 0,
+        missingProofVisits: 0,
+        totalComplianceImpactMinutes: 0,
+      },
+      visits: [],
+      companies,
+      personnel,
+    };
   }
 
   const [visitsResponse, companies, personnel] = await Promise.all([
@@ -991,6 +1076,7 @@ export const listOsgbFieldVisitsWorkspace = async (
         )
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .gte("planned_start_at", `${serviceMonth}T00:00:00`)
       .lte("planned_start_at", `${serviceMonthEnd}T23:59:59`)
       .order("planned_start_at", { ascending: true }),
@@ -1207,23 +1293,37 @@ export const addOsgbFieldVisitEvidence = async (
 };
 
 export const syncOsgbRequiredDocuments = async (organizationId: string, userId: string) => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return 0;
+  }
+
   const [obligationsResponse, existingResponse] = await Promise.all([
     (supabase as any)
       .from("osgb_company_obligations")
       .select("id, company_id, obligation_name, legal_basis, due_date, risk_if_missing, obligation_status")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     (supabase as any)
       .from("osgb_required_documents")
       .select("id, obligation_id, document_type")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
   ]);
 
   if (obligationsResponse.error) throw obligationsResponse.error;
   if (existingResponse.error) throw existingResponse.error;
 
-  const existingRows = existingResponse.data ?? [];
-  const existingKeys = new Set(existingRows.map((row: any) => `${row.obligation_id || "none"}:${row.document_type}`));
-  const existingByKey = new Map(existingRows.map((row: any) => [`${row.obligation_id || "none"}:${row.document_type}`, row]));
+  const existingRows = (existingResponse.data ?? []) as Array<{
+    id: string;
+    obligation_id: string | null;
+    document_type: string;
+    risk_if_missing?: string | null;
+  }>;
+  const existingKeys = new Set(existingRows.map((row) => `${row.obligation_id || "none"}:${row.document_type}`));
+  const existingByKey = new Map<string, (typeof existingRows)[number]>(
+    existingRows.map((row) => [`${row.obligation_id || "none"}:${row.document_type}`, row]),
+  );
 
   const inserts = (obligationsResponse.data ?? [])
     .map((obligation: any) => {
@@ -1294,7 +1394,20 @@ export const listOsgbRequiredDocumentsWorkspace = async (
   organizationId: string,
   userId: string,
 ): Promise<OsgbRequiredDocumentsWorkspaceData> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
   await syncOsgbRequiredDocuments(organizationId, userId);
+
+  if (managedCompanyIds.length === 0) {
+    return {
+      documents: [],
+      overview: {
+        total: 0,
+        missing: 0,
+        overdue: 0,
+        critical: 0,
+      },
+    };
+  }
 
   const { data, error } = await (supabase as any)
     .from("osgb_required_documents")
@@ -1316,6 +1429,7 @@ export const listOsgbRequiredDocumentsWorkspace = async (
       visit:osgb_field_visits(planned_start_at)
     `)
     .eq("organization_id", organizationId)
+    .in("company_id", managedCompanyIds)
     .order("risk_level", { ascending: false })
     .order("due_date", { ascending: true });
 
@@ -1447,6 +1561,11 @@ export const syncOsgbMonthlyAccruals = async (
   userId: string,
   serviceMonth = getServiceMonth(),
 ) => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return 0;
+  }
+
   const serviceMonthEnd = getServiceMonthEnd(serviceMonth);
   const billingFallback = new Date(`${serviceMonthEnd}T00:00:00`).getDate();
 
@@ -1454,6 +1573,7 @@ export const syncOsgbMonthlyAccruals = async (
     .from("osgb_service_contracts")
     .select("id, company_id, monthly_fee, billing_day, package_name, starts_on, ends_on, contract_status")
     .eq("organization_id", organizationId)
+    .in("company_id", managedCompanyIds)
     .eq("contract_status", "active");
 
   if (contractsError) throw contractsError;
@@ -1565,20 +1685,28 @@ export const upsertOsgbFinancialEntry = async (
 };
 
 export const recalculateOsgbFinanceAccounts = async (organizationId: string) => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return;
+  }
+
   const [entriesResponse, activeContractsResponse, profitabilityResponse] = await Promise.all([
     (supabase as any)
       .from("osgb_financial_entries")
       .select("company_id, entry_type, amount, due_date, status")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     (supabase as any)
       .from("osgb_service_contracts")
       .select("company_id, id")
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .eq("contract_status", "active"),
     (supabase as any)
       .from("v_osgb_company_profitability")
       .select("company_id, estimated_monthly_margin")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
   ]);
 
   if (entriesResponse.error) throw entriesResponse.error;
@@ -1659,8 +1787,21 @@ export const listOsgbFinanceWorkspace = async (
   userId: string,
   serviceMonth = getServiceMonth(),
 ): Promise<OsgbFinanceWorkspaceData> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
   await syncOsgbMonthlyAccruals(organizationId, userId, serviceMonth);
   await recalculateOsgbFinanceAccounts(organizationId);
+
+  if (managedCompanyIds.length === 0) {
+    return {
+      serviceMonth,
+      companies: [],
+      entries: [],
+      totalCurrentBalance: 0,
+      totalOverdueBalance: 0,
+      lowProfitabilityCount: 0,
+      latePayerCount: 0,
+    };
+  }
 
   const [entriesResponse, accountsResponse, profitabilityResponse, contractsResponse] = await Promise.all([
     (supabase as any)
@@ -1681,6 +1822,7 @@ export const listOsgbFinanceWorkspace = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .order("entry_date", { ascending: false }),
     (supabase as any)
       .from("osgb_finance_accounts")
@@ -1693,15 +1835,18 @@ export const listOsgbFinanceWorkspace = async (
         profitability_score,
         company:isgkatip_companies(company_name)
       `)
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     (supabase as any)
       .from("v_osgb_company_profitability")
       .select("*")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     (supabase as any)
       .from("osgb_service_contracts")
       .select("id, company_id, package_name, monthly_fee, contract_status")
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .in("contract_status", ["active", "paused"]),
   ]);
 
@@ -1787,5 +1932,847 @@ export const listOsgbFinanceWorkspace = async (
     totalOverdueBalance: companies.reduce((sum, company) => sum + company.overdueBalance, 0),
     lowProfitabilityCount: companies.filter((company) => company.lowProfitability).length,
     latePayerCount: companies.filter((company) => company.lateInvoiceCount > 0).length,
+  };
+};
+
+export interface OsgbManagedCompanyRecord {
+  id: string;
+  organizationId: string;
+  companyName: string;
+  sgkNo: string | null;
+  taxNumber: string | null;
+  employeeCount: number;
+  hazardClass: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  contactName: string | null;
+  assignmentMode: string;
+  visitFrequency: string;
+  notes: string | null;
+  managementSource: string;
+  isManaged: boolean;
+  managedAt: string | null;
+  contractStart: string | null;
+  contractEnd: string | null;
+  monthlyFee: number;
+  assignmentApprovalStatus: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned";
+  totalRequiredMinutes: number;
+  totalAssignedMinutes: number;
+  requiredMinutesByRole: Record<OsgbRole, number>;
+  assignedMinutesByRole: Record<OsgbRole, number>;
+}
+
+export interface OsgbCompanyImportCandidate {
+  id: string;
+  companyName: string;
+  sgkNo: string | null;
+  employeeCount: number;
+  hazardClass: string;
+  contractStart: string | null;
+  contractEnd: string | null;
+  assignedMinutes: number;
+  requiredMinutes: number;
+  managementSource: string;
+}
+
+export interface OsgbCompanyTrackingWorkspaceData {
+  serviceMonth: string;
+  companies: OsgbManagedCompanyRecord[];
+  importCandidates: OsgbCompanyImportCandidate[];
+  summary: {
+    totalCompanies: number;
+    lessHazardousCount: number;
+    hazardousCount: number;
+    veryHazardousCount: number;
+    totalIguMinutes: number;
+    totalHekimMinutes: number;
+    approvedCount: number;
+    pendingPersonnelApprovalCount: number;
+    pendingWorkplaceApprovalCount: number;
+    zeroEmployeeCount: number;
+    missingContractCount: number;
+    plannedAssignmentCount: number;
+  };
+}
+
+export interface OsgbCompanyManagementInput {
+  companyName: string;
+  sgkNo?: string | null;
+  taxNumber?: string | null;
+  employeeCount?: number;
+  hazardClass: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contactName?: string | null;
+  contractStart?: string | null;
+  contractEnd?: string | null;
+  monthlyFee?: number;
+  assignmentMode?: string;
+  visitFrequency?: string;
+  notes?: string | null;
+  managementSource?: "manual" | "import" | "isgkatip" | "extension";
+  naceCode?: string | null;
+}
+
+const deriveAssignmentApprovalStatus = (row: any, assignedMinutes: number) => {
+  const assignedPersonApproval = String(row.assigned_person_approval_status || "").toLocaleLowerCase("tr-TR");
+  const receiverApproval = String(row.service_receiver_approval_status || "").toLocaleLowerCase("tr-TR");
+  const contractStatus = String(row.contract_status || "").toLocaleLowerCase("tr-TR");
+
+  if (assignedMinutes <= 0) return "missing_contract" as const;
+  if (contractStatus.includes("plan")) return "planned" as const;
+  if (assignedPersonApproval && !assignedPersonApproval.includes("approve")) return "pending_personnel" as const;
+  if (receiverApproval && !receiverApproval.includes("approve")) return "pending_workplace" as const;
+  return "approved" as const;
+};
+
+const normalizeManagedCompany = (
+  row: any,
+  compliance: any | undefined,
+  contract: any | undefined,
+): OsgbManagedCompanyRecord => {
+  const iguRequired = Number(compliance?.igu_required_minutes || publicCalculateRequiredFallback(row.employee_count, row.hazard_class, "igu"));
+  const hekimRequired = Number(compliance?.hekim_required_minutes || publicCalculateRequiredFallback(row.employee_count, row.hazard_class, "hekim"));
+  const dspRequired = Number(compliance?.dsp_required_minutes || publicCalculateRequiredFallback(row.employee_count, row.hazard_class, "dsp"));
+  const iguAssigned = Number(compliance?.igu_assigned_minutes || 0);
+  const hekimAssigned = Number(compliance?.hekim_assigned_minutes || 0);
+  const dspAssigned = Number(compliance?.dsp_assigned_minutes || 0);
+  const totalAssignedMinutes = iguAssigned + hekimAssigned + dspAssigned;
+
+  return {
+    id: row.id,
+    organizationId: row.org_id,
+    companyName: row.company_name || "Firma",
+    sgkNo: row.sgk_no || null,
+    taxNumber: row.tax_number || null,
+    employeeCount: Number(row.employee_count || 0),
+    hazardClass: row.hazard_class || "Az Tehlikeli",
+    address: row.address || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    contactName: row.contact_name || null,
+    assignmentMode: row.assignment_mode || "automatic",
+    visitFrequency: row.visit_frequency || "monthly_once",
+    notes: row.notes || null,
+    managementSource: row.management_source || "extension",
+    isManaged: !!row.is_osgb_managed,
+    managedAt: row.managed_at || null,
+    contractStart: contract?.starts_on || row.contract_start || null,
+    contractEnd: contract?.ends_on || row.contract_end || null,
+    monthlyFee: Number(contract?.monthly_fee || 0),
+    assignmentApprovalStatus: deriveAssignmentApprovalStatus(row, totalAssignedMinutes),
+    totalRequiredMinutes: iguRequired + hekimRequired + dspRequired,
+    totalAssignedMinutes,
+    requiredMinutesByRole: {
+      igu: iguRequired,
+      hekim: hekimRequired,
+      dsp: dspRequired,
+    },
+    assignedMinutesByRole: {
+      igu: iguAssigned,
+      hekim: hekimAssigned,
+      dsp: dspAssigned,
+    },
+  };
+};
+
+const publicCalculateRequiredFallback = (
+  employeeCount: number | null | undefined,
+  hazardClass: string | null | undefined,
+  role: OsgbRole,
+) => {
+  const employees = Math.max(0, Number(employeeCount || 0));
+  const normalizedHazard = String(hazardClass || "").toLocaleLowerCase("tr-TR");
+
+  if (role === "dsp") {
+    if (normalizedHazard.includes("çok")) return employees * 10;
+    if (normalizedHazard.includes("tehlikeli")) return employees * 6;
+    return 0;
+  }
+
+  if (role === "hekim") {
+    if (normalizedHazard.includes("çok")) return employees * 15;
+    if (normalizedHazard.includes("tehlikeli")) return employees * 10;
+    return employees * 5;
+  }
+
+  if (normalizedHazard.includes("çok")) return employees * 40;
+  if (normalizedHazard.includes("tehlikeli")) return employees * 20;
+  return employees * 10;
+};
+
+const ensureOsgbCompanyContract = async (
+  userId: string,
+  organizationId: string,
+  companyId: string,
+  input: OsgbCompanyManagementInput,
+) => {
+  const { data: existingContract, error: contractReadError } = await (supabase as any)
+    .from("osgb_service_contracts")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (contractReadError) throw contractReadError;
+
+  const startsOn = input.contractStart || new Date().toISOString().slice(0, 10);
+  const patch = {
+    organization_id: organizationId,
+    company_id: companyId,
+    package_name: "Standart OSGB Hizmeti",
+    contract_status: input.contractStart ? "active" : "draft",
+    starts_on: startsOn,
+    ends_on: input.contractEnd || null,
+    monthly_fee: Number(input.monthlyFee || 0),
+    auto_invoice: true,
+    notes: input.notes || null,
+    created_by: userId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const query = existingContract?.id
+    ? (supabase as any).from("osgb_service_contracts").update(patch).eq("id", existingContract.id)
+    : (supabase as any).from("osgb_service_contracts").insert(patch);
+
+  const { data: savedContract, error: contractSaveError } = await query.select("id").single();
+  if (contractSaveError) throw contractSaveError;
+
+  const { error: accountError } = await (supabase as any)
+    .from("osgb_finance_accounts")
+    .upsert(
+      {
+        organization_id: organizationId,
+        company_id: companyId,
+        contract_id: savedContract.id,
+        payment_term_days: 30,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "organization_id,company_id" },
+    );
+
+  if (accountError) throw accountError;
+};
+
+export const listOsgbCompanyTrackingWorkspace = async (
+  organizationId: string,
+  serviceMonth = getServiceMonth(),
+): Promise<OsgbCompanyTrackingWorkspaceData> => {
+  await refreshOsgbMonthlyCompliance(organizationId, serviceMonth);
+
+  const [companyResponse, complianceResponse, contractResponse] = await Promise.all([
+    (supabase as any)
+      .from("isgkatip_companies")
+      .select(`
+        id,
+        org_id,
+        company_name,
+        sgk_no,
+        tax_number,
+        employee_count,
+        hazard_class,
+        address,
+        phone,
+        email,
+        contact_name,
+        assignment_mode,
+        visit_frequency,
+        notes,
+        is_osgb_managed,
+        management_source,
+        managed_at,
+        contract_start,
+        contract_end,
+        assigned_person_approval_status,
+        service_receiver_approval_status,
+        contract_status,
+        nace_code
+      `)
+      .eq("org_id", organizationId)
+      .eq("is_deleted", false)
+      .order("company_name", { ascending: true }),
+    (supabase as any)
+      .from("osgb_monthly_company_compliance")
+      .select("*")
+      .eq("organization_id", organizationId)
+      .eq("service_month", serviceMonth),
+    (supabase as any)
+      .from("osgb_service_contracts")
+      .select("id, company_id, starts_on, ends_on, monthly_fee, contract_status")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false }),
+  ]);
+
+  if (companyResponse.error) throw companyResponse.error;
+  if (complianceResponse.error) throw complianceResponse.error;
+  if (contractResponse.error) throw contractResponse.error;
+
+  const complianceByCompany = new Map<string, any>((complianceResponse.data ?? []).map((row: any) => [row.company_id, row]));
+  const contractByCompany = new Map<string, any>();
+  for (const contract of contractResponse.data ?? []) {
+    if (!contractByCompany.has(contract.company_id)) {
+      contractByCompany.set(contract.company_id, contract);
+    }
+  }
+
+  const allCompanies = (companyResponse.data ?? []).map((row: any) =>
+    normalizeManagedCompany(row, complianceByCompany.get(row.id), contractByCompany.get(row.id)),
+  );
+
+  const companies = allCompanies.filter((row) => row.isManaged);
+  const importCandidates = allCompanies
+    .filter((row) => !row.isManaged)
+    .map((row) => ({
+      id: row.id,
+      companyName: row.companyName,
+      sgkNo: row.sgkNo,
+      employeeCount: row.employeeCount,
+      hazardClass: row.hazardClass,
+      contractStart: row.contractStart,
+      contractEnd: row.contractEnd,
+      assignedMinutes: row.totalAssignedMinutes,
+      requiredMinutes: row.totalRequiredMinutes,
+      managementSource: row.managementSource,
+    }));
+
+  return {
+    serviceMonth,
+    companies,
+    importCandidates,
+    summary: {
+      totalCompanies: companies.length,
+      lessHazardousCount: companies.filter((item) => item.hazardClass === "Az Tehlikeli").length,
+      hazardousCount: companies.filter((item) => item.hazardClass === "Tehlikeli").length,
+      veryHazardousCount: companies.filter((item) => item.hazardClass === "Çok Tehlikeli").length,
+      totalIguMinutes: companies.reduce((sum, item) => sum + item.requiredMinutesByRole.igu, 0),
+      totalHekimMinutes: companies.reduce((sum, item) => sum + item.requiredMinutesByRole.hekim, 0),
+      approvedCount: companies.filter((item) => item.assignmentApprovalStatus === "approved").length,
+      pendingPersonnelApprovalCount: companies.filter((item) => item.assignmentApprovalStatus === "pending_personnel").length,
+      pendingWorkplaceApprovalCount: companies.filter((item) => item.assignmentApprovalStatus === "pending_workplace").length,
+      zeroEmployeeCount: companies.filter((item) => item.employeeCount === 0).length,
+      missingContractCount: companies.filter((item) => item.assignmentApprovalStatus === "missing_contract").length,
+      plannedAssignmentCount: companies.filter((item) => item.assignmentApprovalStatus === "planned").length,
+    },
+  };
+};
+
+export const upsertOsgbManagedCompany = async (
+  userId: string,
+  organizationId: string,
+  input: OsgbCompanyManagementInput,
+  existingCompanyId?: string,
+) => {
+  const companyPayload = {
+    org_id: organizationId,
+    company_name: input.companyName,
+    sgk_no: input.sgkNo?.trim() || `MANUAL-${Date.now()}`,
+    tax_number: input.taxNumber?.trim() || null,
+    employee_count: Math.max(0, Number(input.employeeCount || 0)),
+    hazard_class: input.hazardClass,
+    address: input.address?.trim() || null,
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null,
+    contact_name: input.contactName?.trim() || null,
+    assignment_mode: input.assignmentMode || "automatic",
+    visit_frequency: input.visitFrequency || "monthly_once",
+    notes: input.notes?.trim() || null,
+    is_osgb_managed: true,
+    management_source: input.managementSource || "manual",
+    managed_at: new Date().toISOString(),
+    nace_code: input.naceCode?.trim() || null,
+    contract_start: input.contractStart || null,
+    contract_end: input.contractEnd || null,
+    assigned_minutes: 0,
+    required_minutes: publicCalculateRequiredFallback(input.employeeCount, input.hazardClass, "igu")
+      + publicCalculateRequiredFallback(input.employeeCount, input.hazardClass, "hekim")
+      + publicCalculateRequiredFallback(input.employeeCount, input.hazardClass, "dsp"),
+    compliance_status: "missing",
+    updated_at: new Date().toISOString(),
+    last_synced_at: new Date().toISOString(),
+  };
+
+  const query = existingCompanyId
+    ? (supabase as any).from("isgkatip_companies").update(companyPayload).eq("id", existingCompanyId).eq("org_id", organizationId)
+    : (supabase as any).from("isgkatip_companies").insert(companyPayload);
+
+  const { data, error } = await query.select("id").single();
+  if (error) throw error;
+
+  await ensureOsgbCompanyContract(userId, organizationId, data.id, input);
+  await refreshOsgbMonthlyCompliance(organizationId);
+  return data.id as string;
+};
+
+export const importOsgbCompaniesFromKatip = async (
+  userId: string,
+  organizationId: string,
+  companyIds: string[],
+) => {
+  const uniqueIds = Array.from(new Set(companyIds.filter(Boolean)));
+  if (uniqueIds.length === 0) return 0;
+
+  const { data: rows, error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .select("*")
+    .eq("org_id", organizationId)
+    .eq("is_deleted", false)
+    .in("id", uniqueIds);
+
+  if (error) throw error;
+
+  let imported = 0;
+  for (const row of rows ?? []) {
+    await upsertOsgbManagedCompany(
+      userId,
+      organizationId,
+      {
+        companyName: row.company_name,
+        sgkNo: row.sgk_no,
+        taxNumber: row.tax_number || null,
+        employeeCount: row.employee_count || 0,
+        hazardClass: row.hazard_class || "Az Tehlikeli",
+        address: row.address || null,
+        phone: row.phone || null,
+        email: row.email || null,
+        contactName: row.contact_name || null,
+        contractStart: row.contract_start || null,
+        contractEnd: row.contract_end || null,
+        monthlyFee: 0,
+        assignmentMode: row.assignment_mode || "automatic",
+        visitFrequency: row.visit_frequency || "monthly_once",
+        notes: row.notes || null,
+        managementSource: "isgkatip",
+        naceCode: row.nace_code || null,
+      },
+      row.id,
+    );
+    imported += 1;
+  }
+
+  return imported;
+};
+
+export const importOsgbCompaniesFromRows = async (
+  userId: string,
+  organizationId: string,
+  rows: OsgbCompanyManagementInput[],
+) => {
+  let created = 0;
+  for (const row of rows) {
+    await upsertOsgbManagedCompany(userId, organizationId, {
+      ...row,
+      managementSource: row.managementSource || "import",
+    });
+    created += 1;
+  }
+  return created;
+};
+
+export interface OsgbManagedCompanyOption {
+  id: string;
+  companyName: string;
+  hazardClass: string;
+}
+
+export interface OsgbWorkspaceTaskRecord {
+  id: string;
+  companyId: string | null;
+  companyName: string | null;
+  title: string;
+  description: string | null;
+  priority: "low" | "medium" | "high" | "critical";
+  status: "open" | "in_progress" | "completed" | "cancelled";
+  assignedTo: string | null;
+  dueDate: string | null;
+  source: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbWorkspaceNoteRecord {
+  id: string;
+  companyId: string | null;
+  companyName: string | null;
+  title: string | null;
+  note: string;
+  noteType: "general" | "finance" | "document" | "assignment" | "risk";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbCompany360Snapshot {
+  companyId: string;
+  activeAssignments: number;
+  assignedMinutes: number;
+  requiredMinutes: number;
+  deficitMinutes: number;
+  recentVisitCount: number;
+  missingEvidenceVisitCount: number;
+  openDocumentCount: number;
+  overdueDocumentCount: number;
+  currentBalance: number;
+  overdueBalance: number;
+  activePortalLinkCount: number;
+  latestPortalViewAt: string | null;
+  openTaskCount: number;
+  noteCount: number;
+  assignedPeople: string[];
+  nextActions: string[];
+}
+
+export const listOsgbManagedCompanyOptions = async (
+  organizationId: string,
+): Promise<OsgbManagedCompanyOption[]> => {
+  const { data, error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .select("id, company_name, hazard_class")
+    .eq("org_id", organizationId)
+    .eq("is_deleted", false)
+    .eq("is_osgb_managed", true)
+    .order("company_name", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    companyName: row.company_name || "Firma",
+    hazardClass: row.hazard_class || "Bilinmiyor",
+  }));
+};
+
+export const listOsgbTasksWorkspace = async (
+  organizationId: string,
+): Promise<OsgbWorkspaceTaskRecord[]> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+
+  let query = (supabase as any)
+    .from("osgb_tasks")
+    .select("id, company_id, title, description, priority, status, assigned_to, due_date, source, created_at, updated_at, company:isgkatip_companies(company_name)")
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (managedCompanyIds.length > 0) {
+    query = query.or(`company_id.is.null,company_id.in.(${managedCompanyIds.join(",")})`);
+  } else {
+    query = query.is("company_id", null);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    companyId: row.company_id || null,
+    companyName: row.company?.company_name || null,
+    title: row.title,
+    description: row.description || null,
+    priority: row.priority,
+    status: row.status,
+    assignedTo: row.assigned_to || null,
+    dueDate: row.due_date || null,
+    source: row.source || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const createOsgbTaskWorkspace = async (
+  userId: string,
+  organizationId: string,
+  input: {
+    companyId?: string | null;
+    title: string;
+    description?: string | null;
+    priority?: OsgbWorkspaceTaskRecord["priority"];
+    status?: OsgbWorkspaceTaskRecord["status"];
+    assignedTo?: string | null;
+    dueDate?: string | null;
+    source?: string | null;
+  },
+) => {
+  if (input.companyId) {
+    const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+    if (!managedCompanyIds.includes(input.companyId)) {
+      throw new Error("Görev yalnızca OSGB havuzundaki firmalara bağlanabilir.");
+    }
+  }
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_tasks")
+    .insert({
+      user_id: userId,
+      created_by: userId,
+      organization_id: organizationId,
+      company_id: input.companyId || null,
+      title: input.title,
+      description: input.description || null,
+      priority: input.priority || "medium",
+      status: input.status || "open",
+      assigned_to: input.assignedTo || null,
+      due_date: input.dueDate || null,
+      source: input.source || "manual",
+    })
+    .select("id, company_id, title, description, priority, status, assigned_to, due_date, source, created_at, updated_at, company:isgkatip_companies(company_name)")
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    companyId: data.company_id || null,
+    companyName: data.company?.company_name || null,
+    title: data.title,
+    description: data.description || null,
+    priority: data.priority,
+    status: data.status,
+    assignedTo: data.assigned_to || null,
+    dueDate: data.due_date || null,
+    source: data.source || null,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  } satisfies OsgbWorkspaceTaskRecord;
+};
+
+export const updateOsgbTaskWorkspaceStatus = async (
+  organizationId: string,
+  id: string,
+  status: OsgbWorkspaceTaskRecord["status"],
+) => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_tasks")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("id", id)
+    .select("id, company_id, title, description, priority, status, assigned_to, due_date, source, created_at, updated_at, company:isgkatip_companies(company_name)")
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    companyId: data.company_id || null,
+    companyName: data.company?.company_name || null,
+    title: data.title,
+    description: data.description || null,
+    priority: data.priority,
+    status: data.status,
+    assignedTo: data.assigned_to || null,
+    dueDate: data.due_date || null,
+    source: data.source || null,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  } satisfies OsgbWorkspaceTaskRecord;
+};
+
+export const deleteOsgbTaskWorkspace = async (
+  organizationId: string,
+  id: string,
+) => {
+  const { error } = await (supabase as any)
+    .from("osgb_tasks")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
+export const listOsgbNotesWorkspace = async (
+  organizationId: string,
+): Promise<OsgbWorkspaceNoteRecord[]> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+
+  let query = (supabase as any)
+    .from("osgb_notes")
+    .select("id, company_id, title, note, note_type, created_at, updated_at, company:isgkatip_companies(company_name)")
+    .eq("organization_id", organizationId)
+    .order("updated_at", { ascending: false });
+
+  if (managedCompanyIds.length > 0) {
+    query = query.or(`company_id.is.null,company_id.in.(${managedCompanyIds.join(",")})`);
+  } else {
+    query = query.is("company_id", null);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    companyId: row.company_id || null,
+    companyName: row.company?.company_name || null,
+    title: row.title || null,
+    note: row.note,
+    noteType: row.note_type,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const upsertOsgbNoteWorkspace = async (
+  userId: string,
+  organizationId: string,
+  input: {
+    companyId?: string | null;
+    title?: string | null;
+    note: string;
+    noteType: OsgbWorkspaceNoteRecord["noteType"];
+  },
+  id?: string,
+) => {
+  if (input.companyId) {
+    const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+    if (!managedCompanyIds.includes(input.companyId)) {
+      throw new Error("Not yalnızca OSGB havuzundaki firmalara bağlanabilir.");
+    }
+  }
+
+  const payload = {
+    user_id: userId,
+    created_by: userId,
+    organization_id: organizationId,
+    company_id: input.companyId || null,
+    title: input.title || null,
+    note: input.note,
+    note_type: input.noteType,
+    updated_at: new Date().toISOString(),
+  };
+
+  const query = id
+    ? (supabase as any).from("osgb_notes").update(payload).eq("organization_id", organizationId).eq("id", id)
+    : (supabase as any).from("osgb_notes").insert(payload);
+
+  const { data, error } = await query
+    .select("id, company_id, title, note, note_type, created_at, updated_at, company:isgkatip_companies(company_name)")
+    .single();
+
+  if (error) throw error;
+  return {
+    id: data.id,
+    companyId: data.company_id || null,
+    companyName: data.company?.company_name || null,
+    title: data.title || null,
+    note: data.note,
+    noteType: data.note_type,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  } satisfies OsgbWorkspaceNoteRecord;
+};
+
+export const deleteOsgbNoteWorkspace = async (
+  organizationId: string,
+  id: string,
+) => {
+  const { error } = await (supabase as any)
+    .from("osgb_notes")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
+export const getOsgbCompany360Snapshot = async (
+  organizationId: string,
+  companyId: string,
+  serviceMonth = getServiceMonth(),
+): Promise<OsgbCompany360Snapshot> => {
+  const [complianceResponse, assignmentsResponse, visitsResponse, documentsResponse, financeResponse, portalResponse, tasksResponse, notesResponse] = await Promise.all([
+    (supabase as any)
+      .from("osgb_monthly_company_compliance")
+      .select("igu_required_minutes, hekim_required_minutes, dsp_required_minutes, igu_assigned_minutes, hekim_assigned_minutes, dsp_assigned_minutes, deficit_minutes")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId)
+      .eq("service_month", serviceMonth)
+      .maybeSingle(),
+    (supabase as any)
+      .from("osgb_assignments")
+      .select("assigned_minutes, personnel:osgb_personnel(full_name)")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId)
+      .eq("status", "active"),
+    (supabase as any)
+      .from("osgb_field_visits")
+      .select("id, visit_status, proof_score")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId),
+    (supabase as any)
+      .from("osgb_required_documents")
+      .select("id, status, delay_days")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId),
+    (supabase as any)
+      .from("osgb_finance_accounts")
+      .select("current_balance, overdue_balance")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId)
+      .maybeSingle(),
+    (supabase as any)
+      .from("osgb_client_portal_links")
+      .select("id, portal_status, last_viewed_at")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId),
+    (supabase as any)
+      .from("osgb_tasks")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId)
+      .in("status", ["open", "in_progress"]),
+    (supabase as any)
+      .from("osgb_notes")
+      .select("id")
+      .eq("organization_id", organizationId)
+      .eq("company_id", companyId),
+  ]);
+
+  if (complianceResponse.error) throw complianceResponse.error;
+  if (assignmentsResponse.error) throw assignmentsResponse.error;
+  if (visitsResponse.error) throw visitsResponse.error;
+  if (documentsResponse.error) throw documentsResponse.error;
+  if (financeResponse.error) throw financeResponse.error;
+  if (portalResponse.error) throw portalResponse.error;
+  if (tasksResponse.error) throw tasksResponse.error;
+  if (notesResponse.error) throw notesResponse.error;
+
+  const compliance = complianceResponse.data;
+  const visits = visitsResponse.data ?? [];
+  const documents = documentsResponse.data ?? [];
+  const portalLinks = portalResponse.data ?? [];
+
+  const nextActions: string[] = [];
+  const deficitMinutes = Number(compliance?.deficit_minutes || 0);
+  const overdueDocuments = documents.filter((item: any) => item.status === "missing" && Number(item.delay_days || 0) > 0).length;
+  const missingEvidenceVisits = visits.filter((item: any) => item.visit_status === "completed" && Number(item.proof_score || 0) < 45).length;
+  const overdueBalance = Number(financeResponse.data?.overdue_balance || 0);
+
+  if (deficitMinutes > 0) nextActions.push("Eksik hizmet süresi için yeni atama yapın.");
+  if (overdueDocuments > 0) nextActions.push("Geciken evraklar için müşteri bildirimi ve görev oluşturun.");
+  if (missingEvidenceVisits > 0) nextActions.push("Kanıt seviyesi düşük ziyaretler için ek fotoğraf veya imza isteyin.");
+  if (overdueBalance > 0) nextActions.push("Cari bakiyede gecikme var; tahsilat takibini başlatın.");
+  if (nextActions.length === 0) nextActions.push("Firma operasyonu dengede görünüyor; planlı ziyaret ve evrak vadesini izleyin.");
+
+  return {
+    companyId,
+    activeAssignments: (assignmentsResponse.data ?? []).length,
+    assignedMinutes: Number(compliance?.igu_assigned_minutes || 0) + Number(compliance?.hekim_assigned_minutes || 0) + Number(compliance?.dsp_assigned_minutes || 0),
+    requiredMinutes: Number(compliance?.igu_required_minutes || 0) + Number(compliance?.hekim_required_minutes || 0) + Number(compliance?.dsp_required_minutes || 0),
+    deficitMinutes,
+    recentVisitCount: visits.length,
+    missingEvidenceVisitCount: missingEvidenceVisits,
+    openDocumentCount: documents.filter((item: any) => item.status !== "approved").length,
+    overdueDocumentCount: overdueDocuments,
+    currentBalance: Number(financeResponse.data?.current_balance || 0),
+    overdueBalance,
+    activePortalLinkCount: portalLinks.filter((item: any) => item.portal_status === "active").length,
+    latestPortalViewAt: portalLinks
+      .map((item: any) => item.last_viewed_at)
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null,
+    openTaskCount: (tasksResponse.data ?? []).length,
+    noteCount: (notesResponse.data ?? []).length,
+    assignedPeople: Array.from(new Set((assignmentsResponse.data ?? []).map((item: any) => item.personnel?.full_name).filter(Boolean))),
+    nextActions,
   };
 };

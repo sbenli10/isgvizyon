@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, BellRing, Bot, CreditCard, FileWarning, MapPinned, RefreshCcw } from "lucide-react";
+import { AlertTriangle, BellRing, Bot, CreditCard, ExternalLink, FileWarning, Mail, MapPinned, MessageCircle, RefreshCcw } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -8,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { listOsgbAutomationWorkspace, runOsgbAutomationBatch, type OsgbAutomationWorkspace } from "@/lib/osgbOrchestration";
+import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 
 const kindIcon = {
   document: FileWarning,
@@ -16,7 +18,9 @@ const kindIcon = {
 } as const;
 
 export default function OsgbAutomationCenter() {
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
+  const { canManageAutomation, canManageOperations } = useOsgbAccess();
   const organizationId = profile?.organization_id || null;
   const [workspace, setWorkspace] = useState<OsgbAutomationWorkspace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,10 @@ export default function OsgbAutomationCenter() {
   }, [loadData]);
 
   const handleRun = async () => {
+    if (!canManageAutomation) {
+      toast.error("Bu rol otomasyon batch çalıştıramaz.");
+      return;
+    }
     if (!organizationId || !user?.id) return;
     setRunning(true);
     try {
@@ -72,6 +80,23 @@ export default function OsgbAutomationCenter() {
     );
   }
 
+  const openMail = (email: string | null | undefined, action: string, companyName: string) => {
+    if (!email) {
+      toast.error("Bu firma için e-posta bilgisi yok.");
+      return;
+    }
+    window.open(`mailto:${email}?subject=${encodeURIComponent(`${companyName} operasyon bildirimi`)}&body=${encodeURIComponent(action)}`);
+  };
+
+  const openWhatsapp = (phone: string | null | undefined, action: string) => {
+    if (!phone) {
+      toast.error("Bu firma için telefon bilgisi yok.");
+      return;
+    }
+    const cleaned = phone.replace(/[^\d]/g, "");
+    window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(action)}`, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="container mx-auto space-y-6 py-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -91,7 +116,7 @@ export default function OsgbAutomationCenter() {
             <RefreshCcw className="mr-2 h-4 w-4" />
             Yenile
           </Button>
-          <Button onClick={() => void handleRun()} disabled={running}>
+          <Button onClick={() => void handleRun()} disabled={running || !canManageAutomation}>
             <BellRing className="mr-2 h-4 w-4" />
             {running ? "Calisiyor" : "Aksiyonlari uret"}
           </Button>
@@ -146,6 +171,29 @@ export default function OsgbAutomationCenter() {
                         {action.priority === "critical" ? "Kritik" : "Yuksek"}
                       </Badge>
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => navigate(action.actionUrl)} disabled={!canManageOperations}>
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Operasyon ekranını aç
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openMail(action.contactEmail, action.reason, action.companyName)}>
+                      <Mail className="mr-2 h-4 w-4" />
+                      E-posta hazırla
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openWhatsapp(action.contactPhone, action.reason)}>
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      WhatsApp aç
+                    </Button>
+                    {action.portalLinkToken ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(`/portal/company/${action.portalLinkToken}`, "_blank", "noopener,noreferrer")}
+                      >
+                        Portalı aç
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               );

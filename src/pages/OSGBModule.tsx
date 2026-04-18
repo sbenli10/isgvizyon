@@ -21,6 +21,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { OsgbOnboardingChecklist } from "@/components/osgb/OsgbOnboardingChecklist";
 
 const featureCards = [
   {
@@ -160,6 +163,9 @@ const launchCards = [
 
 export default function OSGBModule() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const { roleLabel } = useOsgbAccess();
+  const hasOrganization = Boolean(profile?.organization_id);
 
   const phaseBadge = useMemo(() => {
     return (
@@ -168,6 +174,30 @@ export default function OSGBModule() {
       </Badge>
     );
   }, []);
+
+  const onboardingSteps = useMemo(
+    () => [
+      {
+        title: "İSG-KATİP verisini hazırla",
+        description: "Extension veya ekip senkronundan gelen firmaları organizasyona alın.",
+        href: "/osgb/isgkatip",
+        done: hasOrganization,
+      },
+      {
+        title: "Firma havuzunu kur",
+        description: "Yalnızca yöneteceğiniz firmaları OSGB havuzuna taşıyın.",
+        href: "/osgb/company-tracking",
+        done: false,
+      },
+      {
+        title: "Sözleşme ve atama akışını başlat",
+        description: "Kapasite, mevzuat ve operasyon ekranlarını canlı kullanıma açın.",
+        href: "/osgb/assignments",
+        done: false,
+      },
+    ],
+    [hasOrganization],
+  );
 
   return (
     <div className="container mx-auto space-y-8 py-6">
@@ -179,6 +209,9 @@ export default function OSGBModule() {
                 <Briefcase className="h-6 w-6" />
               </div>
               {phaseBadge}
+              <Badge variant="outline" className="border-white/15 text-white/80">
+                Rol: {roleLabel}
+              </Badge>
             </div>
             <div className="space-y-2">
               <h1 className="text-3xl font-bold tracking-tight text-white">OSGB Yönetim Modülü</h1>
@@ -289,6 +322,31 @@ export default function OSGBModule() {
             ))}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <Card className="border-slate-800 bg-slate-900/70">
+          <CardHeader>
+            <CardTitle className="text-white">Modül ayrımı</CardTitle>
+            <CardDescription>İSGBot bireysel uzman ekranıdır. OSGB modülü ekipli operasyon, havuz ve finans yönetimi içindir.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+              <div className="text-sm font-semibold text-white">İSGBot</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Bağımsız uzman, kişisel karar desteği ve bireysel İSG-KATİP görünümü.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+              <div className="text-sm font-semibold text-white">OSGB Modülü</div>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Firma havuzu, ekip ataması, kapasite, saha, evrak, finans, portal ve otomasyon.</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <OsgbOnboardingChecklist
+          title="İlk Kurulum"
+          description="OSGB ürününü satışa hazır kullanmak için ilk adımları bu sırayla tamamlayın."
+          steps={onboardingSteps}
+        />
       </section>
 
       <section className="space-y-4">

@@ -14,6 +14,18 @@ import {
   type OsgbRequiredDocumentRecord,
 } from "@/lib/osgbPlatform";
 
+const listManagedOsgbCompanyIds = async (organizationId: string): Promise<string[]> => {
+  const { data, error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .select("id")
+    .eq("org_id", organizationId)
+    .eq("is_deleted", false)
+    .eq("is_osgb_managed", true);
+
+  if (error) throw error;
+  return (data ?? []).map((row: any) => row.id).filter(Boolean);
+};
+
 export interface OsgbIsgKatipCompanyHealth {
   id: string;
   companyName: string;
@@ -71,6 +83,9 @@ export interface OsgbAutomationAction {
   priority: "medium" | "high" | "critical";
   dueDate: string | null;
   actionUrl: string;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  portalLinkToken?: string | null;
 }
 
 export interface OsgbAutomationWorkspace {
@@ -415,6 +430,45 @@ export const listOsgbAutomationWorkspace = async (
     });
   }
 
+  const companyIds = Array.from(new Set(actions.map((action) => action.companyId).filter(Boolean)));
+  if (companyIds.length > 0) {
+    const [contactsResponse, portalLinksResponse] = await Promise.all([
+      (supabase as any)
+        .from("isgkatip_companies")
+        .select("id, email, phone")
+        .eq("org_id", organizationId)
+        .in("id", companyIds),
+      (supabase as any)
+        .from("osgb_client_portal_links")
+        .select("company_id, access_token, portal_status")
+        .eq("organization_id", organizationId)
+        .eq("portal_status", "active")
+        .in("company_id", companyIds),
+    ]);
+
+    if (contactsResponse.error) throw contactsResponse.error;
+    if (portalLinksResponse.error) throw portalLinksResponse.error;
+
+    const contactsByCompany = new Map<string, { email: string | null; phone: string | null }>();
+    for (const row of contactsResponse.data ?? []) {
+      contactsByCompany.set(row.id, { email: row.email || null, phone: row.phone || null });
+    }
+
+    const portalByCompany = new Map<string, string>();
+    for (const row of portalLinksResponse.data ?? []) {
+      if (!portalByCompany.has(row.company_id)) {
+        portalByCompany.set(row.company_id, row.access_token);
+      }
+    }
+
+    for (const action of actions) {
+      const contact = contactsByCompany.get(action.companyId);
+      action.contactEmail = contact?.email || null;
+      action.contactPhone = contact?.phone || null;
+      action.portalLinkToken = portalByCompany.get(action.companyId) || null;
+    }
+  }
+
   return {
     summary: {
       pendingActions: actions.length,
@@ -457,20 +511,35 @@ const createPortalToken = () => crypto.randomUUID().replace(/-/g, "");
 export const listOsgbClientPortalWorkspace = async (
   organizationId: string,
 ): Promise<OsgbClientPortalWorkspace> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return {
+      links: [],
+      summary: {
+        activeLinks: 0,
+        viewedLinks: 0,
+        companiesCovered: 0,
+      },
+    };
+  }
+
   const [linksResponse, documentsResponse, accountsResponse] = await Promise.all([
     (supabase as any)
       .from("osgb_client_portal_links")
       .select("id, company_id, access_token, contact_name, contact_email, portal_status, expires_at, last_viewed_at, company:isgkatip_companies(company_name)")
       .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds)
       .order("created_at", { ascending: false }),
     (supabase as any)
       .from("osgb_required_documents")
       .select("company_id, status, delay_days")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
     (supabase as any)
       .from("osgb_finance_accounts")
       .select("company_id, overdue_balance")
-      .eq("organization_id", organizationId),
+      .eq("organization_id", organizationId)
+      .in("company_id", managedCompanyIds),
   ]);
 
   if (linksResponse.error) throw linksResponse.error;
@@ -522,6 +591,11 @@ export const createOsgbClientPortalLink = async (
     expiresAt?: string | null;
   },
 ) => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (!managedCompanyIds.includes(input.companyId)) {
+    throw new Error("Müşteri portalı yalnızca OSGB havuzuna alınmış firmalar için açılabilir.");
+  }
+
   const payload = {
     organization_id: organizationId,
     company_id: input.companyId,
@@ -575,6 +649,11 @@ export const getOsgbClientPortalSnapshot = async (
 export const listOsgbClientPortalUploads = async (
   organizationId: string,
 ): Promise<OsgbClientPortalUploadRecord[]> => {
+  const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
+  if (managedCompanyIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await (supabase as any)
     .from("osgb_client_portal_uploads")
     .select(`
@@ -597,6 +676,7 @@ export const listOsgbClientPortalUploads = async (
       document:osgb_required_documents(document_type)
     `)
     .eq("organization_id", organizationId)
+    .in("company_id", managedCompanyIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
