@@ -261,6 +261,22 @@ function resolveSectorTemplateValue(industrySector?: string | null) {
   return matchedTemplate?.industrySector || industrySector || "";
 }
 
+function normalizeCompanyImportHeader(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeHazardClass(value?: string | null): "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli" {
+  const normalized = normalizeCompanyImportHeader(value || "");
+  if (normalized.includes("cok")) return "Çok Tehlikeli";
+  if (normalized.includes("tehlikeli")) return "Tehlikeli";
+  return "Az Tehlikeli";
+}
+
 export default function CompanyManager() {
   const { user } = useAuth();
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
@@ -274,6 +290,21 @@ export default function CompanyManager() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkImportFileName, setBulkImportFileName] = useState("");
+  const [bulkCompanyRows, setBulkCompanyRows] = useState<Array<{
+    company_name: string;
+    tax_number: string;
+    nace_code: string;
+    hazard_class: "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli";
+    industry_sector: string;
+    address: string;
+    city: string;
+    phone: string;
+    email: string;
+    employee_count: number;
+  }>>([]);
 
   // Step 1: Temel Bilgiler
   const [formData, setFormData] = useState({
@@ -702,6 +733,129 @@ export default function CompanyManager() {
     } catch (error: any) {
       toast.error(`❌ ${error.message}`);
       setEmployeeFile(null);
+    }
+  };
+
+  const parseBulkCompanyFile = async (file: File) => {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array" });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
+
+    const parsedRows = rows
+      .map((row) => {
+        const entries = Object.entries(row).map(([key, value]) => [normalizeCompanyImportHeader(key), value] as const);
+        const getValue = (...keys: string[]) => entries.find(([header]) => keys.includes(header))?.[1];
+
+        const companyName = String(
+          getValue("firmaunvani", "firmaadi", "companyname", "name", "unvan"),
+        ).trim();
+        if (!companyName) return null;
+
+        const naceCode = String(getValue("nacekodu", "nacecode", "nace", "faaliyetkodu") || "").trim();
+        const naceMatch = naceCode
+          ? NACE_DATABASE.find((item) => item.code === naceCode) || searchNACE(naceCode)[0]
+          : undefined;
+
+        const hazardClass = String(getValue("tehlikesinifi", "hazardclass", "sinif") || "").trim();
+        const sectorValue = String(getValue("sektor", "industrysector", "industry", "faaliyetalani") || "").trim();
+
+        return {
+          company_name: companyName,
+          tax_number: String(getValue("vergino", "taxnumber", "taxno") || "").trim(),
+          nace_code: naceCode || naceMatch?.code || "",
+          hazard_class: hazardClass
+            ? normalizeHazardClass(hazardClass)
+            : normalizeHazardClass(naceMatch?.hazard_class),
+          industry_sector: resolveSectorTemplateValue(sectorValue || naceMatch?.industry_sector || ""),
+          address: String(getValue("adres", "address", "adresbilgisi") || "").trim(),
+          city: String(getValue("sehir", "city", "il") || "").trim(),
+          phone: String(getValue("telefon", "phone") || "").trim(),
+          email: String(getValue("eposta", "email", "mail") || "").trim(),
+          employee_count: Number(getValue("calisansayisi", "employeecount", "calisan") || 0),
+        };
+      })
+      .filter(Boolean) as Array<{
+      company_name: string;
+      tax_number: string;
+      nace_code: string;
+      hazard_class: "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli";
+      industry_sector: string;
+      address: string;
+      city: string;
+      phone: string;
+      email: string;
+      employee_count: number;
+    }>;
+
+    return parsedRows;
+  };
+
+  const handleBulkCompanyFileUpload = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const rows = await parseBulkCompanyFile(file);
+      setBulkCompanyRows(rows);
+      setBulkImportFileName(file.name);
+      toast.success(`${rows.length} firma satırı hazırlandı`);
+    } catch (error: any) {
+      toast.error(`Firma dosyası okunamadı: ${error.message}`);
+    }
+  };
+
+  const handleBulkCompanyImport = async () => {
+    if (!user?.id || bulkCompanyRows.length === 0) {
+      toast.error("İçe aktarılacak firma bulunamadı.");
+      return;
+    }
+
+    setBulkImporting(true);
+    let successCount = 0;
+    const failedCompanies: string[] = [];
+
+    try {
+      for (const row of bulkCompanyRows) {
+        try {
+          const matchingTemplate = riskTemplates.find((template) => {
+            const templateSector = resolveSectorTemplateValue(template.industry_sector);
+            return templateSector === row.industry_sector || template.industry_sector === row.industry_sector;
+          });
+
+          const { data, error } = await supabase.rpc("create_company_with_data", {
+            p_owner_id: user.id,
+            p_company_data: row,
+            p_risk_template_id: matchingTemplate?.id || null,
+            p_employees: [],
+          });
+
+          if (error) throw error;
+
+          const result = data as { success: boolean; error?: string };
+          if (!result?.success) throw new Error(result?.error || "Kayıt başarısız");
+
+          successCount += 1;
+        } catch (error) {
+          console.error("Bulk company import row failed:", row.company_name, error);
+          failedCompanies.push(row.company_name);
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`${successCount} firma sisteme eklendi.`);
+      }
+
+      if (failedCompanies.length > 0) {
+        toast.error(`${failedCompanies.length} firma eklenemedi: ${failedCompanies.slice(0, 3).join(", ")}${failedCompanies.length > 3 ? "..." : ""}`);
+      }
+
+      if (successCount > 0) {
+        setBulkImportOpen(false);
+        setBulkCompanyRows([]);
+        setBulkImportFileName("");
+        await loadCompanies();
+      }
+    } finally {
+      setBulkImporting(false);
     }
   };
 
@@ -1714,13 +1868,24 @@ export default function CompanyManager() {
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-        <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 text-white shadow-[0_18px_45px_rgba(56,189,248,0.28)] hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400" size="lg">
-              <Plus className="h-5 w-5" />
-              Yeni Firma Ekle
-            </Button>
-          </DialogTrigger>
+        <div className="flex flex-wrap gap-3">
+          <Button
+            variant="outline"
+            size="lg"
+            className="gap-2 rounded-2xl border-emerald-400/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15"
+            onClick={() => setBulkImportOpen(true)}
+          >
+            <Upload className="h-5 w-5" />
+            Toplu Firma Ekle
+          </Button>
+
+          <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 text-white shadow-[0_18px_45px_rgba(56,189,248,0.28)] hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400" size="lg">
+                <Plus className="h-5 w-5" />
+                Yeni Firma Ekle
+              </Button>
+            </DialogTrigger>
           <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
             <DialogHeader>
               <DialogTitle className="text-xl font-black text-white">
@@ -1835,6 +2000,75 @@ export default function CompanyManager() {
                   )}
                 </Button>
               )}
+            </div>
+          </DialogContent>
+          </Dialog>
+        </div>
+
+        <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
+          <DialogContent className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-white">Toplu Firma Ekle</DialogTitle>
+              <DialogDescription className="text-slate-400">
+                Excel veya CSV dosyasından firmaları tek seferde sisteme ekleyin. Çalışan aktarımı bu akışta yapılmaz.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.03] p-8 transition-colors hover:bg-white/[0.05]">
+                <Upload className="mb-3 h-10 w-10 text-cyan-300" />
+                <span className="text-sm font-semibold text-white">{bulkImportFileName || "Firma dosyası seçin"}</span>
+                <span className="mt-1 text-xs text-slate-400">Excel (.xlsx, .xls) veya CSV</span>
+                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => void handleBulkCompanyFileUpload(e.target.files?.[0] || null)} />
+              </label>
+
+              {bulkCompanyRows.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-white">Önizleme ({bulkCompanyRows.length} firma)</p>
+                    <Button variant="ghost" size="sm" className="text-red-300 hover:text-red-200" onClick={() => { setBulkCompanyRows([]); setBulkImportFileName(""); }}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Temizle
+                    </Button>
+                  </div>
+
+                  <div className="max-h-80 overflow-auto rounded-2xl border border-white/10">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Firma</TableHead>
+                          <TableHead>Vergi No</TableHead>
+                          <TableHead>NACE</TableHead>
+                          <TableHead>Tehlike</TableHead>
+                          <TableHead>Çalışan</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {bulkCompanyRows.map((row, index) => (
+                          <TableRow key={`${row.company_name}-${index}`}>
+                            <TableCell className="font-medium">{row.company_name}</TableCell>
+                            <TableCell>{row.tax_number || "-"}</TableCell>
+                            <TableCell>{row.nace_code || "-"}</TableCell>
+                            <TableCell>{row.hazard_class}</TableCell>
+                            <TableCell>{row.employee_count}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-4 text-sm text-slate-300">
+                  Beklenen alanlar: Firma unvanı, vergi no, NACE kodu, tehlike sınıfı, sektör, adres, şehir, telefon, e-posta, çalışan sayısı.
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setBulkImportOpen(false)}>Kapat</Button>
+              <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void handleBulkCompanyImport()} disabled={bulkImporting || bulkCompanyRows.length === 0}>
+                {bulkImporting ? "Ekleniyor..." : "Firmaları Ekle"}
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
