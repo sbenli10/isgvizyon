@@ -86,6 +86,9 @@ export interface OsgbAutomationAction {
   contactEmail?: string | null;
   contactPhone?: string | null;
   portalLinkToken?: string | null;
+  existingTaskId?: string | null;
+  existingTaskStatus?: string | null;
+  skipReason?: "existing_task" | null;
 }
 
 export interface OsgbAutomationWorkspace {
@@ -95,8 +98,22 @@ export interface OsgbAutomationWorkspace {
     missingProofVisits: number;
     latePayers: number;
     openAutomationTasks: number;
+    blockedByExistingTasks: number;
   };
   actions: OsgbAutomationAction[];
+}
+
+export interface OsgbAutomationBatchResult {
+  createdTasks: number;
+  suggestedActions: number;
+  processed: number;
+  skippedTasks: number;
+  skippedExistingTasks: number;
+  breakdown: {
+    fieldVisit: number;
+    document: number;
+    finance: number;
+  };
 }
 
 export interface OsgbClientPortalLinkRecord {
@@ -213,6 +230,12 @@ const normalizePriority = (value: number) => {
   if (value >= 80) return "critical";
   if (value >= 50) return "high";
   return "medium";
+};
+
+const buildAutomationTaskTitle = (action: Pick<OsgbAutomationAction, "kind" | "companyName">) => {
+  if (action.kind === "document") return `Belge aksiyonu: ${action.companyName}`;
+  if (action.kind === "finance") return `Tahsilat aksiyonu: ${action.companyName}`;
+  return `Hizmet kaniti: ${action.companyName}`;
 };
 
 const mapVisitAutomation = (visit: OsgbFieldVisitRecord): OsgbAutomationAction => ({
@@ -397,7 +420,7 @@ export const listOsgbAutomationWorkspace = async (
     listOsgbFinanceWorkspace(organizationId, userId),
     (supabase as any)
       .from("osgb_tasks")
-      .select("id")
+      .select("id, company_id, title, status")
       .eq("organization_id", organizationId)
       .like("source", "automation_%")
       .in("status", ["open", "in_progress"]),
@@ -469,6 +492,29 @@ export const listOsgbAutomationWorkspace = async (
     }
   }
 
+  const existingTaskMap = new Map<string, { id: string; status: string }>();
+  for (const task of tasks.data ?? []) {
+    const key = `${task.company_id}:${task.title}`;
+    if (!existingTaskMap.has(key)) {
+      existingTaskMap.set(key, {
+        id: task.id,
+        status: task.status,
+      });
+    }
+  }
+
+  let blockedByExistingTasks = 0;
+  for (const action of actions) {
+    const taskKey = `${action.companyId}:${buildAutomationTaskTitle(action)}`;
+    const existingTask = existingTaskMap.get(taskKey);
+    if (existingTask) {
+      action.existingTaskId = existingTask.id;
+      action.existingTaskStatus = existingTask.status;
+      action.skipReason = "existing_task";
+      blockedByExistingTasks += 1;
+    }
+  }
+
   return {
     summary: {
       pendingActions: actions.length,
@@ -476,6 +522,7 @@ export const listOsgbAutomationWorkspace = async (
       missingProofVisits: visits.visits.filter((item) => item.status === "completed" && !item.hasEnoughEvidence).length,
       latePayers: finance.companies.filter((item) => item.lateInvoiceCount > 0).length,
       openAutomationTasks: (tasks.data ?? []).length,
+      blockedByExistingTasks,
     },
     actions,
   };
@@ -484,8 +531,19 @@ export const listOsgbAutomationWorkspace = async (
 export const runOsgbAutomationBatch = async (
   organizationId: string,
   userId: string,
-) => {
+): Promise<OsgbAutomationBatchResult> => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error("Oturum doğrulaması bulunamadı. Lütfen tekrar giriş yapıp yeniden deneyin.");
+  }
+
   const { data, error } = await supabase.functions.invoke("osgb-automation-batch", {
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+    },
     body: {
       organizationId,
       userId,
@@ -503,6 +561,14 @@ export const runOsgbAutomationBatch = async (
   return {
     createdTasks: Number(data?.createdTasks || 0),
     suggestedActions: workspace.actions.length,
+    processed: Number(data?.processed || 0),
+    skippedTasks: Number(data?.skippedTasks || 0),
+    skippedExistingTasks: Number(data?.skippedExistingTasks || 0),
+    breakdown: {
+      fieldVisit: Number(data?.breakdown?.fieldVisit || 0),
+      document: Number(data?.breakdown?.document || 0),
+      finance: Number(data?.breakdown?.finance || 0),
+    },
   };
 };
 

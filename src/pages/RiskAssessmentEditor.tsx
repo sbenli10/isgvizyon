@@ -1,11 +1,10 @@
 ﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { debounce } from "lodash";
 import { supabase } from "@/integrations/supabase/client";
 import { generateRisksWithGemini } from "@/services/geminiService";
 import type { GeminiRiskResult } from "@/services/geminiService";
-import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { toast } from "sonner";
 import {
   Building2,
@@ -59,7 +58,6 @@ import type {
   RiskClass
 } from "@/types/risk-assessment";
 import {
-  SECTORS,
   FINE_KINNEY_SCALES,
   calculateRiskScore,
   getRiskClass,
@@ -69,10 +67,10 @@ import {
 } from "@/types/risk-assessment";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { SendReportModal } from "@/components/SendReportModal";
 import * as XLSX from "xlsx";
+import { buildRiskAssessmentPdf } from "@/lib/riskAssessmentPdfExport";
+import { RISK_SECTOR_CATALOG, buildCatalogKey } from "@/lib/riskSectorCatalog";
 import {
   Dialog,
   DialogContent,
@@ -218,7 +216,9 @@ const COMMON_TEMPLATE_RISKS = [
 export default function RiskAssessmentEditor() {
   const { user } = useAuth();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const createdFromWizard = Boolean((location.state as { createdFromWizard?: boolean } | null)?.createdFromWizard);
+  const activeCompanyId = searchParams.get("companyId") || "";
   const riskPhotoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   // E-posta modal için state'ler
   const [sendModalOpen, setSendModalOpen] = useState(false);
@@ -268,13 +268,19 @@ export default function RiskAssessmentEditor() {
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
   const normalizedAiSector = useMemo(() => normalizeSectorKey(aiSector), [aiSector]);
   const selectedSectorOption = useMemo(
-    () => RISK_SECTORS.find((sector) => sector.id === normalizedAiSector || sector.name.toLowerCase() === aiSector.toLowerCase()),
+    () =>
+      RISK_SECTORS.find(
+        (sector) =>
+          sector.id === aiSector ||
+          sector.id === normalizedAiSector ||
+          buildCatalogKey(sector.name) === buildCatalogKey(aiSector)
+      ),
     [aiSector, normalizedAiSector]
   );
   const selectedSectorMeta = useMemo(
     () =>
       selectedSectorOption
-        ? SECTOR_UI_META[selectedSectorOption.id] ?? {
+        ? SECTOR_UI_META[normalizeSectorKey(selectedSectorOption.name)] ?? {
             accent: "from-slate-500/20 to-slate-700/10",
             hint: "Sektöre özel risk paketi ve önerilen önlemler",
           }
@@ -283,7 +289,7 @@ export default function RiskAssessmentEditor() {
   );
   const selectedSectorRiskPreview = useMemo(() => {
     if (!selectedSectorOption) return [];
-    return generateMockRisksForSector(selectedSectorOption.name.toLowerCase());
+    return generateMockRisksForSector(selectedSectorOption.name);
   }, [selectedSectorOption]);
   const selectedSectorDistribution = useMemo(() => {
     const bucket = { critical: 0, high: 0, monitored: 0 };
@@ -340,6 +346,12 @@ useEffect(() => {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []); // Burayı boş dizi yap, user değişimini AuthContext hallediyor zaten
+
+useEffect(() => {
+  if (!activeCompanyId || companies.length === 0 || assessment?.company_id) return;
+  if (!companies.some((company) => company.id === activeCompanyId)) return;
+  setSelectedCompany((prev) => prev || activeCompanyId);
+}, [activeCompanyId, assessment?.company_id, companies]);
 
 useEffect(() => {
   const stateAssessmentId = (location.state as { assessmentId?: string } | null)?.assessmentId;
@@ -482,20 +494,42 @@ useLayoutEffect(() => {
       console.log(`Fetched ${data?.length || 0} library items`);
       setLibrary(data || []);
       
-      // Risk Paketlerini Oluştur (Sektörlere Göre Grupla)
-      const packages = SECTORS.map(sector => {
-        const items = (data || []).filter(item => 
-          item.sector.toLowerCase().includes(sector.toLowerCase())
-        );
-        
+      // Risk Paketlerini Oluştur (katalog + yerleşik fallback)
+      const packages = RISK_SECTOR_CATALOG.map((sectorDef) => {
+        const items = (data || []).filter((item) => {
+          const itemSector = buildCatalogKey(item.sector || "");
+          const sectorName = buildCatalogKey(sectorDef.name);
+          return itemSector.includes(sectorName) || itemSector === sectorName;
+        });
+
+        const fallbackItems = generateMockRisksForSector(sectorDef.name).map((item, index) => ({
+          id: `${sectorDef.code}-${index + 1}`,
+          sector: sectorDef.name,
+          category: item.category,
+          hazard: item.hazard,
+          risk: item.risk,
+          typical_probability: item.probability,
+          typical_frequency: item.frequency,
+          typical_severity: item.severity,
+          suggested_controls: item.controls,
+          legal_reference: undefined,
+          usage_count: 0,
+          is_active: true,
+        }));
+
+        const resolvedItems: RiskLibraryItem[] =
+          items.length >= sectorDef.itemCount
+            ? (items.slice(0, sectorDef.itemCount) as RiskLibraryItem[])
+            : [...(items as RiskLibraryItem[]), ...fallbackItems.slice(items.length, sectorDef.itemCount)];
+
         return {
-          id: sector,
-          name: sector,
-          sector: sector,
-          item_count: items.length,
-          items: items as RiskLibraryItem[]
+          id: sectorDef.code,
+          name: sectorDef.name,
+          sector: sectorDef.name,
+          item_count: sectorDef.itemCount,
+          items: resolvedItems,
         };
-      }).filter(pkg => pkg.item_count > 0);
+      });
 
       setRiskPackages(packages);
       
@@ -584,10 +618,11 @@ useLayoutEffect(() => {
 
     try {
       const company = companies.find(c => c.id === assessment.company_id);
+      const sectorLabel = selectedSectorOption?.name || sector;
 
       // Gerçek Gemini API çağrısı
       const geminiRisks = await generateRisksWithGemini(
-        sector,
+        sectorLabel,
         company?.name
       );
 
@@ -640,7 +675,7 @@ useLayoutEffect(() => {
         duration: 8000
       });
 
-      const fallbackRisks = generateMockRisksForSector(sector);
+      const fallbackRisks = generateMockRisksForSector(selectedSectorOption?.name || sector);
       setAiRisks(fallbackRisks);
       setShowAiDialog(true);
 
@@ -655,6 +690,8 @@ useLayoutEffect(() => {
   // Mock risk generator (gerçekte OpenAI kullanacağız)
   function generateMockRisksForSector(sector: string): typeof aiRisks {
     const sectorLower = sector.toLowerCase();
+    const catalogSector = RISK_SECTOR_CATALOG.find((item) => buildCatalogKey(item.name) === buildCatalogKey(sector));
+    const targetCount = catalogSector?.itemCount ?? 15;
     
     // Sektöre özel risk templates
     const templates: Record<string, Array<{
@@ -1071,8 +1108,15 @@ useLayoutEffect(() => {
     };
 
     const normalizedSector = normalizeSectorKey(sectorLower);
-    const sectorSpecificRisks = templates[normalizedSector] || templates[sectorLower] || templates['otomotiv'];
-    const risks = [...sectorSpecificRisks, ...COMMON_TEMPLATE_RISKS].slice(0, 12);
+    const sectorSpecificRisks = templates[normalizedSector] || templates[sectorLower] || templates["otomotiv"];
+    const baseRisks = [...sectorSpecificRisks, ...COMMON_TEMPLATE_RISKS];
+    const risks = Array.from({ length: targetCount }, (_, index) => {
+      const template = baseRisks[index % baseRisks.length];
+      return {
+        ...template,
+        hazard: `${template.hazard}${index >= baseRisks.length ? ` ${index + 1}` : ""}`,
+      };
+    });
 
     return risks.map((r, idx) => {
       const score = r.o * r.f * r.s;
@@ -1667,7 +1711,7 @@ useLayoutEffect(() => {
                 className="border border-cyan-400/15 bg-slate-950/95 text-slate-100 backdrop-blur-xl"
               >
                 {RISK_SECTORS.map((sector) => {
-                  const meta = SECTOR_UI_META[sector.id] ?? {
+                  const meta = SECTOR_UI_META[normalizeSectorKey(sector.name)] ?? {
                     accent: "from-slate-500/20 to-slate-700/10",
                     hint: "Sektöre özel risk paketi ve önerilen önlemler",
                   };
@@ -1675,7 +1719,7 @@ useLayoutEffect(() => {
                   return (
                   <SelectItem
                     key={sector.id}
-                    value={sector.name.toLowerCase()}
+                    value={sector.id}
                     className="rounded-xl px-3 py-3 text-slate-100 focus:bg-white/[0.08] focus:text-foreground"
                   >
                     <div className="flex min-w-[220px] max-w-full items-center gap-3">
@@ -1683,11 +1727,11 @@ useLayoutEffect(() => {
                         <span aria-hidden="true">{sector.icon}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-100">{sector.name}</p>
+                        <p className="text-sm font-semibold text-slate-100">{sector.id} · {sector.name}</p>
                         <p className="text-xs text-muted-foreground">{meta.hint}</p>
                       </div>
                       <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-[10px] text-cyan-200">
-                        Hazır Paket
+                        {sector.itemCount} Madde
                       </Badge>
                     </div>
                   </SelectItem>
@@ -2069,10 +2113,10 @@ useLayoutEffect(() => {
       const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase());
       if (!selectedSectorOption) return matchesSearch;
 
-      const normalizedPackageSector = normalizeSectorKey(pkg.sector || "");
+      const normalizedPackageSector = buildCatalogKey(pkg.sector || "");
       const matchesSector =
-        normalizedPackageSector === selectedSectorOption.id ||
-        pkg.name.toLowerCase().includes(selectedSectorOption.name.toLowerCase());
+        normalizedPackageSector === buildCatalogKey(selectedSectorOption.name) ||
+        buildCatalogKey(pkg.name).includes(buildCatalogKey(selectedSectorOption.name));
 
       return matchesSearch && matchesSector;
     });
@@ -2137,7 +2181,7 @@ useLayoutEffect(() => {
                           {String(index + 1).padStart(2, "0")}
                         </div>
                         <div className="text-left">
-                          <p className="text-sm font-semibold text-slate-100">{pkg.name}</p>
+                          <p className="text-sm font-semibold text-slate-100">{pkg.id} · {pkg.name}</p>
                           <p className="text-xs text-muted-foreground">{pkg.item_count} risk maddesi</p>
                         </div>
                       </div>
@@ -2760,238 +2804,35 @@ useLayoutEffect(() => {
     );
   };
 
-   const exportToPDF = async () => {
-  if (!assessment || riskItems.length === 0) {
-    toast.error("PDF oluşturmak için veri yok");
-    return;
-  }
-
-  toast.info("Profesyonel PDF oluşturuluyor...");
-
-  try {
-    const doc = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
-    });
-
-    addInterFontsToJsPDF(doc);
-    doc.setFont("Inter");
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const company = companies.find(c => c.id === assessment.company_id);
-    const logoDataUrl = await loadImageAsDataUrl(company?.logo_url);
-
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 30, "F");
-    doc.setDrawColor(34, 211, 238);
-    doc.setLineWidth(0.8);
-    doc.line(0, 30, pageWidth, 30);
-
-    if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", 12, 6, 18, 16);
+  const exportToPDF = async () => {
+    if (!assessment || riskItems.length === 0) {
+      toast.error("PDF oluşturmak için veri yok");
+      return;
     }
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont("Inter", "bold");
-    doc.text("KURUMSAL RİSK DEĞERLENDİRME FORMU", pageWidth / 2, 13, { align: 'center' });
-    doc.setFontSize(8.5);
-    doc.setFont("Inter", "normal");
-    doc.text("Operasyon özeti, risk dağılımı ve önerilen aksiyonlar", pageWidth / 2, 20, { align: 'center' });
-    const coverBoxX = pageWidth - 74;
-    const coverBoxY = 5.5;
-    const coverBoxW = 60;
-    const coverBoxH = 24;
-    const coverCenterX = coverBoxX + coverBoxW / 2;
-    doc.roundedRect(coverBoxX, coverBoxY, coverBoxW, coverBoxH, 3, 3, "S");
-    doc.setTextColor(226, 232, 240);
-    doc.setDrawColor(125, 211, 252);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(coverBoxX + 4, coverBoxY + 4, 5.5, 7, 1.2, 1.2, "S");
-    doc.line(coverBoxX + 5.2, coverBoxY + 6.1, coverBoxX + 8.3, coverBoxY + 6.1);
-    doc.line(coverBoxX + 5.2, coverBoxY + 7.8, coverBoxX + 8.3, coverBoxY + 7.8);
-    doc.setFont("Inter", "bold");
-    doc.setFontSize(7.2);
-    doc.text("Kurum Kapak Bloğu", coverCenterX + 2, 10.3, { align: "center" });
-    doc.setFontSize(8.3);
-    doc.text(`Rev. ${assessment.version ?? 0}`, coverCenterX + 2, 15.4, { align: "center" });
-    doc.setFont("Inter", "normal");
-    doc.setFontSize(6.2);
-    doc.text("Oluşturulma", coverCenterX + 2, 20.1, { align: "center" });
-    doc.setFontSize(6.5);
-    doc.text(format(new Date(), "dd.MM.yyyy HH:mm", { locale: tr }), coverCenterX + 2, 23.2, { align: "center" });
+    toast.info("Profesyonel PDF oluşturuluyor...");
 
-    doc.setTextColor(30, 41, 59);
-    doc.setFillColor(248, 250, 252);
-    doc.roundedRect(10, 36, pageWidth - 20, 16, 3, 3, "F");
-    doc.setFontSize(9);
-    doc.setFont("Inter", "normal");
-    doc.text(`Firma: ${company?.name || "—"}`, 15, 43);
-    doc.text(`Değerlendiren: ${assessment.assessor_name || "—"}`, 15, 48);
-    doc.text(`Bölüm: ${assessment.department || "Tüm Bölümler"}`, 90, 43);
-    doc.text(`Tarih: ${format(new Date(assessment.assessment_date), 'dd.MM.yyyy', { locale: tr })}`, 90, 48);
-    doc.text(`Form No: ${assessment.id.substring(0, 8).toUpperCase()}`, pageWidth - 65, 43);
-    doc.text(`Yöntem: Fine-Kinney (2 Aşama)`, pageWidth - 65, 48);
+    try {
+      const company = companies.find((c) => c.id === assessment.company_id);
+      const doc = await buildRiskAssessmentPdf({
+        assessment,
+        riskItems,
+        company,
+        loadImageAsDataUrl,
+      });
 
-    // ========================
-    // STATISTICS
-    // ========================
-    doc.setFontSize(8);
-    doc.setFont("Inter", "bold");
-    doc.text("OPERASYON ÖZETİ:", 15, 58);
-    doc.setFont("Inter", "normal");
-      const stats = {
-      total: riskItems.length,
-      critical: riskItems.filter(i => i.risk_class_1 === "Çok Yüksek").length,
-      residual_safe: riskItems.filter(i => (i.risk_class_2 === "Kabul Edilebilir" || i.risk_class_2 === "Olası")).length
-    };
-    doc.text(`Toplam: ${stats.total} | Kritik: ${stats.critical} | Kalıntı Risk Güvenli: ${stats.residual_safe}`, 50, 58);
-
-    // ========================
-    // MAIN TABLE DATA
-    // ========================
-    const sharePhotoDataMap = new Map<string, string>();
-    await Promise.all(
-      riskItems.map(async (item) => {
-        if (item.photo_url) {
-          const dataUrl = await loadImageAsDataUrl(item.photo_url);
-          if (dataUrl) {
-            sharePhotoDataMap.set(item.id, dataUrl);
-          }
-        }
-      })
-    );
-
-    const tableData = riskItems.map((item, idx) => [
-      String(idx + 1).padStart(2, '0'),
-      item.department || "—",
-      sharePhotoDataMap.has(item.id) ? " " : "—",
-      item.hazard || "—",
-      item.risk || "—",
-      item.affected_people || "—",
-      item.probability_1.toString(),
-      item.frequency_1.toString(),
-      item.severity_1.toString(),
-      item.score_1.toString(),
-      getRiskClassLabel(item.risk_class_1),
-      item.proposed_controls || "—",
-      (item.probability_2 || 0).toString(),
-      (item.frequency_2 || 0).toString(),
-      (item.severity_2 || 0).toString(),
-      (item.score_2 || 0).toString(),
-      getRiskClassLabel(item.risk_class_2 || "Kabul Edilebilir"),
-      item.responsible_person || "—",
-      item.deadline ? format(new Date(item.deadline), 'dd.MM.yy', { locale: tr }) : "—"
-    ]);
-
-    autoTable(doc, {
-      startY: 63,
-      head: [['No', 'Bölüm', 'Foto', 'Tehlike', 'Risk', 'Etkilenen', 'O', 'F', 'Ş', 'Skor', 'Sınıf', 'Önlemler', 'O', 'F', 'Ş', 'Skor', 'Sınıf', 'Sorumlu', 'Termin']],
-      body: tableData,
-      theme: 'grid',
-      styles: {
-        fontSize: 6,
-        cellPadding: 1.5,
-        font: "Inter",
-        lineColor: [148, 163, 184],
-        lineWidth: 0.1,
-        textColor: [30, 41, 59],
-        fillColor: [248, 250, 252],
-        valign: "middle"
-      },
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
-        font: "Inter",
-        fontStyle: 'bold',
-        halign: 'center',
-        valign: 'middle',
-        fontSize: 7
-      },
-      columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 20 },
-        2: { cellWidth: 16, halign: "center" },
-        3: { cellWidth: 27 },
-        4: { cellWidth: 30 },
-        5: { cellWidth: 18 },
-        6: { cellWidth: 8, halign: "center" },
-        7: { cellWidth: 8, halign: "center" },
-        8: { cellWidth: 8, halign: "center" },
-        9: { cellWidth: 10, halign: "center" },
-        10: { cellWidth: 16, halign: "center" },
-        11: { cellWidth: 36 },
-        12: { cellWidth: 8, halign: "center" },
-        13: { cellWidth: 8, halign: "center" },
-        14: { cellWidth: 8, halign: "center" },
-        15: { cellWidth: 10, halign: "center" },
-        16: { cellWidth: 16, halign: "center" },
-        17: { cellWidth: 20 },
-        18: { cellWidth: 16, halign: "center" },
-      },
-      didParseCell: (data) => {
-        if (data.section === "body") {
-          data.cell.styles.fillColor = data.row.index % 2 === 0 ? [248, 250, 252] : [241, 245, 249];
-          if (data.column.index === 2) {
-            data.cell.styles.fillColor = [240, 249, 255];
-          }
-          if (data.column.index >= 6 && data.column.index <= 10) {
-            data.cell.styles.fillColor = [254, 242, 242];
-          }
-          if (data.column.index === 11) {
-            data.cell.styles.fillColor = [236, 254, 255];
-          }
-          if (data.column.index >= 12 && data.column.index <= 16) {
-            data.cell.styles.fillColor = [240, 253, 244];
-          }
-
-          const riskItem = riskItems[data.row.index];
-          const contentLength =
-            (riskItem?.hazard?.length || 0) +
-            (riskItem?.risk?.length || 0) +
-            (riskItem?.proposed_controls?.length || 0);
-          if (riskItem?.photo_url || contentLength > 180) {
-            data.cell.styles.minCellHeight = contentLength > 260 ? 24 : 18;
-          }
-        }
-      },
-      didDrawCell: (data) => {
-        if (data.section === "body" && data.column.index === 2) {
-          const riskItem = riskItems[data.row.index];
-          const imageData = riskItem ? sharePhotoDataMap.get(riskItem.id) : null;
-          if (imageData) {
-            const size = Math.min(data.cell.width - 3, data.cell.height - 3, 13);
-            const x = data.cell.x + (data.cell.width - size) / 2;
-            const y = data.cell.y + (data.cell.height - size) / 2;
-            doc.addImage(imageData, "JPEG", x, y, size, size);
-          }
-        }
-      },
-      margin: { left: 8, right: 8 },
-      tableWidth: 'auto'
-    });
-
-    // FOOTER
-    doc.setPage(doc.internal.pages.length - 1);
-    doc.setFontSize(7);
-    doc.setFont("Inter", "normal"); 
-    doc.text(`Bu rapor İSGVizyon İSG Yazılımı ile oluşturulmuştur.`, pageWidth / 2, pageHeight - 8, { align: 'center' });
-
-    doc.save(`Risk-Analiz-${assessment.id.substring(0, 8)}.pdf`);
-    toast.success("PDF rapor indirildi");
-
-  } catch (error: any) {
-    console.error("PDF error:", error);
-    toast.error("PDF oluşturma hatası");
-  }
-};
+      doc.save(`Risk-Analiz-${assessment.id.substring(0, 8)}.pdf`);
+      toast.success("PDF rapor indirildi");
+    } catch (error: any) {
+      console.error("PDF error:", error);
+      toast.error("PDF oluşturma hatası");
+    }
+  };
 
 // PDF export fonksiyonundan sonra:
 // PDF Export ve Share Fonksiyonu
 const exportToPDFAndShare = async () => {
-  if (riskItems.length === 0) {
+  if (!assessment || riskItems.length === 0) {
     toast.error("Rapor oluşturmak için en az bir risk kaydı gerekli");
     return;
   }
@@ -3000,214 +2841,13 @@ const exportToPDFAndShare = async () => {
     setSaving(true);
     toast.info("PDF raporu oluşturuluyor...");
 
-    // 1. PDF BLOB OLUŞTUR (Mevcut exportToPDF fonksiyonundan al)
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
-
-    addInterFontsToJsPDF(doc);
-    doc.setFont("Inter", "normal");
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
     const company = companies.find((c) => c.id === assessment?.company_id);
-    const logoDataUrl = await loadImageAsDataUrl(company?.logo_url);
-
-    // Header
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, 0, pageWidth, 28, "F");
-    if (logoDataUrl) {
-      doc.addImage(logoDataUrl, "PNG", 12, 6, 16, 14);
-    }
-
-    doc.setFont("Inter", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(255, 255, 255);
-    doc.text("KURUMSAL RİSK DEĞERLENDİRME ÖZETİ", pageWidth / 2, 12, { align: "center" });
-    const shareCoverBoxX = pageWidth - 74;
-    const shareCoverBoxY = 5;
-    const shareCoverBoxW = 60;
-    const shareCoverBoxH = 23;
-    const shareCoverCenterX = shareCoverBoxX + shareCoverBoxW / 2;
-    doc.roundedRect(shareCoverBoxX, shareCoverBoxY, shareCoverBoxW, shareCoverBoxH, 3, 3, "S");
-    doc.setDrawColor(125, 211, 252);
-    doc.setLineWidth(0.35);
-    doc.roundedRect(shareCoverBoxX + 4, shareCoverBoxY + 4, 5.5, 7, 1.2, 1.2, "S");
-    doc.line(shareCoverBoxX + 5.2, shareCoverBoxY + 6.1, shareCoverBoxX + 8.3, shareCoverBoxY + 6.1);
-    doc.line(shareCoverBoxX + 5.2, shareCoverBoxY + 7.8, shareCoverBoxX + 8.3, shareCoverBoxY + 7.8);
-    doc.setFont("Inter", "bold");
-    doc.setFontSize(7.1);
-    doc.text("Kurum Kapak Bloğu", shareCoverCenterX + 2, 9.9, { align: "center" });
-    doc.setFontSize(8.1);
-    doc.text(`Rev. ${assessment?.version ?? 0}`, shareCoverCenterX + 2, 14.9, { align: "center" });
-    doc.setFont("Inter", "normal");
-    doc.setFontSize(6.1);
-    doc.text("Oluşturulma", shareCoverCenterX + 2, 19.2, { align: "center" });
-    doc.setFontSize(6.4);
-    doc.text(format(new Date(), "dd.MM.yyyy HH:mm", { locale: tr }), shareCoverCenterX + 2, 22.1, { align: "center" });
-
-    doc.setFontSize(9);
-    doc.setFont("Inter", "normal");
-    doc.text(
-      `Firma: ${company?.name || "—"}`,
-      14,
-      20
-    );
-    doc.text(
-      `Tarih: ${format(new Date(), "dd MMMM yyyy", { locale: tr })}`,
-      pageWidth - 14,
-      20,
-      { align: "right" }
-    );
-
-    // Stats
-    const stats = {
-      total: riskItems.length,
-      critical: riskItems.filter(
-        (i) => i.risk_class_1 === "Yüksek" || i.risk_class_1 === "Çok Yüksek"
-      ).length,
-      residual_safe: riskItems.filter(
-        (i) => i.risk_class_2 === "Kabul Edilebilir" || i.risk_class_2 === "Olası"
-      ).length,
-    };
-
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(8);
-    doc.text(
-      `Toplam: ${stats.total} | Kritik: ${stats.critical} | Kalıntı Risk Güvenli: ${stats.residual_safe}`,
-      50,
-      42
-    );
-
-    const photoDataMap = new Map<string, string>();
-    await Promise.all(
-      riskItems.map(async (item) => {
-        if (item.photo_url) {
-          const dataUrl = await loadImageAsDataUrl(item.photo_url);
-          if (dataUrl) {
-            photoDataMap.set(item.id, dataUrl);
-          }
-        }
-      })
-    );
-
-    // Table
-    const tableData = riskItems.map((item, idx) => [
-      String(idx + 1).padStart(2, "0"),
-      item.department || "—",
-      photoDataMap.has(item.id) ? " " : "—",
-      item.hazard || "—",
-      item.risk || "—",
-      item.affected_people || "—",
-      item.probability_1.toString(),
-      item.frequency_1.toString(),
-      item.severity_1.toString(),
-      item.score_1.toString(),
-      getRiskClassLabel(item.risk_class_1),
-      item.proposed_controls || "—",
-      item.probability_2.toString(),
-      item.frequency_2.toString(),
-      item.severity_2.toString(),
-      item.score_2.toString(),
-      getRiskClassLabel(item.risk_class_2),
-    ]);
-
-    autoTable(doc, {
-      head: [
-        [
-          "No",
-          "Birim",
-          "Foto",
-          "Tehlike",
-          "Risk",
-          "Etkilenen",
-          "O1",
-          "F1",
-          "Ş1",
-          "Skor",
-          "Risk Sınıfı",
-          "Önlemler",
-          "O2",
-          "F2",
-          "Ş2",
-          "Skor",
-          "Kalıntı Risk",
-        ],
-      ],
-      body: tableData,
-      startY: 50,
-      styles: { fontSize: 7, cellPadding: 1.5, font: "Inter", lineColor: [148, 163, 184], lineWidth: 0.1, textColor: [30, 41, 59], fillColor: [248, 250, 252], valign: "middle" },
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
-        fontStyle: "bold",
-      },
-      columnStyles: {
-        0: { cellWidth: 8 },
-        1: { cellWidth: 18 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 24 },
-        4: { cellWidth: 24 },
-        5: { cellWidth: 14 },
-        6: { cellWidth: 8 },
-        7: { cellWidth: 8 },
-        8: { cellWidth: 8 },
-        9: { cellWidth: 10 },
-        10: { cellWidth: 14 },
-        11: { cellWidth: 28 },
-        12: { cellWidth: 8 },
-        13: { cellWidth: 8 },
-        14: { cellWidth: 8 },
-        15: { cellWidth: 10 },
-        16: { cellWidth: 14 },
-      },
-      didParseCell: (data) => {
-        if (data.section === "body") {
-          data.cell.styles.fillColor = data.row.index % 2 === 0 ? [248, 250, 252] : [241, 245, 249];
-          if (data.column.index === 2) data.cell.styles.fillColor = [240, 249, 255];
-          if (data.column.index >= 6 && data.column.index <= 10) data.cell.styles.fillColor = [254, 242, 242];
-          if (data.column.index === 11) data.cell.styles.fillColor = [236, 254, 255];
-          if (data.column.index >= 12 && data.column.index <= 16) data.cell.styles.fillColor = [240, 253, 244];
-
-          const riskItem = riskItems[data.row.index];
-          const contentLength =
-            (riskItem?.hazard?.length || 0) +
-            (riskItem?.risk?.length || 0) +
-            (riskItem?.proposed_controls?.length || 0);
-          if (riskItem?.photo_url || contentLength > 180) {
-            data.cell.styles.minCellHeight = contentLength > 260 ? 24 : 18;
-          }
-        }
-      },
-      didDrawCell: (data) => {
-        if (data.section === "body" && data.column.index === 2) {
-          const riskItem = riskItems[data.row.index];
-          const imageData = riskItem ? photoDataMap.get(riskItem.id) : null;
-          if (imageData) {
-            const size = Math.min(data.cell.width - 3, data.cell.height - 3, 14);
-            const x = data.cell.x + (data.cell.width - size) / 2;
-            const y = data.cell.y + (data.cell.height - size) / 2;
-            doc.addImage(imageData, "JPEG", x, y, size, size);
-          }
-        }
-      },
-      margin: { left: 8, right: 8 },
-      tableWidth: "auto",
+    const doc = await buildRiskAssessmentPdf({
+      assessment,
+      riskItems,
+      company,
+      loadImageAsDataUrl,
     });
-
-    // Footer
-    doc.setPage(doc.internal.pages.length - 1);
-    doc.setFontSize(7);
-    doc.setFont("Inter", "normal");
-    doc.text(
-      `Bu rapor İSGVizyon İSG Yazılımı ile oluşturulmuştur.`,
-      pageWidth / 2,
-      pageHeight - 8,
-      { align: "center" }
-    );
 
     const pdfBlob = doc.output("blob");
 
@@ -3598,6 +3238,29 @@ const exportToPDFAndShare = async () => {
                 </div>
 
                 <div className="space-y-5">
+                  {activeCompanyId ? (
+                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div className="space-y-1">
+                          <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+                          <p className="text-sm text-muted-foreground">
+                            Firma 360 icinden acildigi icin firma secimi otomatik uygulanir.
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const next = new URLSearchParams(searchParams);
+                            next.delete("companyId");
+                            setSearchParams(next);
+                          }}
+                        >
+                          Baglami kaldir
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                   <div>
                     <Label className="mb-2 block text-foreground">Firma Seçin</Label>
                     <Select value={selectedCompany} onValueChange={setSelectedCompany}>
@@ -3803,9 +3466,3 @@ const exportToPDFAndShare = async () => {
     </div>
   );
 }
-
-
-
-
-
-

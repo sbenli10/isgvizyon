@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
-import { Building2, Download, Link2, Plus, RefreshCcw, Search, ShieldAlert, Upload } from "lucide-react";
+import { BookOpen, Building2, Download, Link2, Plus, RefreshCcw, Search, ShieldAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
@@ -129,6 +130,7 @@ const parseImportRows = async (file: File): Promise<OsgbCompanyManagementInput[]
 };
 
 export default function OSGBCompanyTracking() {
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { canManageOperations, roleLabel } = useOsgbAccess();
   const organizationId = profile?.organization_id || null;
@@ -331,6 +333,10 @@ export default function OSGBCompanyTracking() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate("/osgb/how-to")}>
+            <BookOpen className="mr-2 h-4 w-4" />
+            Nasıl kullanılır
+          </Button>
           <Button variant="outline" onClick={() => void loadData()}>
             <RefreshCcw className="mr-2 h-4 w-4" />
             Yenile

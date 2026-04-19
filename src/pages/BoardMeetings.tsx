@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMemo } from "react";
 import {
   Users,
   Plus,
@@ -64,7 +65,9 @@ const getBoardMeetingsCacheKey = (userId: string) =>
 
 export default function BoardMeetings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const activeCompanyId = searchParams.get("companyId") || "";
 
   const [meetings, setMeetings] = useState<BoardMeetingListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,9 +208,23 @@ export default function BoardMeetings() {
 
     const matchesStatus =
       filterStatus === "all" || meeting.status === filterStatus;
+    const matchesCompany =
+      !activeCompanyId || meeting.company_id === activeCompanyId;
 
-    return matchesSearch && matchesStatus;
+    return matchesSearch && matchesStatus && matchesCompany;
   });
+
+  const activeCompanyName = useMemo(
+    () =>
+      activeCompanyId
+        ? meetings.find((meeting) => meeting.company_id === activeCompanyId)?.company?.name || ""
+        : "",
+    [activeCompanyId, meetings],
+  );
+
+  const contextSuffix = activeCompanyId
+    ? `?companyId=${encodeURIComponent(activeCompanyId)}`
+    : "";
 
   if (loading) {
     return (
@@ -245,6 +262,29 @@ export default function BoardMeetings() {
 
   return (
     <div className="theme-page-readable min-h-screen bg-background p-6 space-y-6">
+      {activeCompanyId ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCompanyName || "Secili firma"} icin kurul toplantilari listeleniyor.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+              }}
+            >
+              Tum firmalari goster
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-3xl font-bold text-foreground">
@@ -257,7 +297,7 @@ export default function BoardMeetings() {
         </div>
 
         <Button
-          onClick={() => navigate("/board-meetings/new")}
+          onClick={() => navigate(`/board-meetings/new${contextSuffix}`)}
           className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
         >
           <Plus className="h-4 w-4" />
@@ -276,7 +316,7 @@ export default function BoardMeetings() {
         </Button>
 
         <Button
-          onClick={() => navigate("/board-meetings/new")}
+          onClick={() => navigate(`/board-meetings/new${contextSuffix}`)}
           className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
         >
           <Plus className="h-4 w-4" />
@@ -387,12 +427,16 @@ export default function BoardMeetings() {
           <Card className="cardBase">
             <CardContent className="p-12 text-center">
               <Users className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
-              <h3 className="mb-2 text-lg font-semibold text-foreground">{"Hen\u00fcz toplant\u0131 yok"}</h3>
+              <h3 className="mb-2 text-lg font-semibold text-foreground">
+                {activeCompanyId ? "Bu firma icin toplanti yok" : "Hen\u00fcz toplant\u0131 yok"}
+              </h3>
               <p className="mb-6 text-muted-foreground">
-                {'\u0130lk \u0130SG kurul toplant\u0131n\u0131z\u0131 olu\u015fturmak i\u00e7in "Yeni Toplant\u0131" butonuna t\u0131klay\u0131n.'}
+                {activeCompanyId
+                  ? "Firma 360 baglamindan bu firmaya ait ilk kurul toplantisini olusturabilirsiniz."
+                  : '\u0130lk \u0130SG kurul toplant\u0131n\u0131z\u0131 olu\u015fturmak i\u00e7in "Yeni Toplant\u0131" butonuna t\u0131klay\u0131n.'}
               </p>
               <Button
-                onClick={() => navigate("/board-meetings/new")}
+                onClick={() => navigate(`/board-meetings/new${contextSuffix}`)}
                 className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600"
               >
                 <Plus className="h-4 w-4" />

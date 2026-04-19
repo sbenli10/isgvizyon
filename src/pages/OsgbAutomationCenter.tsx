@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { listOsgbAutomationWorkspace, runOsgbAutomationBatch, type OsgbAutomationWorkspace } from "@/lib/osgbOrchestration";
+import { listOsgbAutomationWorkspace, runOsgbAutomationBatch, type OsgbAutomationBatchResult, type OsgbAutomationWorkspace } from "@/lib/osgbOrchestration";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 
 const kindIcon = {
@@ -26,6 +26,7 @@ export default function OsgbAutomationCenter() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastRunResult, setLastRunResult] = useState<OsgbAutomationBatchResult | null>(null);
   usePageDataTiming(loading);
 
   const loadData = useCallback(async () => {
@@ -59,8 +60,15 @@ export default function OsgbAutomationCenter() {
     setRunning(true);
     try {
       const result = await runOsgbAutomationBatch(organizationId, user.id);
+      setLastRunResult(result);
       await loadData();
-      toast.success(`${result.createdTasks} yeni gorev ve bildirim uretildi.`);
+      if (result.createdTasks > 0) {
+        toast.success(`${result.createdTasks} yeni görev üretildi.`);
+      } else if (result.skippedExistingTasks > 0) {
+        toast.info(`Yeni görev üretilmedi. ${result.skippedExistingTasks} aksiyon için zaten açık görev var.`);
+      } else {
+        toast.info("Yeni görev üretilmedi. Şu anda otomasyona düşen yeni bir baskı görünmüyor.");
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Otomasyon calistirilamadi.");
     } finally {
@@ -97,6 +105,10 @@ export default function OsgbAutomationCenter() {
     window.open(`https://wa.me/${cleaned}?text=${encodeURIComponent(action)}`, "_blank", "noopener,noreferrer");
   };
 
+  const emptyStateMessage = workspace?.summary.blockedByExistingTasks
+    ? "Yeni aksiyon baskısı var ama bunların tamamı için zaten açık otomasyon görevi bulunuyor."
+    : "Şu an otomasyonun aksiyona çevirmesi gereken açık bir baskı görünmüyor.";
+
   return (
     <div className="container mx-auto space-y-6 py-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -131,12 +143,23 @@ export default function OsgbAutomationCenter() {
         </Alert>
       ) : null}
 
+      {lastRunResult ? (
+        <Alert className="border-cyan-500/20 bg-cyan-500/10 text-cyan-50">
+          <BellRing className="h-4 w-4" />
+          <AlertTitle>Son batch sonucu</AlertTitle>
+          <AlertDescription>
+            {lastRunResult.processed} aksiyon işlendi, {lastRunResult.createdTasks} yeni görev oluşturuldu, {lastRunResult.skippedExistingTasks} aksiyon mevcut açık görev olduğu için atlandı.
+            {` `}Dağılım: saha {lastRunResult.breakdown.fieldVisit}, evrak {lastRunResult.breakdown.document}, finans {lastRunResult.breakdown.finance}.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Bekleyen aksiyon</CardDescription><CardTitle className="text-white">{workspace?.summary.pendingActions || 0}</CardTitle></CardHeader></Card>
         <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Geciken evrak</CardDescription><CardTitle className="text-rose-200">{workspace?.summary.overdueDocuments || 0}</CardTitle></CardHeader></Card>
         <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Kanit eksik ziyaret</CardDescription><CardTitle className="text-amber-200">{workspace?.summary.missingProofVisits || 0}</CardTitle></CardHeader></Card>
         <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Geciken odeme</CardDescription><CardTitle className="text-cyan-200">{workspace?.summary.latePayers || 0}</CardTitle></CardHeader></Card>
-        <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Acik otomasyon gorevi</CardDescription><CardTitle className="text-white">{workspace?.summary.openAutomationTasks || 0}</CardTitle></CardHeader></Card>
+        <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardDescription>Açık otomasyon görevi</CardDescription><CardTitle className="text-white">{workspace?.summary.openAutomationTasks || 0}</CardTitle><CardDescription className="pt-1">Mevcut görev yüzünden atlanan: {workspace?.summary.blockedByExistingTasks || 0}</CardDescription></CardHeader></Card>
       </div>
 
       <Card className="border-slate-800 bg-slate-900/70">
@@ -170,13 +193,27 @@ export default function OsgbAutomationCenter() {
                       <Badge className={action.priority === "critical" ? "bg-rose-500/15 text-rose-200" : "bg-amber-500/15 text-amber-200"}>
                         {action.priority === "critical" ? "Kritik" : "Yuksek"}
                       </Badge>
+                      {action.skipReason === "existing_task" ? (
+                        <Badge className="bg-cyan-500/15 text-cyan-200">Zaten açık görev var</Badge>
+                      ) : null}
                     </div>
                   </div>
+                  {action.skipReason === "existing_task" ? (
+                    <div className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+                      Bu aksiyon için yeni görev üretilmedi çünkü aynı firma ve başlıkta açık bir otomasyon görevi zaten bulunuyor.
+                    </div>
+                  ) : null}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => navigate(action.actionUrl)} disabled={!canManageOperations}>
                       <ExternalLink className="mr-2 h-4 w-4" />
                       Operasyon ekranını aç
                     </Button>
+                    {action.existingTaskId ? (
+                      <Button size="sm" variant="outline" onClick={() => navigate(`/osgb/tasks?taskId=${encodeURIComponent(action.existingTaskId)}`)}>
+                        <BellRing className="mr-2 h-4 w-4" />
+                        AÃ§Ä±k gÃ¶reve git
+                      </Button>
+                    ) : null}
                     <Button size="sm" variant="outline" onClick={() => openMail(action.contactEmail, action.reason, action.companyName)}>
                       <Mail className="mr-2 h-4 w-4" />
                       E-posta hazırla
@@ -200,7 +237,7 @@ export default function OsgbAutomationCenter() {
             })
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-5 text-sm text-slate-400">
-              Su an otomasyonun aksiyona cevirmesi gereken acik bir baski gorunmuyor.
+              {emptyStateMessage}
             </div>
           )}
         </CardContent>

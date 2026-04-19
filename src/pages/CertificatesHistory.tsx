@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CalendarDays, Download, Eye, Filter, Loader2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +73,7 @@ function getHistoryStatusMeta(job: CertificateJobRecord | null) {
 }
 
 export default function CertificatesHistory() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<CertificateHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -81,10 +82,17 @@ export default function CertificatesHistory() {
   const [companyFilter, setCompanyFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const activeCompanyId = searchParams.get("companyId") || "";
+  const activeCompanyName = searchParams.get("companyName") || "";
 
   useEffect(() => {
     void loadHistory();
   }, []);
+
+  useEffect(() => {
+    if (!activeCompanyName || companyFilter !== "all") return;
+    setCompanyFilter(activeCompanyName);
+  }, [activeCompanyName, companyFilter]);
 
   async function loadHistory() {
     setLoading(true);
@@ -176,6 +184,32 @@ export default function CertificatesHistory() {
 
   return (
     <div className="space-y-6">
+      {activeCompanyId || activeCompanyName ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCompanyName || "Secili firma"} icin sertifika gecmisi oncelikli olarak filtreleniyor.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                next.delete("companyName");
+                setSearchParams(next);
+                setCompanyFilter("all");
+              }}
+            >
+              Tum firmalari goster
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Sertifika Geçmişi</h1>
@@ -267,7 +301,7 @@ export default function CertificatesHistory() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" asChild className="gap-2"><Link to={`/dashboard/certificates/${row.id}`}><Eye className="h-4 w-4" /> Detay</Link></Button>
+                  <Button variant="outline" asChild className="gap-2"><Link to={`/dashboard/certificates/${row.id}${activeCompanyId || activeCompanyName ? `?${new URLSearchParams({ ...(activeCompanyId ? { companyId: activeCompanyId } : {}), ...(activeCompanyName ? { companyName: activeCompanyName } : {}) }).toString()}` : ""}`}><Eye className="h-4 w-4" /> Detay</Link></Button>
                   <Button variant="outline" className="gap-2" onClick={() => row.id && void handleDownload(row.id)} disabled={!row.latestJob?.zip_path}><Download className="h-4 w-4" /> ZIP</Button>
                 </div>
               </CardContent>

@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Trash2,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
@@ -215,7 +216,9 @@ const formatDate = (value: string | null) =>
 
 export default function IncidentManagement() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { role, canManage, isViewer } = useAccessRole();
+  const activeCompanyId = searchParams.get("companyId") || "";
 
   const [records, setRecords] = useState<IncidentReportRecord[]>([]);
   const [companies, setCompanies] = useState<OsgbCompanyOption[]>([]);
@@ -433,6 +436,18 @@ export default function IncidentManagement() {
     };
   }, [records]);
 
+  const activeCompany = activeCompanyId
+    ? companies.find((company) => company.id === activeCompanyId) || null
+    : null;
+
+  const filteredRecords = useMemo(
+    () =>
+      activeCompanyId
+        ? records.filter((record) => record.company_id === activeCompanyId)
+        : records,
+    [activeCompanyId, records],
+  );
+
   const resetIncidentForm = () => {
     setForm(emptyIncidentForm);
     setEditing(null);
@@ -453,6 +468,9 @@ export default function IncidentManagement() {
     }
 
     resetIncidentForm();
+    if (activeCompanyId) {
+      setForm((prev) => ({ ...prev, companyId: activeCompanyId }));
+    }
     setDialogOpen(true);
   };
 
@@ -893,16 +911,38 @@ export default function IncidentManagement() {
               </p>
             </div>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={() =>
+      </div>
+      {activeCompany ? (
+        <Alert className="border-primary/20 bg-primary/5">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Firma baglami aktif</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <span>
+              {activeCompany.companyName} icin olay ve DÖF akisina odaklandiniz. Yeni kayitlar bu firmayla baslatilacak.
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+              }}
+            >
+              Tum firmalari goster
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          className="gap-2"
+          onClick={() =>
               downloadCsv(
                 "is-kazasi-ramak-kala.csv",
                 ["Tür", "Başlık", "Firma", "Şiddet", "Durum", "Tarih"],
-                records.map((record) => [
+                filteredRecords.map((record) => [
                   typeLabel[record.incident_type],
                   record.title,
                   record.company?.company_name || "",
@@ -1217,17 +1257,19 @@ export default function IncidentManagement() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {records.length === 0 ? (
+                  {filteredRecords.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={7}
                         className="py-12 text-center text-sm text-slate-400"
                       >
-                        Kayıt bulunamadı.
+                        {activeCompanyId
+                          ? "Bu firma icin kayit bulunamadi."
+                          : "Kayit bulunamadi."}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    records.map((record) => (
+                    filteredRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell>{typeLabel[record.incident_type]}</TableCell>
                         <TableCell>

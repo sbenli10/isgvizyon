@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Edit,
@@ -54,6 +54,9 @@ interface AttendeeWithEmployee extends MeetingAttendee {
 export default function BoardMeetingView() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCompanyId = searchParams.get("companyId") || "";
+  const contextSuffix = activeCompanyId ? `?companyId=${encodeURIComponent(activeCompanyId)}` : "";
 
   const [meeting, setMeeting] = useState<BoardMeetingWithRelations | null>(null);
   const [attendees, setAttendees] = useState<AttendeeWithEmployee[]>([]);
@@ -224,7 +227,7 @@ export default function BoardMeetingView() {
       if (error) throw error;
 
       toast.success("✅ Toplantı silindi");
-      navigate("/board-meetings");
+      navigate(`/board-meetings${contextSuffix}`);
     } catch (error: any) {
       console.error("Delete error:", error);
       toast.error("Toplantı silinemedi");
@@ -288,7 +291,7 @@ export default function BoardMeetingView() {
           <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
           <p className="text-white text-lg mb-2">Toplantı bulunamadı</p>
           <p className="text-slate-400 text-sm mb-4">Bu toplantı silinmiş veya erişim izniniz yok</p>
-          <Button onClick={() => navigate("/board-meetings")} className="mt-4">
+          <Button onClick={() => navigate(`/board-meetings${contextSuffix}`)} className="mt-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Toplantılara Dön
           </Button>
@@ -299,13 +302,37 @@ export default function BoardMeetingView() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 space-y-6">
+      {activeCompanyId ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">Firma baglami aktif</p>
+              <p className="text-sm text-slate-300">
+                Bu kurul kaydi Firma 360 icinden acildi. Geri donus ve duzenleme akisi ayni firma baglamini korur.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+              }}
+            >
+              Baglami kaldir
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/board-meetings")}
+            onClick={() => navigate(`/board-meetings${contextSuffix}`)}
             className="text-slate-400 hover:text-white"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -353,7 +380,7 @@ export default function BoardMeetingView() {
             PDF İndir
           </Button>
 
-          <Button variant="outline" onClick={() => navigate(`/board-meetings/${id}/edit`)} className="gap-2">
+          <Button variant="outline" onClick={() => navigate(`/board-meetings/${id}/edit${contextSuffix}`)} className="gap-2">
             <Edit className="h-4 w-4" />
             Düzenle
           </Button>

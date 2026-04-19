@@ -23,7 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import * as pdfjsLib from 'pdfjs-dist';
 
 // ✅ PDF.js worker setup
@@ -148,7 +148,9 @@ const RiskHeatmap = ({ history }: { history: AnalysisHistory[] }) => {
 
 export default function Reports() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const activeCompanyId = searchParams.get("companyId") || "";
   const [hazardInput, setHazardInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -459,7 +461,7 @@ export default function Reports() {
   };
 
   const sendToCapa = (analysis: FineKinneyAiResult, description: string) => {
-    navigate("/capa", {
+    navigate(`/capa${activeCompanyId ? `?companyId=${encodeURIComponent(activeCompanyId)}` : ""}`, {
       state: {
         aiData: {
           description: analysis.hazardDescription || description,
@@ -769,6 +771,30 @@ export default function Reports() {
           Mevzuat destekli çoklu görsel analizi ve Fine-Kinney Risk Isı Haritası.
         </p>
       </div>
+
+      {activeCompanyId ? (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                Bu ekran Firma 360 icinden acildi. Buradan CAPA akisina gecerken ayni firma baglami korunur.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+              }}
+            >
+              Baglami kaldir
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {/* DASHBOARD TOP (Stats + Heatmap) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import {
   Plus,
   AlertTriangle,
@@ -57,6 +57,7 @@ interface CAPARecord {
   id: string;
   org_id: string;
   user_id: string;
+  company_id?: string | null;
   non_conformity: string;
   root_cause: string;
   corrective_action: string;
@@ -89,6 +90,7 @@ interface CAPAActivityLogRow {
   description: string | null;
   created_at: string;
   metadata: Record<string, any> | null;
+  company_id?: string | null;
   capa_record_id?: string | null;
   finding_id?: string | null;
 }
@@ -539,6 +541,8 @@ const getUploadStatusLabel = (progress: number) => {
 export default function CAPA() {
   const { user } = useAuth();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCompanyId = searchParams.get("companyId") || "";
 
   const [records, setRecords] = useState<CAPARecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -593,7 +597,7 @@ export default function CAPA() {
       setLoading(false);
     }
     void fetchRecords(Boolean(cached));
-  }, [user]);
+  }, [activeCompanyId, user]);
 
   useEffect(() => {
     if (!location.state?.aiData) return;
@@ -623,7 +627,7 @@ export default function CAPA() {
       const targetColumn = detailRecord.source === "findings" ? "finding_id" : "capa_record_id";
       const { data, error } = await supabase
         .from("capa_activity_logs")
-        .select("id, action_type, title, description, created_at, metadata")
+        .select("id, action_type, title, description, created_at, metadata, company_id")
         .eq("user_id", user.id)
         .eq(targetColumn, detailRecord.id)
         .order("created_at", { ascending: false });
@@ -664,6 +668,7 @@ export default function CAPA() {
 
       const capaRecords: CAPARecord[] = (capaData || []).map((record: any) => ({
         ...record,
+        company_id: record.company_id || null,
         status: record.status as CAPAStatus,
         priority: record.priority as CAPAPriority,
         source: "capa",
@@ -699,6 +704,7 @@ export default function CAPA() {
           id: finding.id,
           org_id: profile?.organization_id || user.id,
           user_id: finding.user_id || user.id,
+          company_id: finding.company_id || null,
           non_conformity: finding.description,
           root_cause: inspection?.risk_definition || "Toplu DÖF kaydından dönüştürülen bulgu.",
           corrective_action: inspection?.corrective_action || finding.action_required || "Belirtilmemiş",
@@ -740,13 +746,19 @@ export default function CAPA() {
       let escalationLogs: CAPAActivityLogRow[] = [];
 
       if (capaActivityLogsFeatureAvailable !== false) {
-        const { data, error } = await supabase
+        let escalationQuery = supabase
           .from("capa_activity_logs")
-          .select("id, action_type, title, description, created_at, metadata, capa_record_id, finding_id")
+          .select("id, action_type, title, description, created_at, metadata, company_id, capa_record_id, finding_id")
           .eq("user_id", user.id)
           .eq("action_type", "escalated")
           .order("created_at", { ascending: false })
           .limit(100);
+
+        if (activeCompanyId) {
+          escalationQuery = escalationQuery.eq("company_id", activeCompanyId);
+        }
+
+        const { data, error } = await escalationQuery;
 
         if (error) {
           handleCapaActivityLogsError(error, "escalation fetch");
@@ -790,6 +802,7 @@ export default function CAPA() {
   }: {
     capaRecordId?: string | null;
     findingId?: string | null;
+    companyId?: string | null;
     actionType: string;
     title: string;
     description: string;
@@ -804,11 +817,12 @@ export default function CAPA() {
       .eq("id", user.id)
       .maybeSingle();
 
-    const { data, error } = await supabase
+      const { data, error } = await supabase
       .from("capa_activity_logs")
       .insert({
       user_id: user.id,
       org_id: profile?.organization_id || null,
+      company_id: companyId ?? null,
       capa_record_id: capaRecordId ?? null,
       finding_id: findingId ?? null,
       action_type: actionType,
@@ -816,10 +830,11 @@ export default function CAPA() {
       description,
       metadata: {
         actor_name: currentProfileName || user.email || "İSGVİZYON kullanıcısı",
+        active_company_id: companyId ?? null,
         ...(metadata ?? {}),
       },
       })
-      .select("id, action_type, title, description, created_at, metadata, capa_record_id, finding_id")
+      .select("id, action_type, title, description, created_at, metadata, company_id, capa_record_id, finding_id")
       .maybeSingle();
 
     if (error) {
@@ -840,6 +855,7 @@ export default function CAPA() {
   }: {
     capaRecordId?: string | null;
     findingId?: string | null;
+    companyId?: string | null;
     nextPriority: CAPAPriority;
     nextStatus: CAPAStatus;
     nextDeadline: string;
@@ -856,6 +872,7 @@ export default function CAPA() {
     const insertedLog = await writeActivityLog({
       capaRecordId,
       findingId,
+      companyId,
       actionType: "escalated",
       title,
       description,
@@ -1079,6 +1096,7 @@ export default function CAPA() {
           if (error) throw error;
           await writeActivityLog({
             findingId: editingId,
+            companyId: record?.company_id || activeCompanyId || null,
             actionType: "updated",
             title: "Bulgu aksiyonu güncellendi",
             description: "Toplu DÖF kaynağından gelen kayıt için aksiyon alanları güncellendi.",
@@ -1086,6 +1104,7 @@ export default function CAPA() {
           });
           await maybeWriteEscalationLog({
             findingId: editingId,
+            companyId: record?.company_id || activeCompanyId || null,
             nextPriority: priority,
             nextStatus: (record.status || "Açık") as CAPAStatus,
             nextDeadline: deadline,
@@ -1095,6 +1114,7 @@ export default function CAPA() {
           const { error } = await supabase
             .from("capa_records")
             .update({
+              company_id: record?.company_id || activeCompanyId || null,
               non_conformity: nonConformity,
               root_cause: rootCause,
               corrective_action: correctiveAction,
@@ -1112,6 +1132,7 @@ export default function CAPA() {
           if (error) throw error;
           await writeActivityLog({
             capaRecordId: editingId,
+            companyId: record?.company_id || activeCompanyId || null,
             actionType: "updated",
             title: "CAPA kaydı güncellendi",
             description: "Aksiyon planı, sorumlu veya termin alanlarında güncelleme yapıldı.",
@@ -1127,6 +1148,7 @@ export default function CAPA() {
           if (uploadedEvidence.mediaUrls.length) {
             await writeActivityLog({
               capaRecordId: editingId,
+              companyId: record?.company_id || activeCompanyId || null,
               actionType: "updated",
               title: "Fotoğraf kanıtı yüklendi",
               description: `${uploadedEvidence.mediaUrls.length} adet fotoğraf kanıtı kayda eklendi.`,
@@ -1136,6 +1158,7 @@ export default function CAPA() {
           if (uploadedEvidence.documentUrls.length) {
             await writeActivityLog({
               capaRecordId: editingId,
+              companyId: record?.company_id || activeCompanyId || null,
               actionType: "updated",
               title: "Belge kanıtı yüklendi",
               description: `${uploadedEvidence.documentUrls.length} adet belge kayda eklendi.`,
@@ -1145,6 +1168,7 @@ export default function CAPA() {
           if (uploadedEvidence.fileUrls.length) {
             await writeActivityLog({
               capaRecordId: editingId,
+              companyId: record?.company_id || activeCompanyId || null,
               actionType: "updated",
               title: "Ek dosya yüklendi",
               description: `${uploadedEvidence.fileUrls.length} adet ek dosya kayda eklendi.`,
@@ -1153,6 +1177,7 @@ export default function CAPA() {
           }
           await maybeWriteEscalationLog({
             capaRecordId: editingId,
+            companyId: record?.company_id || activeCompanyId || null,
             nextPriority: priority,
             nextStatus: (record?.status || "Açık") as CAPAStatus,
             nextDeadline: deadline,
@@ -1166,6 +1191,7 @@ export default function CAPA() {
           .insert({
             org_id: orgId,
             user_id: user?.id,
+            company_id: activeCompanyId || null,
             non_conformity: nonConformity,
             root_cause: rootCause,
             corrective_action: correctiveAction,
@@ -1195,6 +1221,7 @@ export default function CAPA() {
         if (uploadedEvidence.mediaUrls.length) {
           await writeActivityLog({
             capaRecordId: createdRecord.id,
+            companyId: activeCompanyId || null,
             actionType: "updated",
             title: "Fotoğraf kanıtı yüklendi",
             description: `${uploadedEvidence.mediaUrls.length} adet fotoğraf kanıtı ilk kayda bağlandı.`,
@@ -1204,6 +1231,7 @@ export default function CAPA() {
         if (uploadedEvidence.documentUrls.length) {
           await writeActivityLog({
             capaRecordId: createdRecord.id,
+            companyId: activeCompanyId || null,
             actionType: "updated",
             title: "Belge kanıtı yüklendi",
             description: `${uploadedEvidence.documentUrls.length} adet belge ilk kayda bağlandı.`,
@@ -1213,6 +1241,7 @@ export default function CAPA() {
         if (uploadedEvidence.fileUrls.length) {
           await writeActivityLog({
             capaRecordId: createdRecord.id,
+            companyId: activeCompanyId || null,
             actionType: "updated",
             title: "Ek dosya yüklendi",
             description: `${uploadedEvidence.fileUrls.length} adet ek dosya ilk kayda bağlandı.`,
@@ -1221,6 +1250,7 @@ export default function CAPA() {
         }
         await writeActivityLog({
           capaRecordId: createdRecord?.id,
+          companyId: activeCompanyId || null,
           actionType: "created",
           title: "CAPA kaydı oluşturuldu",
           description: "Yeni aksiyon planı sisteme eklendi ve takip akışı başlatıldı.",
@@ -1235,6 +1265,7 @@ export default function CAPA() {
         });
         await maybeWriteEscalationLog({
           capaRecordId: createdRecord.id,
+          companyId: activeCompanyId || null,
           nextPriority: priority,
           nextStatus: "Açık",
           nextDeadline: deadline,
@@ -1301,6 +1332,7 @@ export default function CAPA() {
         if (error) throw error;
         await writeActivityLog({
           findingId: id,
+          companyId: record?.company_id || activeCompanyId || null,
           actionType: status === "Tamamlandı" ? "closed" : "status_changed",
           title: `Durum güncellendi: ${status}`,
           description: "Toplu DÖF bulgusunun durum bilgisi güncellendi.",
@@ -1308,6 +1340,7 @@ export default function CAPA() {
         });
         await maybeWriteEscalationLog({
           findingId: id,
+          companyId: record?.company_id || activeCompanyId || null,
           nextPriority: record.priority,
           nextStatus: status,
           nextDeadline: record.deadline,
@@ -1320,6 +1353,7 @@ export default function CAPA() {
         if (error) throw error;
         await writeActivityLog({
           capaRecordId: id,
+          companyId: record?.company_id || activeCompanyId || null,
           actionType: status === "Tamamlandı" ? "closed" : "status_changed",
           title: `Durum güncellendi: ${status}`,
           description: "CAPA kaydının durum bilgisi ve takip akışı güncellendi.",
@@ -1327,6 +1361,7 @@ export default function CAPA() {
         });
         await maybeWriteEscalationLog({
           capaRecordId: id,
+          companyId: record?.company_id || activeCompanyId || null,
           nextPriority: record.priority,
           nextStatus: status,
           nextDeadline: record.deadline,
@@ -1348,14 +1383,15 @@ export default function CAPA() {
   const filteredRecords = useMemo(
     () =>
       records.filter((record) => {
+        const matchesCompany = !activeCompanyId || record.company_id === activeCompanyId;
         const matchesStatus = filterStatus === "all" || record.status === filterStatus;
         const haystack = [record.non_conformity, record.assigned_person, record.root_cause, record.corrective_action, record.notes || ""]
           .join(" ")
           .toLowerCase();
         const matchesSearch = haystack.includes(searchText.toLowerCase());
-        return matchesStatus && matchesSearch;
+        return matchesCompany && matchesStatus && matchesSearch;
       }),
-    [filterStatus, records, searchText],
+    [activeCompanyId, filterStatus, records, searchText],
   );
 
   const editingRecord = useMemo(
@@ -1364,14 +1400,17 @@ export default function CAPA() {
   );
 
   const stats = useMemo(() => {
-    const open = records.filter((r) => r.status === "Açık").length;
-    const inProgress = records.filter((r) => r.status === "Devam Ediyor").length;
-    const completed = records.filter((r) => r.status === "Tamamlandı").length;
-    const overdue = records.filter((r) => r.status !== "Tamamlandı" && r.deadline && isPast(parseISO(r.deadline))).length;
-    const critical = records.filter((r) => r.priority === "Kritik").length;
-    const completionRate = records.length ? Math.round((completed / records.length) * 100) : 0;
+    const scopedRecords = activeCompanyId
+      ? records.filter((record) => record.company_id === activeCompanyId)
+      : records;
+    const open = scopedRecords.filter((r) => r.status === "Açık").length;
+    const inProgress = scopedRecords.filter((r) => r.status === "Devam Ediyor").length;
+    const completed = scopedRecords.filter((r) => r.status === "Tamamlandı").length;
+    const overdue = scopedRecords.filter((r) => r.status !== "Tamamlandı" && r.deadline && isPast(parseISO(r.deadline))).length;
+    const critical = scopedRecords.filter((r) => r.priority === "Kritik").length;
+    const completionRate = scopedRecords.length ? Math.round((completed / scopedRecords.length) * 100) : 0;
     const highestPressure =
-      records
+      scopedRecords
         .filter((record) => record.status !== "Tamamlandı")
         .sort((a, b) => {
           const priorityDiff = priorityWeight[b.priority] - priorityWeight[a.priority];
@@ -1379,8 +1418,8 @@ export default function CAPA() {
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         })[0] || null;
 
-    return { total: records.length, open, inProgress, completed, overdue, critical, completionRate, highestPressure };
-  }, [records]);
+    return { total: scopedRecords.length, open, inProgress, completed, overdue, critical, completionRate, highestPressure };
+  }, [activeCompanyId, records]);
 
   const detailSummary = detailRecord
     ? [
@@ -1413,6 +1452,30 @@ export default function CAPA() {
 
   return (
     <div className="theme-page-readable space-y-8">
+      {activeCompanyId ? (
+        <section className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                Bu DÖF akisi Firma 360 icinden acildi. Yeni CAPA kayitlari ve faaliyet loglari secili firma ile iliskilendirilecek.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+              }}
+            >
+              Baglami kaldir
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="relative overflow-hidden rounded-[28px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_28%),linear-gradient(145deg,rgba(7,10,24,0.98),rgba(15,23,42,0.94))] p-6 shadow-[0_24px_90px_rgba(10,14,35,0.45)] lg:p-8">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:34px_34px] opacity-40" />
         <div className="relative grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">

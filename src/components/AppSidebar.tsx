@@ -45,6 +45,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import {
   Sidebar,
   SidebarContent,
@@ -211,6 +212,17 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
+  const {
+    canViewAnalytics,
+    canViewAutomation,
+    canViewCompanyHub,
+    canViewDashboard,
+    canViewDocuments,
+    canViewFinance,
+    canViewKatip,
+    canViewPeople,
+    canViewPortal,
+  } = useOsgbAccess();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -279,33 +291,30 @@ export function AppSidebar() {
         items: [
           { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
           { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
-          { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
-          { title: "Sağlık Gözetimi", url: "/health-surveillance", icon: HeartPulse, badge: "NEW" },
-          {
-            title: "OSGB Modülü",
-            url: "/osgb",
-            icon: Briefcase,
-            badge: "NEW",
-            children: [
-              { title: "OSGB Paneli", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
-              { title: "Personel Havuzu", url: "/osgb/personnel", icon: Users, badge: null },
-              { title: "Personel Görevlendirme", url: "/osgb/assignments", icon: Briefcase, badge: null },
-              { title: "Firma Takibi", url: "/osgb/company-tracking", icon: Building2, badge: null },
-              { title: "Süreç ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null },
-              { title: "Uyarı Merkezi", url: "/osgb/alerts", icon: ShieldAlert, badge: "NEW" },
-              { title: "Saha Ziyaretleri", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" },
-              { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" },
-              { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" },
-              { title: "Cari ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null },
-              { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null },
-              { title: "Musteri Portali", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" },
-              { title: "Görev Motoru", url: "/osgb/tasks", icon: ClipboardCheck, badge: null },
-              { title: "Operasyon Notları", url: "/osgb/notes", icon: BookOpen, badge: null },
-              { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null },
+              { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
+              { title: "Sağlık Gözetimi", url: "/health-surveillance", icon: HeartPulse, badge: "NEW" },
+              {
+                title: "OSGB Modülü",
+                url: "/osgb",
+                icon: Briefcase,
+                badge: "NEW",
+                children: [
+                  canViewDashboard ? { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null } : null,
+                  canViewDashboard ? { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null } : null,
+                  canViewCompanyHub ? { title: "Firma Havuzu", url: "/osgb/company-tracking", icon: Building2, badge: null } : null,
+                  canViewPeople ? { title: "Personel ve Atamalar", url: "/osgb/assignments", icon: Briefcase, badge: null } : null,
+                  canViewPeople ? { title: "Dakika ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null } : null,
+                  canViewPeople ? { title: "Saha Operasyonu", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" } : null,
+                  canViewDocuments ? { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null } : null,
+                  canViewFinance ? { title: "Finans ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null } : null,
+                  canViewAutomation ? { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" } : null,
+                  canViewKatip ? { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" } : null,
+                  canViewPortal ? { title: "Müşteri Portalı", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" } : null,
+                  canViewAnalytics ? { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null } : null,
+                ].filter((item): item is MenuItem => Boolean(item)),
+              },
             ],
           },
-        ],
-      },
       {
         label: "Belge Yönetimi",
         icon: Award,

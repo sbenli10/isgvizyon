@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Save,
@@ -58,8 +58,10 @@ interface Employee {
 export default function BoardMeetingForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const isEditMode = !!id;
+  const requestedCompanyId = searchParams.get("companyId") || "";
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -115,6 +117,16 @@ export default function BoardMeetingForm() {
       setAttendees([]); // ✅ Firma yoksa katılımcıları da temizle
     }
   }, [formData.company_id, companies]);
+
+  useEffect(() => {
+    if (isEditMode || !requestedCompanyId || companies.length === 0) return;
+    if (!companies.some((company) => company.id === requestedCompanyId)) return;
+    setFormData((prev) =>
+      prev.company_id === requestedCompanyId
+        ? prev
+        : { ...prev, company_id: requestedCompanyId }
+    );
+  }, [companies, isEditMode, requestedCompanyId]);
 
   const fetchCompanies = async () => {
     try {
@@ -498,7 +510,7 @@ export default function BoardMeetingForm() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => navigate("/board-meetings")}
+            onClick={() => navigate(`/board-meetings${requestedCompanyId ? `?companyId=${encodeURIComponent(requestedCompanyId)}` : ""}`)}
             className="text-slate-400 hover:text-white"
           >
             <ArrowLeft className="h-5 w-5" />

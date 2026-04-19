@@ -178,7 +178,12 @@ const ensureTask = async (
     .limit(1);
 
   if (existingError) throw existingError;
-  if ((existing ?? []).length > 0) return false;
+  if ((existing ?? []).length > 0) {
+    return {
+      created: false,
+      reason: "existing_task" as const,
+    };
+  }
 
   const { error } = await supabase.from("osgb_tasks").insert({
     user_id: userId,
@@ -194,7 +199,10 @@ const ensureTask = async (
   });
 
   if (error) throw error;
-  return true;
+  return {
+    created: true,
+    reason: "created" as const,
+  };
 };
 
 serve(async (req) => {
@@ -229,11 +237,15 @@ serve(async (req) => {
     const actions = [...visitActions, ...documentActions, ...financeActions];
     let createdTasks = 0;
     let skippedTasks = 0;
+    let skippedExistingTasks = 0;
 
     for (const action of actions) {
-      const created = await ensureTask(supabase, organizationId, executionUserId, action);
-      if (created) createdTasks += 1;
-      else skippedTasks += 1;
+      const result = await ensureTask(supabase, organizationId, executionUserId, action);
+      if (result.created) createdTasks += 1;
+      else {
+        skippedTasks += 1;
+        if (result.reason === "existing_task") skippedExistingTasks += 1;
+      }
     }
 
     await supabase.from("osgb_batch_logs").insert({
@@ -245,6 +257,14 @@ serve(async (req) => {
       processed_count: actions.length,
       created_count: createdTasks,
       skipped_count: skippedTasks,
+      metadata: {
+        skippedExistingTasks,
+        breakdown: {
+          fieldVisit: visitActions.length,
+          document: documentActions.length,
+          finance: financeActions.length,
+        },
+      },
       error_message: null,
     });
 
@@ -253,6 +273,12 @@ serve(async (req) => {
       processed: actions.length,
       createdTasks,
       skippedTasks,
+      skippedExistingTasks,
+      breakdown: {
+        fieldVisit: visitActions.length,
+        document: documentActions.length,
+        finance: financeActions.length,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

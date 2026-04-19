@@ -313,7 +313,9 @@ export default function CertificatesDashboard() {
   const [employeeLoadMessage, setEmployeeLoadMessage] = useState("");
   const [trainerNamesInput, setTrainerNamesInput] = useState(defaultForm.trainer_names.join(", "));
   const studioSectionRef = useRef<HTMLDivElement | null>(null);
+  const companyContextAppliedRef = useRef<string | null>(null);
   const currentTab = searchParams.get("tab") === "templates" ? "templates" : "production";
+  const activeCompanyId = searchParams.get("companyId") || "";
 
   const completedItems = useMemo(
     () => jobItems.filter((item) => item.status === "completed" && item.pdf_path),
@@ -402,6 +404,14 @@ export default function CertificatesDashboard() {
     }
   }, [currentTab]);
 
+  useEffect(() => {
+    if (!activeCompanyId || companies.length === 0) return;
+    if (companyContextAppliedRef.current === activeCompanyId) return;
+    if (!companies.some((company) => company.id === activeCompanyId)) return;
+    companyContextAppliedRef.current = activeCompanyId;
+    void applyCompany(activeCompanyId);
+  }, [activeCompanyId, companies]);
+
   async function bootstrap() {
     setLoading(true);
     try {
@@ -430,6 +440,10 @@ export default function CertificatesDashboard() {
 
     setCompanies(mapped);
   }
+
+  const activeCompany = activeCompanyId
+    ? companies.find((company) => company.id === activeCompanyId) || null
+    : null;
 
   async function loadRecentCertificates() {
     const { data, error } = await (supabase as any)
@@ -766,13 +780,41 @@ export default function CertificatesDashboard() {
         </div>
       </div>
 
+      {activeCompany ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCompany.company_name} icin katilimci ve sertifika bilgileri otomatik uygulanir.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                setSearchParams(next);
+                companyContextAppliedRef.current = null;
+              }}
+            >
+              Baglami kaldir
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
           variant={currentTab === "production" ? "default" : "outline"}
           className="gap-2"
-          onClick={() => setSearchParams({})}
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.delete("tab");
+            setSearchParams(next);
+          }}
         >
           <Award className="h-4 w-4" />
           Sertifika Üret
@@ -781,7 +823,11 @@ export default function CertificatesDashboard() {
           type="button"
           variant={currentTab === "templates" ? "default" : "outline"}
           className="gap-2"
-          onClick={() => setSearchParams({ tab: "templates" })}
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.set("tab", "templates");
+            setSearchParams(next);
+          }}
         >
           <Palette className="h-4 w-4" />
           Tasarım Şablonları

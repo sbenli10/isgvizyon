@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   CircleHelp,
@@ -239,6 +239,7 @@ const normalizeLegacyHazards = (rows: HazardRow[]): LibraryItem[] =>
 
 export default function SafetyLibrary() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<LibraryTab>("topics");
   const [collections, setCollections] = useState<LibraryCollection[]>(fallbackCollections);
   const [items, setItems] = useState<LibraryItem[]>(fallbackOfficialItems);
@@ -254,6 +255,8 @@ export default function SafetyLibrary() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newItem, setNewItem] = useState(emptyItemForm);
+  const activeCompanyId = searchParams.get("companyId") || "";
+  const activeCompanyName = searchParams.get("companyName") || "";
 
   useEffect(() => {
     void fetchCatalog();
@@ -402,7 +405,7 @@ export default function SafetyLibrary() {
       .filter(Boolean)
       .join("\n");
 
-    navigate("/inspections", {
+    navigate(`/inspections${activeCompanyId ? `?companyId=${encodeURIComponent(activeCompanyId)}` : ""}`, {
       state: {
         prefilledNotes: notes,
         hazardName: item.title,
@@ -446,6 +449,31 @@ export default function SafetyLibrary() {
 
   return (
     <div className="theme-page-readable space-y-6">
+      {activeCompanyId || activeCompanyName ? (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+              <p className="text-sm text-muted-foreground">
+                {activeCompanyName || "Secili firma"} icin arsiv ve kutuphane akisindasiniz. Buradan baslatilan denetim notlari ayni firma baglamiyla devam eder.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete("companyId");
+                next.delete("companyName");
+                setSearchParams(next);
+              }}
+            >
+              Baglami kaldir
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <section className="rounded-3xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.18),_transparent_30%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(135deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] p-8">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-3xl space-y-3">

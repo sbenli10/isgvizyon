@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "react-router-dom";
 import { 
   generateWorkPlanPDF, 
   generateTrainingPlanPDF,
@@ -63,6 +64,8 @@ const EDUCATION_TEMPLATE_PATH = "/templates/yillik-egitim-template.xlsx";
 
 export default function AnnualPlans() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeCompanyId = searchParams.get("companyId") || "";
   const [activeTab, setActiveTab] = useState("work_plan");
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [loading, setLoading] = useState(false);
@@ -149,6 +152,29 @@ export default function AnnualPlans() {
       organizationLogoUrl: prev.organizationLogoUrl || organizationLogoUrl,
     }));
   }, [organizationLogoUrl, organizationName, user]);
+
+  useEffect(() => {
+    const applyCompanyContext = async () => {
+      if (!user || !activeCompanyId) return;
+
+      const { data: company, error } = await supabase
+        .from("companies")
+        .select("id, name, address, tax_number")
+        .eq("id", activeCompanyId)
+        .maybeSingle();
+
+      if (error || !company) return;
+
+      setTrainingMeta((prev) => ({
+        ...prev,
+        workplaceTitle: company.name || prev.workplaceTitle,
+        workplaceAddress: company.address || prev.workplaceAddress,
+        workplaceRegistrationNo: company.tax_number || prev.workplaceRegistrationNo,
+      }));
+    };
+
+    void applyCompanyContext();
+  }, [activeCompanyId, user]);
 
   const loadPlans = async () => {
     if (!user) return;
@@ -947,6 +973,29 @@ const savePlan = async (planType: 'work_plan' | 'training_plan' | 'evaluation_re
                 alışık olunan Excel şablon mantığını koruyarak daha temiz ve kurumsal bir formatta dışa aktarılır.
               </p>
             </div>
+            {activeCompanyId ? (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">Firma baglami aktif</p>
+                    <p className="text-sm text-muted-foreground">
+                      Yillik plan basligi ve kurum bilgileri secili firmaya gore onceden dolduruluyor.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const next = new URLSearchParams(searchParams);
+                      next.delete("companyId");
+                      setSearchParams(next);
+                    }}
+                  >
+                    Baglami kaldir
+                  </Button>
+                </div>
+              </div>
+            ) : null}
                         <div className="grid gap-4 md:grid-cols-3">
               {overviewCards.map((card) => (
                 <div
