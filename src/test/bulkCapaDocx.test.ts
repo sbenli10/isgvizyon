@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPhotoGridRows, generateBulkCapaOfficialDocx } from "../pages/BulkCAPA";
+import { buildPhotoGridRows, generateBulkCapaOfficialDocx, type BulkCapaOfficialEntry } from "../pages/BulkCAPA";
 
 const tinyPngBase64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO9WmJ4AAAAASUVORK5CYII=";
 
 describe("BulkCAPA DOCX photo layout", () => {
   it("groups photos in 3-column rows for each entry", () => {
+    const photos: NonNullable<BulkCapaOfficialEntry["photos"]> = [
+      { file: tinyPngBase64 },
+      { file: tinyPngBase64 },
+      { file: tinyPngBase64 },
+      { file: tinyPngBase64 },
+    ];
+
     const rows = buildPhotoGridRows(0, [
-      { file: tinyPngBase64 },
-      { file: tinyPngBase64 },
-      { file: tinyPngBase64 },
-      { file: tinyPngBase64 },
-    ] as any);
+      ...photos,
+    ]);
 
     expect(rows).toHaveLength(2);
     expect((rows[0] as any).options.children).toHaveLength(3);

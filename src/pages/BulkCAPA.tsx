@@ -41,7 +41,7 @@ const PHOTO_HEIGHT = 120;
 
 function decodeBase64(value: string) {
   if (typeof globalThis.atob !== "function") {
-    throw new Error("Base64 çözümleme desteklenmiyor.");
+    throw new Error("Base64 decoding is not supported / Base64 çözümleme desteklenmiyor.");
   }
   return Uint8Array.from(globalThis.atob(value), (char) => char.charCodeAt(0));
 }
@@ -218,7 +218,7 @@ export function generateBulkCapaOfficialDocx(entries: BulkCapaOfficialEntry[]) {
   return Packer.toBuffer(doc);
 }
 
-const generateDofReport = (analyses: BulkCapaOfficialEntry[]) => generateBulkCapaOfficialDocx(analyses);
+const generateBulkCapaReport = (analyses: BulkCapaOfficialEntry[]) => generateBulkCapaOfficialDocx(analyses);
 
 export { buildPhotoGridRows };
-export default generateDofReport;
+export default generateBulkCapaReport;
