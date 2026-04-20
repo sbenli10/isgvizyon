@@ -1312,8 +1312,11 @@ export type Database = {
           employment_type: string | null
           end_date: string | null
           first_name: string
+          full_name: string | null
           gender: string | null
           id: string
+          insured_job_code: string | null
+          insured_job_name: string | null
           is_active: boolean | null
           job_title: string
           last_name: string
@@ -1337,8 +1340,11 @@ export type Database = {
           employment_type?: string | null
           end_date?: string | null
           first_name: string
+          full_name?: string | null
           gender?: string | null
           id?: string
+          insured_job_code?: string | null
+          insured_job_name?: string | null
           is_active?: boolean | null
           job_title: string
           last_name: string
@@ -1362,8 +1368,11 @@ export type Database = {
           employment_type?: string | null
           end_date?: string | null
           first_name?: string
+          full_name?: string | null
           gender?: string | null
           id?: string
+          insured_job_code?: string | null
+          insured_job_name?: string | null
           is_active?: boolean | null
           job_title?: string
           last_name?: string

@@ -485,8 +485,11 @@ export default function CompanyManager() {
       if (!normalizedSearch) return true;
 
       const haystack = [
+        employee.full_name,
         employee.first_name,
         employee.last_name,
+        employee.tc_number,
+        employee.insured_job_name,
         employee.job_title,
         employee.department,
         employee.phone,
@@ -511,8 +514,11 @@ export default function CompanyManager() {
       if (!normalizedSearch) return true;
 
       const haystack = [
+        employee.full_name,
         employee.first_name,
         employee.last_name,
+        employee.tc_number,
+        employee.insured_job_name,
         employee.job_title,
         employee.department,
         employee.phone,
@@ -529,10 +535,17 @@ export default function CompanyManager() {
   const startEmployeeEdit = (employee: Employee) => {
     setEditingEmployeeId(employee.id);
     setEmployeeDraft({
+      full_name: employee.full_name || `${employee.first_name} ${employee.last_name}`.trim(),
       first_name: employee.first_name,
       last_name: employee.last_name,
+      tc_number: employee.tc_number || "",
       job_title: employee.job_title,
       department: employee.department || "",
+      start_date: employee.start_date || "",
+      end_date: employee.end_date || "",
+      gender: employee.gender || "",
+      insured_job_code: employee.insured_job_code || "",
+      insured_job_name: employee.insured_job_name || "",
       phone: employee.phone || "",
       email: employee.email || "",
     });
@@ -551,10 +564,17 @@ export default function CompanyManager() {
     setSavingEmployeeId(employeeId);
     try {
       const payload = {
+        full_name: (employeeDraft.full_name || `${employeeDraft.first_name || ""} ${employeeDraft.last_name || ""}`).trim(),
         first_name: (employeeDraft.first_name || "").trim(),
         last_name: (employeeDraft.last_name || "").trim(),
+        tc_number: (employeeDraft.tc_number || "").trim() || null,
         job_title: (employeeDraft.job_title || "").trim(),
         department: (employeeDraft.department || "").trim() || null,
+        start_date: (employeeDraft.start_date || "").trim() || null,
+        end_date: (employeeDraft.end_date || "").trim() || null,
+        gender: (employeeDraft.gender || "").trim() || null,
+        insured_job_code: (employeeDraft.insured_job_code || "").trim() || null,
+        insured_job_name: (employeeDraft.insured_job_name || "").trim() || null,
         phone: (employeeDraft.phone || "").trim() || null,
         email: (employeeDraft.email || "").trim() || null,
       };
@@ -926,15 +946,19 @@ export default function CompanyManager() {
       });
 
       const employeesJson = parsedEmployees.map((emp) => ({
+        full_name: emp.full_name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || null,
         first_name: emp.first_name || "",
         last_name: emp.last_name || "",
         tc_number: emp.tc_number || null,
-        job_title: emp.job_title || "Belirtilmemiş",
+        job_title: emp.job_title || emp.insured_job_name || "Belirtilmemiş",
         department: emp.department || null,
         start_date: emp.start_date || new Date().toISOString().split("T")[0],
+        end_date: emp.end_date || null,
         employment_type: emp.employment_type || "Süresiz",
         birth_date: emp.birth_date || null,
         gender: emp.gender || null,
+        insured_job_code: emp.insured_job_code || null,
+        insured_job_name: emp.insured_job_name || emp.job_title || null,
         email: emp.email || null,
         phone: emp.phone || null,
       }));
@@ -1030,7 +1054,7 @@ export default function CompanyManager() {
           evacuation_support_person_name: formData.evacuation_support_person_name || null,
         },
         p_risk_template_id: template?.id || null,
-        p_employees: employeesJson,
+        p_employees: [],
       });
 
       if (error) throw error;
@@ -1078,8 +1102,24 @@ export default function CompanyManager() {
         if (extendedUpdateError) throw extendedUpdateError;
       }
 
+      let insertedEmployeesCount = result.inserted_employees || 0;
+      if (result.company_id && employeesJson.length > 0) {
+        const employeesToInsert = employeesJson.map((employee) => ({
+          ...employee,
+          company_id: result.company_id,
+          is_active: true,
+        }));
+
+        const { error: employeesError } = await (supabase as any)
+          .from("employees")
+          .insert(employeesToInsert);
+
+        if (employeesError) throw employeesError;
+        insertedEmployeesCount = employeesToInsert.length;
+      }
+
       toast.success("🎉 Firma başarıyla kaydedildi!", {
-        description: `${result.inserted_risks || 0} risk, ${result.inserted_employees || 0} çalışan eklendi`,
+        description: `${result.inserted_risks || 0} risk, ${insertedEmployeesCount} çalışan eklendi`,
       });
 
       setWizardOpen(false);
@@ -1623,7 +1663,7 @@ export default function CompanyManager() {
                     <Input
                       value={employeeSearchQuery}
                       onChange={(e) => setEmployeeSearchQuery(e.target.value)}
-                      placeholder="Ad, görev, bölüm, telefon veya e-posta ile ara"
+                      placeholder="Ad, TC, meslek, bölüm, telefon veya e-posta ile ara"
                       className="pl-10"
                     />
                   </div>
@@ -1661,10 +1701,12 @@ export default function CompanyManager() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Ad Soyad</TableHead>
-                            <TableHead>Görev</TableHead>
+                            <TableHead>TC Kimlik No</TableHead>
+                            <TableHead>Sigortalı Meslek</TableHead>
                             <TableHead>Bölüm</TableHead>
+                            <TableHead>İşe Giriş</TableHead>
                             <TableHead>Telefon</TableHead>
-                            <TableHead>E-posta</TableHead>
+                            <TableHead>Cinsiyet</TableHead>
                             <TableHead className="text-right">İşlemler</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1692,12 +1734,23 @@ export default function CompanyManager() {
                               <TableCell>
                                 {editingEmployeeId === employee.id ? (
                                   <Input
-                                    value={employeeDraft.job_title || ""}
-                                    onChange={(e) => updateEmployeeDraft({ job_title: e.target.value })}
-                                    placeholder="Görev"
+                                    value={employeeDraft.tc_number || ""}
+                                    onChange={(e) => updateEmployeeDraft({ tc_number: e.target.value })}
+                                    placeholder="TC Kimlik No"
                                   />
                                 ) : (
-                                  employee.job_title || "-"
+                                  employee.tc_number || "-"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {editingEmployeeId === employee.id ? (
+                                  <Input
+                                    value={employeeDraft.insured_job_name || employeeDraft.job_title || ""}
+                                    onChange={(e) => updateEmployeeDraft({ insured_job_name: e.target.value, job_title: e.target.value })}
+                                    placeholder="Sigortalı Meslek"
+                                  />
+                                ) : (
+                                  employee.insured_job_name || employee.job_title || "-"
                                 )}
                               </TableCell>
                               <TableCell>
@@ -1713,24 +1766,20 @@ export default function CompanyManager() {
                               </TableCell>
                               <TableCell>
                                 {editingEmployeeId === employee.id ? (
-                                  <Input
-                                    value={employeeDraft.phone || ""}
-                                    onChange={(e) => updateEmployeeDraft({ phone: e.target.value })}
-                                    placeholder="Telefon"
-                                  />
+                                  <Input type="date" value={employeeDraft.start_date || ""} onChange={(e) => updateEmployeeDraft({ start_date: e.target.value })} />
                                 ) : (
-                                  employee.phone || "-"
+                                  employee.start_date || "-"
                                 )}
                               </TableCell>
                               <TableCell>
                                 {editingEmployeeId === employee.id ? (
                                   <Input
-                                    value={employeeDraft.email || ""}
-                                    onChange={(e) => updateEmployeeDraft({ email: e.target.value })}
-                                    placeholder="E-posta"
+                                    value={employeeDraft.gender || ""}
+                                    onChange={(e) => updateEmployeeDraft({ gender: e.target.value })}
+                                    placeholder="Cinsiyet"
                                   />
                                 ) : (
-                                  employee.email || "-"
+                                  employee.gender || "-"
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
@@ -1841,20 +1890,22 @@ export default function CompanyManager() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Ad Soyad</TableHead>
-                        <TableHead>Görev</TableHead>
-                        <TableHead>Bölüm</TableHead>
-                        <TableHead>Başlangıç</TableHead>
+                        <TableHead>TC Kimlik No</TableHead>
+                        <TableHead>Sigortalı Meslek</TableHead>
+                        <TableHead>İşe Giriş</TableHead>
+                        <TableHead>Cinsiyet</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {parsedEmployees.slice(0, 5).map((emp, idx) => (
                         <TableRow key={idx}>
                           <TableCell className="font-medium">
-                            {emp.first_name} {emp.last_name}
+                            {emp.full_name || `${emp.first_name} ${emp.last_name}`.trim()}
                           </TableCell>
-                          <TableCell>{emp.job_title}</TableCell>
-                          <TableCell>{emp.department || "-"}</TableCell>
+                          <TableCell>{emp.tc_number || "-"}</TableCell>
+                          <TableCell>{emp.insured_job_name || emp.job_title || "-"}</TableCell>
                           <TableCell>{emp.start_date}</TableCell>
+                          <TableCell>{emp.gender || "-"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

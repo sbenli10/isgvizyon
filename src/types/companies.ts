@@ -33,6 +33,7 @@
 export interface Employee {
   id: string;
   company_id: string;
+  full_name?: string;
   tc_number?: string;
   first_name: string;
   last_name: string;
@@ -45,6 +46,8 @@ export interface Employee {
   department?: string;
   start_date: string;
   end_date?: string;
+  insured_job_code?: string;
+  insured_job_name?: string;
   employment_type?: "Süresiz" | "Süreli" | "Stajyer" | "Part-Time";
   education_level?: string;
   certifications?: any[];

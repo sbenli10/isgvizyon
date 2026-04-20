@@ -23,6 +23,7 @@ type EmployeeRecord = {
   id: string;
   company_id: string;
   company_name: string | null;
+  full_name: string | null;
   first_name: string;
   last_name: string;
   tc_number: string | null;
@@ -31,18 +32,27 @@ type EmployeeRecord = {
   job_title: string;
   department: string | null;
   start_date: string | null;
+  end_date: string | null;
+  gender: string | null;
+  insured_job_code: string | null;
+  insured_job_name: string | null;
   employment_type: string | null;
   is_active: boolean;
 };
 
 type EmployeeFormState = {
   companyId: string;
+  fullName: string;
   firstName: string;
   lastName: string;
   tcNumber: string;
   jobTitle: string;
   department: string;
   startDate: string;
+  endDate: string;
+  gender: string;
+  insuredJobCode: string;
+  insuredJobName: string;
   employmentType: string;
   phone: string;
   email: string;
@@ -70,12 +80,17 @@ type EmployeeHealthRecord = {
 
 const emptyForm: EmployeeFormState = {
   companyId: "",
+  fullName: "",
   firstName: "",
   lastName: "",
   tcNumber: "",
   jobTitle: "",
   department: "",
   startDate: new Date().toISOString().slice(0, 10),
+  endDate: "",
+  gender: "",
+  insuredJobCode: "",
+  insuredJobName: "",
   employmentType: "Süresiz",
   phone: "",
   email: "",
@@ -94,6 +109,34 @@ const normalizeHeader = (value: string) =>
     .replace(/ü/g, "u")
     .replace(/ö/g, "o")
     .replace(/\s+/g, "_");
+
+const getHeaderValue = (row: EmployeeImportRow, ...keys: string[]) => {
+  const normalizedKeys = keys.map((key) => normalizeHeader(key));
+  return row[normalizedKeys.find((key) => row[key] !== undefined) || ""] || "";
+};
+
+const parseWorkbookDate = (value: string) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return null;
+  const parsed = new Date(normalized);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  const match = normalized.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (!match) return normalized;
+  const [, day, month, yearRaw] = match;
+  const year = yearRaw.length === 2 ? `20${yearRaw}` : yearRaw;
+  return `${year.padStart(4, "0")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+};
+
+const splitFullName = (value: string) => {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (!normalized) return { firstName: "", lastName: "" };
+  const parts = normalized.split(" ");
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts.slice(-1).join(" "),
+  };
+};
 
 const readWorkbookRows = (file: File): Promise<EmployeeImportRow[]> =>
   new Promise((resolve, reject) => {
@@ -123,8 +166,22 @@ const readWorkbookRows = (file: File): Promise<EmployeeImportRow[]> =>
 
 const downloadAddTemplate = () => {
   const rows = [
-    ["company_name", "first_name", "last_name", "job_title", "department", "start_date", "employment_type", "tc_number", "phone", "email"],
-    ["Benli AŞ", "Ahmet", "Yılmaz", "Kaynak Ustası", "Üretim", "2026-03-01", "Süresiz", "12345678901", "05551234567", "ahmet@example.com"],
+    [
+      "Firma",
+      "Adı Soyadı",
+      "Adı",
+      "Soyadı",
+      "Tc Kimlik No",
+      "İşe Giriş Tar.",
+      "İşten Çık.Tar.",
+      "Cinsiyeti",
+      "Sigortalı Mes. Kodu",
+      "Sigortalı Mes. İsmi",
+      "Departman",
+      "Telefon",
+      "E-Posta",
+    ],
+    ["Benli AŞ", "Ahmet Yılmaz", "Ahmet", "Yılmaz", "12345678901", "2026-03-01", "", "Erkek", "7223.14", "Kaynak Ustası", "Üretim", "05551234567", "ahmet@example.com"],
   ];
   const ws = XLSX.utils.aoa_to_sheet(rows);
   const wb = XLSX.utils.book_new();
@@ -176,6 +233,7 @@ export default function Employees() {
       id: String(row.id),
       company_id: String(row.company_id),
       company_name: companyMap.get(String(row.company_id)) || null,
+      full_name: row.full_name ? String(row.full_name) : null,
       first_name: String(row.first_name || ""),
       last_name: String(row.last_name || ""),
       tc_number: row.tc_number ? String(row.tc_number) : null,
@@ -184,6 +242,10 @@ export default function Employees() {
       job_title: String(row.job_title || ""),
       department: row.department ? String(row.department) : null,
       start_date: row.start_date ? String(row.start_date) : null,
+      end_date: row.end_date ? String(row.end_date) : null,
+      gender: row.gender ? String(row.gender) : null,
+      insured_job_code: row.insured_job_code ? String(row.insured_job_code) : null,
+      insured_job_name: row.insured_job_name ? String(row.insured_job_name) : null,
       employment_type: row.employment_type ? String(row.employment_type) : null,
       is_active: Boolean(row.is_active),
     }));
@@ -370,12 +432,17 @@ export default function Employees() {
     try {
       const payload = {
         company_id: form.companyId,
+        full_name: form.fullName.trim() || `${form.firstName.trim()} ${form.lastName.trim()}`.trim(),
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         tc_number: form.tcNumber.trim() || null,
         job_title: form.jobTitle.trim(),
         department: form.department.trim() || null,
         start_date: form.startDate || new Date().toISOString().slice(0, 10),
+        end_date: form.endDate || null,
+        gender: form.gender || null,
+        insured_job_code: form.insuredJobCode.trim() || null,
+        insured_job_name: form.insuredJobName.trim() || form.jobTitle.trim(),
         employment_type: form.employmentType || "Süresiz",
         phone: form.phone.trim() || null,
         email: form.email.trim() || null,
@@ -412,16 +479,19 @@ export default function Employees() {
       const errors: string[] = [];
 
       rows.forEach((row, index) => {
-        const companyName = row.company_name || row.firma || row.company;
+        const companyName = getHeaderValue(row, "company_name", "firma", "company", "firma adı", "firma ünvanı");
         const companyId = companyName ? companyMap.get(companyName.toLocaleLowerCase("tr-TR")) : undefined;
-        const firstName = row.first_name || row.ad || row.isim;
-        const lastName = row.last_name || row.soyad;
-        const jobTitle = row.job_title || row.gorev || row.görev || row.title;
-        const tcNumber = row.tc_number || row.tc || "";
-        const email = (row.email || row.eposta || "").toLocaleLowerCase("tr-TR");
+        const fullName = getHeaderValue(row, "adı soyadı", "ad soyad", "full_name", "fullname");
+        const splitName = splitFullName(fullName);
+        const firstName = getHeaderValue(row, "first_name", "adı", "adi", "ad", "isim") || splitName.firstName;
+        const lastName = getHeaderValue(row, "last_name", "soyadı", "soyadi", "soyad") || splitName.lastName;
+        const insuredJobName = getHeaderValue(row, "sigortalı mes. ismi", "sigortali mes. ismi", "sigortalı meslek ismi", "meslek adı", "insured_job_name");
+        const jobTitle = getHeaderValue(row, "job_title", "gorev", "görev", "title") || insuredJobName;
+        const tcNumber = getHeaderValue(row, "tc kimlik no", "tc_no", "tc_number", "tc");
+        const email = getHeaderValue(row, "email", "eposta", "e-posta").toLocaleLowerCase("tr-TR");
 
         if (!companyId || !firstName || !lastName || !jobTitle) {
-          errors.push(`Satır ${index + 2}: company_name, first_name, last_name ve job_title zorunlu.`);
+          errors.push(`Satır ${index + 2}: firma, ad/soyad ve sigortalı meslek bilgisi zorunlu.`);
           return;
         }
         if (tcNumber && existingTc.has(tcNumber)) {
@@ -435,14 +505,21 @@ export default function Employees() {
 
         inserts.push({
           company_id: companyId,
+          full_name: fullName || `${firstName} ${lastName}`.trim(),
           first_name: firstName,
           last_name: lastName,
           tc_number: tcNumber || null,
           job_title: jobTitle,
-          department: row.department || row.departman || null,
-          start_date: row.start_date || row.baslangic_tarihi || new Date().toISOString().slice(0, 10),
-          employment_type: row.employment_type || row.calisma_tipi || "Süresiz",
-          phone: row.phone || row.telefon || null,
+          department: getHeaderValue(row, "department", "departman", "bölüm", "bolum", "birim") || null,
+          start_date:
+            parseWorkbookDate(getHeaderValue(row, "işe giriş tar.", "ise giris tar.", "işe giriş tarihi", "start_date", "başlangıç tarihi", "baslangic_tarihi")) ||
+            new Date().toISOString().slice(0, 10),
+          end_date: parseWorkbookDate(getHeaderValue(row, "işten çık.tar.", "isten cik.tar.", "işten çıkış tarihi", "end_date")) || null,
+          gender: getHeaderValue(row, "cinsiyeti", "cinsiyet", "gender") || null,
+          insured_job_code: getHeaderValue(row, "sigortalı mes. kodu", "sigortali mes. kodu", "sigortalı meslek kodu", "insured_job_code") || null,
+          insured_job_name: insuredJobName || null,
+          employment_type: getHeaderValue(row, "employment_type", "calisma_tipi") || "Süresiz",
+          phone: getHeaderValue(row, "phone", "telefon") || null,
           email: email || null,
           is_active: true,
         });
@@ -543,17 +620,36 @@ export default function Employees() {
         ...mapEmployeeRows((passiveResult.data || []) as Array<Record<string, unknown>>, companyMap),
       ];
 
-      const headers = ["Ad", "Soyad", "Firma", "Görev", "Departman", "Telefon", "E-posta", "TC", "Başlangıç", "Durum"];
+      const headers = [
+        "Adı Soyadı",
+        "Adı",
+        "Soyadı",
+        "Firma",
+        "TC Kimlik No",
+        "İşe Giriş Tar.",
+        "İşten Çık.Tar.",
+        "Cinsiyeti",
+        "Sigortalı Mes. Kodu",
+        "Sigortalı Mes. İsmi",
+        "Departman",
+        "Telefon",
+        "E-Posta",
+        "Durum",
+      ];
       const body = rows.map((employee) => [
+        employee.full_name || `${employee.first_name} ${employee.last_name}`.trim(),
         employee.first_name,
         employee.last_name,
         employee.company_name || "",
-        employee.job_title,
+        employee.tc_number || "",
+        employee.start_date || "",
+        employee.end_date || "",
+        employee.gender || "",
+        employee.insured_job_code || "",
+        employee.insured_job_name || employee.job_title || "",
         employee.department || "",
         employee.phone || "",
         employee.email || "",
-        employee.tc_number || "",
-        employee.start_date || "",
         employee.is_active ? "Aktif" : "Pasif",
       ]);
 
@@ -627,12 +723,12 @@ export default function Employees() {
 
       {!id && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Alert className="border-sky-500/20 bg-sky-500/5 text-slate-100">
+            <Alert className="border-sky-500/20 bg-sky-500/5 text-slate-100">
             <FileSpreadsheet className="h-4 w-4" />
             <AlertTitle>Toplu çalışan ekleme</AlertTitle>
             <AlertDescription>
-              Excel dosyasında `company_name`, `first_name`, `last_name`, `job_title` zorunludur.
-              Opsiyonel alanlar: `department`, `start_date`, `employment_type`, `tc_number`, `phone`, `email`.
+              Excel dosyasında `Firma`, `Adı Soyadı` veya `Adı` + `Soyadı`, ayrıca meslek/görev bilgisi bulunmalıdır.
+              Desteklenen alanlar arasında `Tc Kimlik No`, `İşe Giriş Tar.`, `İşten Çık.Tar.`, `Cinsiyeti`, `Sigortalı Mes. Kodu`, `Sigortalı Mes. İsmi`, `Telefon`, `E-Posta` yer alır.
             </AlertDescription>
           </Alert>
           <Alert className="border-amber-500/20 bg-amber-500/5 text-slate-100">
@@ -729,9 +825,14 @@ export default function Employees() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-            <div><p className="text-sm text-muted-foreground">Görev</p><p className="font-medium">{detailEmployee?.job_title || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">Adı Soyadı</p><p className="font-medium">{detailEmployee?.full_name || `${detailEmployee?.first_name || ""} ${detailEmployee?.last_name || ""}`.trim() || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">TC Kimlik No</p><p className="font-medium">{detailEmployee?.tc_number || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">Sigortalı Mes. İsmi</p><p className="font-medium">{detailEmployee?.insured_job_name || detailEmployee?.job_title || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">Sigortalı Mes. Kodu</p><p className="font-medium">{detailEmployee?.insured_job_code || "-"}</p></div>
             <div><p className="text-sm text-muted-foreground">Departman</p><p className="font-medium">{detailEmployee?.department || "-"}</p></div>
-            <div><p className="text-sm text-muted-foreground">Başlangıç</p><p className="font-medium">{detailEmployee?.start_date || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">Cinsiyet</p><p className="font-medium">{detailEmployee?.gender || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">İşe Giriş</p><p className="font-medium">{detailEmployee?.start_date || "-"}</p></div>
+            <div><p className="text-sm text-muted-foreground">İşten Çıkış</p><p className="font-medium">{detailEmployee?.end_date || "-"}</p></div>
             <div><p className="text-sm text-muted-foreground">İletişim</p><p className="font-medium">{detailEmployee?.phone || detailEmployee?.email || "-"}</p></div>
             </div>
 
@@ -983,7 +1084,7 @@ export default function Employees() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Yeni Çalışan Ekle</DialogTitle>
-            <DialogDescription>Zorunlu alanlar: firma, ad, soyad ve görev.</DialogDescription>
+            <DialogDescription>Zorunlu alanlar: firma, ad, soyad ve sigortalı meslek/görev bilgisi.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 md:col-span-2">
@@ -993,12 +1094,17 @@ export default function Employees() {
                 <SelectContent>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Ad</Label><Input value={form.firstName} onChange={(e) => setForm((prev) => ({ ...prev, firstName: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Soyad</Label><Input value={form.lastName} onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value }))} /></div>
+            <div className="space-y-2 md:col-span-2"><Label>Adı Soyadı</Label><Input value={form.fullName} onChange={(e) => { const fullName = e.target.value; const split = splitFullName(fullName); setForm((prev) => ({ ...prev, fullName, firstName: split.firstName || prev.firstName, lastName: split.lastName || prev.lastName })); }} /></div>
+            <div className="space-y-2"><Label>Ad</Label><Input value={form.firstName} onChange={(e) => setForm((prev) => ({ ...prev, firstName: e.target.value, fullName: `${e.target.value} ${prev.lastName}`.trim() }))} /></div>
+            <div className="space-y-2"><Label>Soyad</Label><Input value={form.lastName} onChange={(e) => setForm((prev) => ({ ...prev, lastName: e.target.value, fullName: `${prev.firstName} ${e.target.value}`.trim() }))} /></div>
             <div className="space-y-2"><Label>TC Kimlik No</Label><Input value={form.tcNumber} onChange={(e) => setForm((prev) => ({ ...prev, tcNumber: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Sigortalı Mes. Kodu</Label><Input value={form.insuredJobCode} onChange={(e) => setForm((prev) => ({ ...prev, insuredJobCode: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Sigortalı Mes. İsmi</Label><Input value={form.insuredJobName} onChange={(e) => setForm((prev) => ({ ...prev, insuredJobName: e.target.value, jobTitle: e.target.value || prev.jobTitle }))} /></div>
             <div className="space-y-2"><Label>Görev</Label><Input value={form.jobTitle} onChange={(e) => setForm((prev) => ({ ...prev, jobTitle: e.target.value }))} /></div>
             <div className="space-y-2"><Label>Departman</Label><Input value={form.department} onChange={(e) => setForm((prev) => ({ ...prev, department: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Başlangıç Tarihi</Label><Input type="date" value={form.startDate} onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>İşe Giriş Tar.</Label><Input type="date" value={form.startDate} onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>İşten Çık.Tar.</Label><Input type="date" value={form.endDate} onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))} /></div>
+            <div className="space-y-2"><Label>Cinsiyeti</Label><Select value={form.gender || "EMPTY"} onValueChange={(value) => setForm((prev) => ({ ...prev, gender: value === "EMPTY" ? "" : value }))}><SelectTrigger><SelectValue placeholder="Cinsiyet seçin" /></SelectTrigger><SelectContent><SelectItem value="EMPTY">Belirtilmedi</SelectItem><SelectItem value="Erkek">Erkek</SelectItem><SelectItem value="Kadın">Kadın</SelectItem><SelectItem value="Diğer">Diğer</SelectItem></SelectContent></Select></div>
             <div className="space-y-2"><Label>Çalışma Tipi</Label><Select value={form.employmentType} onValueChange={(value) => setForm((prev) => ({ ...prev, employmentType: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Süresiz">Süresiz</SelectItem><SelectItem value="Süreli">Süreli</SelectItem><SelectItem value="Stajyer">Stajyer</SelectItem><SelectItem value="Part-Time">Part-Time</SelectItem></SelectContent></Select></div>
             <div className="space-y-2"><Label>Telefon</Label><Input value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} /></div>
             <div className="space-y-2"><Label>E-posta</Label><Input value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} /></div>
