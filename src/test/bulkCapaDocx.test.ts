@@ -17,10 +17,12 @@ describe("BulkCAPA DOCX photo layout", () => {
     const rows = buildPhotoGridRows(0, [
       ...photos,
     ]);
+    const firstRowCells = (rows[0] as { options: { children: unknown[] } }).options.children;
+    const secondRowCells = (rows[1] as { options: { children: unknown[] } }).options.children;
 
     expect(rows).toHaveLength(2);
-    expect((rows[0] as any).options.children).toHaveLength(3);
-    expect((rows[1] as any).options.children).toHaveLength(3);
+    expect(firstRowCells).toHaveLength(3);
+    expect(secondRowCells).toHaveLength(3);
   });
 
   it("generates a DOCX buffer without mixing entry blocks", async () => {

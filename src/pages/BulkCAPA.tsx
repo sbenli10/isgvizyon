@@ -58,7 +58,7 @@ function normalizePhotoData(input: BulkCapaPhotoInput): Uint8Array {
   return decodeBase64(base64Part);
 }
 
-function buildPhotoGridRows(entryIndex: number, photos: BulkCapaPhoto[]) {
+export function buildPhotoGridRows(entryIndex: number, photos: BulkCapaPhoto[]) {
   const rows: TableRow[] = [];
 
   for (let i = 0; i < photos.length; i += PHOTO_COLUMNS) {
@@ -220,5 +220,4 @@ export function generateBulkCapaOfficialDocx(entries: BulkCapaOfficialEntry[]) {
 
 const generateBulkCapaReport = (analyses: BulkCapaOfficialEntry[]) => generateBulkCapaOfficialDocx(analyses);
 
-export { buildPhotoGridRows };
 export default generateBulkCapaReport;
