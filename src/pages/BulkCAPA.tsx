@@ -1,41 +1,224 @@
-import { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, Alignment, Media } from 'docx';
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  HeadingLevel,
+  ImageRun,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableLayoutType,
+  TableRow,
+  TextRun,
+  WidthType,
+} from "docx";
 
-const generateDofReport = (analyses) => {
-    const doc = new Document();
+type BulkCapaPhotoInput = string | Uint8Array | ArrayBuffer;
 
-    analyses.forEach((analysis, analysisIndex) => {
-        const paragraphs = [];
-        const photos = analysis.photos;
-        if (photos && photos.length > 0) {
-            let tableRows = [];
+interface BulkCapaPhoto {
+  file: BulkCapaPhotoInput;
+  caption?: string;
+}
 
-            for (let i = 0; i < photos.length; i += 3) {
-                const rowCells = []; // Cells for current row
-                const endIndex = Math.min(i + 3, photos.length);
-                for (let j = i; j < endIndex; j++) {
-                    const photo = photos[j];
-                    const cell = new TableCell({
-                        children: [
-                            Media.addImage(doc, photo.file),
-                            new Paragraph({ text: `Madde ${analysisIndex + 1} - Fotoğraf ${j + 1}/${photos.length}`, alignment: Alignment.CENTER }),
-                        ],
-                        borders: { top: { style: 'none' }, bottom: { style: 'none' }, left: { style: 'none' }, right: { style: 'none' } },
-                    });
-                    rowCells.push(cell);
-                }
-                tableRows.push(new TableRow({ children: rowCells }));
-            }
+export interface BulkCapaOfficialEntry {
+  itemNo?: number | string;
+  title?: string;
+  photos?: BulkCapaPhoto[];
+  nonCompliance?: string;
+  riskAnalysis?: string;
+  legislationBasis?: string;
+  suggestedCapa?: string;
+  dueDate?: string;
+  actionPlan?: string;
+  responsible?: string;
+}
 
-            const table = new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } });
-            paragraphs.push(table);
-        }
+const PHOTO_COLUMNS = 3;
+const PHOTO_CELL_WIDTH_PERCENT = Math.floor(100 / PHOTO_COLUMNS);
+const PHOTO_WIDTH = 160;
+const PHOTO_HEIGHT = 120;
 
-        doc.addSection({ children: [...paragraphs] });
-    });
+function decodeBase64(value: string) {
+  if (typeof globalThis.atob !== "function") {
+    throw new Error("Base64 çözümleme desteklenmiyor.");
+  }
+  return Uint8Array.from(globalThis.atob(value), (char) => char.charCodeAt(0));
+}
 
-    Packer.toBuffer(doc).then((buffer) => {
-        // Save or process the .docx file buffer
-    });
-};
+function normalizePhotoData(input: BulkCapaPhotoInput): Uint8Array {
+  if (input instanceof Uint8Array) return input;
+  if (input instanceof ArrayBuffer) return new Uint8Array(input);
 
+  if (!input.startsWith("data:")) {
+    return decodeBase64(input);
+  }
+
+  const base64Part = input.split(",")[1] || "";
+  return decodeBase64(base64Part);
+}
+
+function buildPhotoGridRows(entryIndex: number, photos: BulkCapaPhoto[]) {
+  const rows: TableRow[] = [];
+
+  for (let i = 0; i < photos.length; i += PHOTO_COLUMNS) {
+    const rowCells: TableCell[] = [];
+
+    for (let offset = 0; offset < PHOTO_COLUMNS; offset += 1) {
+      const photo = photos[i + offset];
+
+      if (!photo) {
+        rowCells.push(
+          new TableCell({
+            width: { size: PHOTO_CELL_WIDTH_PERCENT, type: WidthType.PERCENTAGE },
+            children: [new Paragraph("")],
+            borders: {
+              top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+              right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            },
+          })
+        );
+        continue;
+      }
+
+      const photoIndex = i + offset + 1;
+      const caption = photo.caption || `Madde ${entryIndex + 1} - Fotoğraf ${photoIndex}/${photos.length}`;
+
+      rowCells.push(
+        new TableCell({
+          width: { size: PHOTO_CELL_WIDTH_PERCENT, type: WidthType.PERCENTAGE },
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [
+                new ImageRun({
+                  data: normalizePhotoData(photo.file),
+                  transformation: { width: PHOTO_WIDTH, height: PHOTO_HEIGHT },
+                }),
+              ],
+            }),
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 100 },
+              children: [new TextRun({ text: caption, size: 18 })],
+            }),
+          ],
+          borders: {
+            top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+            right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+          },
+        })
+      );
+    }
+
+    rows.push(new TableRow({ children: rowCells }));
+  }
+
+  return rows;
+}
+
+function createFieldRow(label: string, value?: string) {
+  return new TableRow({
+    children: [
+      new TableCell({
+        width: { size: 30, type: WidthType.PERCENTAGE },
+        children: [new Paragraph({ children: [new TextRun({ text: label, bold: true })] })],
+      }),
+      new TableCell({
+        width: { size: 70, type: WidthType.PERCENTAGE },
+        children: [new Paragraph(value?.trim() || "-")],
+      }),
+    ],
+  });
+}
+
+function createMainEntryTable(entry: BulkCapaOfficialEntry) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      createFieldRow("TESPİT EDİLEN UYGUNSUZLUK", entry.nonCompliance),
+      createFieldRow("RİSK ANALİZİ", entry.riskAnalysis),
+      createFieldRow("MEVZUAT DAYANAĞI", entry.legislationBasis),
+      createFieldRow("ÖNERİLEN DÖF", entry.suggestedCapa),
+    ],
+  });
+}
+
+function createActionPlanTable(entry: BulkCapaOfficialEntry) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    rows: [
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Termin", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Aksiyon Planı", bold: true })] })] }),
+          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Sorumlu", bold: true })] })] }),
+        ],
+      }),
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph(entry.dueDate?.trim() || "-")] }),
+          new TableCell({ children: [new Paragraph(entry.actionPlan?.trim() || "-")] }),
+          new TableCell({ children: [new Paragraph(entry.responsible?.trim() || "-")] }),
+        ],
+      }),
+    ],
+  });
+}
+
+export function generateBulkCapaOfficialDocx(entries: BulkCapaOfficialEntry[]) {
+  const doc = new Document({
+    sections: [
+      {
+        children: [
+          new Paragraph({
+            text: "EK-1 FOTOĞRAF KANITLARI",
+            heading: HeadingLevel.HEADING_1,
+            spacing: { after: 240 },
+          }),
+          ...(entries.length === 0
+            ? [new Paragraph("Fotoğraf kanıtı bulunamadı.")]
+            : entries.flatMap((entry, entryIndex) => {
+                const entryLabel = entry.itemNo ?? entryIndex + 1;
+                const entryTitle = entry.title?.trim() ? ` – ${entry.title.trim()}` : "";
+                const photos = entry.photos || [];
+
+                return [
+                  new Paragraph({
+                    text: `Madde ${entryLabel}${entryTitle}`,
+                    heading: HeadingLevel.HEADING_2,
+                    spacing: { before: 200, after: 140 },
+                  }),
+                  ...(photos.length > 0
+                    ? [
+                        new Table({
+                          width: { size: 100, type: WidthType.PERCENTAGE },
+                          layout: TableLayoutType.FIXED,
+                          rows: buildPhotoGridRows(entryIndex, photos),
+                        }),
+                      ]
+                    : [new Paragraph("Bu madde için fotoğraf kanıtı yok.")]),
+                  new Paragraph({ text: "", spacing: { after: 100 } }),
+                  createMainEntryTable(entry),
+                  new Paragraph({ text: "", spacing: { after: 100 } }),
+                  createActionPlanTable(entry),
+                  new Paragraph({ text: "", spacing: { after: 240 } }),
+                ];
+              })),
+        ],
+      },
+    ],
+  });
+
+  return Packer.toBuffer(doc);
+}
+
+const generateDofReport = (analyses: BulkCapaOfficialEntry[]) => generateBulkCapaOfficialDocx(analyses);
+
+export { buildPhotoGridRows };
 export default generateDofReport;
