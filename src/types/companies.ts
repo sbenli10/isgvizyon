@@ -16,6 +16,15 @@
   employee_count: number;
   workplace_registration_number?: string;
   sgk_workplace_number?: string;
+  visit_frequency?: string;
+  employer_representative_name?: string;
+  occupational_safety_specialist_name?: string;
+  workplace_doctor_name?: string;
+  employee_representative_name?: string;
+  knowledgeable_employee_name?: string;
+  fire_support_person_name?: string;
+  first_aid_support_person_name?: string;
+  evacuation_support_person_name?: string;
   created_at: string;
   updated_at: string;
   is_active: boolean;

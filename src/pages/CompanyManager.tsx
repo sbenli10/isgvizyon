@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { FixedSizeList as List } from "react-window";
+import * as XLSX from "xlsx";
 import { 
   Building2, Users, FileSpreadsheet, Plus, Save, 
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -230,6 +231,14 @@ const SECTOR_TEMPLATES = [
   }
 ];
 
+const VISIT_FREQUENCY_OPTIONS = [
+  "Haftada 1 Defa",
+  "15 Günde 1 Defa",
+  "Ayda 1 Defa",
+  "2 Ayda 1 Defa",
+  "3 Ayda 1 Defa",
+] as const;
+
 function normalizeTemplateText(value: string) {
   return value
     .toLocaleLowerCase("tr-TR")
@@ -318,7 +327,18 @@ export default function CompanyManager() {
     phone: "",
     email: "",
     logo_url: "",
-    employee_count: 0
+    employee_count: 0,
+    workplace_registration_number: "",
+    sgk_workplace_number: "",
+    visit_frequency: "Ayda 1 Defa",
+    employer_representative_name: "",
+    occupational_safety_specialist_name: "",
+    workplace_doctor_name: "",
+    employee_representative_name: "",
+    knowledgeable_employee_name: "",
+    fire_support_person_name: "",
+    first_aid_support_person_name: "",
+    evacuation_support_person_name: "",
   });
   const [logoPreviewUrl, setLogoPreviewUrl] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -375,8 +395,21 @@ export default function CompanyManager() {
         ...item,
         owner_id: item.user_id,
         company_name: item.name,
+        tax_number: item.tax_number || "",
         nace_code: item.industry || "",
         hazard_class: item.hazard_class || "Az Tehlikeli",
+        industry_sector: item.industry_sector || "",
+        workplace_registration_number: item.workplace_registration_number || item.sgk_workplace_number || "",
+        sgk_workplace_number: item.sgk_workplace_number || "",
+        visit_frequency: item.visit_frequency || "Ayda 1 Defa",
+        employer_representative_name: item.employer_representative_name || "",
+        occupational_safety_specialist_name: item.occupational_safety_specialist_name || "",
+        workplace_doctor_name: item.workplace_doctor_name || "",
+        employee_representative_name: item.employee_representative_name || "",
+        knowledgeable_employee_name: item.knowledgeable_employee_name || "",
+        fire_support_person_name: item.fire_support_person_name || "",
+        first_aid_support_person_name: item.first_aid_support_person_name || "",
+        evacuation_support_person_name: item.evacuation_support_person_name || "",
         logo_url: item.logo_url || "",
       }));
 
@@ -659,6 +692,17 @@ export default function CompanyManager() {
       email: company.email || "",
       logo_url: company.logo_url || "",
       employee_count: company.employee_count || 0,
+      workplace_registration_number: company.workplace_registration_number || company.sgk_workplace_number || "",
+      sgk_workplace_number: company.sgk_workplace_number || "",
+      visit_frequency: company.visit_frequency || "Ayda 1 Defa",
+      employer_representative_name: company.employer_representative_name || "",
+      occupational_safety_specialist_name: company.occupational_safety_specialist_name || "",
+      workplace_doctor_name: company.workplace_doctor_name || "",
+      employee_representative_name: company.employee_representative_name || "",
+      knowledgeable_employee_name: company.knowledgeable_employee_name || "",
+      fire_support_person_name: company.fire_support_person_name || "",
+      first_aid_support_person_name: company.first_aid_support_person_name || "",
+      evacuation_support_person_name: company.evacuation_support_person_name || "",
     });
 
     void syncCompanyLogoPreview(company.logo_url || "");
@@ -860,13 +904,16 @@ export default function CompanyManager() {
   };
 
   const handleSaveCompany = async () => {
-    if (!formData.company_name || !formData.tax_number || !formData.nace_code) {
+    if (!formData.company_name || !formData.hazard_class) {
       toast.error("Lütfen zorunlu alanları doldurun");
       return;
     }
 
-    if (formData.tax_number.length !== 10 && formData.tax_number.length !== 11) {
-      toast.error("Vergi numarası 10 veya 11 haneli olmalıdır");
+    if (
+      formData.workplace_registration_number &&
+      !/^\d+$/.test(formData.workplace_registration_number)
+    ) {
+      toast.error("SGK sicil no alanına sadece rakam giriniz");
       return;
     }
 
@@ -898,13 +945,25 @@ export default function CompanyManager() {
           .from("companies")
           .update({
             name: formData.company_name,
-            tax_number: formData.tax_number,
-            industry: formData.nace_code,
+            tax_number: formData.tax_number || null,
+            industry: formData.nace_code || null,
             address: formData.address,
             phone: formData.phone,
             email: formData.email,
             logo_url: formData.logo_url || null,
             employee_count: employeesJson.length || formData.employee_count,
+            hazard_class: formData.hazard_class,
+            workplace_registration_number: formData.workplace_registration_number || null,
+            sgk_workplace_number: formData.workplace_registration_number || null,
+            visit_frequency: formData.visit_frequency || null,
+            employer_representative_name: formData.employer_representative_name || null,
+            occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
+            workplace_doctor_name: formData.workplace_doctor_name || null,
+            employee_representative_name: formData.employee_representative_name || null,
+            knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
+            fire_support_person_name: formData.fire_support_person_name || null,
+            first_aid_support_person_name: formData.first_aid_support_person_name || null,
+            evacuation_support_person_name: formData.evacuation_support_person_name || null,
           })
           .eq("id", editingCompanyId);
 
@@ -950,14 +1009,25 @@ export default function CompanyManager() {
         p_owner_id: user?.id,
         p_company_data: {
           company_name: formData.company_name,
-          tax_number: formData.tax_number,
-          nace_code: formData.nace_code,
+          tax_number: formData.tax_number || null,
+          nace_code: formData.nace_code || null,
           hazard_class: formData.hazard_class,
           industry_sector: formData.industry_sector,
           address: formData.address,
           phone: formData.phone,
           email: formData.email,
           employee_count: employeesJson.length || formData.employee_count,
+          workplace_registration_number: formData.workplace_registration_number || null,
+          sgk_workplace_number: formData.workplace_registration_number || null,
+          visit_frequency: formData.visit_frequency || null,
+          employer_representative_name: formData.employer_representative_name || null,
+          occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
+          workplace_doctor_name: formData.workplace_doctor_name || null,
+          employee_representative_name: formData.employee_representative_name || null,
+          knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
+          fire_support_person_name: formData.fire_support_person_name || null,
+          first_aid_support_person_name: formData.first_aid_support_person_name || null,
+          evacuation_support_person_name: formData.evacuation_support_person_name || null,
         },
         p_risk_template_id: template?.id || null,
         p_employees: employeesJson,
@@ -984,6 +1054,28 @@ export default function CompanyManager() {
           .eq("id", result.company_id);
 
         if (logoUpdateError) throw logoUpdateError;
+      }
+
+      if (result.company_id) {
+        const { error: extendedUpdateError } = await (supabase as any)
+          .from("companies")
+          .update({
+            hazard_class: formData.hazard_class,
+            workplace_registration_number: formData.workplace_registration_number || null,
+            sgk_workplace_number: formData.workplace_registration_number || null,
+            visit_frequency: formData.visit_frequency || null,
+            employer_representative_name: formData.employer_representative_name || null,
+            occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
+            workplace_doctor_name: formData.workplace_doctor_name || null,
+            employee_representative_name: formData.employee_representative_name || null,
+            knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
+            fire_support_person_name: formData.fire_support_person_name || null,
+            first_aid_support_person_name: formData.first_aid_support_person_name || null,
+            evacuation_support_person_name: formData.evacuation_support_person_name || null,
+          })
+          .eq("id", result.company_id);
+
+        if (extendedUpdateError) throw extendedUpdateError;
       }
 
       toast.success("🎉 Firma başarıyla kaydedildi!", {
@@ -1015,7 +1107,18 @@ export default function CompanyManager() {
       phone: "",
       email: "",
       logo_url: "",
-      employee_count: 0
+      employee_count: 0,
+      workplace_registration_number: "",
+      sgk_workplace_number: "",
+      visit_frequency: "Ayda 1 Defa",
+      employer_representative_name: "",
+      occupational_safety_specialist_name: "",
+      workplace_doctor_name: "",
+      employee_representative_name: "",
+      knowledgeable_employee_name: "",
+      fire_support_person_name: "",
+      first_aid_support_person_name: "",
+      evacuation_support_person_name: "",
     });
     setLogoPreviewUrl("");
     setSelectedNACE(null);
@@ -1033,7 +1136,7 @@ export default function CompanyManager() {
 
   const goToStep = (step: number) => {
     if (step === 2 && currentStep === 1) {
-      if (!formData.company_name || !formData.tax_number || !formData.nace_code) {
+      if (!formData.company_name || !formData.hazard_class) {
         toast.error("Lütfen zorunlu alanları doldurun");
         return;
       }
@@ -1057,8 +1160,9 @@ export default function CompanyManager() {
       result = result.filter(
         company =>
           company.company_name.toLowerCase().includes(query) ||
-          company.tax_number.includes(query) ||
-          company.nace_code.includes(query)
+          (company.tax_number || "").includes(query) ||
+          (company.nace_code || "").includes(query) ||
+          (company.workplace_registration_number || "").includes(query)
       );
     }
 
@@ -1889,10 +1993,10 @@ export default function CompanyManager() {
           <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
             <DialogHeader>
               <DialogTitle className="text-xl font-black text-white">
-                {editingCompanyId ? "Firma Düzenle" : "Yeni Firma Kayıt Sihirbazı"}
+                {editingCompanyId ? "Firma Düzenle" : "Yeni Firma Ekle"}
               </DialogTitle>
               <DialogDescription className="text-slate-400">
-                3 adımda firma kaydı oluşturun
+                Firma kartını, ekip bilgisini ve operasyon ritmini tek ekranda tanımlayın.
               </DialogDescription>
             </DialogHeader>
 
@@ -2718,3 +2822,4 @@ export default function CompanyManager() {
     </div>    
   );
 }
+

@@ -214,7 +214,7 @@ const COMMON_TEMPLATE_RISKS = [
 ];
 
 export default function RiskAssessmentEditor() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const createdFromWizard = Boolean((location.state as { createdFromWizard?: boolean } | null)?.createdFromWizard);
@@ -1287,6 +1287,13 @@ useLayoutEffect(() => {
     try {
       const company = companies.find(c => c.id === selectedCompany);
       
+      const assessorDisplayName =
+        profile?.full_name?.trim() ||
+        user?.user_metadata?.full_name?.trim() ||
+        user?.user_metadata?.name?.trim() ||
+        user?.email ||
+        "";
+
       const { data, error } = await supabase
         .from("risk_assessments")
         .insert({
@@ -1295,7 +1302,8 @@ useLayoutEffect(() => {
           assessment_name: `Risk Değerlendirmesi - ${company?.name || "Firma"} - ${format(new Date(), 'dd.MM.yyyy', { locale: tr })}`,
           assessment_date: new Date().toISOString().split('T')[0],
           status: 'draft',
-          assessor_name: user?.email || "",
+          assessor_name: assessorDisplayName,
+          occupational_safety_specialist_name: assessorDisplayName,
           next_review_date: format(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
         } as any)
         .select()

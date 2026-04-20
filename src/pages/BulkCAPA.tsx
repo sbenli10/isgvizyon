@@ -59,6 +59,15 @@ import {
   analyzeBulkCapaImages,
   generateBulkCapaOverallAnalysis,
 } from "@/lib/ai/analyzeBulkCapa";
+import {
+  generateBulkCapaOfficialDocx,
+  getBulkCapaLegalBasis,
+  type BulkCapaOfficialCompany,
+  type BulkCapaOfficialEntry,
+  type BulkCapaOfficialGeneralInfo,
+  type BulkCapaOfficialOrganization,
+  type BulkCapaOfficialProfileContext,
+} from "@/lib/bulkCapaOfficialDocx";
 
 // ? INTERFACE DEFINITIONS
 // HazardEntry interface'ine ekle:
@@ -180,6 +189,7 @@ interface BulkCAPADraftSnapshot {
   manualCompanyName: string;
   generalInfo: BulkCAPAGeneralInfo;
   newEntry: HazardEntry;
+  bulkSourceImages?: string[];
   entries: HazardEntry[];
   overallAnalysis: string;
   createMode: "single" | "bulk";
@@ -204,6 +214,7 @@ type ModuleCardProps = {
 };
 
 const BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX = "bulk-capa-draft";
+const BULK_SOURCE_IMAGE_LIMIT = 12;
 
 const coerceText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -1712,6 +1723,7 @@ function BulkCAPAContent() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const clientLogoInputRef = useRef<HTMLInputElement>(null);
   const providerLogoInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -1738,6 +1750,8 @@ function BulkCAPAContent() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createMode, setCreateMode] = useState<"single" | "bulk">("single");
   const [createStep, setCreateStep] = useState<"general" | "items">("general");
+  const [bulkSourceImages, setBulkSourceImages] = useState<string[]>([]);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [overallAnalysis, setOverallAnalysis] = useState("");
@@ -1832,6 +1846,9 @@ function BulkCAPAContent() {
           ...prev,
           ...parsedDraft.newEntry,
         }));
+      }
+      if (Array.isArray(parsedDraft.bulkSourceImages)) {
+        setBulkSourceImages(parsedDraft.bulkSourceImages.filter((item): item is string => typeof item === "string"));
       }
       if (Array.isArray(parsedDraft.entries)) {
         setEntries(parsedDraft.entries);
@@ -1962,6 +1979,7 @@ function BulkCAPAContent() {
       manualCompanyName,
       generalInfo,
       newEntry,
+      bulkSourceImages,
       entries,
       overallAnalysis,
       createMode,
@@ -1983,7 +2001,8 @@ function BulkCAPAContent() {
       newEntry.riskDefinition.trim().length > 0 ||
       newEntry.correctiveAction.trim().length > 0 ||
       newEntry.preventiveAction.trim().length > 0 ||
-      newEntry.media_urls.length > 0;
+      newEntry.media_urls.length > 0 ||
+      bulkSourceImages.length > 0;
 
     try {
       if (!hasMeaningfulDraft) {
@@ -1997,6 +2016,7 @@ function BulkCAPAContent() {
     }
   }, [
     companyInputMode,
+    bulkSourceImages,
     createMode,
     createStep,
     draftStorageKey,
@@ -2740,6 +2760,147 @@ function BulkCAPAContent() {
     }
   };
 
+  const getSuggestedTerminDate = (importanceLevel: HazardEntry["importance_level"]) => {
+    const days =
+      importanceLevel === "Kritik"
+        ? 1
+        : importanceLevel === "Yüksek"
+        ? 3
+        : importanceLevel === "Orta"
+        ? 7
+        : 14;
+
+    const next = new Date();
+    next.setDate(next.getDate() + days);
+    return next.toISOString().split("T")[0];
+  };
+
+  const buildBulkEntryFromAnalysis = (analysis: AIAnalysisResult, imageUrl: string, index: number): HazardEntry => ({
+    id: `bulk-ai-${Date.now()}-${index}`,
+    description: coerceText(analysis.description).trim(),
+    riskDefinition: coerceText(analysis.riskDefinition).trim(),
+    correctiveAction: coerceText(analysis.correctiveAction).trim(),
+    preventiveAction: coerceText(analysis.preventiveAction).trim(),
+    importance_level: analysis.importance_level,
+    termin_date: getSuggestedTerminDate(analysis.importance_level),
+    related_department:
+      newEntry.related_department?.trim() && newEntry.related_department !== "Diger"
+        ? newEntry.related_department
+        : generalInfo.area_region?.trim() || "Genel Saha",
+    notification_method: "E-mail",
+    responsible_name:
+      generalInfo.employer_representative_name?.trim() ||
+      generalInfo.responsible_person?.trim() ||
+      "İşveren / İşveren Vekili",
+    responsible_role:
+      generalInfo.employer_representative_title?.trim() ||
+      "İşveren / İşveren Vekili",
+    approver_name:
+      generalInfo.observer_name?.trim() ||
+      profileContext?.full_name?.trim() ||
+      user?.email ||
+      "",
+    approver_title:
+      profileContext?.position?.trim() ||
+      "İş Güvenliği Uzmanı",
+    include_stamp: true,
+    media_urls: [imageUrl],
+    ai_analyzed: true,
+  });
+
+  const removeBulkSourceImage = (index: number) => {
+    setBulkSourceImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const handleEditExistingEntry = (entryId: string) => {
+    const entry = entries.find((item) => item.id === entryId);
+    if (!entry) {
+      toast.error("Düzenlenecek madde bulunamadı.");
+      return;
+    }
+
+    setNewEntry({ ...entry });
+    setEditingEntryId(entry.id);
+    setEditBaselineEntry({ ...entry });
+    setCreateDialogOpen(true);
+    setCreateMode("bulk");
+    setCreateStep("items");
+    toast.info("Seçilen satır düzenleme modunda açıldı.");
+  };
+
+  const handleGenerateBulkDraftFromPhotos = async () => {
+    if (!reportCompanyName.trim()) {
+      toast.error("Önce firma bilgisini seçin veya manuel girin");
+      setCreateStep("general");
+      return;
+    }
+
+    if (!generalInfoStepReady) {
+      toast.error("Önce genel bilgileri tamamlayın");
+      setCreateStep("general");
+      return;
+    }
+
+    if (bulkSourceImages.length === 0) {
+      toast.error("Toplu DÖF için önce fotoğraf yükleyin");
+      return;
+    }
+
+    setBulkGenerating(true);
+    try {
+      const generatedEntries: HazardEntry[] = [];
+
+      for (let index = 0; index < bulkSourceImages.length; index += 1) {
+        const imageUrl = bulkSourceImages[index];
+        const analysis = await analyzeImagesWithAI([imageUrl]);
+        if (!analysis) {
+          continue;
+        }
+
+        generatedEntries.push(buildBulkEntryFromAnalysis(analysis, imageUrl, index));
+      }
+
+      if (generatedEntries.length === 0) {
+        throw new Error("Yüklenen fotoğraflardan analiz üretilemedi.");
+      }
+
+      setEntries(generatedEntries);
+      setPreviewFocusEntryId(null);
+
+      const prompt = `Sen deneyimli bir iş sağlığı ve güvenliği uzmanısın.
+Aşağıdaki toplu DÖF maddeleri için resmi raporda kullanılacak yönetici özetini yaz.
+
+Kurallar:
+- 1 kısa paragraf yaz.
+- Genel risk yoğunluğunu, tekrar eden uygunsuzlukları ve öncelikli aksiyon temasını özetle.
+- Düz metin üret.
+
+Maddeler:
+${generatedEntries
+  .map(
+    (entry, index) =>
+      `${index + 1}. Bulgu: ${entry.description}\nRisk: ${entry.riskDefinition}\nDüzeltici Faaliyet: ${entry.correctiveAction}\nÖnleyici Faaliyet: ${entry.preventiveAction}\nÖnemlilik: ${entry.importance_level}`,
+  )
+  .join("\n\n")}`;
+
+      try {
+        const nextOverallAnalysis = coerceText(await generateBulkCapaOverallAnalysis(prompt)).trim();
+        if (nextOverallAnalysis) {
+          setOverallAnalysis(nextOverallAnalysis);
+        }
+      } catch (overallError) {
+        console.warn("Bulk overall analysis generation skipped:", overallError);
+      }
+
+      toast.success(`${generatedEntries.length} fotoğraf analiz edildi ve toplu DÖF taslağı hazırlandı.`);
+    } catch (error) {
+      console.error("Bulk photo-first draft generation failed:", error);
+      toast.error(getUserFriendlyErrorMessage(error, "analysis"));
+    } finally {
+      setBulkGenerating(false);
+    }
+  };
+
   // ? FETCH ORGANIZATION DATA
   useEffect(() => {
     const fetchOrgData = async () => {
@@ -3117,9 +3278,11 @@ ${entries
 
   // ? PROCESS FILES
   const processFiles = (files: FileList) => {
-    const remainingSlots = Math.max(0, 2 - newEntry.media_urls.length);
+    const currentImageCount = createMode === "bulk" ? bulkSourceImages.length : newEntry.media_urls.length;
+    const limit = createMode === "bulk" ? BULK_SOURCE_IMAGE_LIMIT : 2;
+    const remainingSlots = Math.max(0, limit - currentImageCount);
     if (remainingSlots === 0) {
-      toast.error("En fazla 2 fotograf ekleyebilirsiniz");
+      toast.error(createMode === "bulk" ? `En fazla ${BULK_SOURCE_IMAGE_LIMIT} fotograf ekleyebilirsiniz` : "En fazla 2 fotograf ekleyebilirsiniz");
       return;
     }
 
@@ -3142,11 +3305,15 @@ ${entries
       const reader = new FileReader();
       reader.onload = (event) => {
         const dataUrl = event.target?.result as string;
-        setNewEntry((prev) => ({
-          ...prev,
-          media_urls: [...prev.media_urls, dataUrl],
-          ai_analyzed: false,
-        }));
+        if (createMode === "bulk") {
+          setBulkSourceImages((prev) => [...prev, dataUrl]);
+        } else {
+          setNewEntry((prev) => ({
+            ...prev,
+            media_urls: [...prev.media_urls, dataUrl],
+            ai_analyzed: false,
+          }));
+        }
         toast.success("Fotograf eklendi");
       };
       reader.readAsDataURL(file);
@@ -3158,9 +3325,9 @@ ${entries
     const files = e.target.files;
     if (!files) return;
     processFiles(files);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    e.target.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (bulkFileInputRef.current) bulkFileInputRef.current.value = "";
   };
 
   // ? REMOVE IMAGE
@@ -3602,18 +3769,48 @@ const handleSaveAndExport = async () => {
     // ? 2. WORD DOKÜMANI OLUSTUR
     toast.info("Word raporu olusturuluyor");
 
-    const wordBlob = await generateWordDocument(
-      entries,
-      effectiveLocation,
+    const wordBlob = await generateBulkCapaOfficialDocx({
+      entries: entries.map(
+        (entry): BulkCapaOfficialEntry => ({
+          id: entry.id,
+          description: entry.description,
+          riskDefinition: entry.riskDefinition,
+          correctiveAction: entry.correctiveAction,
+          preventiveAction: entry.preventiveAction,
+          importanceLevel: entry.importance_level,
+          terminDate: entry.termin_date,
+          relatedDepartment: entry.related_department,
+          notificationMethod: entry.notification_method,
+          responsibleName: entry.responsible_name,
+          responsibleRole: entry.responsible_role,
+          approverName: entry.approver_name,
+          approverTitle: entry.approver_title,
+          includeStamp: entry.include_stamp,
+          mediaUrls: entry.media_urls,
+          aiAnalyzed: entry.ai_analyzed,
+        }),
+      ),
+      locationName: effectiveLocation,
       reportCompanyName,
-      orgData,
-      selectedCompany,
-      user,
-      orgData?.id || null,
+      orgData: orgData as BulkCapaOfficialOrganization | null,
+      selectedCompany: selectedCompany as BulkCapaOfficialCompany | null,
       overallAnalysis,
-      profileContext,
-      generalInfo
-    );
+      profileContext: profileContext as BulkCapaOfficialProfileContext | null,
+      generalInfo: {
+        companyName: generalInfo.company_name,
+        companyLogoUrl: generalInfo.company_logo_url,
+        providerLogoUrl: generalInfo.provider_logo_url,
+        areaRegion: generalInfo.area_region,
+        observationRange: generalInfo.observation_range,
+        reportDate: generalInfo.report_date,
+        observerName: generalInfo.observer_name,
+        observerCertificateNo: generalInfo.observer_certificate_no,
+        responsiblePerson: generalInfo.responsible_person,
+        employerRepresentativeTitle: generalInfo.employer_representative_title,
+        employerRepresentativeName: generalInfo.employer_representative_name,
+        reportNo: generalInfo.report_no,
+      } as BulkCapaOfficialGeneralInfo,
+    });
 
     const today = new Date();
     const safeSiteName = (effectiveLocation || "firma")
@@ -3698,6 +3895,7 @@ const handleSaveAndExport = async () => {
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
 
     setEntries([]);
+    setBulkSourceImages([]);
     setSelectedCompanyId("");
     setManualCompanyName("");
     setCompanyInputMode("existing");
@@ -4327,6 +4525,103 @@ const handleSaveAndExport = async () => {
                 </div>
 
                 {createMode === "bulk" ? (
+                  <div className="space-y-4 rounded-[24px] border border-emerald-400/20 bg-emerald-400/5 p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Yeni toplu DÖF akışı</p>
+                        <h4 className="mt-2 text-lg font-bold text-white">Fotoğraf yükle, sistem analiz etsin, resmi DÖF dosyan hazır olsun</h4>
+                        <p className="mt-2 text-sm leading-6 text-slate-300">
+                          Toplu modda artık maddeleri tek tek yazmanız gerekmiyor. Fotoğrafları yükleyin; sistem her görseli ayrı bulguya çevirsin, toplu DÖF taslağını ve resmi Word çıktısını otomatik hazırlasın.
+                        </p>
+                      </div>
+                      <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        {bulkSourceImages.length}/{BULK_SOURCE_IMAGE_LIMIT} fotoğraf
+                      </span>
+                    </div>
+
+                    <div
+                      ref={dropZoneRef}
+                      onDragEnter={handleDrag}
+                      onDragOver={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDrop={handleDrop}
+                      className={cn(
+                        "rounded-[24px] border border-dashed px-5 py-8 text-center transition-all",
+                        dragActive ? "border-emerald-300 bg-emerald-400/10" : "border-white/15 bg-white/5",
+                      )}
+                    >
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/10 text-emerald-200">
+                        <Upload className="h-7 w-7" />
+                      </div>
+                      <p className="mt-4 text-base font-semibold text-white">Toplu DÖF için fotoğraf yükle</p>
+                      <p className="mt-2 text-sm text-slate-300">
+                        Aynı saha turuna ait görselleri bırakın veya seçin. Sistem her fotoğrafı ayrı uygunsuzluk maddesi olarak analiz edecektir.
+                      </p>
+                      <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+                        <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()} className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10">
+                          <ImageIcon className="mr-2 h-4 w-4" />
+                          Fotoğraf Seç
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => void handleGenerateBulkDraftFromPhotos()}
+                          disabled={bulkGenerating || bulkSourceImages.length === 0 || !generalInfoStepReady}
+                          className="border-0 bg-emerald-500 font-semibold text-white hover:bg-emerald-400"
+                        >
+                          {bulkGenerating ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Toplu taslak hazırlanıyor...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              Fotoğrafları Analiz Et ve DÖF Taslağı Oluştur
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {bulkSourceImages.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                        {bulkSourceImages.map((imageUrl, imageIndex) => (
+                          <div key={buildMediaKey(imageUrl, imageIndex)} className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/40">
+                            <img src={imageUrl} alt={`Toplu DÖF fotoğraf ${imageIndex + 1}`} className="h-32 w-full object-cover" />
+                            <div className="flex items-center justify-between px-3 py-2">
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                                Fotoğraf {imageIndex + 1}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => removeBulkSourceImage(imageIndex)}
+                                className="h-8 w-8 text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/30 p-4 text-sm text-slate-400">
+                        Henüz toplu analiz için yüklenmiş fotoğraf yok.
+                      </div>
+                    )}
+                    <input
+                      ref={bulkFileInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </div>
+                ) : null}
+
+                {createMode === "bulk" && editingEntryId ? (
                 <div className="rounded-[24px] border border-white/10 bg-white/5 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -4370,6 +4665,27 @@ const handleSaveAndExport = async () => {
                 </div>
                 ) : null}
 
+                {createMode === "bulk" && !editingEntryId ? (
+                  <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-400/10 p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Fotoğraf odaklı toplu akış</p>
+                        <h4 className="mt-2 text-lg font-bold text-white">Maddeler tabloya otomatik düşer, gerekirse satır bazında düzenlenir</h4>
+                        <p className="mt-2 text-sm leading-6 text-slate-200">
+                          Bu ekranda artık manuel madde girişi zorunlu değil. Fotoğrafları analiz ettikten sonra aşağıdaki resmi tablo oluşur. Herhangi bir satırı değiştirmek isterseniz listeden <span className="font-semibold text-white">Düzenle</span> butonunu kullanın.
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/30 px-4 py-3 text-sm text-cyan-100">
+                        {entries.length > 0
+                          ? `${entries.length} satır hazırlandı`
+                          : "Henüz analiz edilmiş satır yok"}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {createMode === "single" || editingEntryId ? (
+                <>
                 <div className="grid gap-3 md:grid-cols-[110px_minmax(0,1fr)_152px]">
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">DÖF No</p>
@@ -4592,6 +4908,8 @@ const handleSaveAndExport = async () => {
                     <Switch checked={newEntry.include_stamp} onCheckedChange={(checked) => setNewEntry((prev) => ({ ...prev, include_stamp: checked }))} />
                   </div>
                 </div>
+                </>
+                ) : null}
 
               </div>
               )}
@@ -4636,10 +4954,14 @@ const handleSaveAndExport = async () => {
                         Önizlemeye Geç
                       </Button>
                     ) : null}
-                    <Button onClick={createMode === "single" ? handleCreateSingleDOF : handleAddEntry} className="h-12 min-w-[220px] rounded-2xl border-0 bg-emerald-500 font-semibold text-white shadow-[0_18px_40px_rgba(16,185,129,0.25)] hover:bg-emerald-400">
-                      <CheckCircle2 className="mr-2 h-5 w-5" />
-                      {createMode === "single" ? (editingEntryId ? "Değişiklikleri Kaydet" : "Tekli DÖF Oluştur") : (editingEntryId ? "Maddeleri Güncelle" : "Bulguyu Ekle")}
-                    </Button>
+                    {createMode === "single" || editingEntryId ? (
+                      <Button onClick={createMode === "single" ? handleCreateSingleDOF : handleAddEntry} className="h-12 min-w-[220px] rounded-2xl border-0 bg-emerald-500 font-semibold text-white shadow-[0_18px_40px_rgba(16,185,129,0.25)] hover:bg-emerald-400">
+                        <CheckCircle2 className="mr-2 h-5 w-5" />
+                        {createMode === "single"
+                          ? (editingEntryId ? "Değişiklikleri Kaydet" : "Tekli DÖF Oluştur")
+                          : "Satır Değişikliklerini Kaydet"}
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               </div>
@@ -4938,82 +5260,124 @@ const handleSaveAndExport = async () => {
             <div className="rounded-[24px] border border-border/60 bg-background/60 p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-bold text-foreground">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-900">
                     Eklenen Bulgular ({entries.length})
                   </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin.
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-600">
+                    {createMode === "bulk"
+                      ? "Yüklenen fotoğraflardan otomatik üretilen uygunsuzluklar burada listelenir. Gerekirse tek tek düzenleyebilir veya silebilirsiniz."
+                      : "Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                     Liste hazir
                   </span>
-                  <Button type="button" onClick={handleOpenBulkPreview} className="h-10 rounded-2xl border-0 gradient-primary text-foreground font-semibold">
+                  <Button type="button" onClick={handleOpenBulkPreview} className="h-10 rounded-2xl border-0 gradient-primary font-semibold text-slate-950">
                     <Eye className="mr-2 h-4 w-4" />
                     Önizlemeye Geç
                   </Button>
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
-                {entries.map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-2xl border border-border/60 bg-background/80 p-4 transition-colors hover:border-primary/50"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold text-muted-foreground">
-                            MADDE {idx + 1}
-                          </span>
-                          {entry.ai_analyzed && (
-                            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                              AI
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-3 text-sm font-semibold leading-6 text-foreground">
-                          {entry.description}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <span
-                            className={`text-xs px-2 py-1 rounded font-semibold ${
-                              IMPORTANCE_LEVELS.find(
-                                (l) => l.value === entry.importance_level
-                              )?.color
-                            }`}
-                          >
-                            {entry.importance_level}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded bg-secondary/50 text-muted-foreground">
-                            {entry.related_department}
-                          </span>
-                          <span className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-600">
-                            {new Date(entry.termin_date).toLocaleDateString("tr-TR")}
-                          </span>
-                          {entry.media_urls.length > 0 && (
-                            <span className="text-xs px-2 py-1 rounded bg-purple-500/10 text-purple-600">
-                              {entry.media_urls.length} fotograf
-                            </span>
-                          )}
-                          <span className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-600">
-                            Bildirim: {entry.notification_method || "E-mail"}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div className="overflow-x-auto">
+                  <table className="min-w-[1120px] w-full border-collapse text-sm">
+                    <thead className="bg-slate-950 text-white">
+                      <tr>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">No</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Tespit Edilen Uygunsuzluk</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Risk Analizi</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Mevzuat Dayanağı</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Önerilen DÖF (Aksiyon)</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Durum</th>
+                        <th className="border-b border-white/10 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em]">İşlem</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white">
+                      {entries.map((entry, idx) => {
+                        const legalBasis = getBulkCapaLegalBasis({
+                          id: entry.id,
+                          description: entry.description,
+                          riskDefinition: entry.riskDefinition,
+                          correctiveAction: entry.correctiveAction,
+                          preventiveAction: entry.preventiveAction,
+                          importanceLevel: entry.importance_level,
+                          terminDate: entry.termin_date,
+                          relatedDepartment: entry.related_department,
+                          notificationMethod: entry.notification_method,
+                          responsibleName: entry.responsible_name,
+                          responsibleRole: entry.responsible_role,
+                          approverName: entry.approver_name,
+                          approverTitle: entry.approver_title,
+                          includeStamp: entry.include_stamp,
+                          mediaUrls: entry.media_urls,
+                          aiAnalyzed: entry.ai_analyzed,
+                        });
+
+                        return (
+                          <tr key={entry.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500">
+                              {idx + 1}
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:text-slate-900">
+                              {entry.description}
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-rose-700 dark:text-rose-700">
+                              {entry.riskDefinition}
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-600 dark:text-slate-600">
+                              {legalBasis}
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:text-slate-900">
+                              <div>{entry.correctiveAction}</div>
+                              {entry.preventiveAction ? (
+                                <div className="mt-2 text-slate-600 dark:text-slate-600">{entry.preventiveAction}</div>
+                              ) : null}
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3">
+                              <div className="flex flex-col gap-2">
+                                <span
+                                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    IMPORTANCE_LEVELS.find((level) => level.value === entry.importance_level)?.color
+                                  }`}
+                                >
+                                  {entry.importance_level}
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-500">
+                                  Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
+                                </span>
+                                <span className="text-xs text-slate-500 dark:text-slate-500">
+                                  Kanıt: {entry.media_urls.length} fotoğraf
+                                </span>
+                              </div>
+                            </td>
+                            <td className="align-top border-b border-slate-200 px-3 py-3">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditExistingEntry(entry.id)}
+                                >
+                                  Düzenle
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteEntry(entry.id)}
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
 
@@ -5123,7 +5487,7 @@ const handleSaveAndExport = async () => {
         setPreviewOpen(open);
         if (!open) setPreviewFocusEntryId(null);
       }}>
-        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto border-border/50 bg-slate-200/95 p-0 shadow-[0_40px_120px_rgba(15,23,42,0.45)]">
+        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto border-border/50 bg-slate-200/95 p-0 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.45)] dark:text-slate-900">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 border-b border-slate-300 bg-white px-6 py-4 text-xl text-slate-900">
               {previewFocusEntryId ? "Tekli DÖF Önizlemesi" : "Rapor Önizlemesi"}
@@ -5134,7 +5498,7 @@ const handleSaveAndExport = async () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="max-h-[calc(92vh-76px)] overflow-y-auto bg-slate-200 px-4 py-6 md:px-8">
+          <div className="max-h-[calc(92vh-76px)] overflow-y-auto bg-slate-200 px-4 py-6 text-slate-900 md:px-8 dark:text-slate-900">
             {previewFocusEntryId && focusedPreviewEntry ? (
               <div className="mx-auto mb-6 flex max-w-[794px] flex-col gap-3 rounded-[24px] border border-emerald-200 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] md:flex-row md:items-center md:justify-between">
                 <div>
