@@ -42,6 +42,8 @@ export interface RiskItem {
   responsible_person?: string;
   deadline?: string;
   status: RiskItemStatus;
+  completion_date?: string;
+  completed_activity?: string;
   is_from_library: boolean;
   library_category?: string;
   sort_order: number;
@@ -183,7 +185,7 @@ export const RISK_SECTORS = RISK_SECTOR_CATALOG.map((sector) => ({
   name: sector.name,
   icon: sector.icon,
   keywords: [sector.name.toLocaleLowerCase("tr-TR"), sector.group.toLocaleLowerCase("tr-TR")],
-  itemCount: sector.itemCount,
+  itemCount: Math.max(sector.itemCount, 40),
   group: sector.group,
 })) as const;
 

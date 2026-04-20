@@ -28,6 +28,12 @@ import {
   Sparkles,
   Check,
   Share2,
+  Save,
+  Upload,
+  Columns3,
+  ListOrdered,
+  CalendarClock,
+  ClipboardList,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -53,6 +59,7 @@ import {
 import type {
   RiskAssessment,
   RiskItem,
+  RiskItemStatus,
   RiskLibraryItem,
   RiskPackage,
   RiskClass
@@ -154,6 +161,30 @@ const SECTOR_ALIAS_MAP: Record<string, string> = {
 const normalizeSectorKey = (value: string) => {
   const normalized = value.trim().toLowerCase();
   return SECTOR_ALIAS_MAP[normalized] || normalized;
+};
+
+type AssessmentMethod = "fine_kinney" | "l_matrix";
+
+interface RiskAssessmentTemplateRecord {
+  id: string;
+  name: string;
+  sector?: string | null;
+  method: AssessmentMethod | string;
+  payload: {
+    assessment?: Partial<RiskAssessment>;
+    items?: Array<Partial<RiskItem>>;
+  };
+  created_at: string;
+}
+
+const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
+
+const ensureMinimumCount = <T,>(items: T[], minCount: number, factory: (index: number) => T) => {
+  const nextItems = [...items];
+  while (nextItems.length < minCount) {
+    nextItems.push(factory(nextItems.length));
+  }
+  return nextItems;
 };
 
 const COMMON_TEMPLATE_RISKS = [
@@ -266,6 +297,16 @@ export default function RiskAssessmentEditor() {
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string>("all");
   const [photoUploadingItemId, setPhotoUploadingItemId] = useState<string | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [showOrderColumn, setShowOrderColumn] = useState(true);
+  const [showTerminColumn, setShowTerminColumn] = useState(true);
+  const [showStatusColumns, setShowStatusColumns] = useState(true);
+  const [showProposedControlsColumn, setShowProposedControlsColumn] = useState(true);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [riskTemplates, setRiskTemplates] = useState<RiskAssessmentTemplateRecord[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const templateFileInputRef = useRef<HTMLInputElement | null>(null);
   const normalizedAiSector = useMemo(() => normalizeSectorKey(aiSector), [aiSector]);
   const selectedSectorOption = useMemo(
     () =>
@@ -291,6 +332,45 @@ export default function RiskAssessmentEditor() {
     if (!selectedSectorOption) return [];
     return generateMockRisksForSector(selectedSectorOption.name);
   }, [selectedSectorOption]);
+  const currentAssessmentMethod = ((assessment?.method as AssessmentMethod | undefined) || "fine_kinney");
+  const templatePayload = useMemo(
+    () => ({
+      assessment: assessment
+        ? {
+            sector: assessment.sector,
+            method: currentAssessmentMethod,
+            notes: assessment.notes,
+            department: assessment.department,
+            workplace_title: assessment.workplace_title,
+            workplace_address: assessment.workplace_address,
+          }
+        : { method: currentAssessmentMethod },
+      items: riskItems.map((item) => ({
+        department: item.department,
+        hazard: item.hazard,
+        risk: item.risk,
+        affected_people: item.affected_people,
+        existing_controls: item.existing_controls,
+        probability_1: item.probability_1,
+        frequency_1: item.frequency_1,
+        severity_1: item.severity_1,
+        score_1: item.score_1,
+        risk_class_1: item.risk_class_1,
+        proposed_controls: item.proposed_controls,
+        probability_2: item.probability_2,
+        frequency_2: item.frequency_2,
+        severity_2: item.severity_2,
+        score_2: item.score_2,
+        risk_class_2: item.risk_class_2,
+        responsible_person: item.responsible_person,
+        deadline: item.deadline,
+        status: item.status,
+        completion_date: item.completion_date,
+        completed_activity: item.completed_activity,
+      })),
+    }),
+    [assessment, currentAssessmentMethod, riskItems]
+  );
   const selectedSectorDistribution = useMemo(() => {
     const bucket = { critical: 0, high: 0, monitored: 0 };
     selectedSectorRiskPreview.forEach((risk) => {
@@ -343,9 +423,17 @@ useEffect(() => {
   if (user) {
     fetchCompanies();
     fetchLibrary();
+    fetchRiskTemplates();
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []); // Burayı boş dizi yap, user değişimini AuthContext hallediyor zaten
+
+useEffect(() => {
+  if (profile?.organization_id) {
+    void fetchRiskTemplates();
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [profile?.organization_id]);
 
 useEffect(() => {
   if (!activeCompanyId || companies.length === 0 || assessment?.company_id) return;
@@ -496,6 +584,7 @@ useLayoutEffect(() => {
       
       // Risk Paketlerini Oluştur (katalog + yerleşik fallback)
       const packages = RISK_SECTOR_CATALOG.map((sectorDef) => {
+        const targetCount = Math.max(sectorDef.itemCount, 40);
         const items = (data || []).filter((item) => {
           const itemSector = buildCatalogKey(item.sector || "");
           const sectorName = buildCatalogKey(sectorDef.name);
@@ -518,15 +607,15 @@ useLayoutEffect(() => {
         }));
 
         const resolvedItems: RiskLibraryItem[] =
-          items.length >= sectorDef.itemCount
-            ? (items.slice(0, sectorDef.itemCount) as RiskLibraryItem[])
-            : [...(items as RiskLibraryItem[]), ...fallbackItems.slice(items.length, sectorDef.itemCount)];
+          items.length >= targetCount
+            ? (items.slice(0, targetCount) as RiskLibraryItem[])
+            : [...(items as RiskLibraryItem[]), ...fallbackItems.slice(items.length, targetCount)];
 
         return {
           id: sectorDef.code,
           name: sectorDef.name,
           sector: sectorDef.name,
-          item_count: sectorDef.itemCount,
+          item_count: targetCount,
           items: resolvedItems,
         };
       });
@@ -537,6 +626,355 @@ useLayoutEffect(() => {
       console.error("Fetch library error:", error);
       toast.error("Risk kütüphanesi yüklenemedi", {
         description: error.message
+      });
+    }
+  };
+
+  const fetchRiskTemplates = async () => {
+    if (!profile?.organization_id) {
+      setRiskTemplates([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("risk_assessment_templates")
+        .select("id, name, sector, method, payload, created_at")
+        .eq("org_id", profile.organization_id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setRiskTemplates((data || []) as RiskAssessmentTemplateRecord[]);
+    } catch (error: any) {
+      console.error("Fetch risk templates error:", error);
+      toast.error("Risk şablonları yüklenemedi", {
+        description: error.message,
+      });
+    }
+  };
+
+  const updateAssessmentField = async (field: keyof RiskAssessment, value: unknown) => {
+    if (!assessment) return;
+
+    try {
+      const { error } = await supabase
+        .from("risk_assessments")
+        .update({ [field]: value })
+        .eq("id", assessment.id);
+
+      if (error) throw error;
+      setAssessment((prev) => (prev ? { ...prev, [field]: value } : prev));
+    } catch (error: any) {
+      console.error("Update assessment field error:", error);
+      toast.error("Değerlendirme güncellenemedi", {
+        description: error.message,
+      });
+    }
+  };
+
+  const saveCurrentAsTemplate = async () => {
+    if (!user?.id || !profile?.organization_id) {
+      toast.error("Şablon kaydetmek için organizasyon bilgisi gerekli");
+      return;
+    }
+
+    if (!templateName.trim()) {
+      toast.error("Şablon adı girin");
+      return;
+    }
+
+    setTemplateSaving(true);
+    try {
+      const { error } = await supabase.from("risk_assessment_templates").insert({
+        org_id: profile.organization_id,
+        user_id: user.id,
+        name: templateName.trim(),
+        sector: assessment?.sector || selectedSectorOption?.name || null,
+        method: currentAssessmentMethod,
+        payload: templatePayload,
+      } as any);
+
+      if (error) throw error;
+
+      toast.success("Şablon kaydedildi");
+      setTemplateName("");
+      void fetchRiskTemplates();
+    } catch (error: any) {
+      console.error("Save risk template error:", error);
+      toast.error("Şablon kaydedilemedi", {
+        description: error.message,
+      });
+    } finally {
+      setTemplateSaving(false);
+    }
+  };
+
+  const replaceAssessmentItemsFromTemplate = async (template: RiskAssessmentTemplateRecord) => {
+    if (!assessment) {
+      toast.error("Önce bir değerlendirme oluşturun");
+      return;
+    }
+
+    const templateItems = template.payload?.items || [];
+    const templateAssessment = template.payload?.assessment || {};
+    const today = getTodayIsoDate();
+
+    try {
+      const { error: deleteError } = await supabase
+        .from("risk_items")
+        .delete()
+        .eq("assessment_id", assessment.id);
+
+      if (deleteError) throw deleteError;
+
+      const nextItems = templateItems.map((item, index) => ({
+        assessment_id: assessment.id,
+        item_number: index + 1,
+        department: item.department || "",
+        hazard: item.hazard || "Yeni Tehlike",
+        risk: item.risk || "Yeni Risk",
+        affected_people: item.affected_people || "",
+        existing_controls: item.existing_controls || "",
+        probability_1: item.probability_1 ?? 3,
+        frequency_1: item.frequency_1 ?? 3,
+        severity_1: item.severity_1 ?? 3,
+        score_1: item.score_1 ?? calculateRiskScore(item.probability_1 ?? 3, item.frequency_1 ?? 3, item.severity_1 ?? 3),
+        risk_class_1: item.risk_class_1 ?? getRiskClass(item.score_1 ?? calculateRiskScore(item.probability_1 ?? 3, item.frequency_1 ?? 3, item.severity_1 ?? 3)),
+        proposed_controls: item.proposed_controls || "",
+        probability_2: item.probability_2 ?? 1,
+        frequency_2: item.frequency_2 ?? 1,
+        severity_2: item.severity_2 ?? 1,
+        score_2: item.score_2 ?? 1,
+        risk_class_2: item.risk_class_2 ?? "Kabul Edilebilir",
+        responsible_person: item.responsible_person || "",
+        deadline: item.deadline || today,
+        status: item.status || "open",
+        completion_date: item.completion_date || null,
+        completed_activity: item.completed_activity || "",
+        is_from_library: false,
+        sort_order: index,
+      }));
+
+      const { data, error: insertError } = await supabase
+        .from("risk_items")
+        .insert(nextItems as any)
+        .select("*")
+        .order("sort_order");
+
+      if (insertError) throw insertError;
+
+      if (templateAssessment.method && templateAssessment.method !== assessment.method) {
+        await updateAssessmentField("method", templateAssessment.method);
+      }
+
+      if (templateAssessment.sector && templateAssessment.sector !== assessment.sector) {
+        await updateAssessmentField("sector", templateAssessment.sector);
+      }
+
+      setRiskItems((data || []) as RiskItem[]);
+      setSelectedTemplateId(template.id);
+      toast.success("Şablon uygulandı");
+    } catch (error: any) {
+      console.error("Apply risk template error:", error);
+      toast.error("Şablon uygulanamadı", {
+        description: error.message,
+      });
+    }
+  };
+
+  const importTemplateFile = async (file: File) => {
+    if (!user?.id || !profile?.organization_id) {
+      toast.error("Şablon içe aktarmak için organizasyon bilgisi gerekli");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+
+      if (!worksheet) {
+        throw new Error("Excel içinde okunabilir sayfa bulunamadı.");
+      }
+
+      const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(worksheet, {
+        header: 1,
+        defval: "",
+        raw: false,
+      });
+
+      const normalizeHeader = (value: unknown) =>
+        String(value || "")
+          .toLocaleLowerCase("tr-TR")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+
+      const hasHeaderToken = (cell: string, aliases: readonly string[]) =>
+        aliases.some((alias) => cell === alias || cell.includes(alias));
+
+      const aliasMap = {
+        department: ["faaliyet", "bolum", "bölüm", "birim", "ortam"],
+        hazard: ["tehlike"],
+        risk: ["risk", "riskin tanimi", "riskin tanımı"],
+        existing_controls: ["mevcut durum"],
+        affected_people: ["olasi sonuc", "olası sonuc", "olası sonuç", "etkilenen"],
+        probability_1: ["olasilik o", "olasilik", "o1", "olasilik(o)"],
+        frequency_1: ["frekans f", "frekans", "f1", "frekans(f)"],
+        severity_1: ["siddet s", "siddet", "s1", "siddet(s)"],
+        score_1: ["risk degeri r", "risk degeri", "risk değeri", "r1"],
+        risk_class_1: ["riskin tanimi", "riskin tanımı", "risk sinifi", "risk sınıfı"],
+        proposed_controls: [
+          "duzeltici onleyici faaliyet",
+          "düzeltici önleyici faaliyet",
+          "yapilmasi gereken duzeltici onleyici faaliyet",
+          "yapılması gereken düzeltici önleyici faaliyet",
+          "onerilen dof",
+          "önerilen döf",
+          "onlemler",
+          "önlemler",
+          "pros",
+        ],
+        probability_2: ["olasilik(o) 2", "o2"],
+        frequency_2: ["frekans(f) 2", "f2"],
+        severity_2: ["siddet(s) 2", "s2"],
+        score_2: ["risk degeri(r) 2", "risk degeri 2", "risk değeri 2", "r2"],
+        risk_class_2: ["riskin tanimi 2", "risk tanimi 2", "risk sınıfı 2"],
+        deadline: ["termin", "termin suresi", "termin süresi"],
+        responsible_person: ["sorumlu"],
+        completion_date: ["gerceklesme tarihi", "gerçeklesme tarihi", "gerçekleşme tarihi"],
+        completed_activity: ["gerceklesen faaliyetler", "gerçeklesen faaliyetler", "gerçekleşen faaliyetler"],
+        status: ["durum"],
+      } as const;
+
+      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+      const scannedCells: Array<{ row: number; col: number; value: string }> = [];
+
+      for (let rowIndex = range.s.r; rowIndex <= Math.min(range.e.r, 40); rowIndex += 1) {
+        for (let colIndex = range.s.c; colIndex <= Math.min(range.e.c, 60); colIndex += 1) {
+          const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+          const cell = worksheet[cellAddress];
+          if (!cell?.v) continue;
+          const normalizedValue = normalizeHeader(cell.v);
+          if (!normalizedValue) continue;
+          scannedCells.push({ row: rowIndex, col: colIndex, value: normalizedValue });
+        }
+      }
+
+      const detectedHeaderRow = [...new Set(scannedCells.map((cell) => cell.row))]
+        .sort((a, b) => a - b)
+        .find((rowIndex) => {
+          const rowCells = scannedCells.filter((cell) => cell.row === rowIndex);
+          return rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.department)) &&
+            rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.hazard)) &&
+            rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.risk));
+        });
+
+      if (detectedHeaderRow === undefined) {
+        throw new Error("Excel şablonunda başlık satırı bulunamadı. Tehlike, Risk ve Faaliyet sütunları gerekli.");
+      }
+
+      const headerCells = scannedCells.filter((cell) => cell.row === detectedHeaderRow);
+      const columnMap = Object.fromEntries(
+        Object.entries(aliasMap).map(([field, aliases]) => {
+          const match = headerCells.find((cell) => hasHeaderToken(cell.value, aliases));
+          return [field, match?.col ?? -1];
+        })
+      ) as Record<keyof typeof aliasMap, number>;
+
+      if (columnMap.department === -1 || columnMap.hazard === -1 || columnMap.risk === -1) {
+        throw new Error("Excel şablonunda temel sütunlar okunamadı. Faaliyet, Tehlike ve Risk alanlarını kontrol edin.");
+      }
+
+      const dataRows = rows.slice(detectedHeaderRow + 1).filter((row) =>
+        row.some((cell) => String(cell || "").trim().length > 0)
+      );
+
+      const findValue = (row: (string | number | null)[], field: keyof typeof aliasMap) => {
+        const headerIndex = columnMap[field];
+        return headerIndex >= 0 ? row[headerIndex] : "";
+      };
+
+      const parseNumeric = (value: unknown, fallback: number) => {
+        const parsedValue = Number(String(value || "").replace(",", "."));
+        return Number.isFinite(parsedValue) && parsedValue > 0 ? parsedValue : fallback;
+      };
+
+      const parseStatus = (value: unknown): RiskItemStatus => {
+        const normalized = normalizeHeader(value);
+        if (normalized.includes("tamam")) return "completed";
+        if (normalized.includes("devam")) return "in_progress";
+        return "open";
+      };
+
+      const items = dataRows.map((row, index) => {
+        const probability1 = parseNumeric(findValue(row, "probability_1"), 3);
+        const frequency1 = parseNumeric(findValue(row, "frequency_1"), 3);
+        const severity1 = parseNumeric(findValue(row, "severity_1"), 3);
+        const score1 = calculateRiskScore(probability1, frequency1, severity1);
+        const probability2 = parseNumeric(findValue(row, "probability_2"), 1);
+        const frequency2 = parseNumeric(findValue(row, "frequency_2"), 1);
+        const severity2 = parseNumeric(findValue(row, "severity_2"), 1);
+        const score2 = calculateRiskScore(probability2, frequency2, severity2);
+
+        return {
+          item_number: index + 1,
+          department: String(findValue(row, "department")).trim(),
+          hazard: String(findValue(row, "hazard")).trim() || "Yeni tehlike",
+          risk: String(findValue(row, "risk")).trim() || "Yeni risk",
+          existing_controls: String(findValue(row, "existing_controls")).trim(),
+          affected_people: String(findValue(row, "affected_people")).trim(),
+          probability_1: probability1,
+          frequency_1: frequency1,
+          severity_1: severity1,
+          score_1: score1,
+          risk_class_1: getRiskClass(score1),
+          proposed_controls: String(findValue(row, "proposed_controls")).trim(),
+          probability_2: probability2,
+          frequency_2: frequency2,
+          severity_2: severity2,
+          score_2: score2,
+          risk_class_2: getRiskClass(score2),
+          responsible_person: String(findValue(row, "responsible_person")).trim(),
+          deadline: String(findValue(row, "deadline")).trim() || getTodayIsoDate(),
+          status: parseStatus(findValue(row, "status")),
+          completion_date: String(findValue(row, "completion_date")).trim(),
+          completed_activity: String(findValue(row, "completed_activity")).trim(),
+        } satisfies Partial<RiskItem>;
+      }).filter((item) => item.hazard || item.risk);
+
+      if (items.length === 0) {
+        throw new Error("Excel şablonunda içe aktarılacak risk maddesi bulunamadı.");
+      }
+
+      const parsed: RiskAssessmentTemplateRecord["payload"] = {
+        assessment: {
+          sector: assessment?.sector || selectedSectorOption?.name || sheetName,
+          method: currentAssessmentMethod,
+        },
+        items,
+      };
+      const fallbackName = file.name.replace(/\.[^/.]+$/, "");
+
+      const { error } = await supabase.from("risk_assessment_templates").insert({
+        org_id: profile.organization_id,
+        user_id: user.id,
+        name: fallbackName,
+        sector: parsed?.assessment?.sector || null,
+        method: parsed?.assessment?.method || "fine_kinney",
+        payload: parsed,
+      } as any);
+
+      if (error) throw error;
+
+      toast.success("Excel şablonu içe aktarıldı");
+      void fetchRiskTemplates();
+    } catch (error: any) {
+      console.error("Import risk template error:", error);
+      toast.error("Excel şablonu içe aktarılamadı", {
+        description: error.message,
       });
     }
   };
@@ -646,10 +1084,34 @@ useLayoutEffect(() => {
         };
       });
 
-      setAiRisks(mappedRisks);
+      const fallbackRisks = generateMockRisksForSector(selectedSectorOption?.name || sector);
+      const dedupedRisks = [...mappedRisks];
+      const existingKeys = new Set(dedupedRisks.map((item) => `${item.hazard}::${item.risk}`));
+
+      for (const fallbackRisk of fallbackRisks) {
+        const riskKey = `${fallbackRisk.hazard}::${fallbackRisk.risk}`;
+        if (existingKeys.has(riskKey)) continue;
+        dedupedRisks.push({
+          ...fallbackRisk,
+          id: `ai-fallback-${Date.now()}-${dedupedRisks.length}`,
+        });
+        existingKeys.add(riskKey);
+        if (dedupedRisks.length >= 40) break;
+      }
+
+      const completedRiskSet = ensureMinimumCount(dedupedRisks.slice(0, 40), 40, (index) => {
+        const fallbackRisk = fallbackRisks[index % fallbackRisks.length];
+        return {
+          ...fallbackRisk,
+          id: `ai-fill-${Date.now()}-${index}`,
+          selected: true,
+        };
+      });
+
+      setAiRisks(completedRiskSet);
       setShowAiDialog(true);
 
-      toast.success(`${mappedRisks.length} risk maddesi oluşturuldu`, {
+      toast.success(`${completedRiskSet.length} risk maddesi oluşturuldu`, {
         description: "Sunucu tarafinda guvenli AI analizi ile olusturuldu",
         duration: 5000
       });
@@ -691,7 +1153,7 @@ useLayoutEffect(() => {
   function generateMockRisksForSector(sector: string): typeof aiRisks {
     const sectorLower = sector.toLowerCase();
     const catalogSector = RISK_SECTOR_CATALOG.find((item) => buildCatalogKey(item.name) === buildCatalogKey(sector));
-    const targetCount = catalogSector?.itemCount ?? 15;
+    const targetCount = Math.max(catalogSector?.itemCount ?? 15, 40);
     
     // Sektöre özel risk templates
     const templates: Record<string, Array<{
@@ -1118,7 +1580,16 @@ useLayoutEffect(() => {
       };
     });
 
-    return risks.map((r, idx) => {
+    const normalizedRisks = ensureMinimumCount(risks, targetCount, (index) => {
+      const commonTemplate = COMMON_TEMPLATE_RISKS[index % COMMON_TEMPLATE_RISKS.length];
+      return {
+        ...commonTemplate,
+        hazard: `${commonTemplate.hazard} #${index + 1}`,
+        risk: `${commonTemplate.risk} (${sector})`,
+      };
+    });
+
+    return normalizedRisks.map((r, idx) => {
       const score = r.o * r.f * r.s;
       const riskClass = getRiskClass(score);
 
@@ -1155,6 +1626,7 @@ useLayoutEffect(() => {
     toast.info(`${selectedRisks.length} risk tabloya ekleniyor...`);
 
     try {
+        const today = getTodayIsoDate();
         const newItems: Partial<RiskItem>[] = selectedRisks.map((r, idx) => ({
         assessment_id: assessment.id,
         item_number: riskItems.length + idx + 1,
@@ -1162,6 +1634,7 @@ useLayoutEffect(() => {
         hazard: r.hazard,
         risk: r.risk,
         affected_people: "",
+        existing_controls: "",
         probability_1: r.probability,
         frequency_1: r.frequency,
         severity_1: r.severity,
@@ -1173,8 +1646,11 @@ useLayoutEffect(() => {
         severity_2: 1,
         score_2: 1,
         risk_class_2: "Kabul Edilebilir",
+        responsible_person: "",
+        deadline: today,
         is_from_library: false,
         status: 'open',
+        completed_activity: "",
         sort_order: riskItems.length + idx
         }));
 
@@ -1301,6 +1777,7 @@ useLayoutEffect(() => {
           company_id: selectedCompany,
           assessment_name: `Risk Değerlendirmesi - ${company?.name || "Firma"} - ${format(new Date(), 'dd.MM.yyyy', { locale: tr })}`,
           assessment_date: new Date().toISOString().split('T')[0],
+          method: "fine_kinney",
           status: 'draft',
           assessor_name: assessorDisplayName,
           occupational_safety_specialist_name: assessorDisplayName,
@@ -1348,6 +1825,7 @@ useLayoutEffect(() => {
     toast.info(`${pkg.name} paketi ekleniyor... (${pkg.item_count} madde)`);
 
     try {
+      const today = getTodayIsoDate();
       const newItems: Partial<RiskItem>[] = pkg.items.map((item, idx) => ({
         assessment_id: assessment.id,
         item_number: riskItems.length + idx + 1,
@@ -1355,6 +1833,7 @@ useLayoutEffect(() => {
         hazard: item.hazard,
         risk: item.risk,
         affected_people: "",
+        existing_controls: "",
         probability_1: item.typical_probability,
         frequency_1: item.typical_frequency,
         severity_1: item.typical_severity,
@@ -1366,9 +1845,12 @@ useLayoutEffect(() => {
         severity_2: 1,
         score_2: 0.5,
         risk_class_2: "Kabul Edilebilir",
+        responsible_person: "",
+        deadline: today,
         is_from_library: true,
         library_category: item.category || item.sector,
         status: 'open',
+        completed_activity: "",
         sort_order: riskItems.length + idx
       }));
 
@@ -1414,12 +1896,15 @@ useLayoutEffect(() => {
     }
 
     try {
+      const today = getTodayIsoDate();
       const newItem: Partial<RiskItem> = {
         assessment_id: assessment.id,
         item_number: riskItems.length + 1,
+        department: "",
         hazard: "Yeni tehlike",
         risk: "Risk tanımı",
         affected_people: "",
+        existing_controls: "",
         probability_1: 3,
         frequency_1: 3,
         severity_1: 3,
@@ -1430,7 +1915,10 @@ useLayoutEffect(() => {
         severity_2: 1,
         score_2: 1,
         risk_class_2: "Kabul Edilebilir",
+        responsible_person: "",
+        deadline: today,
         status: 'open',
+        completed_activity: "",
         is_from_library: false,
         sort_order: riskItems.length
       };
@@ -2267,11 +2755,13 @@ useLayoutEffect(() => {
           <thead className="sticky top-0 z-10">
             {/* Ana Başlık Satırı */}
             <tr className="bg-[linear-gradient(90deg,rgba(2,6,23,0.98),rgba(15,23,42,0.98),rgba(30,41,59,0.96))] shadow-[inset_0_-1px_0_rgba(255,255,255,0.07)]">
-              <th rowSpan={2} className="sticky left-0 z-20 w-16 border border-slate-700/80 bg-slate-950 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">No</div>
-              </th>
+              {showOrderColumn ? (
+                <th rowSpan={2} className="sticky left-0 z-20 w-16 border border-slate-700/80 bg-slate-950 px-2 py-3">
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Risk Sıra No</div>
+                </th>
+              ) : null}
               <th rowSpan={2} className="min-w-[152px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Bölüm / Ortam</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Faaliyet</div>
               </th>
               <th rowSpan={2} className="min-w-[112px] border border-slate-700/80 px-2 py-3">
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Foto</div>
@@ -2282,27 +2772,29 @@ useLayoutEffect(() => {
               <th rowSpan={2} className="min-w-[300px] border border-slate-700/80 px-2 py-3">
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Risk</div>
               </th>
+              <th rowSpan={2} className="min-w-[220px] border border-slate-700/80 px-2 py-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Mevcut Durum</div>
+              </th>
               <th rowSpan={2} className="min-w-[152px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Etkilenen</div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Olası Sonuç</div>
               </th>
                 
               <th colSpan={5} className="border border-slate-700/80 bg-red-500/10 px-2 py-3">
-                <div className="text-sm font-black tracking-[0.16em] text-red-200">1. AŞAMA · MEVCUT DURUM</div>
+                <div className="text-sm font-black tracking-[0.16em] text-red-200">RİSKİN DEĞERLENDİRİLMESİ</div>
               </th>
 
-              <th rowSpan={2} className="min-w-[320px] border border-slate-700/80 bg-cyan-500/10 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200">Önlemler</div>
-              </th>
+              {showProposedControlsColumn ? (
+                <th rowSpan={2} className="min-w-[320px] border border-slate-700/80 bg-cyan-500/10 px-2 py-3">
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-200">Yapılması Gereken Düzeltici / Önleyici Faaliyet</div>
+                </th>
+              ) : null}
 
               <th colSpan={5} className="border border-slate-700/80 bg-emerald-500/10 px-2 py-3">
-                <div className="text-sm font-black tracking-[0.16em] text-emerald-200">2. AŞAMA · KALINTI RİSK</div>
+                <div className="text-sm font-black tracking-[0.16em] text-emerald-200">Düzeltici-Önleyici Faaliyet Gerçekleşmesi Durumunda Riskin Değerlendirilmesi</div>
               </th>
 
-              <th rowSpan={2} className="min-w-[160px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Sorumlu</div>
-              </th>
-              <th rowSpan={2} className="min-w-[132px] border border-slate-700/80 px-2 py-3">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Termin</div>
+              <th colSpan={showStatusColumns ? 4 : 2} className="border border-slate-700/80 px-2 py-3">
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">Düzeltici / Önleyici Faaliyet Saha Aksiyon Planı</div>
               </th>
               <th rowSpan={2} className="w-20 border border-slate-700/80 px-2 py-3">
                 <div className="text-[11px] font-black uppercase tracking-[0.18em] text-foreground">İşlem</div>
@@ -2341,6 +2833,22 @@ useLayoutEffect(() => {
               <th className="min-w-[100px] border border-slate-700/80 bg-emerald-500/5 p-2">
                 <div className="text-xs font-bold uppercase tracking-[0.14em] text-green-300">Sınıf</div>
               </th>
+              <th className="min-w-[132px] border border-slate-700/80 p-2">
+                <div className="text-xs font-bold uppercase tracking-[0.14em] text-foreground">Termin Süresi</div>
+              </th>
+              <th className="min-w-[160px] border border-slate-700/80 p-2">
+                <div className="text-xs font-bold uppercase tracking-[0.14em] text-foreground">Sorumlu</div>
+              </th>
+              {showStatusColumns ? (
+                <>
+                  <th className="min-w-[132px] border border-slate-700/80 p-2">
+                    <div className="text-xs font-bold uppercase tracking-[0.14em] text-foreground">Gerçekleşme Tarihi</div>
+                  </th>
+                  <th className="min-w-[220px] border border-slate-700/80 p-2">
+                    <div className="text-xs font-bold uppercase tracking-[0.14em] text-foreground">Gerçekleşen Faaliyetler</div>
+                  </th>
+                </>
+              ) : null}
             </tr>
           </thead>
 
@@ -2352,11 +2860,13 @@ useLayoutEffect(() => {
                 className="border-b border-slate-800/70 transition-colors odd:bg-white/[0.015] even:bg-slate-950/35 hover:bg-white/[0.06]"
               >
                 {/* NO */}
-                <td className="sticky left-0 z-10 border border-slate-800/80 bg-slate-950 px-2 py-3 text-center">
-                  <Badge variant="outline" className="border-slate-600 bg-slate-900/80 font-mono text-foreground">
-                    {String(idx + 1).padStart(2, '0')}
-                  </Badge>
-                </td>
+                {showOrderColumn ? (
+                  <td className="sticky left-0 z-10 border border-slate-800/80 bg-slate-950 px-2 py-3 text-center">
+                    <Badge variant="outline" className="border-slate-600 bg-slate-900/80 font-mono text-foreground">
+                      {String(idx + 1).padStart(2, '0')}
+                    </Badge>
+                  </td>
+                ) : null}
 
                 {/* BÖLÜM/ORTAM */}
                 <td className="border border-slate-800/80 px-2 py-3">
@@ -2526,6 +3036,37 @@ useLayoutEffect(() => {
                   )}
                 </td>
 
+                {/* MEVCUT DURUM */}
+                <td className="border border-slate-800/80 px-2 py-3">
+                  {editingCell?.itemId === item.id && editingCell.field === 'existing_controls' ? (
+                    <div className="flex items-start gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/[0.06] p-2">
+                      <Textarea
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="min-h-[84px] rounded-2xl border-white/10 bg-slate-950/80 text-xs text-slate-100 placeholder:text-muted-foreground resize-none"
+                        autoFocus
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveEdit}>
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={cancelEdit}>
+                          <X className="h-3 w-3 text-red-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => startEdit(item.id, 'existing_controls', item.existing_controls)}
+                      className="min-h-[72px] cursor-pointer rounded-xl border border-transparent p-2 transition hover:border-white/10 hover:bg-white/[0.04]"
+                    >
+                      <p className="text-xs text-foreground whitespace-pre-wrap">
+                        {item.existing_controls || "—"}
+                      </p>
+                    </div>
+                  )}
+                </td>
+
                 {/* ETKİLENEN */}
                 <td className="border border-slate-800/80 px-2 py-3">
                   {editingCell?.itemId === item.id && editingCell.field === 'affected_people' ? (
@@ -2639,7 +3180,8 @@ useLayoutEffect(() => {
                   </Badge>
                 </td>
 
-                {/* ÖNLEMLER */}
+                {/* YAPILMASI GEREKEN DÜZELTİCİ / ÖNLEYİCİ FAALİYET */}
+                {showProposedControlsColumn ? (
                 <td className="border border-slate-800/80 bg-cyan-900/10 px-2 py-3">
                   {editingCell?.itemId === item.id && editingCell.field === 'proposed_controls' ? (
                     <div className="flex items-start gap-2 rounded-2xl border border-cyan-400/20 bg-cyan-500/[0.06] p-2">
@@ -2669,6 +3211,7 @@ useLayoutEffect(() => {
                     </div>
                   )}
                 </td>
+                ) : null}
 
                 {/* 2. AŞAMA - O */}
                 <td className="border border-slate-800/80 bg-green-900/10 p-2 text-center">
@@ -2750,6 +3293,16 @@ useLayoutEffect(() => {
                   </Badge>
                 </td>
 
+                {/* TERMİN */}
+                <td className="border border-slate-700 p-2">
+                  <Input
+                    type="date"
+                    value={item.deadline || ""}
+                    onChange={(e) => updateRiskItem(item.id, 'deadline', e.target.value)}
+                    className="h-8 text-xs bg-slate-800 border-slate-600"
+                  />
+                </td>
+
                 {/* SORUMLU */}
                 <td className="border border-slate-700 p-2">
                   {editingCell?.itemId === item.id && editingCell.field === 'responsible_person' ? (
@@ -2783,15 +3336,42 @@ useLayoutEffect(() => {
                   )}
                 </td>
 
-                {/* TERMİN */}
-                <td className="border border-slate-700 p-2">
-                  <Input
-                    type="date"
-                    value={item.deadline || ""}
-                    onChange={(e) => updateRiskItem(item.id, 'deadline', e.target.value)}
-                    className="h-8 text-xs bg-slate-800 border-slate-600"
-                  />
-                </td>
+                {showStatusColumns ? (
+                  <>
+                    <td className="border border-slate-700 p-2">
+                      <Input
+                        type="date"
+                        value={item.completion_date || ""}
+                        onChange={(e) => updateRiskItem(item.id, 'completion_date', e.target.value)}
+                        className="h-8 text-xs bg-slate-800 border-slate-600"
+                      />
+                    </td>
+                    <td className="border border-slate-700 p-2">
+                      {editingCell?.itemId === item.id && editingCell.field === 'completed_activity' ? (
+                        <div className="flex items-start gap-1">
+                          <Textarea
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="min-h-[84px] text-xs bg-slate-800 border-slate-600"
+                            autoFocus
+                          />
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveEdit}>
+                            <CheckCircle2 className="h-3 w-3 text-green-500" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => startEdit(item.id, 'completed_activity', item.completed_activity)}
+                          className="cursor-pointer hover:bg-slate-800 p-2 rounded min-h-[32px]"
+                        >
+                          <p className="text-xs text-foreground whitespace-pre-wrap">
+                            {item.completed_activity || (item.status === "completed" ? "Tamamlandı" : "—")}
+                          </p>
+                        </div>
+                      )}
+                    </td>
+                  </>
+                ) : null}
 
                 {/* İŞLEM */}
                 <td className="border border-slate-700 p-1 text-center">
@@ -2922,7 +3502,8 @@ const exportToPDFAndShare = async () => {
         'Foto URL': item.photo_url || "",
         'Tehlike': item.hazard,
         'Risk': item.risk,
-        'Etkilenen': item.affected_people || "",
+        'Mevcut Durum': item.existing_controls || "",
+        'Olası Sonuç': item.affected_people || "",
         // 1. AŞAMA
         'O1': item.probability_1,
         'F1': item.frequency_1,
@@ -2939,7 +3520,9 @@ const exportToPDFAndShare = async () => {
         'Sınıf2': item.risk_class_2 || "Kabul Edilebilir",
         // DİĞER
         'Sorumlu': item.responsible_person || "",
-        'Termin': item.deadline || ""
+        'Termin': item.deadline || "",
+        'Gerçekleşme Tarihi': item.completion_date || "",
+        'Gerçekleşen Faaliyetler': item.completed_activity || "",
       }));
 
       const headerRows = [
@@ -3382,6 +3965,110 @@ const exportToPDFAndShare = async () => {
                 </div>
               </div>
             </div>
+            <div className="border-b border-white/10 bg-slate-950/80 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Select
+                  value={currentAssessmentMethod}
+                  onValueChange={(value) => {
+                    void updateAssessmentField("method", value as AssessmentMethod);
+                  }}
+                  disabled={!assessment}
+                >
+                  <SelectTrigger className="h-10 min-w-[220px] rounded-xl border-indigo-400/25 bg-indigo-500/10 text-sm font-semibold text-indigo-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fine_kinney">FK (FINE-KINNEY)</SelectItem>
+                    <SelectItem value="l_matrix">L5 (L-MATRİS)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showOrderColumn ? "default" : "outline"}
+                  onClick={() => setShowOrderColumn((prev) => !prev)}
+                  className="gap-2 rounded-xl"
+                >
+                  <ListOrdered className="h-4 w-4" />
+                  Sıra
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showTerminColumn ? "default" : "outline"}
+                  onClick={() => setShowTerminColumn((prev) => !prev)}
+                  className="gap-2 rounded-xl"
+                >
+                  <CalendarClock className="h-4 w-4" />
+                  Termin
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showStatusColumns ? "default" : "outline"}
+                  onClick={() => setShowStatusColumns((prev) => !prev)}
+                  className="gap-2 rounded-xl"
+                >
+                  <ClipboardList className="h-4 w-4" />
+                  Durum
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showProposedControlsColumn ? "default" : "outline"}
+                  onClick={() => setShowProposedControlsColumn((prev) => !prev)}
+                  className="gap-2 rounded-xl"
+                >
+                  <Columns3 className="h-4 w-4" />
+                  Pros
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    void autoSave();
+                    toast.success("Risk değerlendirmesi kaydedildi");
+                  }}
+                  className="gap-2 rounded-xl border-amber-400/25 bg-amber-500/10 text-amber-100"
+                >
+                  <Save className="h-4 w-4" />
+                  Kaydet
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setShowTemplateDialog(true)}
+                  className="gap-2 rounded-xl border-cyan-400/25 bg-cyan-500/10 text-cyan-100"
+                >
+                  <Upload className="h-4 w-4" />
+                  Şablon
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!assessment) return;
+                    void supabase.from("risk_items").delete().eq("assessment_id", assessment.id).then(({ error }) => {
+                      if (error) {
+                        toast.error("Risk listesi temizlenemedi", { description: error.message });
+                        return;
+                      }
+                      setRiskItems([]);
+                      toast.success("Risk listesi temizlendi");
+                    });
+                  }}
+                  disabled={!assessment || riskItems.length === 0}
+                  className="gap-2 rounded-xl border-rose-400/25 bg-rose-500/10 text-rose-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Sil
+                </Button>
+              </div>
+            </div>
             <div className="border-b border-white/10 bg-slate-950/60 px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="gap-2 border-white/10 bg-white/[0.04] text-foreground">
@@ -3428,6 +4115,119 @@ const exportToPDFAndShare = async () => {
           </div>
         </div>
       )}
+        <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
+          <DialogContent className="max-w-3xl border border-white/10 bg-slate-950/95 text-foreground">
+            <DialogHeader>
+              <DialogTitle>Risk Şablonları</DialogTitle>
+              <DialogDescription>
+                Mevcut tabloyu şablon olarak kaydedin, kendi şablon dosyanızı içe alın ve daha sonra tekrar kullanın.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+              <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="risk-template-name">Şablon Adı</Label>
+                  <Input
+                    id="risk-template-name"
+                    value={templateName}
+                    onChange={(event) => setTemplateName(event.target.value)}
+                    placeholder="Örn: Metal üretim temel şablonu"
+                    className="border-white/10 bg-slate-900/80"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => void saveCurrentAsTemplate()}
+                    disabled={templateSaving || !assessment || riskItems.length === 0}
+                    className="gap-2"
+                  >
+                    <Save className="h-4 w-4" />
+                    Şablonu Kaydet
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => templateFileInputRef.current?.click()}
+                    className="gap-2 border-white/10 bg-white/[0.03]"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Şablon İçe Aktar
+                  </Button>
+                  <input
+                    ref={templateFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                    className="hidden"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        void importTemplateFile(file);
+                      }
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </div>
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  İçe aktarılacak dosya Excel formatında olmalı. Sistem ilk sayfadaki sütun başlıklarını okuyup şablona çevirir ve organizasyon içinde saklar.
+                </div>
+              </div>
+
+              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-sm font-semibold">Kayıtlı Şablonlar</p>
+                <ScrollArea className="h-72 pr-3">
+                  <div className="space-y-3">
+                    {riskTemplates.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-muted-foreground">
+                        Henüz kayıtlı risk şablonu yok.
+                      </div>
+                    ) : (
+                      riskTemplates.map((template) => (
+                        <button
+                          key={template.id}
+                          type="button"
+                          onClick={() => setSelectedTemplateId(template.id)}
+                          className={`w-full rounded-2xl border p-4 text-left transition ${
+                            selectedTemplateId === template.id
+                              ? "border-cyan-400/40 bg-cyan-500/10"
+                              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">{template.name}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {template.sector || "Genel"} · {template.method === "l_matrix" ? "L5 (L-MATRİS)" : "FK (FINE-KINNEY)"}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
+                              {(template.payload?.items || []).length} madde
+                            </Badge>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+                <Button
+                  type="button"
+                  disabled={!selectedTemplateId || !assessment}
+                  onClick={() => {
+                    const template = riskTemplates.find((item) => item.id === selectedTemplateId);
+                    if (template) {
+                      void replaceAssessmentItemsFromTemplate(template);
+                      setShowTemplateDialog(false);
+                    }
+                  }}
+                  className="w-full gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  Seçili Şablonu Uygula
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <Dialog open={!!previewPhotoUrl} onOpenChange={(open) => !open && setPreviewPhotoUrl(null)}>
           <DialogContent className="max-w-4xl border border-cyan-400/20 bg-slate-950/95 p-0 shadow-[0_30px_80px_rgba(15,23,42,0.55)] backdrop-blur-xl">
             <div className="border-b border-white/10 bg-[linear-gradient(90deg,rgba(8,47,73,0.95),rgba(15,23,42,0.98),rgba(17,24,39,0.95))] px-6 py-4">

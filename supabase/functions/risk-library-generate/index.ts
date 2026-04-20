@@ -27,7 +27,7 @@ function buildPrompt(sector: string, companyName?: string) {
   return `Sen Turkiye mevzuatina hakim kidemli bir ISG uzmani ve Fine-Kinney degerlendirme uzmansin.
 
 Gorev:
-- ${companyName ? `"${companyName}" icin` : "Bir firma icin"} ${sector} sektorune ozel 30 ila 40 farkli risk maddesi uret.
+- ${companyName ? `"${companyName}" icin` : "Bir firma icin"} ${sector} sektorune ozel en az 40 farkli risk maddesi uret.
 - Maddeler tekrarsiz, uygulanabilir ve sahaya ozgu olsun.
 - Her madde icin hazard, risk, category, probability, frequency, severity ve controls alanlarini doldur.
 - Controls alaninda en az 3 somut onlem olsun.

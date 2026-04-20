@@ -214,6 +214,8 @@ type ModuleCardProps = {
 };
 
 const BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX = "bulk-capa-draft";
+const BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:fallback`;
+const BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:last-key`;
 const BULK_SOURCE_IMAGE_LIMIT = 12;
 
 const coerceText = (value: unknown): string => {
@@ -1810,57 +1812,73 @@ function BulkCAPAContent() {
   });
   const [companySearch, setCompanySearch] = useState("");
   const draftStorageKey = user ? `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:${user.id}` : null;
+  const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
 
-  useEffect(() => {
-    if (!user || !draftStorageKey) {
-      draftHydratedRef.current = false;
-      return;
+  const restoreDraftFromStorage = (rawDraft: string | null) => {
+    if (!rawDraft) {
+      return false;
     }
 
+    const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
+
+    if (parsedDraft.companyInputMode === "existing" || parsedDraft.companyInputMode === "manual") {
+      setCompanyInputMode(parsedDraft.companyInputMode);
+    }
+    if (typeof parsedDraft.selectedCompanyId === "string") {
+      setSelectedCompanyId(parsedDraft.selectedCompanyId);
+    }
+    if (typeof parsedDraft.manualCompanyName === "string") {
+      setManualCompanyName(parsedDraft.manualCompanyName);
+    }
+    if (parsedDraft.generalInfo) {
+      setGeneralInfo((prev) => ({
+        ...prev,
+        ...parsedDraft.generalInfo,
+      }));
+    }
+    if (parsedDraft.newEntry) {
+      setNewEntry((prev) => ({
+        ...prev,
+        ...parsedDraft.newEntry,
+      }));
+    }
+    if (Array.isArray(parsedDraft.bulkSourceImages)) {
+      setBulkSourceImages(parsedDraft.bulkSourceImages.filter((item): item is string => typeof item === "string"));
+    }
+    if (Array.isArray(parsedDraft.entries)) {
+      setEntries(parsedDraft.entries);
+    }
+    if (typeof parsedDraft.overallAnalysis === "string") {
+      setOverallAnalysis(parsedDraft.overallAnalysis);
+    }
+    if (parsedDraft.createMode === "single" || parsedDraft.createMode === "bulk") {
+      setCreateMode(parsedDraft.createMode);
+    }
+    if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
+      setCreateStep(parsedDraft.createStep);
+    }
+
+    return true;
+  };
+
+  useEffect(() => {
     try {
-      const rawDraft = window.localStorage.getItem(draftStorageKey);
-      if (!rawDraft) {
+      if (!user && !draftStorageKey) {
+        draftHydratedRef.current = false;
+      }
+
+      const preferredKey =
+        draftStorageKey ||
+        window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
+        BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
+
+      const restored =
+        restoreDraftFromStorage(window.localStorage.getItem(preferredKey)) ||
+        restoreDraftFromStorage(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY));
+
+      if (!restored) {
         draftHydratedRef.current = true;
         return;
-      }
-
-      const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
-
-      if (parsedDraft.companyInputMode === "existing" || parsedDraft.companyInputMode === "manual") {
-        setCompanyInputMode(parsedDraft.companyInputMode);
-      }
-      if (typeof parsedDraft.selectedCompanyId === "string") {
-        setSelectedCompanyId(parsedDraft.selectedCompanyId);
-      }
-      if (typeof parsedDraft.manualCompanyName === "string") {
-        setManualCompanyName(parsedDraft.manualCompanyName);
-      }
-      if (parsedDraft.generalInfo) {
-        setGeneralInfo((prev) => ({
-          ...prev,
-          ...parsedDraft.generalInfo,
-        }));
-      }
-      if (parsedDraft.newEntry) {
-        setNewEntry((prev) => ({
-          ...prev,
-          ...parsedDraft.newEntry,
-        }));
-      }
-      if (Array.isArray(parsedDraft.bulkSourceImages)) {
-        setBulkSourceImages(parsedDraft.bulkSourceImages.filter((item): item is string => typeof item === "string"));
-      }
-      if (Array.isArray(parsedDraft.entries)) {
-        setEntries(parsedDraft.entries);
-      }
-      if (typeof parsedDraft.overallAnalysis === "string") {
-        setOverallAnalysis(parsedDraft.overallAnalysis);
-      }
-      if (parsedDraft.createMode === "single" || parsedDraft.createMode === "bulk") {
-        setCreateMode(parsedDraft.createMode);
-      }
-      if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
-        setCreateStep(parsedDraft.createStep);
       }
     } catch (error) {
       console.warn("Bulk CAPA draft could not be restored:", error);
@@ -1985,6 +2003,7 @@ function BulkCAPAContent() {
       createMode,
       createStep,
     };
+    draftSnapshotRef.current = snapshot;
 
     const hasMeaningfulDraft =
       entries.length > 0 ||
@@ -2006,11 +2025,18 @@ function BulkCAPAContent() {
 
     try {
       if (!hasMeaningfulDraft) {
-        window.localStorage.removeItem(draftStorageKey);
+        if (draftStorageKey) {
+          window.localStorage.removeItem(draftStorageKey);
+        }
+        window.localStorage.removeItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
         return;
       }
 
-      window.localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+      if (draftStorageKey) {
+        window.localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+        window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
+      }
+      window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, JSON.stringify(snapshot));
     } catch (error) {
       console.warn("Bulk CAPA draft could not be saved:", error);
     }
@@ -2027,6 +2053,38 @@ function BulkCAPAContent() {
     overallAnalysis,
     selectedCompanyId,
   ]);
+
+  useEffect(() => {
+    const flushDraft = () => {
+      if (!draftSnapshotRef.current) return;
+
+      try {
+        const serialized = JSON.stringify(draftSnapshotRef.current);
+        if (draftStorageKey) {
+          window.localStorage.setItem(draftStorageKey, serialized);
+          window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
+        }
+        window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, serialized);
+      } catch (error) {
+        console.warn("Bulk CAPA draft flush failed:", error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushDraft();
+      }
+    };
+
+    window.addEventListener("pagehide", flushDraft);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      flushDraft();
+      window.removeEventListener("pagehide", flushDraft);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [draftStorageKey]);
 
   const effectiveLocation = useMemo(() =>
     generalInfo.area_region || reportCompanyName,
@@ -5575,364 +5633,198 @@ const handleSaveAndExport = async () => {
                 </span>
               </div>
             ) : null}
-            <div className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14">
-              <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 md:flex-row md:items-start md:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    {generalInfo.company_logo_url || selectedCompany?.logo_url || orgData?.logo_url ? (
-                      <img
-                        src={generalInfo.company_logo_url || selectedCompany?.logo_url || orgData?.logo_url || ""}
-                        alt={`${reportCompanyName || orgData?.name || "Kurum"} logosu`}
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-lg font-bold text-slate-700">
-                        {(reportCompanyName || orgData?.name || "İV").slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-500">
-                      Resmî Belge Önizlemesi
-                    </p>
-                    <h3 className="mt-2 text-2xl font-bold text-slate-950">
-                      Düzeltici ve Önleyici Faaliyet Formu (DÖF)
-                    </h3>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {reportCompanyName || "N/A"} • {generalInfo.area_region || "Konum belirtilmedi"} •{" "}
-                      {generalInfo.report_date
-                        ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR")
-                        : new Date().toLocaleDateString("tr-TR")}
-                    </p>
-                    {(selectedCompany?.industry || selectedCompany?.employee_count) && (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {selectedCompany?.industry ? (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                            {selectedCompany.industry} sektörü
-                          </span>
-                        ) : null}
-                        {selectedCompany?.employee_count ? (
-                          <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                            {selectedCompany.employee_count}+ çalışan
-                          </span>
-                        ) : null}
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                          {generalInfo.observation_range || "Gözetim aralığı belirtilmedi"}
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
-                          Rapor No: {generalInfo.report_no || "Belirtilmedi"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                  <p>
-                    <strong>Toplam bulgu:</strong> {previewEntries.length}
-                  </p>
-                  <p className="mt-1">
-                    <strong>AI analizi:</strong> {previewEntries.filter((e) => e.ai_analyzed).length} / {previewEntries.length}
-                  </p>
-                </div>
+            <div
+              className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14 [&_p]:text-slate-900 [&_span]:text-inherit [&_td]:text-slate-900 [&_h2]:text-slate-800 [&_h3]:text-[#1d3760] [&_th]:text-white"
+              style={{ color: "#0f172a" }}
+            >
+              <div className="flex items-center justify-end border-b border-slate-300 pb-2 text-[11px] text-slate-500">
+                <span>İSG TESPİT VE DÖF RAPORU</span>
+                <span className="mx-2">|</span>
+                <span>{generalInfo.report_date ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR")}</span>
               </div>
 
-              {previewEntries.length > 0 && (
-                <div className="mt-8 overflow-hidden rounded-[24px] border border-slate-200">
-                  <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                        Onay Bloğu
-                      </p>
-                      <h3 className="mt-2 text-lg font-bold text-slate-950">
-                        Onaylayan (İş Güvenliği Uzmanı)
+              <div className="mt-8 text-center">
+                <h2 className="text-[28px] font-bold tracking-tight text-slate-800">İŞ SAĞLIĞI VE GÜVENLİĞİ</h2>
+                <p className="mt-2 text-[17px] font-semibold text-slate-800">TESPİT VE DÜZELTİCİ / ÖNLEYİCİ FAALİYET (DÖF) RAPORU</p>
+              </div>
+
+              <div className="mt-5 border-b-2 border-red-500" />
+
+              <div className="mt-4 flex justify-center">
+                <table className="w-full max-w-[560px] border-collapse text-sm">
+                  <tbody>
+                    {[
+                      ["Rapor Tarihi", generalInfo.report_date ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR")],
+                      ["Hazırlayan", `${generalInfo.observer_name || profileContext?.full_name || "İsim Soyisim"} - ${profileContext?.position || "İş Güvenliği Uzmanı"}`],
+                      ["Konu", `${generalInfo.area_region || "Genel Çalışma Sahası"} Risk Analizi`],
+                      ["Tehlike Sınıfı", (selectedCompany?.notes || selectedCompany?.industry || "Çok Tehlikeli").toString().toLocaleUpperCase("tr-TR")],
+                    ].map(([label, value], index) => (
+                      <tr key={label}>
+                        <td className="w-[32%] border border-slate-400 bg-[#1d3760] px-3 py-2 font-semibold text-white">{label}</td>
+                        <td className={`border border-slate-400 px-3 py-2 ${index === 3 ? "font-bold text-red-600" : "text-slate-900"}`}>{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {previewEntries.map((entry, idx) => {
+                const legalBasis = getBulkCapaLegalBasis({
+                  id: entry.id,
+                  description: entry.description,
+                  riskDefinition: entry.riskDefinition,
+                  correctiveAction: entry.correctiveAction,
+                  preventiveAction: entry.preventiveAction,
+                  importanceLevel: entry.importance_level,
+                  terminDate: entry.termin_date,
+                  relatedDepartment: entry.related_department,
+                  notificationMethod: entry.notification_method,
+                  responsibleName: entry.responsible_name,
+                  responsibleRole: entry.responsible_role,
+                  approverName: entry.approver_name,
+                  approverTitle: entry.approver_title,
+                  includeStamp: entry.include_stamp,
+                  mediaUrls: entry.media_urls,
+                  aiAnalyzed: entry.ai_analyzed,
+                });
+
+                return (
+                  <div key={entry.id} className="mt-10">
+                    {entry.media_urls.length > 0 ? (
+                      <div className={`grid gap-3 ${entry.media_urls.length === 1 ? "grid-cols-1 justify-items-center" : entry.media_urls.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                        {entry.media_urls.map((imageUrl, imgIdx) => (
+                          <div key={buildMediaKey(imageUrl, imgIdx)} className="border border-slate-400 bg-white p-2">
+                            <img
+                              src={imageUrl}
+                              alt={`Fotoğraf ${imgIdx + 1}`}
+                              className={`mx-auto object-cover ${entry.media_urls.length === 1 ? "h-[240px] w-[240px]" : "h-[190px] w-full"}`}
+                            />
+                            <p className="mt-2 text-center text-[11px] leading-4 text-slate-700">
+                              Görsel Tanım — {entry.related_department || "Genel Alan"}<br />
+                              {entry.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-6 border-b-2 border-[#1d3760] pb-1">
+                      <h3 className="text-[26px] font-bold text-[#1d3760]">
+                        {idx + 1}. {(entry.related_department || "GENEL SAHA").toUpperCase()}
                       </h3>
                     </div>
-                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
-                      Kurumsal imza alanı
-                    </span>
-                  </div>
 
-                  <div className="grid gap-0 md:grid-cols-[1.15fr_0.85fr]">
-                    <div className="space-y-4 p-5">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Kurum
-                        </p>
-                        <p className="mt-3 text-lg font-semibold text-slate-900">
-                          {reportCompanyName || orgData?.name || "N/A"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Ad Soyad
-                        </p>
-                        <p className="mt-3 text-xl font-semibold text-slate-950">
-                          {generalInfo.observer_name ||
-                            [...entries].reverse().find((entry) => entry.approver_name)?.approver_name ||
-                            profileContext?.full_name ||
-                            "N/A"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Ünvan
-                        </p>
-                        <p className="mt-3 text-base text-slate-700">
-                          {[...entries].reverse().find((entry) => entry.approver_title)?.approver_title ||
-                            profileContext?.position ||
-                            "İş Güvenliği Uzmanı"}
-                        </p>
-                        <p className="mt-2 text-sm text-slate-600">
-                          Sertifika No: {generalInfo.observer_certificate_no || "Belirtilmedi"}
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">
-                          Bu bilgi Word çıktısında onaylayan uzman alanında yer alır.
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          İşveren / İşveren Vekili
-                        </p>
-                        <p className="mt-3 text-base font-semibold text-slate-900">
-                          {generalInfo.employer_representative_name || "Belirtilmedi"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-600">
-                          {generalInfo.employer_representative_title || "İşveren / İşveren Vekili"}
-                        </p>
-                      </div>
-
-                      <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-800">
-                          Kaşe Durumu
-                        </p>
-                        <p className="mt-3 text-sm leading-6 text-cyan-950/80">
-                          {[...entries].reverse().find((entry) => entry.include_stamp)?.include_stamp
-                            ? profileContext?.stamp_url
-                              ? "Ayarlar sayfasında yüklenen kaşe bu rapora eklenecek."
-                              : "Kaşe işaretli ancak ayarlarda yüklenmiş bir kaşe bulunmuyor."
-                            : "Bu rapor için kaşe eklenmeden çıktı oluşturulacak."}
-                        </p>
-                        {!profileContext?.stamp_url &&
-                        [...entries].reverse().find((entry) => entry.include_stamp)?.include_stamp ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="mt-4 border-cyan-300 bg-white text-cyan-900 hover:bg-cyan-100"
-                            onClick={() => {
-                              setPreviewOpen(false);
-                              navigate("/settings");
-                            }}
-                          >
-                            Ayarlar’a Git
-                          </Button>
-                        ) : null}
-                      </div>
+                    <div className="mt-3">
+                      <table className="w-full border-collapse text-[13px]">
+                        <thead>
+                          <tr>
+                            {["TESPİT EDİLEN UYGUNSUZLUK", "RİSK ANALİZİ", "MEVZUAT DAYANAĞI", "ÖNERİLEN DÖF (AKSİYON)"].map((title) => (
+                              <th key={title} className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white">
+                                {title}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{entry.description}</td>
+                            <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{entry.riskDefinition}</td>
+                            <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{legalBasis}</td>
+                            <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">
+                              <span className={entry.importance_level === "Kritik" ? "font-bold text-red-600" : "text-slate-900"}>
+                                {entry.correctiveAction}
+                              </span>
+                              {entry.preventiveAction ? <div className="mt-1 text-slate-700">{entry.preventiveAction}</div> : null}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
 
-                    <div className="border-t border-slate-200 bg-slate-50/70 p-5 md:border-l md:border-t-0">
-                      <div className="rounded-[24px] border border-dashed border-slate-300 bg-white p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                          Kaşe / İmza Alanı
-                        </p>
-                        <div className="mt-4 flex min-h-[220px] items-center justify-center rounded-[20px] border border-slate-200 bg-slate-50 p-4">
-                          <div className="w-full space-y-4 text-center">
-                            {generalInfo.provider_logo_url || orgData?.logo_url ? (
-                              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white p-2 shadow-sm">
-                                <img
-                                  src={generalInfo.provider_logo_url || orgData?.logo_url || ""}
-                                  alt={`${reportCompanyName || orgData?.name || "Kurum"} mührü`}
-                                  className="h-full w-full object-contain"
-                                />
-                              </div>
-                            ) : null}
-                            {[...entries].reverse().find((entry) => entry.include_stamp)?.include_stamp &&
-                            profileContext?.stamp_url ? (
-                              <img
-                                src={profileContext.stamp_url}
-                                alt="İSG uzmanı kaşesi"
-                                className="mx-auto max-h-40 w-full object-contain"
-                              />
-                            ) : (
-                              <div className="space-y-3 text-center">
-                                <div className="mx-auto h-px w-28 bg-slate-300" />
-                                <p className="text-xs text-slate-500">
-                                  Kaşe önizlemesi burada gösterilir.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <p className="mt-4 text-center text-xs text-slate-500">
-                          Çıktıda kaşe alanı onaylayan uzman bölümünün sağında yer alır.
-                        </p>
-                        <div className="mt-5 border-t border-slate-200 pt-4 text-center">
-                          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                            İmza Çizgisi
-                          </p>
-                          <div className="mx-auto mt-4 h-px w-40 bg-slate-300" />
-                          <p className="mt-3 text-xs text-slate-500">
-                            Onay Tarihi: {new Date().toLocaleDateString("tr-TR")}
-                          </p>
-                        </div>
-                      </div>
+                    <div className="mt-3 border-b-2 border-[#1d3760] pb-1">
+                      <p className="text-[12px] font-bold text-slate-900">
+                        FOTOĞRAF KANITI — {(entry.related_department || "GENEL SAHA").toUpperCase()} UYGUNSUZLUKLARI
+                      </p>
                     </div>
                   </div>
-                </div>
-              )}
+                );
+              })}
 
-              {overallAnalysis.trim() && (
-                <div className="mt-8 rounded-[20px] border border-slate-200 bg-slate-50 p-5">
-                  <p className="font-semibold text-slate-900">Genel Analiz ve Kapanış</p>
-                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">
-                    {overallAnalysis}
-                  </p>
-                </div>
-              )}
-
-              <div className="mt-8 space-y-5">
-                {previewPageChunks[0]?.map((entry, idx) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
-                  >
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                      <h4 className="flex items-center gap-2 text-lg font-bold text-slate-950">
-                        Madde {idx + 1} – Uygunsuzluk / Risk
-                        {entry.ai_analyzed && <Sparkles className="h-4 w-4 text-yellow-500" />}
-                      </h4>
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Kurumsal Kayıt
-                      </span>
-                    </div>
-                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                      <p className="text-sm leading-6 text-slate-700">
-                        <strong className="text-slate-950">Bulgu:</strong> {entry.description}
-                      </p>
-                      <p className="text-sm leading-6 text-slate-700">
-                        <strong className="text-slate-950">Önemlilik:</strong> {entry.importance_level}
-                      </p>
-                      <p className="text-sm leading-6 text-slate-700">
-                        <strong className="text-slate-950">Bölüm:</strong> {entry.related_department}
-                      </p>
-                      <p className="text-sm leading-6 text-slate-700">
-                        <strong className="text-slate-950">Termin:</strong>{" "}
-                        {new Date(entry.termin_date).toLocaleDateString("tr-TR")}
-                      </p>
-                    </div>
-
-                    {entry.media_urls.length > 0 && (
-                      <div className="mt-5 space-y-3 border-t border-slate-200 pt-4">
-                        <p className="text-sm font-semibold text-slate-900">
-                          Fotoğraflar ({entry.media_urls.length})
-                        </p>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                          {entry.media_urls.map((imageUrl, imgIdx) => (
-                            <div
-                              key={buildMediaKey(imageUrl, imgIdx)}
-                              className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
-                            >
-                              <img
-                                src={imageUrl}
-                                alt={`Fotoğraf ${imgIdx + 1}`}
-                                className="h-32 w-full object-cover"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+              <div className="mt-12 border-b-2 border-[#1d3760] pb-1">
+                <h3 className="text-[24px] font-bold text-[#1d3760]">TERMİN VE AKSİYON PLANI</h3>
               </div>
 
-              <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-5 text-[11px] uppercase tracking-[0.22em] text-slate-400 md:flex-row md:items-center md:justify-between">
-                <span>
-                  {(reportCompanyName || orgData?.name || "İSGVİZYON").toUpperCase()} • Resmî belge önizlemesi
-                </span>
-                <span>
-                  {selectedCompany?.industry ? `${selectedCompany.industry.toUpperCase()} • ` : ""}
-                  Sayfa 1 / {previewPageChunks.length}
-                </span>
+              <div className="mt-3 flex justify-center">
+                <table className="w-full max-w-[610px] border-collapse text-[13px]">
+                  <thead>
+                    <tr>
+                      {["RİSK SEVİYESİ", "TERMİN", "YAPILACAK İŞLEMLER"].map((title) => (
+                        <th key={title} className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white">
+                          {title}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewEntries.map((entry) => {
+                      const riskColors =
+                        entry.importance_level === "Kritik" || entry.importance_level === "Yüksek"
+                          ? "bg-red-700 text-white"
+                          : entry.importance_level === "Orta"
+                            ? "bg-orange-500 text-white"
+                            : "bg-green-700 text-white";
+                      return (
+                        <tr key={`${entry.id}-action`}>
+                          <td className={`border border-slate-400 px-2 py-2 text-center font-bold ${riskColors}`}>
+                            {entry.importance_level === "Kritik" || entry.importance_level === "Yüksek" ? "YÜKSEK RİSK" : entry.importance_level === "Orta" ? "ORTA RİSK" : "DÜŞÜK RİSK"}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-2 text-center font-bold text-slate-900">
+                            {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-2 text-slate-900">
+                            {entry.correctiveAction}
+                            {entry.preventiveAction ? <div className="mt-1 text-slate-700">{entry.preventiveAction}</div> : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-12 border-b-2 border-red-500 pb-1">
+                <p className="text-[18px] font-bold text-red-600">HUKUKİ HATIRLATMA (Yönetici Özeti)</p>
+              </div>
+
+              <div className="mt-4 border-2 border-red-500 bg-[#fff7f7] px-5 py-4">
+                <p className="text-[13px] font-bold text-red-600">6331 Sayılı İş Sağlığı ve Güvenliği Kanunu gereğince:</p>
+                <p className="mt-3 text-center text-[13px] font-bold leading-6 text-slate-900">
+                  İŞVEREN, ÇALIŞANLARIN BAĞLILIĞINI VE GÜVENLİĞİNİ SAĞLAMAKLA YÜKÜMLÜDÜR.
+                </p>
+                <p className="mt-4 text-[13px] leading-6 text-slate-800">
+                  {overallAnalysis.trim() || "Bu raporda fotoğraf kanıtlarıyla sunulan uygunsuzlukların giderilmemesi durumunda meydana gelebilecek iş kazalarında işveren, ilgili mevzuat kapsamında idari ve hukuki sorumlulukla karşılaşabilir."}
+                </p>
+              </div>
+
+              <p className="mt-12 text-right text-[13px] text-slate-700">Onayınıza arz ederim.</p>
+
+              <div className="mt-16 grid grid-cols-2 gap-10">
+                <div className="text-center">
+                  <div className="mx-auto h-px w-full max-w-[220px] bg-slate-800" />
+                  <p className="mt-3 text-[13px] font-semibold text-slate-900">Hazırlayan</p>
+                  <p className="mt-1 text-[12px] text-slate-600">{generalInfo.observer_name || profileContext?.full_name || "İş Güvenliği Uzmanı"}</p>
+                </div>
+                <div className="text-center">
+                  <div className="mx-auto h-px w-full max-w-[220px] bg-slate-800" />
+                  <p className="mt-3 text-[13px] font-semibold text-slate-900">Onaylayan</p>
+                  <p className="mt-1 text-[12px] text-slate-600">{generalInfo.employer_representative_name || "İşveren / İşveren Vekili"}</p>
+                </div>
+              </div>
+
+              <div className="mt-16 text-center text-[11px] text-slate-400">
+                Sayfa 1 / 1
               </div>
             </div>
-
-            {previewPageChunks.slice(1).map((pageEntries, pageIndex) => (
-              <div
-                key={`preview-page-${pageIndex + 2}`}
-                className="mx-auto mt-8 min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14"
-              >
-                <div className="flex items-center justify-between border-b border-slate-200 pb-5">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                      Belge Devamı
-                    </p>
-                    <h4 className="mt-2 text-xl font-bold text-slate-950">
-                      DÖF Maddeleri • Sayfa {pageIndex + 2}
-                    </h4>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {generalInfo.company_logo_url || selectedCompany?.logo_url || orgData?.logo_url ? (
-                      <img
-                        src={generalInfo.company_logo_url || selectedCompany?.logo_url || orgData?.logo_url || ""}
-                        alt={`${reportCompanyName || orgData?.name || "Kurum"} logosu`}
-                        className="h-12 w-12 rounded-xl border border-slate-200 bg-slate-50 object-contain p-2"
-                      />
-                    ) : null}
-                    <div className="text-right text-xs text-slate-500">
-                      <p>{reportCompanyName || orgData?.name || "N/A"}</p>
-                      <p>{new Date().toLocaleDateString("tr-TR")}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 space-y-5">
-                  {pageEntries.map((entry, idx) => (
-                    <div
-                      key={entry.id}
-                      className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.06)]"
-                    >
-                      <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                        <h4 className="flex items-center gap-2 text-lg font-bold text-slate-950">
-                          Madde {(pageIndex + 1) * 3 + idx + 1} – Uygunsuzluk / Risk
-                          {entry.ai_analyzed && <Sparkles className="h-4 w-4 text-yellow-500" />}
-                        </h4>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          Devam Sayfası
-                        </span>
-                      </div>
-                      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                        <p className="text-sm leading-6 text-slate-700">
-                          <strong className="text-slate-950">Bulgu:</strong> {entry.description}
-                        </p>
-                        <p className="text-sm leading-6 text-slate-700">
-                          <strong className="text-slate-950">Önemlilik:</strong> {entry.importance_level}
-                        </p>
-                        <p className="text-sm leading-6 text-slate-700">
-                          <strong className="text-slate-950">Bölüm:</strong> {entry.related_department}
-                        </p>
-                        <p className="text-sm leading-6 text-slate-700">
-                          <strong className="text-slate-950">Termin:</strong>{" "}
-                          {new Date(entry.termin_date).toLocaleDateString("tr-TR")}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-10 flex flex-col gap-3 border-t border-slate-200 pt-5 text-[11px] uppercase tracking-[0.22em] text-slate-400 md:flex-row md:items-center md:justify-between">
-                  <span>
-                    {(reportCompanyName || orgData?.name || "İSGVİZYON").toUpperCase()} • Resmî belge önizlemesi
-                  </span>
-                  <span>
-                    {selectedCompany?.industry ? `${selectedCompany.industry.toUpperCase()} • ` : ""}
-                    Sayfa {pageIndex + 2} / {previewPageChunks.length}
-                  </span>
-                </div>
-              </div>
-            ))}
           </div>
 
           <Button
