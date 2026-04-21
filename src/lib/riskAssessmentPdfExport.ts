@@ -56,6 +56,20 @@ function formatProcedurePageLabel(pageNumber: number) {
   return `- ${pageNumber} -`;
 }
 
+function formatTableDate(value?: string | null) {
+  if (!value) return "—";
+
+  const rawValue = String(value).trim();
+  if (!rawValue || rawValue === "-" || rawValue === "—") return "—";
+
+  const parsedDate = new Date(rawValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return rawValue;
+  }
+
+  return format(parsedDate, "dd.MM.yy", { locale: tr });
+}
+
 function drawWrappedText(
   doc: jsPDF,
   text: string,
@@ -767,6 +781,164 @@ function addTablePages(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photoMap: M
   });
 }
 
+function addRiskTablePagesV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photoMap: Map<string, string>, logoDataUrl: string | null) {
+  doc.addPage("a4", "landscape");
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const companyName = args.company?.name || "Firma";
+
+  setFill(doc, COLORS.ink);
+  doc.rect(0, 0, pageWidth, 18, "F");
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, getImageFormat(logoDataUrl), 10, 3.4, 13, 10, undefined, "FAST");
+  }
+
+  setText(doc, [255, 255, 255]);
+  setFont(doc, "bold");
+  doc.setFontSize(12.5);
+  doc.text("RİSK ANALİZ TABLOSU", pageWidth / 2, 8.7, { align: "center" });
+  setFont(doc, "normal");
+  doc.setFontSize(7.5);
+  doc.text(`${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
+
+  const stats = {
+    total: args.riskItems.length,
+    critical: args.riskItems.filter((item) => item.risk_class_1 === "Yüksek" || item.risk_class_1 === "Çok Yüksek").length,
+    residualSafe: args.riskItems.filter((item) => item.risk_class_2 === "Kabul Edilebilir" || item.risk_class_2 === "Olası").length,
+  };
+
+  setFill(doc, COLORS.soft);
+  setDraw(doc, COLORS.line);
+  doc.roundedRect(8, 22, pageWidth - 16, 12, 2.5, 2.5, "FD");
+  setText(doc, COLORS.ink);
+  setFont(doc, "bold");
+  doc.setFontSize(8);
+  doc.text(`Toplam Madde: ${stats.total}`, 12, 29);
+  doc.text(`Kritik Madde: ${stats.critical}`, 58, 29);
+  doc.text(`Kabul Edilebilir / Olası Kalıntı Risk: ${stats.residualSafe}`, 103, 29);
+  doc.text(`Değerlendirme Tarihi: ${formatTableDate(args.assessment.assessment_date)}`, pageWidth - 12, 29, { align: "right" });
+
+  const tableData = args.riskItems.map((item, idx) => [
+    String(idx + 1).padStart(2, "0"),
+    item.department || "—",
+    photoMap.has(item.id) ? " " : "—",
+    item.hazard || "—",
+    item.risk || "—",
+    item.existing_controls || "—",
+    item.affected_people || "—",
+    String(item.probability_1),
+    String(item.frequency_1),
+    String(item.severity_1),
+    String(item.score_1),
+    getRiskClassLabel(item.risk_class_1),
+    item.proposed_controls || "—",
+    String(item.probability_2 ?? 0),
+    String(item.frequency_2 ?? 0),
+    String(item.severity_2 ?? 0),
+    String(item.score_2 ?? 0),
+    getRiskClassLabel(item.risk_class_2 || "Kabul Edilebilir"),
+    formatTableDate(item.deadline),
+    item.responsible_person || "—",
+    formatTableDate(item.completion_date),
+    item.completed_activity || (item.status === "completed" ? "Tamamlandı" : "—"),
+  ]);
+
+  autoTable(doc, {
+    startY: 42,
+    margin: { left: 8, right: 8, bottom: 16 },
+    head: [[
+      "No",
+      "Faaliyet",
+      "Foto",
+      "Tehlike",
+      "Risk",
+      "Mevcut Durum",
+      "Olası Sonuç",
+      "O",
+      "F",
+      "Ş",
+      "Skor",
+      "Riskin Tanımı",
+      "Yapılması Gereken DÖF",
+      "O",
+      "F",
+      "Ş",
+      "Skor",
+      "Riskin Tanımı",
+      "Termin Süresi",
+      "Sorumlu",
+      "Gerçekleşme Tarihi",
+      "Gerçekleşen Faaliyetler",
+    ]],
+    body: tableData,
+    theme: "grid",
+    styles: {
+      fontSize: 4.7,
+      cellPadding: 0.9,
+      font: "Inter",
+      lineColor: [148, 163, 184],
+      lineWidth: 0.1,
+      textColor: [30, 41, 59],
+      fillColor: [248, 250, 252],
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      font: "Inter",
+      fontStyle: "bold",
+      halign: "center",
+      valign: "middle",
+      fontSize: 5.4,
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 16 },
+      2: { cellWidth: 12, halign: "center" },
+      3: { cellWidth: 24 },
+      4: { cellWidth: 25 },
+      5: { cellWidth: 19 },
+      6: { cellWidth: 16 },
+      7: { cellWidth: 6, halign: "center" },
+      8: { cellWidth: 6, halign: "center" },
+      9: { cellWidth: 6, halign: "center" },
+      10: { cellWidth: 8, halign: "center" },
+      11: { cellWidth: 13, halign: "center" },
+      12: { cellWidth: 28 },
+      13: { cellWidth: 6, halign: "center" },
+      14: { cellWidth: 6, halign: "center" },
+      15: { cellWidth: 6, halign: "center" },
+      16: { cellWidth: 8, halign: "center" },
+      17: { cellWidth: 13, halign: "center" },
+      18: { cellWidth: 14, halign: "center" },
+      19: { cellWidth: 15 },
+      20: { cellWidth: 14, halign: "center" },
+      21: { cellWidth: 20 },
+    },
+    didParseCell: (data) => {
+      if (data.section !== "head") return;
+      if (data.column.index >= 7 && data.column.index <= 11) {
+        data.cell.styles.fillColor = [127, 29, 29];
+      }
+      if (data.column.index >= 13 && data.column.index <= 17) {
+        data.cell.styles.fillColor = [20, 83, 45];
+      }
+      if (data.column.index >= 18 && data.column.index <= 21) {
+        data.cell.styles.fillColor = [30, 41, 59];
+      }
+    },
+    didDrawCell: (data) => {
+      if (data.section !== "body" || data.column.index !== 2) return;
+      const riskItem = args.riskItems[data.row.index];
+      const imageData = riskItem ? photoMap.get(riskItem.id) : null;
+      if (!imageData) return;
+      const size = Math.min(data.cell.width - 3, data.cell.height - 3, 10);
+      const x = data.cell.x + (data.cell.width - size) / 2;
+      const y = data.cell.y + (data.cell.height - size) / 2;
+      doc.addImage(imageData, getImageFormat(imageData), x, y, size, size, undefined, "FAST");
+    },
+  });
+}
+
 function addPageFooters(doc: jsPDF, companyName: string) {
   const totalPages = doc.getNumberOfPages();
   const roles = ["İŞ GÜVENLİĞİ UZMANI", "İŞYERİ HEKİMİ", "ÇALIŞAN TEM.", "DESTEK ELEMANI", "Bilgi Sahibi Çalışan", "İŞVEREN/VEKİLİ"];
@@ -824,7 +996,7 @@ export async function buildRiskAssessmentPdf(args: BuildRiskAssessmentPdfArgs) {
   await addFineKinneyReferencePage(doc, args);
   await addProcessFlowPage(doc, args);
   addPhotoGalleryPage(doc, photoItems);
-  addTablePages(doc, args, photoMap, logoDataUrl);
+  addRiskTablePagesV2(doc, args, photoMap, logoDataUrl);
   addPageFooters(doc, args.company?.name?.trim() || "Firma");
 
   return doc;
