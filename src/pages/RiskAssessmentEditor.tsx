@@ -878,6 +878,39 @@ useLayoutEffect(() => {
     }
   };
 
+  const deleteRiskTemplate = async (template: RiskAssessmentTemplateRecord) => {
+    if (!user?.id || !profile?.organization_id) {
+      toast.error("Şablon silmek için organizasyon bilgisi gerekli");
+      return;
+    }
+
+    const confirmed = window.confirm(`"${template.name}" şablonunu silmek istediğinize emin misiniz?`);
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from("risk_assessment_templates")
+        .delete()
+        .eq("id", template.id)
+        .eq("org_id", profile.organization_id)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+
+      if (selectedTemplateId === template.id) {
+        setSelectedTemplateId("");
+      }
+
+      toast.success("Şablon silindi");
+      void fetchRiskTemplates();
+    } catch (error: any) {
+      console.error("Delete risk template error:", error);
+      toast.error("Şablon silinemedi", {
+        description: error.message,
+      });
+    }
+  };
+
   const importTemplateFile = async (file: File) => {
     if (!user?.id || !profile?.organization_id) {
       toast.error("Şablon içe aktarmak için organizasyon bilgisi gerekli");
@@ -1003,9 +1036,31 @@ useLayoutEffect(() => {
         return matches[0] || null;
       };
 
-      const departmentHeader = findHeaderCell(aliasMap.department);
-      const hazardHeader = findHeaderCell(aliasMap.hazard, { afterCol: departmentHeader?.col });
-      const riskHeader = findHeaderCell(aliasMap.risk, { afterCol: hazardHeader?.col });
+      const findExactHeaderCell = (value: string, options?: { afterCol?: number; beforeCol?: number }) => {
+        const normalizedTarget = normalizeHeader(value);
+        return scannedCells
+          .filter((cell) => {
+            if (options?.afterCol !== undefined && cell.col <= options.afterCol) return false;
+            if (options?.beforeCol !== undefined && cell.col >= options.beforeCol) return false;
+            return cell.value === normalizedTarget;
+          })
+          .sort((a, b) => (a.row - b.row) || (a.col - b.col))[0] || null;
+      };
+
+      const departmentHeader = findExactHeaderCell("faaliyet") || findHeaderCell(aliasMap.department);
+      const hazardHeader = findExactHeaderCell("tehlike", { afterCol: departmentHeader?.col }) || findHeaderCell(aliasMap.hazard, { afterCol: departmentHeader?.col });
+      const existingControlsHeader = findExactHeaderCell("mevcut durum", { afterCol: hazardHeader?.col });
+      const riskHeader =
+        findExactHeaderCell("risk", { afterCol: hazardHeader?.col, beforeCol: existingControlsHeader?.col }) ||
+        scannedCells
+          .filter((cell) => {
+            if (hazardHeader?.col !== undefined && cell.col <= hazardHeader.col) return false;
+            if (existingControlsHeader?.col !== undefined && cell.col >= existingControlsHeader.col) return false;
+            if (cell.value !== "risk") return false;
+            return !cell.value.includes("degerlendirme") && !cell.value.includes("tanimi") && !cell.value.includes("degeri");
+          })
+          .sort((a, b) => (a.row - b.row) || (a.col - b.col))[0] ||
+        findHeaderCell(["risk"], { afterCol: hazardHeader?.col, beforeCol: existingControlsHeader?.col });
 
       if (!departmentHeader || !hazardHeader || !riskHeader) {
         throw new Error("Excel şablonunda başlık satırı bulunamadı. Tehlike, Risk ve Faaliyet sütunları gerekli.");
@@ -4357,11 +4412,18 @@ const exportToPDFAndShare = async () => {
                       </div>
                     ) : (
                       riskTemplates.map((template) => (
-                        <button
+                        <div
                           key={template.id}
-                          type="button"
                           onClick={() => setSelectedTemplateId(template.id)}
-                          className={`w-full rounded-2xl border p-4 text-left transition ${
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              setSelectedTemplateId(template.id);
+                            }
+                          }}
+                          className={`w-full cursor-pointer rounded-2xl border p-4 text-left transition ${
                             selectedTemplateId === template.id
                               ? "border-cyan-400/40 bg-cyan-500/10"
                               : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
@@ -4374,11 +4436,26 @@ const exportToPDFAndShare = async () => {
                                 {template.sector || "Genel"} · {template.method === "l_matrix" ? "L5 (L-MATRİS)" : "FK (FINE-KINNEY)"}
                               </p>
                             </div>
-                            <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
-                              {(template.payload?.items || []).length} madde
-                            </Badge>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
+                                {(template.payload?.items || []).length} madde
+                              </Badge>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 text-red-200 hover:bg-red-500/10 hover:text-red-100"
+                                title="Şablonu sil"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void deleteRiskTemplate(template);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       ))
                     )}
                   </div>
