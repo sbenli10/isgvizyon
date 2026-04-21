@@ -791,7 +791,45 @@ useLayoutEffect(() => {
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheetName = workbook.SheetNames[0];
+      const normalizeHeader = (value: unknown) =>
+        String(value || "")
+          .toLocaleLowerCase("tr-TR")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+
+      const findRiskSheetName = () => {
+        for (const candidateSheetName of workbook.SheetNames) {
+          const candidateWorksheet = workbook.Sheets[candidateSheetName];
+          if (!candidateWorksheet?.["!ref"]) continue;
+
+          const candidateRange = XLSX.utils.decode_range(candidateWorksheet["!ref"]);
+          const values: string[] = [];
+
+          for (let rowIndex = candidateRange.s.r; rowIndex <= Math.min(candidateRange.e.r, 80); rowIndex += 1) {
+            for (let colIndex = candidateRange.s.c; colIndex <= Math.min(candidateRange.e.c, 60); colIndex += 1) {
+              const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
+              const cell = candidateWorksheet[cellAddress];
+              if (!cell?.v) continue;
+              const normalizedValue = normalizeHeader(cell.v);
+              if (normalizedValue) values.push(normalizedValue);
+            }
+          }
+
+          const hasDepartment = values.some((value) => value === "faaliyet" || value.includes("faaliyet"));
+          const hasHazard = values.some((value) => value === "tehlike" || value.includes("tehlike"));
+          const hasRisk = values.some((value) => value === "risk" || value.includes("risk"));
+
+          if (hasDepartment && hasHazard && hasRisk) {
+            return candidateSheetName;
+          }
+        }
+
+        return workbook.SheetNames[0];
+      };
+
+      const sheetName = findRiskSheetName();
       const worksheet = workbook.Sheets[sheetName];
 
       if (!worksheet) {
@@ -803,14 +841,6 @@ useLayoutEffect(() => {
         defval: "",
         raw: false,
       });
-
-      const normalizeHeader = (value: unknown) =>
-        String(value || "")
-          .toLocaleLowerCase("tr-TR")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, " ")
-          .trim();
 
       const hasHeaderToken = (cell: string, aliases: readonly string[]) =>
         aliases.some((alias) => {
