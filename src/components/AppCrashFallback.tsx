@@ -12,10 +12,7 @@ export function AppCrashFallback() {
         <p className="mt-3 text-sm leading-6 text-slate-400">
           Uygulama boş ekranda kalmasın diye kurtarma ekranı gösteriyoruz. Tek dokunuşla sayfayı yeniden yükleyebilirsiniz.
         </p>
-        <Button
-          className="mt-5 w-full gap-2"
-          onClick={() => window.location.reload()}
-        >
+        <Button className="mt-5 w-full gap-2" onClick={() => window.location.reload()}>
           <RefreshCcw className="h-4 w-4" />
           Sayfayı yeniden yükle
         </Button>

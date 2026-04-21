@@ -179,6 +179,74 @@ interface RiskAssessmentTemplateRecord {
 
 const getTodayIsoDate = () => new Date().toISOString().split("T")[0];
 
+const normalizeTemplateText = (value: unknown) =>
+  String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const formatDateAsIso = (date: Date) => {
+  if (Number.isNaN(date.getTime())) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeRiskDate = (value: unknown, fallback: string | null = null) => {
+  if (value === null || value === undefined) return fallback;
+
+  if (value instanceof Date) {
+    return formatDateAsIso(value) || fallback;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    const excelDate = new Date(Date.UTC(1899, 11, 30 + Math.floor(value)));
+    return formatDateAsIso(excelDate) || fallback;
+  }
+
+  const rawValue = String(value).trim();
+  if (!rawValue || rawValue === "-" || rawValue === "—") return fallback;
+
+  const normalizedValue = normalizeTemplateText(rawValue);
+  const headerLikeValues = new Set([
+    "tarih",
+    "riskin tespit tarihi",
+    "termin",
+    "termin suresi",
+    "gerceklesme tarihi",
+    "gerceklesen faaliyetler",
+  ]);
+
+  if (headerLikeValues.has(normalizedValue) || normalizedValue.includes("gerceklesme tarihi")) {
+    return fallback;
+  }
+
+  const isoMatch = rawValue.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return formatDateAsIso(date) || fallback;
+  }
+
+  const trDateMatch = rawValue.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (trDateMatch) {
+    const [, day, month, yearValue] = trDateMatch;
+    const year = yearValue.length === 2 ? `20${yearValue}` : yearValue;
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    return formatDateAsIso(date) || fallback;
+  }
+
+  if (/[a-zçğıöşü]/i.test(rawValue)) {
+    return fallback;
+  }
+
+  const parsedDate = new Date(rawValue);
+  return formatDateAsIso(parsedDate) || fallback;
+};
+
 const ensureMinimumCount = <T,>(items: T[], minCount: number, factory: (index: number) => T) => {
   const nextItems = [...items];
   while (nextItems.length < minCount) {
@@ -363,14 +431,26 @@ export default function RiskAssessmentEditor() {
         score_2: item.score_2,
         risk_class_2: item.risk_class_2,
         responsible_person: item.responsible_person,
-        deadline: item.deadline,
+        deadline: normalizeRiskDate(item.deadline, getTodayIsoDate()),
         status: item.status,
-        completion_date: item.completion_date,
+        completion_date: normalizeRiskDate(item.completion_date, null),
         completed_activity: item.completed_activity,
       })),
     }),
     [assessment, currentAssessmentMethod, riskItems]
   );
+  const selectedRiskTemplate = useMemo(
+    () => riskTemplates.find((template) => template.id === selectedTemplateId) || null,
+    [riskTemplates, selectedTemplateId],
+  );
+  const canSaveRiskTemplate = Boolean(templateName.trim()) && (riskItems.length > 0 || Boolean(selectedRiskTemplate));
+  const riskTemplateSaveHint = !templateName.trim()
+    ? "Şablon adı girin."
+    : riskItems.length > 0
+      ? "Mevcut tablodaki risk maddeleri yeni şablon olarak kaydedilecek."
+      : selectedRiskTemplate
+        ? "Seçili kayıtlı şablon yeni adla kopyalanacak."
+        : "Kaydetmek için önce tabloya risk maddesi ekleyin veya sağdan bir şablon seçin.";
   const selectedSectorDistribution = useMemo(() => {
     const bucket = { critical: 0, high: 0, monitored: 0 };
     selectedSectorRiskPreview.forEach((risk) => {
@@ -683,15 +763,31 @@ useLayoutEffect(() => {
       return;
     }
 
+    if (riskItems.length === 0 && !selectedRiskTemplate) {
+      toast.error("Kaydedilecek şablon içeriği yok", {
+        description: "Önce tabloya risk maddesi ekleyin, Excel içe aktarın veya sağdan kayıtlı bir şablon seçin.",
+      });
+      return;
+    }
+
+    const payloadToSave = riskItems.length > 0
+      ? templatePayload
+      : selectedRiskTemplate?.payload;
+
+    if (!payloadToSave?.items?.length) {
+      toast.error("Kaydedilecek risk maddesi bulunamadı");
+      return;
+    }
+
     setTemplateSaving(true);
     try {
       const { error } = await supabase.from("risk_assessment_templates").insert({
         org_id: profile.organization_id,
         user_id: user.id,
         name: templateName.trim(),
-        sector: assessment?.sector || selectedSectorOption?.name || null,
-        method: currentAssessmentMethod,
-        payload: templatePayload,
+        sector: assessment?.sector || selectedSectorOption?.name || selectedRiskTemplate?.sector || payloadToSave.assessment?.sector || null,
+        method: currentAssessmentMethod || selectedRiskTemplate?.method || payloadToSave.assessment?.method || "fine_kinney",
+        payload: payloadToSave,
       } as any);
 
       if (error) throw error;
@@ -747,9 +843,9 @@ useLayoutEffect(() => {
         score_2: item.score_2 ?? 1,
         risk_class_2: item.risk_class_2 ?? "Kabul Edilebilir",
         responsible_person: item.responsible_person || "",
-        deadline: item.deadline || today,
+        deadline: normalizeRiskDate(item.deadline, today) || today,
         status: item.status || "open",
-        completion_date: item.completion_date || null,
+        completion_date: normalizeRiskDate(item.completion_date, null),
         completed_activity: item.completed_activity || "",
         is_from_library: false,
         sort_order: index,
@@ -791,13 +887,7 @@ useLayoutEffect(() => {
     try {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const normalizeHeader = (value: unknown) =>
-        String(value || "")
-          .toLocaleLowerCase("tr-TR")
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, " ")
-          .trim();
+      const normalizeHeader = normalizeTemplateText;
 
       const findRiskSheetName = () => {
         for (const candidateSheetName of workbook.SheetNames) {
@@ -1020,9 +1110,9 @@ useLayoutEffect(() => {
           score_2: score2,
           risk_class_2: getRiskClass(score2),
           responsible_person: String(findValue(row, "responsible_person")).trim(),
-          deadline: String(findValue(row, "deadline")).trim() || getTodayIsoDate(),
+          deadline: normalizeRiskDate(findValue(row, "deadline"), getTodayIsoDate()) || getTodayIsoDate(),
           status: parseStatus(findValue(row, "status")),
-          completion_date: String(findValue(row, "completion_date")).trim(),
+          completion_date: normalizeRiskDate(findValue(row, "completion_date"), null) || undefined,
           completed_activity: String(findValue(row, "completed_activity")).trim(),
         } satisfies Partial<RiskItem>;
         return [item];
@@ -4222,11 +4312,11 @@ const exportToPDFAndShare = async () => {
                   <Button
                     type="button"
                     onClick={() => void saveCurrentAsTemplate()}
-                    disabled={templateSaving || !assessment || riskItems.length === 0}
+                    disabled={templateSaving || !canSaveRiskTemplate}
                     className="gap-2"
                   >
                     <Save className="h-4 w-4" />
-                    Şablonu Kaydet
+                    {selectedRiskTemplate && riskItems.length === 0 ? "Seçili Şablonu Kopyala" : "Şablonu Kaydet"}
                   </Button>
                   <Button
                     type="button"
@@ -4252,7 +4342,8 @@ const exportToPDFAndShare = async () => {
                   />
                 </div>
                 <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-3 text-sm text-amber-100">
-                  İçe aktarılacak dosya Excel formatında olmalı. Sistem ilk sayfadaki sütun başlıklarını okuyup şablona çevirir ve organizasyon içinde saklar.
+                  İçe aktarılacak dosya Excel formatında olmalı. Sistem risk tablosunun olduğu sayfayı bulup sütun başlıklarını okuyarak şablona çevirir ve organizasyon içinde saklar.
+                  <span className="mt-2 block text-xs text-amber-50/80">{riskTemplateSaveHint}</span>
                 </div>
               </div>
 

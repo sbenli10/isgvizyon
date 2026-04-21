@@ -15,6 +15,9 @@ export const initSentry = () => {
     tracesSampleRate: 0.1,
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
+    ignoreErrors: [
+      "Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.",
+    ],
   });
 };
 

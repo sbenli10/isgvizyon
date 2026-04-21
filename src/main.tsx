@@ -4,7 +4,9 @@ import App from "./App.tsx";
 import "./index.css";
 import { initSentry, sentryEnabled, Sentry } from "@/lib/sentry";
 import { AppCrashFallback } from "@/components/AppCrashFallback";
+import { installDomMutationGuards } from "@/lib/domMutationGuards";
 
+installDomMutationGuards();
 initSentry();
 
 const root = createRoot(document.getElementById("root")!);
