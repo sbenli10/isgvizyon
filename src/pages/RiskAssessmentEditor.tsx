@@ -255,6 +255,132 @@ const ensureMinimumCount = <T,>(items: T[], minCount: number, factory: (index: n
   return nextItems;
 };
 
+const normalizeRiskNarrativeText = (value?: string | null) =>
+  (value || "")
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const hasAnyRiskKeyword = (text: string, keywords: string[]) =>
+  keywords.some((keyword) => text.includes(normalizeRiskNarrativeText(keyword)));
+
+const isLikelyConsequenceText = (value?: string | null) => {
+  const text = normalizeRiskNarrativeText(value);
+  if (!text) return false;
+  return hasAnyRiskKeyword(text, [
+    "yaralanma",
+    "olum",
+    "yanik",
+    "carpma",
+    "ezilme",
+    "dusme",
+    "kesik",
+    "uzuv",
+    "zehirlenme",
+    "tahris",
+    "hastalik",
+    "enfeksiyon",
+    "hasar",
+    "travma",
+    "isitme kaybi",
+    "solunum",
+    "yangin",
+    "patlama",
+    "panik",
+    "stres",
+    "kontaminasyon",
+  ]);
+};
+
+const buildRiskNarratives = (input: {
+  sector?: string | null;
+  category?: string | null;
+  hazard?: string | null;
+  risk?: string | null;
+  controls?: string[] | null;
+}) => {
+  const searchableText = normalizeRiskNarrativeText([
+    input.sector,
+    input.category,
+    input.hazard,
+    input.risk,
+    ...(input.controls || []),
+  ].filter(Boolean).join(" "));
+  const area = input.category || input.sector || "ilgili çalışma alanı";
+  const hazard = input.hazard || "belirlenen tehlike";
+  const explicitConsequence = (input.controls || []).find(isLikelyConsequenceText);
+
+  let existingControls =
+    `${area} kapsamında ${hazard} için mevcut saha kontrollerinin düzenli kayıt altına alınmadığı, uygulamanın vardiya ve kişi bazında değişkenlik gösterebildiği değerlendirildi.`;
+  let affectedPeople =
+    explicitConsequence ||
+    "Çalışanlarda yaralanma, sağlık kaybı, ekipman hasarı veya operasyon kesintisi meydana gelebilir.";
+
+  if (hasAnyRiskKeyword(searchableText, ["elektrik", "pano", "kablo", "priz", "akim"])) {
+    existingControls =
+      "Elektrik tesisatı ve ekipman erişimi için kilitleme, yetkilendirme ve periyodik kontrol kayıtlarının sahada tam standardize edilmediği değerlendirildi.";
+    affectedPeople = explicitConsequence || "Elektrik çarpması, yanık, yangın, ekipman hasarı veya ölüm riski oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["yangin", "patlama", "parlama", "yanici", "solvent", "gaz", "akaryakit"])) {
+    existingControls =
+      "Yanıcı/parlayıcı kaynaklara yönelik depolama, ateşli çalışma izni, algılama-söndürme ve acil müdahale kontrollerinin düzenli doğrulanmadığı görüldü.";
+    affectedPeople = explicitConsequence || "Yangın, patlama, duman maruziyeti, yanık, can kaybı ve ciddi maddi hasar meydana gelebilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["kimyasal", "asit", "baz", "boya", "tiner", "pestisit", "reaktif", "gbf"])) {
+    existingControls =
+      "Kimyasal kullanımında etiketleme, güvenlik bilgi formu, uygun KKD ve depolama ayrımı kontrollerinin tüm alanlarda aynı disiplinle uygulanmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Cilt ve göz tahrişi, kimyasal yanık, zehirlenme veya solunum yolu etkilenmesi oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["yuksekten", "iskele", "cati", "merdiven", "dusme", "kenar", "korkuluk"])) {
+    existingControls =
+      "Yüksekte çalışma alanlarında korkuluk, yaşam hattı, merdiven uygunluğu ve emniyet ekipmanı kontrollerinin sürekli doğrulanmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Yüksekten düşme sonucu kırık, ağır yaralanma, kalıcı sakatlık veya ölüm meydana gelebilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["forklift", "vinc", "arac", "trafik", "sevkiyat", "yaya", "operator"])) {
+    existingControls =
+      "Araç-yaya ayrımı, hız sınırı, operatör yetkilendirme ve yönlendirme işaretlerinin saha genelinde yeterince görünür ve sürdürülebilir olmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Çarpma, sıkışma, ezilme, malzeme düşmesi, ağır yaralanma veya ölüm oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["makine", "pres", "testere", "torna", "taslama", "kayis", "kasnak", "kalip", "el aleti"])) {
+    existingControls =
+      "Makine koruyucuları, bakım öncesi enerji kesme, arızalı ekipman ayrımı ve operatör kontrol listelerinin düzenli uygulanmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Sıkışma, ezilme, kesilme, uzuv kaybı, göz yaralanması veya ciddi travma meydana gelebilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["kaynak", "duman", "toz", "silika", "elyaf", "ahsap tozu", "havalandirma"])) {
+    existingControls =
+      "Toz/duman oluşan alanlarda lokal emiş, genel havalandırma, maruziyet ölçümü ve solunum koruyucu kullanım takibinin yeterince düzenli olmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Solunum yolu irritasyonu, mesleki akciğer hastalığı, göz tahrişi veya kronik maruziyet etkileri oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["gurultu", "ses", "headset", "isitme"])) {
+    existingControls =
+      "Gürültü kaynakları için ölçüm, mühendislik kontrolü, kulak koruyucu seçimi ve kullanım denetiminin düzenli kayıt altına alınmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Geçici veya kalıcı işitme kaybı, stres, dikkat dağınıklığı ve iletişim kaynaklı kaza riski oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["ergonomi", "manuel tasima", "ekran", "sandalye", "masa", "tekrarli", "hasta transferi"])) {
+    existingControls =
+      "Ergonomik düzenleme, yardımcı ekipman kullanımı, mola planı ve çalışan bilgilendirmesinin iş akışına yeterince yerleşmediği değerlendirildi.";
+    affectedPeople = explicitConsequence || "Kas-iskelet sistemi rahatsızlıkları, bel-boyun ağrısı, zorlanma ve iş gücü kaybı oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["kaygan", "islak", "zemin", "duzensiz", "housekeeping", "granul", "sızıntı", "sizinti"])) {
+    existingControls =
+      "Zemin kontrolü, temizlik sıklığı, döküntüye hızlı müdahale ve uyarı levhası uygulamalarının her vardiyada aynı seviyede yürütülmediği değerlendirildi.";
+    affectedPeople = explicitConsequence || "Kayma, takılma, düşme, burkulma, kırık veya ekipman hasarı meydana gelebilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["biyolojik", "hijyen", "numune", "atik", "enjektor", "kesici-delici", "gida", "kontaminasyon"])) {
+    existingControls =
+      "Hijyen, atık ayrıştırma, kesici-delici ekipman yönetimi ve biyolojik maruziyet önlemlerinin düzenli kontrol edilmediği değerlendirildi.";
+    affectedPeople = explicitConsequence || "Enfeksiyon, kontaminasyon, bulaşıcı hastalık riski veya sağlık kaybı oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["sicak", "buhar", "firin", "kazan", "soguk", "termal"])) {
+    existingControls =
+      "Sıcak/soğuk yüzey ve ortamlar için izolasyon, uyarı levhası, uygun KKD ve maruziyet süresi kontrollerinin yeterince izlenmediği değerlendirildi.";
+    affectedPeople = explicitConsequence || "Yanık, haşlanma, hipotermi, donma veya termal stres kaynaklı sağlık etkileri oluşabilir.";
+  } else if (hasAnyRiskKeyword(searchableText, ["acil", "tahliye", "tatbikat", "yangin dolabi", "levha"])) {
+    existingControls =
+      "Acil durum planı, ekip görevlendirmesi, kaçış yönlendirmesi ve tatbikat kayıtlarının güncelliğinin düzenli doğrulanmadığı değerlendirildi.";
+    affectedPeople = explicitConsequence || "Tahliye gecikmesi, panik, dumana maruziyet, yaralanma veya can kaybı riski oluşabilir.";
+  }
+
+  return { existingControls, affectedPeople };
+};
+
+const splitSuggestedControls = (controls?: string[] | null) => {
+  const safeControls = (controls || []).filter((control) => control && control.trim().length > 0);
+  if (safeControls.length > 1 && isLikelyConsequenceText(safeControls[0])) {
+    return safeControls.slice(1);
+  }
+  return safeControls;
+};
+
 const COMMON_TEMPLATE_RISKS = [
   {
     hazard: "Acil Durum Hazırlığı",
@@ -671,7 +797,7 @@ useLayoutEffect(() => {
           return itemSector.includes(sectorName) || itemSector === sectorName;
         });
 
-        const fallbackItems = generateMockRisksForSector(sectorDef.name).map((item, index) => ({
+      const fallbackItems = generateMockRisksForSector(sectorDef.name).map((item, index) => ({
           id: `${sectorDef.code}-${index + 1}`,
           sector: sectorDef.name,
           category: item.category,
@@ -680,7 +806,7 @@ useLayoutEffect(() => {
           typical_probability: item.probability,
           typical_frequency: item.frequency,
           typical_severity: item.severity,
-          suggested_controls: item.controls,
+          suggested_controls: splitSuggestedControls(item.controls),
           legal_reference: undefined,
           usage_count: 0,
           is_active: true,
@@ -1238,15 +1364,27 @@ useLayoutEffect(() => {
       if (error) throw error;
 
       // Gelen veriyi RiskItem tipine uygun hale getiriyoruz
-      const mappedData = (data || []).map((item: any) => ({
-        ...item,
-        // Eğer veritabanında bu sütunlar henüz yoksa varsayılan değer atıyoruz
-        probability_1: item.probability_1 ?? item.probability ?? 3,
-        frequency_1: item.frequency_1 ?? item.frequency ?? 3,
-        severity_1: item.severity_1 ?? item.severity ?? 3,
-        score_1: item.score_1 ?? item.score ?? 27,
-        risk_class_1: item.risk_class_1 ?? item.risk_class ?? "Kabul Edilebilir"
-      })) as RiskItem[];
+      const mappedData = (data || []).map((item: any) => {
+        const narratives = buildRiskNarratives({
+          sector: assessment?.sector,
+          category: item.department || item.library_category,
+          hazard: item.hazard,
+          risk: item.risk,
+          controls: item.proposed_controls ? [item.proposed_controls] : [],
+        });
+
+        return {
+          ...item,
+          // Eğer veritabanında bu sütunlar henüz yoksa varsayılan değer atıyoruz
+          affected_people: item.affected_people || narratives.affectedPeople,
+          existing_controls: item.existing_controls || narratives.existingControls,
+          probability_1: item.probability_1 ?? item.probability ?? 3,
+          frequency_1: item.frequency_1 ?? item.frequency ?? 3,
+          severity_1: item.severity_1 ?? item.severity ?? 3,
+          score_1: item.score_1 ?? item.score ?? 27,
+          risk_class_1: item.risk_class_1 ?? item.risk_class ?? "Kabul Edilebilir"
+        };
+      }) as RiskItem[];
 
       console.log(`Fetched ${mappedData.length} risk items`);
       setRiskItems(mappedData);
@@ -1855,20 +1993,28 @@ useLayoutEffect(() => {
 
     try {
         const today = getTodayIsoDate();
-        const newItems: Partial<RiskItem>[] = selectedRisks.map((r, idx) => ({
+        const newItems: Partial<RiskItem>[] = selectedRisks.map((r, idx) => {
+        const narratives = buildRiskNarratives({
+          sector: selectedSectorOption?.name || aiSector || assessment.sector,
+          category: r.category,
+          hazard: r.hazard,
+          risk: r.risk,
+          controls: r.controls,
+        });
+        return ({
         assessment_id: assessment.id,
         item_number: riskItems.length + idx + 1,
         department: r.category,
         hazard: r.hazard,
         risk: r.risk,
-        affected_people: "",
-        existing_controls: "",
+        affected_people: narratives.affectedPeople,
+        existing_controls: narratives.existingControls,
         probability_1: r.probability,
         frequency_1: r.frequency,
         severity_1: r.severity,
         score_1: r.score,
         risk_class_1: r.riskClass,
-        proposed_controls: r.controls.join('; '),
+        proposed_controls: splitSuggestedControls(r.controls).join('; '),
         probability_2: 1,
         frequency_2: 1,
         severity_2: 1,
@@ -1880,7 +2026,8 @@ useLayoutEffect(() => {
         status: 'open',
         completed_activity: "",
         sort_order: riskItems.length + idx
-        }));
+        });
+      });
 
         const { data, error } = await supabase
         .from("risk_items")
@@ -2054,20 +2201,28 @@ useLayoutEffect(() => {
 
     try {
       const today = getTodayIsoDate();
-      const newItems: Partial<RiskItem>[] = pkg.items.map((item, idx) => ({
+      const newItems: Partial<RiskItem>[] = pkg.items.map((item, idx) => {
+        const narratives = buildRiskNarratives({
+          sector: pkg.name,
+          category: item.category || item.sector,
+          hazard: item.hazard,
+          risk: item.risk,
+          controls: item.suggested_controls,
+        });
+        return ({
         assessment_id: assessment.id,
         item_number: riskItems.length + idx + 1,
         department: pkg.name,
         hazard: item.hazard,
         risk: item.risk,
-        affected_people: "",
-        existing_controls: "",
+        affected_people: narratives.affectedPeople,
+        existing_controls: narratives.existingControls,
         probability_1: item.typical_probability,
         frequency_1: item.typical_frequency,
         severity_1: item.typical_severity,
         score_1: calculateRiskScore(item.typical_probability, item.typical_frequency, item.typical_severity),
         risk_class_1: getRiskClass(calculateRiskScore(item.typical_probability, item.typical_frequency, item.typical_severity)),
-        proposed_controls: item.suggested_controls.join('; '),
+        proposed_controls: splitSuggestedControls(item.suggested_controls).join('; '),
         probability_2: 0.5,
         frequency_2: 1,
         severity_2: 1,
@@ -2080,7 +2235,8 @@ useLayoutEffect(() => {
         status: 'open',
         completed_activity: "",
         sort_order: riskItems.length + idx
-      }));
+      });
+    });
 
       const { data, error } = await supabase
         .from("risk_items")
@@ -3715,10 +3871,100 @@ const exportToPDFAndShare = async () => {
   // EXCEL EXPORT
   // ========================
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (riskItems.length === 0) {
       toast.error("Dışa aktarılacak risk yok");
       return;
+    }
+
+    const formatExcelTemplateDate = (value?: string | null) => {
+      if (!value) return "";
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return value;
+      return format(parsed, "dd.MM.yyyy", { locale: tr });
+    };
+
+    const setTemplateCell = (ws: XLSX.WorkSheet, address: string, value: string | number) => {
+      const existingCell = ws[address] || {};
+      ws[address] = {
+        ...existingCell,
+        t: typeof value === "number" ? "n" : "s",
+        v: value,
+      };
+    };
+
+    try {
+      const templateResponse = await fetch("/templates/risk-assessment-template.xls");
+      if (!templateResponse.ok) {
+        throw new Error("Gömülü risk analizi Excel şablonu okunamadı.");
+      }
+
+      const workbook = XLSX.read(await templateResponse.arrayBuffer(), {
+        type: "array",
+        cellDates: true,
+        cellStyles: true,
+      });
+      const worksheet = workbook.Sheets["Risk Analizi ve Aksiyon Planı"];
+
+      if (!worksheet) {
+        throw new Error("Excel şablonunda 'Risk Analizi ve Aksiyon Planı' sayfası bulunamadı.");
+      }
+
+      const company = companies.find((c) => c.id === assessment?.company_id);
+      const companyRecord = company as any;
+      const assessmentDate = assessment?.assessment_date || getTodayIsoDate();
+
+      setTemplateCell(worksheet, "C3", `${company?.name || "FİRMA"} RİSK ANALİZİ VE DEĞERLENDİRMESİ`);
+      setTemplateCell(worksheet, "D5", companyRecord?.sgk_registration_no || companyRecord?.sgk_sicil_no || companyRecord?.sgkNo || "");
+      setTemplateCell(worksheet, "M5", companyRecord?.hazard_class || companyRecord?.danger_class || companyRecord?.tehlike_sinifi || assessment?.sector || "");
+      setTemplateCell(worksheet, "G6", formatExcelTemplateDate(assessmentDate));
+      setTemplateCell(worksheet, "K6", assessment?.next_review_date ? formatExcelTemplateDate(assessment.next_review_date) : "");
+
+      for (let rowIndex = 9; rowIndex <= 386; rowIndex += 1) {
+        for (let colIndex = 0; colIndex <= 21; colIndex += 1) {
+          delete worksheet[XLSX.utils.encode_cell({ r: rowIndex, c: colIndex })];
+        }
+      }
+
+      const rows = riskItems.map((item, index) => [
+        index + 1,
+        item.department || "",
+        item.hazard || "",
+        item.risk || "",
+        item.existing_controls || "",
+        formatExcelTemplateDate(assessmentDate),
+        item.probability_1 ?? "",
+        item.frequency_1 ?? "",
+        item.severity_1 ?? "",
+        item.score_1 ?? "",
+        item.risk_class_1 || "",
+        item.affected_people || "",
+        item.proposed_controls || "",
+        item.probability_2 ?? "",
+        item.frequency_2 ?? "",
+        item.severity_2 ?? "",
+        item.score_2 ?? "",
+        item.risk_class_2 || "",
+        item.deadline ? formatExcelTemplateDate(item.deadline) : "",
+        item.responsible_person || "",
+        item.completion_date ? formatExcelTemplateDate(item.completion_date) : "",
+        item.completed_activity || "",
+      ]);
+
+      XLSX.utils.sheet_add_aoa(worksheet, rows, { origin: "A10" });
+      const finalRow = Math.max(386, 9 + rows.length);
+      worksheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: finalRow, c: 21 } });
+
+      const fileName = `Risk-Analizi-Sablonlu-${format(new Date(), "yyyy-MM-dd-HHmmss")}.xlsx`;
+      XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
+
+      toast.success("Şablonlu Excel dosyası indirildi", {
+        description: fileName,
+      });
+      return;
+    } catch (templateError) {
+      console.warn("Template Excel export failed, falling back to generated workbook:", templateError);
+      toast.warning("Hazır şablon okunamadı, standart Excel çıktısı hazırlanıyor.");
     }
 
     try {
