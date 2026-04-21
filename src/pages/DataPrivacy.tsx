@@ -370,8 +370,8 @@ export default function DataPrivacy() {
           <CardContent className="p-6 text-center">
             <p className="text-sm text-muted-foreground">
               Taleplerinizle ilgili sorularınız için{" "}
-              <a href="mailto:kvkk@denetron.com" className="text-primary hover:underline">
-                kvkk@denetron.com
+              <a href="mailto:kvkk@isgvizyon.com" className="text-primary hover:underline">
+                kvkk@isgvizyon.com
               </a>{" "}
               adresine e-posta gönderebilirsiniz.
             </p>

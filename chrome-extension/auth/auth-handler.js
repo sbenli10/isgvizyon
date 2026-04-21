@@ -5,7 +5,7 @@
 export class AuthHandler {
   constructor() {
     this.supabaseUrl = null;
-    this.webAppUrl = 'https://www.denetron.me';
+    this.webAppUrl = 'https://www.isgvizyon.com';
     this.storageKey = 'denetron_auth';
   }
 

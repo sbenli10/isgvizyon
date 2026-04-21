@@ -1,18 +1,9 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { isChunkLoadError } from "@/lib/appRecovery";
 
 type ModuleLoader<T extends ComponentType<any>> = () => Promise<{ default: T }>;
 
 const RETRY_PREFIX = "lazy-retry:";
-
-const isChunkLoadError = (error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  return (
-    message.includes("Failed to fetch dynamically imported module") ||
-    message.includes("Importing a module script failed") ||
-    message.includes("ChunkLoadError") ||
-    message.includes("error loading dynamically imported module")
-  );
-};
 
 export function lazyWithRetry<T extends ComponentType<any>>(
   key: string,

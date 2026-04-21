@@ -84,7 +84,7 @@ export function SendReportModal({
           report_url: reportUrl,
           report_filename: reportFilename,
           sender_name: senderName,
-          sender_email: user?.email || "noreply@denetron.app",
+          sender_email: user?.email || "noreply@isgvizyon.com",
           custom_message: formData.customMessage,
           org_id: organizationId,
           user_id: user?.id,

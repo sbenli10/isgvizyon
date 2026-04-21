@@ -14,8 +14,8 @@
   "host_permissions": [
     "https://isgkatip.csgb.gov.tr/*",
     "https://elmdzekyyoepdrpnfppn.supabase.co/*",
-    "https://www.denetron.me/*",
-    "https://denetron.me/*"
+    "https://www.isgvizyon.com/*",
+    "https://isgvizyon.com/*"
   ],
   
   "content_scripts": [
@@ -29,8 +29,8 @@
     },
     {
       "matches": [
-        "https://www.denetron.me/*",
-        "https://denetron.me/*"
+        "https://www.isgvizyon.com/*",
+        "https://isgvizyon.com/*"
       ],
       "js": ["content-scripts/auth-listener.js"],
       "run_at": "document_start"

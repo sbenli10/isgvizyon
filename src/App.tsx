@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
@@ -31,6 +31,7 @@ import ISGBotDeleted from "./pages/ISGBotDeleted";
 import EmailHistory from "@/pages/EmailHistory";
 import { useAuth } from "@/contexts/AuthContext";
 import CookieConsent from "@/components/CookieConsent";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 // ============================================
 // CORE PAGES
@@ -191,11 +192,13 @@ const PageLoader = () => (
 
 const ProtectedShell = () => {
   const { session, loading } = useAuth();
+  const location = useLocation();
 
   return (
     <ProtectedRoute>
       <RouteWarmup enabled={!loading && !!session} tasks={routeWarmupTasks} />
       <AppLayout>
+        <RouteErrorBoundary routeKey={`${location.pathname}${location.search}`}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ============================================ */}
@@ -337,6 +340,7 @@ const ProtectedShell = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        </RouteErrorBoundary>
       </AppLayout>
     </ProtectedRoute>
   );

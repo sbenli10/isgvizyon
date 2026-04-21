@@ -4,7 +4,7 @@
 Frontend: **React + TypeScript + Vite** — Backend: **Supabase (PostgreSQL + Edge Functions)**.  
 Ayrıca **Google Gemini (Generative AI)** entegrasyonu ve **Chrome eklentisi** içerir.
 
-**Canlı URL:** https://isgvizyon.vercel.app
+**Canlı URL:** https://www.isgvizyon.com
 
 ---
 
@@ -201,7 +201,7 @@ Repo Vercel ile uyumludur:
 3. Build komutu: `npm run build`
 4. Vercel dashboard üzerinden `.env` değişkenlerini ekle
 
-Canlı URL: https://isgvizyon.vercel.app
+Canlı URL: https://www.isgvizyon.com
 
 ---
 

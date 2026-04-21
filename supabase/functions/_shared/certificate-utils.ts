@@ -1,8 +1,8 @@
 ﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8";
 
 const ALLOWED_ORIGINS = [
-  "https://denetron.com",
-  "https://www.denetron.com",
+  "https://isgvizyon.com",
+  "https://www.isgvizyon.com",
   "https://elmdzekyyoepdrpnfppn.supabase.co",
   Deno.env.get("PUBLIC_APP_URL"),
   Deno.env.get("SITE_URL"),

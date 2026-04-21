@@ -12,7 +12,7 @@ const sections = [
     content: `Denetron İSG Platformu ("Platform") veri sorumlusu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verilerinizi aşağıda açıklanan şekilde işlemektedir.
 
 İletişim:
-• E-posta: kvkk@denetron.com
+• E-posta: kvkk@isgvizyon.com
 • Adres: Platform üzerinden bildirilebilir`,
   },
   {
@@ -82,7 +82,7 @@ T.C. kimlik numarası KVKK Madde 6 kapsamında "özel nitelikli kişisel veri" o
 • İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle kişinin kendisi aleyhine bir sonucun ortaya çıkmasına itiraz etme
 • Verilerin kanuna aykırı olarak işlenmesi sebebiyle zarara uğraması hâlinde zararın giderilmesini talep etme
 
-Bu haklarınızı kullanmak için "Veri Haklarım" sayfasını kullanabilir veya kvkk@denetron.com adresine başvurabilirsiniz.`,
+Bu haklarınızı kullanmak için "Veri Haklarım" sayfasını kullanabilir veya kvkk@isgvizyon.com adresine başvurabilirsiniz.`,
   },
   {
     id: "saklama",

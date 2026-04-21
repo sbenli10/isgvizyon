@@ -156,7 +156,7 @@ class PopupController {
   async checkLocalStorageAuth() {
     try {
       const tabs = await chrome.tabs.query({
-        url: ["https://www.denetron.me/*", "https://denetron.me/*"],
+        url: ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"],
       });
 
       for (const tab of tabs) {
@@ -269,7 +269,7 @@ class PopupController {
       .getElementById("btnOpenDashboard")
       ?.addEventListener("click", () => {
         chrome.tabs.create({
-          url: "https://www.denetron.me/isg-bot",
+          url: "https://www.isgvizyon.com/isg-bot",
         });
       });
 
