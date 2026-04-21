@@ -3877,6 +3877,8 @@ const exportToPDFAndShare = async () => {
       return;
     }
 
+    const XLSX = await import("xlsx-js-style");
+
     const formatExcelTemplateDate = (value?: string | null) => {
       if (!value) return "";
       const parsed = new Date(value);
@@ -3891,6 +3893,148 @@ const exportToPDFAndShare = async () => {
         t: typeof value === "number" ? "n" : "s",
         v: value,
       };
+    };
+
+    const riskScaleRows = [
+      { range: "R < 20", label: "KABUL EDİLEBİLİR RİSK", color: "00B050", textColor: "000000" },
+      { range: "20 ≤ R < 70", label: "OLASI RİSK", color: "00B0F0", textColor: "000000" },
+      { range: "70 ≤ R < 200", label: "ÖNEMLİ RİSK", color: "FFFF00", textColor: "000000" },
+      { range: "200 ≤ R ≤ 400", label: "YÜKSEK RİSK", color: "E46C0A", textColor: "000000" },
+      { range: "R > 400", label: "ÇOK YÜKSEK RİSK", color: "FF0000", textColor: "000000" },
+    ];
+
+    const setStyledCell = (
+      ws: XLSX.WorkSheet,
+      address: string,
+      value: string | number,
+      style?: Record<string, any>
+    ) => {
+      const existingCell = ws[address] || {};
+      ws[address] = {
+        ...existingCell,
+        t: typeof value === "number" ? "n" : "s",
+        v: value,
+        ...(style ? { s: style } : {}),
+      };
+    };
+
+    const appendMerge = (ws: XLSX.WorkSheet, merge: XLSX.Range) => {
+      ws["!merges"] = [...(ws["!merges"] || []), merge];
+    };
+
+    const buildRiskScaleStyle = (fillColor: string, textColor = "000000", fontSize = 16) => ({
+      font: { bold: true, sz: fontSize, color: { rgb: textColor } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      fill: { fgColor: { rgb: fillColor } },
+      border: {
+        top: { style: "thin", color: { rgb: "000000" } },
+        bottom: { style: "thin", color: { rgb: "000000" } },
+        left: { style: "thin", color: { rgb: "000000" } },
+        right: { style: "thin", color: { rgb: "000000" } },
+      },
+    } as any);
+
+    const applyRiskScaleLegend = (workbook: XLSX.WorkBook, mainSheet?: XLSX.WorkSheet) => {
+      const legendData = riskScaleRows.flatMap((row) => [[row.range], [row.label]]);
+      const legendSheet = XLSX.utils.aoa_to_sheet([
+        ["FINE-KINNEY RİSK SINIFLANDIRMA SKALASI"],
+        ...legendData,
+      ]);
+
+      legendSheet["!merges"] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+        ...riskScaleRows.flatMap((_, index) => {
+          const startRow = 1 + index * 2;
+          return [
+            { s: { r: startRow, c: 0 }, e: { r: startRow, c: 3 } },
+            { s: { r: startRow + 1, c: 0 }, e: { r: startRow + 1, c: 3 } },
+          ];
+        }),
+      ];
+      legendSheet["!cols"] = [{ wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+      legendSheet["!rows"] = [
+        { hpt: 30 },
+        ...riskScaleRows.flatMap(() => [{ hpt: 24 }, { hpt: 30 }]),
+      ];
+      setStyledCell(legendSheet, "A1", "FINE-KINNEY RİSK SINIFLANDIRMA SKALASI", {
+        font: { bold: true, sz: 15, color: { rgb: "FFFFFF" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        fill: { fgColor: { rgb: "0F172A" } },
+      });
+      riskScaleRows.forEach((row, index) => {
+        const rangeRow = 2 + index * 2;
+        const labelRow = rangeRow + 1;
+        const style = buildRiskScaleStyle(row.color, row.textColor, 15);
+        setStyledCell(legendSheet, `A${rangeRow}`, row.range, style);
+        setStyledCell(legendSheet, `A${labelRow}`, row.label, style);
+      });
+
+      const existingIndex = workbook.SheetNames.indexOf("Risk Skalası");
+      if (existingIndex >= 0) {
+        workbook.SheetNames.splice(existingIndex, 1);
+      }
+      delete workbook.Sheets["Risk Skalası"];
+      XLSX.utils.book_append_sheet(workbook, legendSheet, "Risk Skalası");
+
+      if (!mainSheet) return;
+
+      const startRow = 1;
+      const startCol = 23; // X sütunu
+      const titleAddress = XLSX.utils.encode_cell({ r: startRow, c: startCol });
+      appendMerge(mainSheet, { s: { r: startRow, c: startCol }, e: { r: startRow, c: startCol + 4 } });
+      setStyledCell(mainSheet, titleAddress, "RİSK SINIFLANDIRMA SKALASI", {
+        font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
+        alignment: { horizontal: "center", vertical: "center" },
+        fill: { fgColor: { rgb: "0F172A" } },
+      });
+
+      riskScaleRows.forEach((row, index) => {
+        const rangeRow = startRow + 1 + index * 2;
+        const labelRow = rangeRow + 1;
+        const style = buildRiskScaleStyle(row.color, row.textColor, 11);
+        appendMerge(mainSheet, { s: { r: rangeRow, c: startCol }, e: { r: rangeRow, c: startCol + 4 } });
+        appendMerge(mainSheet, { s: { r: labelRow, c: startCol }, e: { r: labelRow, c: startCol + 4 } });
+        setStyledCell(mainSheet, XLSX.utils.encode_cell({ r: rangeRow, c: startCol }), row.range, style);
+        setStyledCell(mainSheet, XLSX.utils.encode_cell({ r: labelRow, c: startCol }), row.label, style);
+      });
+    };
+
+    const applyRiskTableLayout = (ws: XLSX.WorkSheet, dataRowCount: number, includeLegendColumns = false) => {
+      ws["!cols"] = [
+        { wch: 6 },   // No
+        { wch: 20 },  // Faaliyet/Bölüm
+        { wch: 30 },  // Tehlike
+        { wch: 34 },  // Risk
+        { wch: 42 },  // Mevcut Durum
+        { wch: 14 },  // Tarih
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 10 },
+        { wch: 18 },
+        { wch: 34 },  // Olası Sonuç
+        { wch: 46 },  // DÖF
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 8 },
+        { wch: 10 },
+        { wch: 18 },
+        { wch: 16 },
+        { wch: 20 },
+        { wch: 16 },
+        { wch: 36 },
+        ...(includeLegendColumns
+          ? [{ wch: 3 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }]
+          : []),
+      ];
+      const existingRows = ws["!rows"] || [];
+      const totalRows = Math.max(existingRows.length, 10 + dataRowCount + 1);
+      ws["!rows"] = Array.from({ length: totalRows }, (_, index) => {
+        if (index <= 8) return existingRows[index] || { hpt: index === 0 ? 28 : 22 };
+        return { hpt: 56 };
+      });
+      ws["!autofilter"] = { ref: `A9:V${Math.max(10, 9 + dataRowCount)}` };
+      (ws as any)["!freeze"] = { xSplit: 2, ySplit: 9 };
     };
 
     try {
@@ -3953,7 +4097,9 @@ const exportToPDFAndShare = async () => {
 
       XLSX.utils.sheet_add_aoa(worksheet, rows, { origin: "A10" });
       const finalRow = Math.max(386, 9 + rows.length);
-      worksheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: finalRow, c: 21 } });
+      applyRiskTableLayout(worksheet, rows.length, true);
+      applyRiskScaleLegend(workbook, worksheet);
+      worksheet["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: finalRow, c: 28 } });
 
       const fileName = `Risk-Analizi-Sablonlu-${format(new Date(), "yyyy-MM-dd-HHmmss")}.xlsx`;
       XLSX.writeFile(workbook, fileName, { bookType: "xlsx" });
@@ -4030,6 +4176,9 @@ const exportToPDFAndShare = async () => {
         { wch: 10 }, { wch: 16 }, { wch: 34 }, { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 16 }, { wch: 18 }, { wch: 14 }, { wch: 28 }
       ];
       ws["!rows"] = [{ hpt: 28 }, { hpt: 22 }, { hpt: 22 }, { hpt: 22 }, { hpt: 20 }];
+      applyRiskTableLayout(ws, exportData.length, true);
+      applyRiskScaleLegend(wb, ws);
+      ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(5 + exportData.length, 14), c: 28 } });
       if (ws["A1"]) {
         ws["A1"].s = {
           font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
