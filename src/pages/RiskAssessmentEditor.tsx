@@ -813,7 +813,10 @@ useLayoutEffect(() => {
           .trim();
 
       const hasHeaderToken = (cell: string, aliases: readonly string[]) =>
-        aliases.some((alias) => cell === alias || cell.includes(alias));
+        aliases.some((alias) => {
+          const normalizedAlias = normalizeHeader(alias);
+          return cell === normalizedAlias || cell.includes(normalizedAlias);
+        });
 
       const aliasMap = {
         department: ["faaliyet", "bolum", "bölüm", "birim", "ortam"],
@@ -850,36 +853,65 @@ useLayoutEffect(() => {
       } as const;
 
       const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
-      const scannedCells: Array<{ row: number; col: number; value: string }> = [];
+      const scannedCells: Array<{ row: number; col: number; value: string; raw: string }> = [];
 
-      for (let rowIndex = range.s.r; rowIndex <= Math.min(range.e.r, 40); rowIndex += 1) {
+      for (let rowIndex = range.s.r; rowIndex <= Math.min(range.e.r, 80); rowIndex += 1) {
         for (let colIndex = range.s.c; colIndex <= Math.min(range.e.c, 60); colIndex += 1) {
           const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: colIndex });
           const cell = worksheet[cellAddress];
           if (!cell?.v) continue;
+          const rawValue = String(cell.v || "").trim();
           const normalizedValue = normalizeHeader(cell.v);
           if (!normalizedValue) continue;
-          scannedCells.push({ row: rowIndex, col: colIndex, value: normalizedValue });
+          scannedCells.push({ row: rowIndex, col: colIndex, value: normalizedValue, raw: rawValue });
         }
       }
 
-      const detectedHeaderRow = [...new Set(scannedCells.map((cell) => cell.row))]
-        .sort((a, b) => a - b)
-        .find((rowIndex) => {
-          const rowCells = scannedCells.filter((cell) => cell.row === rowIndex);
-          return rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.department)) &&
-            rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.hazard)) &&
-            rowCells.some((cell) => hasHeaderToken(cell.value, aliasMap.risk));
-        });
+      const findHeaderCell = (aliases: readonly string[], options?: { afterCol?: number; beforeCol?: number }) => {
+        const matches = scannedCells
+          .filter((cell) => {
+            if (options?.afterCol !== undefined && cell.col <= options.afterCol) return false;
+            if (options?.beforeCol !== undefined && cell.col >= options.beforeCol) return false;
+            return hasHeaderToken(cell.value, aliases);
+          })
+          .map((cell) => {
+            const exactScore = aliases.some((alias) => cell.value === normalizeHeader(alias)) ? 0 : 10;
+            return { ...cell, score: exactScore + cell.row / 100 + cell.col / 1000 };
+          })
+          .sort((a, b) => a.score - b.score);
 
-      if (detectedHeaderRow === undefined) {
+        return matches[0] || null;
+      };
+
+      const departmentHeader = findHeaderCell(aliasMap.department);
+      const hazardHeader = findHeaderCell(aliasMap.hazard, { afterCol: departmentHeader?.col });
+      const riskHeader = findHeaderCell(aliasMap.risk, { afterCol: hazardHeader?.col });
+
+      if (!departmentHeader || !hazardHeader || !riskHeader) {
         throw new Error("Excel şablonunda başlık satırı bulunamadı. Tehlike, Risk ve Faaliyet sütunları gerekli.");
       }
 
-      const headerCells = scannedCells.filter((cell) => cell.row === detectedHeaderRow);
+      const detectedHeaderRow = Math.max(departmentHeader.row, hazardHeader.row, riskHeader.row);
+      const headerSearchRows = new Set<number>([
+        detectedHeaderRow - 2,
+        detectedHeaderRow - 1,
+        detectedHeaderRow,
+        detectedHeaderRow + 1,
+        detectedHeaderRow + 2,
+      ]);
+      const headerCells = scannedCells.filter((cell) => headerSearchRows.has(cell.row));
       const columnMap = Object.fromEntries(
         Object.entries(aliasMap).map(([field, aliases]) => {
-          const match = headerCells.find((cell) => hasHeaderToken(cell.value, aliases));
+          let match = headerCells.find((cell) => hasHeaderToken(cell.value, aliases));
+
+          if (field === "department") match = departmentHeader;
+          if (field === "hazard") match = hazardHeader;
+          if (field === "risk") match = riskHeader;
+
+          if (!match) {
+            match = findHeaderCell(aliases);
+          }
+
           return [field, match?.col ?? -1];
         })
       ) as Record<keyof typeof aliasMap, number>;
@@ -909,7 +941,27 @@ useLayoutEffect(() => {
         return "open";
       };
 
-      const items = dataRows.map((row, index) => {
+      const items = dataRows.flatMap((row, index) => {
+        const rawDepartment = String(findValue(row, "department")).trim();
+        const rawHazard = String(findValue(row, "hazard")).trim();
+        const rawRisk = String(findValue(row, "risk")).trim();
+
+        if (!rawDepartment && !rawHazard && !rawRisk) {
+          return [];
+        }
+
+        const normalizedDepartment = normalizeHeader(rawDepartment);
+        const normalizedHazard = normalizeHeader(rawHazard);
+        const normalizedRisk = normalizeHeader(rawRisk);
+        const isRepeatedHeader =
+          hasHeaderToken(normalizedDepartment, aliasMap.department) ||
+          hasHeaderToken(normalizedHazard, aliasMap.hazard) ||
+          normalizedRisk === "risk";
+
+        if (isRepeatedHeader) {
+          return [];
+        }
+
         const probability1 = parseNumeric(findValue(row, "probability_1"), 3);
         const frequency1 = parseNumeric(findValue(row, "frequency_1"), 3);
         const severity1 = parseNumeric(findValue(row, "severity_1"), 3);
@@ -919,11 +971,11 @@ useLayoutEffect(() => {
         const severity2 = parseNumeric(findValue(row, "severity_2"), 1);
         const score2 = calculateRiskScore(probability2, frequency2, severity2);
 
-        return {
+        const item = {
           item_number: index + 1,
-          department: String(findValue(row, "department")).trim(),
-          hazard: String(findValue(row, "hazard")).trim() || "Yeni tehlike",
-          risk: String(findValue(row, "risk")).trim() || "Yeni risk",
+          department: rawDepartment,
+          hazard: rawHazard || "Yeni tehlike",
+          risk: rawRisk || "Yeni risk",
           existing_controls: String(findValue(row, "existing_controls")).trim(),
           affected_people: String(findValue(row, "affected_people")).trim(),
           probability_1: probability1,
@@ -943,6 +995,7 @@ useLayoutEffect(() => {
           completion_date: String(findValue(row, "completion_date")).trim(),
           completed_activity: String(findValue(row, "completed_activity")).trim(),
         } satisfies Partial<RiskItem>;
+        return [item];
       }).filter((item) => item.hazard || item.risk);
 
       if (items.length === 0) {

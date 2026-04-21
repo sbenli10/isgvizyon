@@ -2694,7 +2694,7 @@ export const getOsgbCompany360Snapshot = async (
       .eq("status", "active"),
     (supabase as any)
       .from("osgb_field_visits")
-      .select("id, visit_status, proof_score")
+      .select("id, visit_status")
       .eq("organization_id", organizationId)
       .eq("company_id", companyId),
     (supabase as any)
@@ -2743,7 +2743,7 @@ export const getOsgbCompany360Snapshot = async (
   const nextActions: string[] = [];
   const deficitMinutes = Number(compliance?.deficit_minutes || 0);
   const overdueDocuments = documents.filter((item: any) => item.status === "missing" && Number(item.delay_days || 0) > 0).length;
-  const missingEvidenceVisits = visits.filter((item: any) => item.visit_status === "completed" && Number(item.proof_score || 0) < 45).length;
+  const missingEvidenceVisits = visits.filter((item: any) => item.visit_status === "completed").length;
   const overdueBalance = Number(financeResponse.data?.overdue_balance || 0);
 
   if (deficitMinutes > 0) nextActions.push("Eksik hizmet süresi için yeni atama yapın.");

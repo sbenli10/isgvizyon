@@ -963,33 +963,84 @@ export default function CompanyManager() {
         phone: emp.phone || null,
       }));
 
+      const isMissingLogoColumnError = (error: unknown) => {
+        const message =
+          error instanceof Error
+            ? error.message
+            : typeof error === "object" && error !== null && "message" in error
+              ? String((error as { message?: unknown }).message || "")
+              : "";
+
+        return message.toLocaleLowerCase("tr-TR").includes("logo_url");
+      };
+
+      const buildCompanyPayload = (includeLogo: boolean) => ({
+        name: formData.company_name,
+        tax_number: formData.tax_number || null,
+        industry: formData.nace_code || null,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        ...(includeLogo ? { logo_url: formData.logo_url || null } : {}),
+        employee_count: employeesJson.length || formData.employee_count,
+        hazard_class: formData.hazard_class,
+        workplace_registration_number: formData.workplace_registration_number || null,
+        sgk_workplace_number: formData.workplace_registration_number || null,
+        visit_frequency: formData.visit_frequency || null,
+        employer_representative_name: formData.employer_representative_name || null,
+        occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
+        workplace_doctor_name: formData.workplace_doctor_name || null,
+        employee_representative_name: formData.employee_representative_name || null,
+        knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
+        fire_support_person_name: formData.fire_support_person_name || null,
+        first_aid_support_person_name: formData.first_aid_support_person_name || null,
+        evacuation_support_person_name: formData.evacuation_support_person_name || null,
+      });
+
+      const buildRpcCompanyData = (includeLogo: boolean) => ({
+        company_name: formData.company_name,
+        tax_number: formData.tax_number || null,
+        nace_code: formData.nace_code || null,
+        hazard_class: formData.hazard_class,
+        industry_sector: formData.industry_sector,
+        address: formData.address,
+        phone: formData.phone,
+        email: formData.email,
+        ...(includeLogo ? { logo_url: formData.logo_url || null } : {}),
+        employee_count: employeesJson.length || formData.employee_count,
+        workplace_registration_number: formData.workplace_registration_number || null,
+        sgk_workplace_number: formData.workplace_registration_number || null,
+        visit_frequency: formData.visit_frequency || null,
+        employer_representative_name: formData.employer_representative_name || null,
+        occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
+        workplace_doctor_name: formData.workplace_doctor_name || null,
+        employee_representative_name: formData.employee_representative_name || null,
+        knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
+        fire_support_person_name: formData.fire_support_person_name || null,
+        first_aid_support_person_name: formData.first_aid_support_person_name || null,
+        evacuation_support_person_name: formData.evacuation_support_person_name || null,
+      });
+
       if (editingCompanyId) {
         const existingCompany = companies.find((company) => company.id === editingCompanyId);
-        const { error: companyError } = await (supabase as any)
+        let companyError: unknown = null;
+        const firstUpdate = await (supabase as any)
           .from("companies")
-          .update({
-            name: formData.company_name,
-            tax_number: formData.tax_number || null,
-            industry: formData.nace_code || null,
-            address: formData.address,
-            phone: formData.phone,
-            email: formData.email,
-            logo_url: formData.logo_url || null,
-            employee_count: employeesJson.length || formData.employee_count,
-            hazard_class: formData.hazard_class,
-            workplace_registration_number: formData.workplace_registration_number || null,
-            sgk_workplace_number: formData.workplace_registration_number || null,
-            visit_frequency: formData.visit_frequency || null,
-            employer_representative_name: formData.employer_representative_name || null,
-            occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
-            workplace_doctor_name: formData.workplace_doctor_name || null,
-            employee_representative_name: formData.employee_representative_name || null,
-            knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
-            fire_support_person_name: formData.fire_support_person_name || null,
-            first_aid_support_person_name: formData.first_aid_support_person_name || null,
-            evacuation_support_person_name: formData.evacuation_support_person_name || null,
-          })
+          .update(buildCompanyPayload(true))
           .eq("id", editingCompanyId);
+
+        companyError = firstUpdate.error;
+
+        if (companyError && isMissingLogoColumnError(companyError)) {
+          const retryUpdate = await (supabase as any)
+            .from("companies")
+            .update(buildCompanyPayload(false))
+            .eq("id", editingCompanyId);
+          companyError = retryUpdate.error;
+          if (!companyError) {
+            toast.warning("Firma kaydedildi, ancak logo alanı veritabanında henüz bulunmadığı için logo kaydı atlandı.");
+          }
+        }
 
         if (companyError) throw companyError;
 
@@ -1029,37 +1080,29 @@ export default function CompanyManager() {
         return;
       }
 
-      const { data, error } = await supabase.rpc("create_company_with_data", {
+      let rpcResult = await supabase.rpc("create_company_with_data", {
         p_owner_id: user?.id,
-        p_company_data: {
-          company_name: formData.company_name,
-          tax_number: formData.tax_number || null,
-          nace_code: formData.nace_code || null,
-          hazard_class: formData.hazard_class,
-          industry_sector: formData.industry_sector,
-          address: formData.address,
-          phone: formData.phone,
-          email: formData.email,
-          employee_count: employeesJson.length || formData.employee_count,
-          workplace_registration_number: formData.workplace_registration_number || null,
-          sgk_workplace_number: formData.workplace_registration_number || null,
-          visit_frequency: formData.visit_frequency || null,
-          employer_representative_name: formData.employer_representative_name || null,
-          occupational_safety_specialist_name: formData.occupational_safety_specialist_name || null,
-          workplace_doctor_name: formData.workplace_doctor_name || null,
-          employee_representative_name: formData.employee_representative_name || null,
-          knowledgeable_employee_name: formData.knowledgeable_employee_name || null,
-          fire_support_person_name: formData.fire_support_person_name || null,
-          first_aid_support_person_name: formData.first_aid_support_person_name || null,
-          evacuation_support_person_name: formData.evacuation_support_person_name || null,
-        },
+        p_company_data: buildRpcCompanyData(true),
         p_risk_template_id: template?.id || null,
         p_employees: [],
       });
 
-      if (error) throw error;
+      if (rpcResult.error && isMissingLogoColumnError(rpcResult.error)) {
+        rpcResult = await supabase.rpc("create_company_with_data", {
+          p_owner_id: user?.id,
+          p_company_data: buildRpcCompanyData(false),
+          p_risk_template_id: template?.id || null,
+          p_employees: [],
+        });
 
-      const result = data as {
+        if (!rpcResult.error) {
+          toast.warning("Firma kaydedildi, ancak logo alanı veritabanında henüz bulunmadığı için logo kaydı atlandı.");
+        }
+      }
+
+      if (rpcResult.error) throw rpcResult.error;
+
+      const result = rpcResult.data as {
         success: boolean;
         error?: string;
         company_id?: string;
@@ -1077,7 +1120,7 @@ export default function CompanyManager() {
           .update({ logo_url: formData.logo_url })
           .eq("id", result.company_id);
 
-        if (logoUpdateError) throw logoUpdateError;
+        if (logoUpdateError && !isMissingLogoColumnError(logoUpdateError)) throw logoUpdateError;
       }
 
       if (result.company_id) {
