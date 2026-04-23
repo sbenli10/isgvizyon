@@ -80,6 +80,7 @@ import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -419,9 +420,9 @@ export default function ISGBotDashboard() {
       a.download = `${company.company_name.replace(/\s+/g, "_")}_rapor_${
         new Date().toISOString().split("T")[0]
       }.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      withTemporaryBodyChild(a, () => {
+        a.click();
+      });
       URL.revokeObjectURL(url);
 
       toast.success("Rapor oluşturuldu", {

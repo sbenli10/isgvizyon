@@ -1,6 +1,7 @@
 import { Sentry, sentryEnabled } from "@/lib/sentry";
+import { safeInsertBefore, safeRemoveChild, type SafeDomFailure } from "@/lib/safeDom";
 
-type GuardOperation = "appendChild" | "insertBefore" | "removeChild" | "replaceChild";
+type GuardOperation = "insertBefore" | "removeChild";
 
 type GuardNodeSummary = {
   name: string;
@@ -23,6 +24,7 @@ type GuardFailurePayload = {
 export type DomGuardSnapshot = {
   failureCount: number;
   lastFailure: GuardFailurePayload | null;
+  routeComponentCounts: Record<string, number>;
 };
 
 let domMutationGuardsInstalled = false;
@@ -30,14 +32,8 @@ let domMutationGuardsInstalled = false;
 const domGuardSnapshot: DomGuardSnapshot = {
   failureCount: 0,
   lastFailure: null,
+  routeComponentCounts: {},
 };
-
-const isDomNotFoundError = (error: unknown) =>
-  error instanceof DOMException &&
-  error.name === "NotFoundError" &&
-  typeof error.message === "string" &&
-  (error.message.includes("not a child of this node") ||
-    error.message.includes("before which the new node is to be inserted"));
 
 const summarizeNode = (node: Node | null | undefined): GuardNodeSummary | null => {
   if (!node) return null;
@@ -68,6 +64,10 @@ const getCurrentComponentName = () => {
 const recordGuardFailure = (payload: GuardFailurePayload) => {
   domGuardSnapshot.failureCount += 1;
   domGuardSnapshot.lastFailure = payload;
+  const routeComponentKey = `${payload.route}::${payload.componentName}`;
+  domGuardSnapshot.routeComponentCounts[routeComponentKey] =
+    (domGuardSnapshot.routeComponentCounts[routeComponentKey] ?? 0) + 1;
+  const routeComponentCount = domGuardSnapshot.routeComponentCounts[routeComponentKey];
 
   if (!sentryEnabled) return;
 
@@ -80,6 +80,9 @@ const recordGuardFailure = (payload: GuardFailurePayload) => {
       component_name: payload.componentName,
       fallback_strategy: payload.fallbackStrategy,
       fallback_used: payload.fallbackUsed,
+      dom_guard_event: "fallback",
+      route_component_key: routeComponentKey,
+      route_component_count: routeComponentCount,
       reason: payload.reason,
       parent: payload.parent,
       child: payload.child,
@@ -88,8 +91,14 @@ const recordGuardFailure = (payload: GuardFailurePayload) => {
   });
 
   Sentry.setTag("dom_guard_failed", "true");
+  Sentry.setTag("dom_guard_event", "fallback");
+  Sentry.setTag("dom_guard_operation", payload.operation);
+  Sentry.setTag("dom_guard_route_component", routeComponentKey);
   Sentry.setContext("dom_guard", {
     failure_count: domGuardSnapshot.failureCount,
+    route_component_key: routeComponentKey,
+    route_component_count: routeComponentCount,
+    route_component_counts: domGuardSnapshot.routeComponentCounts,
     last_operation: payload.operation,
     route: payload.route,
     component_name: payload.componentName,
@@ -100,11 +109,48 @@ const recordGuardFailure = (payload: GuardFailurePayload) => {
     child: payload.child,
     reference: payload.reference,
   });
+
+  if (routeComponentCount <= 3) {
+    Sentry.captureMessage("dom_guard_fallback", {
+      level: "warning",
+      tags: {
+        dom_guard_event: "fallback",
+        dom_guard_operation: payload.operation,
+        current_route: payload.route,
+        component_name: payload.componentName,
+      },
+      fingerprint: ["dom-guard-fallback", payload.operation, routeComponentKey],
+      extra: {
+        route_component_count: routeComponentCount,
+        fallback_strategy: payload.fallbackStrategy,
+        reason: payload.reason,
+      },
+    });
+  }
 };
 
 export const getDomGuardSnapshot = (): DomGuardSnapshot => ({
   failureCount: domGuardSnapshot.failureCount,
   lastFailure: domGuardSnapshot.lastFailure,
+  routeComponentCounts: { ...domGuardSnapshot.routeComponentCounts },
+});
+
+export const resetDomGuardSnapshotForTests = () => {
+  domGuardSnapshot.failureCount = 0;
+  domGuardSnapshot.lastFailure = null;
+  domGuardSnapshot.routeComponentCounts = {};
+};
+
+const toGuardPayload = (failure: SafeDomFailure): GuardFailurePayload => ({
+  operation: failure.operation,
+  fallbackUsed: failure.fallbackUsed,
+  fallbackStrategy: failure.fallbackStrategy,
+  parent: failure.parentName ? { name: failure.parentName, nodeType: 0, isConnected: true } : null,
+  child: failure.childName ? { name: failure.childName, nodeType: 0, isConnected: true } : null,
+  reference: failure.referenceName ? { name: failure.referenceName, nodeType: 0, isConnected: true } : null,
+  route: getCurrentRoute(),
+  componentName: getCurrentComponentName(),
+  reason: failure.reason,
 });
 
 export function installDomMutationGuards() {
@@ -112,125 +158,42 @@ export function installDomMutationGuards() {
 
   domMutationGuardsInstalled = true;
 
-  const nativeAppendChild = Node.prototype.appendChild;
   const nativeInsertBefore = Node.prototype.insertBefore;
   const nativeRemoveChild = Node.prototype.removeChild;
-  const nativeReplaceChild = Node.prototype.replaceChild;
-
-  Node.prototype.appendChild = function guardedAppendChild<T extends Node>(child: T): T {
-    try {
-      return nativeAppendChild.call(this, child) as T;
-    } catch (error) {
-      const parent = this as Node;
-
-      if (child.parentNode === parent) {
-        recordGuardFailure({
-          operation: "appendChild",
-          fallbackUsed: true,
-          fallbackStrategy: "reuse-existing-child",
-          parent: summarizeNode(parent),
-          child: summarizeNode(child),
-          reference: null,
-          route: getCurrentRoute(),
-          componentName: getCurrentComponentName(),
-          reason: error instanceof Error ? error.message : "appendChild failed",
-        });
-        return child;
-      }
-
-      throw error;
-    }
-  };
 
   Node.prototype.insertBefore = function guardedInsertBefore<T extends Node>(
     newNode: T,
     referenceNode: Node | null,
   ): T {
+    const parent = this as Node;
+    Node.prototype.insertBefore = nativeInsertBefore;
     try {
-      return nativeInsertBefore.call(this, newNode, referenceNode) as T;
-    } catch (error) {
-      const parent = this as Node;
-      const referenceParent = referenceNode?.parentNode ?? null;
-
-      if (isDomNotFoundError(error) && referenceNode && referenceParent !== parent) {
+      return safeInsertBefore(parent, newNode, referenceNode, (failure) =>
         recordGuardFailure({
-          operation: "insertBefore",
-          fallbackUsed: true,
-          fallbackStrategy: "append-child",
+          ...toGuardPayload(failure),
           parent: summarizeNode(parent),
           child: summarizeNode(newNode),
           reference: summarizeNode(referenceNode),
-          route: getCurrentRoute(),
-          componentName: getCurrentComponentName(),
-          reason: error.message,
-        });
-
-        if (newNode.parentNode === parent) {
-          return newNode;
-        }
-
-        return nativeAppendChild.call(parent, newNode) as T;
-      }
-
-      throw error;
+        }),
+      );
+    } finally {
+      Node.prototype.insertBefore = guardedInsertBefore;
     }
   };
 
   Node.prototype.removeChild = function guardedRemoveChild<T extends Node>(child: T): T {
+    const parent = this as Node;
+    Node.prototype.removeChild = nativeRemoveChild;
     try {
-      return nativeRemoveChild.call(this, child) as T;
-    } catch (error) {
-      const parent = this as Node;
-
-      if (isDomNotFoundError(error) && child.parentNode !== parent) {
+      return safeRemoveChild(parent, child, (failure) =>
         recordGuardFailure({
-          operation: "removeChild",
-          fallbackUsed: true,
-          fallbackStrategy: "skip-remove",
+          ...toGuardPayload(failure),
           parent: summarizeNode(parent),
           child: summarizeNode(child),
-          reference: null,
-          route: getCurrentRoute(),
-          componentName: getCurrentComponentName(),
-          reason: error.message,
-        });
-        return child;
-      }
-
-      throw error;
-    }
-  };
-
-  Node.prototype.replaceChild = function guardedReplaceChild<T extends Node, U extends Node>(
-    newChild: T,
-    oldChild: U,
-  ): U {
-    try {
-      return nativeReplaceChild.call(this, newChild, oldChild) as U;
-    } catch (error) {
-      const parent = this as Node;
-
-      if (isDomNotFoundError(error) && oldChild.parentNode !== parent) {
-        recordGuardFailure({
-          operation: "replaceChild",
-          fallbackUsed: true,
-          fallbackStrategy: "append-new-child",
-          parent: summarizeNode(parent),
-          child: summarizeNode(newChild),
-          reference: summarizeNode(oldChild),
-          route: getCurrentRoute(),
-          componentName: getCurrentComponentName(),
-          reason: error.message,
-        });
-
-        if (newChild.parentNode !== parent) {
-          nativeAppendChild.call(parent, newChild);
-        }
-
-        return oldChild;
-      }
-
-      throw error;
+        }),
+      );
+    } finally {
+      Node.prototype.removeChild = guardedRemoveChild;
     }
   };
 }

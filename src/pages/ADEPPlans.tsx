@@ -73,6 +73,15 @@ type CoverMeta = {
 const eyebrowClass = "text-[11px] uppercase tracking-[0.18em] text-slate-400";
 const cardTitleClass =
   "text-[1.08rem] font-semibold tracking-[-0.02em] text-white";
+const ADEP_HERO_SKELETON_KEYS = ["hero-stat-1", "hero-stat-2", "hero-stat-3"] as const;
+const ADEP_CARD_SKELETON_KEYS = [
+  "plan-skeleton-1",
+  "plan-skeleton-2",
+  "plan-skeleton-3",
+  "plan-skeleton-4",
+  "plan-skeleton-5",
+  "plan-skeleton-6",
+] as const;
 
 const getHazardTone = (hazardClass: string) => {
   if (hazardClass === "Çok Tehlikeli") {
@@ -318,9 +327,9 @@ export default function ADEPPlans() {
               <div className="h-10 w-72 animate-pulse rounded-2xl bg-white/10" />
               <div className="h-5 w-96 animate-pulse rounded-xl bg-white/5" />
               <div className="grid gap-3 sm:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, index) => (
+                {ADEP_HERO_SKELETON_KEYS.map((key) => (
                   <div
-                    key={index}
+                    key={key}
                     className="h-24 animate-pulse rounded-2xl border border-white/10 bg-white/[0.03]"
                   />
                 ))}
@@ -331,9 +340,9 @@ export default function ADEPPlans() {
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
+          {ADEP_CARD_SKELETON_KEYS.map((key) => (
             <div
-              key={index}
+              key={key}
               className="h-80 animate-pulse rounded-[24px] border border-white/10 bg-slate-950/65"
             />
           ))}

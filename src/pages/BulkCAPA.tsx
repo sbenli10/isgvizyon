@@ -53,6 +53,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
@@ -1766,6 +1767,13 @@ function BulkCAPAContent() {
   const [suggestedTemplateReason, setSuggestedTemplateReason] = useState("");
   const [recentHeaderSuggestion, setRecentHeaderSuggestion] = useState<BulkCAPAGeneralInfo | null>(null);
   const [recentHeaderSuggestionReason, setRecentHeaderSuggestionReason] = useState("");
+
+  useRouteOverlayCleanup(() => {
+    setCompanyComboboxOpen(false);
+    setPreviewOpen(false);
+    setCreateDialogOpen(false);
+    setTemplateDialogOpen(false);
+  });
 
   const loadCompanyOptions = async (userId: string) => {
     const { data, error } = await supabase

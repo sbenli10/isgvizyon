@@ -31,6 +31,7 @@ import {
   upsertHealthSurveillanceRecord,
   uploadHealthSurveillanceFile,
 } from "@/lib/healthSurveillanceOperations";
+import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { readPageSessionCache, writePageSessionCache } from "@/lib/pageSessionCache";
 
 type FormState = {
@@ -193,6 +194,11 @@ export default function HealthSurveillance() {
   useEffect(() => {
     setRecordsPage(1);
   }, [search, statusFilter, employeeFilter]);
+
+  useRouteOverlayCleanup(() => {
+    setDialogOpen(false);
+    setFileDialogOpen(false);
+  });
 
   const stats = useMemo(() => ({
     total: records.length,

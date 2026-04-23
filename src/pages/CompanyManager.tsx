@@ -1,5 +1,7 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { FixedSizeList as List } from "react-window";
+import { useLocation } from "react-router-dom";
+import { useRef, useCallback } from "react";
 import { 
   Building2, Users, FileSpreadsheet, Plus, Save, 
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -65,6 +67,8 @@ import type { Company, Employee, RiskTemplate } from "@/types/companies";
 import { cn } from "@/lib/utils";
 import { useSafeMode } from "@/hooks/useSafeMode";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { getBulkCompanyPreviewKey, getParsedEmployeePreviewKey } from "@/lib/companyManagerKeys";
+import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 
 interface NACEVirtualListProps {
   items: NACECode[];
@@ -289,9 +293,28 @@ function normalizeHazardClass(value?: string | null): "Az Tehlikeli" | "Tehlikel
   return "Az Tehlikeli";
 }
 
+function createBulkCompanyClientId(
+  row: {
+    company_name: string;
+    tax_number: string;
+    nace_code: string;
+    email: string;
+  },
+  index: number,
+) {
+  const slug = [row.tax_number, row.nace_code, row.company_name, row.email]
+    .map((value) => (value || "").trim().toLocaleLowerCase("tr-TR"))
+    .filter(Boolean)
+    .join("|");
+
+  return `bulk-company-${slug || "row"}-${index}`;
+}
+
 export default function CompanyManager() {
   const { user } = useAuth();
+  const location = useLocation();
   const runtimeMode = useSafeMode();
+  const overlayContainerRef = useRef<HTMLDivElement | null>(null);
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -309,6 +332,7 @@ export default function CompanyManager() {
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkImportFileName, setBulkImportFileName] = useState("");
   const [bulkCompanyRows, setBulkCompanyRows] = useState<Array<{
+    client_id: string;
     company_name: string;
     tax_number: string;
     nace_code: string;
@@ -373,6 +397,12 @@ export default function CompanyManager() {
   const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
 
+  const closeTransientUi = useCallback(() => {
+    setNaceOpen(false);
+    setViewingCompany(null);
+    cancelEmployeeEdit();
+  }, []);
+
   // ============================================
   // LOAD DATA
   // ============================================
@@ -393,6 +423,18 @@ export default function CompanyManager() {
   useEffect(() => {
     setShowAllCompanies(false);
   }, [hazardFilter, searchQuery, runtimeMode.safeMode]);
+
+  useRouteOverlayCleanup(closeTransientUi);
+
+  useEffect(() => {
+    closeTransientUi();
+  }, [workspaceMode, closeTransientUi]);
+
+  useEffect(() => {
+    if (location.pathname !== "/companies") {
+      closeTransientUi();
+    }
+  }, [closeTransientUi, location.pathname]);
 
   const loadCompanies = async () => {
     try {
@@ -703,6 +745,7 @@ export default function CompanyManager() {
   const handleViewCompany = async (companyId: string) => {
     const company = companies.find(c => c.id === companyId);
     if (company) {
+      setNaceOpen(false);
       setDetailEmployeeSearchQuery("");
       setDetailEmployeeDepartmentFilter("all");
       void loadExistingEmployees(companyId);
@@ -716,6 +759,8 @@ export default function CompanyManager() {
   };
 
   const handleEditCompany = (company: Company) => {
+    setViewingCompany(null);
+    setNaceOpen(false);
     setFormData({
       company_name: company.company_name,
       tax_number: company.tax_number,
@@ -843,6 +888,15 @@ export default function CompanyManager() {
         const sectorValue = String(getValue("sektor", "industrysector", "industry", "faaliyetalani") || "").trim();
 
         return {
+          client_id: createBulkCompanyClientId(
+            {
+              company_name: companyName,
+              tax_number: String(getValue("vergino", "taxnumber", "taxno") || "").trim(),
+              nace_code: naceCode || naceMatch?.code || "",
+              email: String(getValue("eposta", "email", "mail") || "").trim(),
+            },
+            0,
+          ),
           company_name: companyName,
           tax_number: String(getValue("vergino", "taxnumber", "taxno") || "").trim(),
           nace_code: naceCode || naceMatch?.code || "",
@@ -857,7 +911,12 @@ export default function CompanyManager() {
           employee_count: Number(getValue("calisansayisi", "employeecount", "calisan") || 0),
         };
       })
-      .filter(Boolean) as Array<{
+      .filter(Boolean)
+      .map((row, index) => ({
+        ...row,
+        client_id: createBulkCompanyClientId(row, index),
+      })) as Array<{
+      client_id: string;
       company_name: string;
       tax_number: string;
       nace_code: string;
@@ -878,6 +937,8 @@ export default function CompanyManager() {
     try {
       const rows = await parseBulkCompanyFile(file);
       setBulkCompanyRows(rows);
+      setViewingCompany(null);
+      setNaceOpen(false);
       setBulkImportFileName(file.name);
       toast.success(`${rows.length} firma satırı hazırlandı`);
     } catch (error: any) {
@@ -905,7 +966,18 @@ export default function CompanyManager() {
 
           const { data, error } = await supabase.rpc("create_company_with_data", {
             p_owner_id: user.id,
-            p_company_data: row,
+            p_company_data: {
+              company_name: row.company_name,
+              tax_number: row.tax_number,
+              nace_code: row.nace_code,
+              hazard_class: row.hazard_class,
+              industry_sector: row.industry_sector,
+              address: row.address,
+              city: row.city,
+              phone: row.phone,
+              email: row.email,
+              employee_count: row.employee_count,
+            },
             p_risk_template_id: matchingTemplate?.id || null,
             p_employees: [],
           });
@@ -1415,7 +1487,8 @@ export default function CompanyManager() {
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent 
+                    <PopoverContent
+                        container={overlayContainerRef.current}
                         className="w-[95vw] md:w-[750px] max-w-[750px] p-0"
                         align="center"
                       >
@@ -1967,13 +2040,7 @@ export default function CompanyManager() {
                     </TableHeader>
                     <TableBody>
                       {parsedEmployees.slice(0, 5).map((emp) => (
-                        <TableRow
-                          key={
-                            emp.tc_number ||
-                            emp.email ||
-                            `${emp.full_name || `${emp.first_name}-${emp.last_name}`}-${emp.start_date || "no-date"}`
-                          }
-                        >
+                        <TableRow key={getParsedEmployeePreviewKey(emp)}>
                           <TableCell className="font-medium">
                             {emp.full_name || `${emp.first_name} ${emp.last_name}`.trim()}
                           </TableCell>
@@ -2008,6 +2075,7 @@ export default function CompanyManager() {
 
   return (
     <div className="theme-page-readable space-y-8 pb-8">
+      <div ref={overlayContainerRef} data-companies-overlay-root />
       <section className="overflow-hidden rounded-[30px] border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.18),transparent_24%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] shadow-[0_28px_80px_rgba(2,6,23,0.45)]">
         <div className="grid gap-6 px-6 py-7 lg:grid-cols-[1.6fr_0.9fr] lg:px-8">
           <div className="space-y-5">
@@ -2288,9 +2356,7 @@ export default function CompanyManager() {
                     </TableHeader>
                     <TableBody>
                       {bulkCompanyRows.map((row) => (
-                        <TableRow
-                          key={`${row.tax_number || "no-tax"}-${row.nace_code || "no-nace"}-${row.company_name}`}
-                        >
+                        <TableRow key={getBulkCompanyPreviewKey(row)}>
                           <TableCell className="font-medium">{row.company_name}</TableCell>
                           <TableCell>{row.tax_number || "-"}</TableCell>
                           <TableCell>{row.nace_code || "-"}</TableCell>
@@ -2700,7 +2766,7 @@ export default function CompanyManager() {
       {viewingCompany && (
         <RouteErrorBoundary routeKey="companies:view-modal" componentName="CompanyManagerViewModal">
         <Dialog open={!!viewingCompany} onOpenChange={() => setViewingCompany(null)}>
-          <DialogContent className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
+          <DialogContent container={overlayContainerRef.current} className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-white">
                 <Building2 className="h-5 w-5 text-cyan-300" />

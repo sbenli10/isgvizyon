@@ -59,6 +59,7 @@ import { SendReportModal } from "@/components/SendReportModal";
 import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 
 interface StatCard {
   title: string;
@@ -564,9 +565,9 @@ export default function Inspections() {
       const link = document.createElement("a");
       link.href = objectUrl;
       link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      withTemporaryBodyChild(link, () => {
+        link.click();
+      });
       URL.revokeObjectURL(objectUrl);
     } catch (error: any) {
       toast.error(error?.message || "Rapor indirilemedi");

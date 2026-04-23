@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 
 export interface LegendItem {
   id: string;
@@ -71,9 +72,9 @@ export class ExportService {
     const link = document.createElement("a");
     link.href = url;
     link.download = name;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    withTemporaryBodyChild(link, () => {
+      link.click();
+    });
 
     if (revoke) {
       URL.revokeObjectURL(url);

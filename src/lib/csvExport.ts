@@ -1,4 +1,10 @@
-﻿export const downloadCsv = (filename: string, headers: string[], rows: Array<Array<string | number | null | undefined>>) => {
+import { withTemporaryBodyChild } from "@/lib/safeDom";
+
+export const downloadCsv = (
+  filename: string,
+  headers: string[],
+  rows: Array<Array<string | number | null | undefined>>,
+) => {
   const escapeCell = (value: string | number | null | undefined) => {
     const normalized = String(value ?? "").replace(/"/g, '""');
     return `"${normalized}"`;
@@ -13,8 +19,10 @@
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
+
+  withTemporaryBodyChild(anchor, () => {
+    anchor.click();
+  });
+
   URL.revokeObjectURL(url);
 };

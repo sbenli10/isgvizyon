@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { BookOpen, Building2, Download, Link2, Plus, RefreshCcw, Search, ShieldAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { HighRiskSectionBoundary } from "@/components/HighRiskSectionBoundary";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
+import { attachDeterministicClientIds } from "@/lib/clientIdentity";
 import { OsgbCompany360Panel } from "@/components/osgb/OsgbCompany360Panel";
 import { OsgbOnboardingChecklist } from "@/components/osgb/OsgbOnboardingChecklist";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -46,6 +49,10 @@ type ManualCompanyFormState = {
   assignmentMode: string;
   visitFrequency: string;
   notes: string;
+};
+
+type ImportPreviewRow = OsgbCompanyManagementInput & {
+  client_id: string;
 };
 
 const emptyManualForm: ManualCompanyFormState = {
@@ -97,13 +104,13 @@ const normalizeHeader = (value: string) =>
 
 const loadXlsx = () => import("xlsx");
 
-const parseImportRows = async (file: File): Promise<OsgbCompanyManagementInput[]> => {
+const parseImportRows = async (file: File): Promise<ImportPreviewRow[]> => {
   const XLSX = await loadXlsx();
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
-  return rows.map((row) => {
+  const parsedRows = rows.map((row) => {
     const normalizedEntries = Object.entries(row).map(([key, value]) => [normalizeHeader(key), value] as const);
     const getValue = (...keys: string[]) => normalizedEntries.find(([header]) => keys.includes(header))?.[1];
     const companyName = String(getValue("firmaunvani", "firmaadi", "companyname", "unvan") || "").trim();
@@ -129,6 +136,13 @@ const parseImportRows = async (file: File): Promise<OsgbCompanyManagementInput[]
       managementSource: "import",
     } satisfies OsgbCompanyManagementInput;
   }).filter(Boolean) as OsgbCompanyManagementInput[];
+
+  return attachDeterministicClientIds(parsedRows, "osgb-company-import", (row) => [
+    row.taxNumber,
+    row.sgkNo,
+    row.companyName,
+    row.email,
+  ]);
 };
 
 export default function OSGBCompanyTracking() {
@@ -150,7 +164,7 @@ export default function OSGBCompanyTracking() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [manualForm, setManualForm] = useState<ManualCompanyFormState>(emptyManualForm);
   const [selectedKatipIds, setSelectedKatipIds] = useState<string[]>([]);
-  const [importPreviewRows, setImportPreviewRows] = useState<OsgbCompanyManagementInput[]>([]);
+  const [importPreviewRows, setImportPreviewRows] = useState<ImportPreviewRow[]>([]);
   const [uploadingFileName, setUploadingFileName] = useState("");
   const [company360, setCompany360] = useState<Awaited<ReturnType<typeof getOsgbCompany360Snapshot>> | null>(null);
   usePageDataTiming(loading);
@@ -194,6 +208,14 @@ export default function OSGBCompanyTracking() {
     }
     void getOsgbCompany360Snapshot(organizationId, selectedCompany.id).then(setCompany360).catch(() => setCompany360(null));
   }, [organizationId, selectedCompany?.id]);
+
+  const closeTransientUi = useCallback(() => {
+    setManualOpen(false);
+    setKatipOpen(false);
+    setBulkOpen(false);
+  }, []);
+
+  useRouteOverlayCleanup(closeTransientUi);
 
   const onboardingSteps = [
     { title: "İSG-KATİP verisini hazırla", description: "Extension veya ekip senkronundan gelen firmaları merkezde görün.", href: "/osgb/isgkatip", done: (workspace?.importCandidates.length || 0) > 0 || (workspace?.summary.totalCompanies || 0) > 0 },
@@ -413,6 +435,7 @@ export default function OSGBCompanyTracking() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.55fr_0.95fr]">
+        <HighRiskSectionBoundary section="company-pool" componentName="OSGBCompanyTrackingPool">
         <Card>
           <CardHeader>
             <CardTitle>Firma Havuzu</CardTitle>
@@ -456,6 +479,7 @@ export default function OSGBCompanyTracking() {
             )}
           </CardContent>
         </Card>
+        </HighRiskSectionBoundary>
 
         <div className="space-y-6">
           <OsgbCompany360Panel company={selectedCompany} snapshot={company360} />
@@ -526,7 +550,7 @@ export default function OSGBCompanyTracking() {
             <div className="max-h-72 overflow-auto rounded-2xl border border-border">
               <Table>
                 <TableHeader><TableRow><TableHead>Firma</TableHead><TableHead>Çalışan</TableHead><TableHead>Tehlike</TableHead><TableHead>Ücret</TableHead></TableRow></TableHeader>
-                <TableBody>{importPreviewRows.map((row, index) => <TableRow key={`${row.companyName}-${index}`}><TableCell>{row.companyName}</TableCell><TableCell>{row.employeeCount}</TableCell><TableCell>{row.hazardClass}</TableCell><TableCell>{formatMoney(row.monthlyFee || 0)}</TableCell></TableRow>)}</TableBody>
+                <TableBody>{importPreviewRows.map((row) => <TableRow key={row.client_id}><TableCell>{row.companyName}</TableCell><TableCell>{row.employeeCount}</TableCell><TableCell>{row.hazardClass}</TableCell><TableCell>{formatMoney(row.monthlyFee || 0)}</TableCell></TableRow>)}</TableBody>
               </Table>
             </div>
           </div>

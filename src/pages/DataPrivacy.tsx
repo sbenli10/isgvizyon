@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 
 type RequestType = "export" | "view" | "correction" | "deletion" | "objection";
 
@@ -160,9 +161,9 @@ export default function DataPrivacy() {
       const a = document.createElement("a");
       a.href = url;
       a.download = `denetron-verilerim-${new Date().toISOString().split("T")[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      withTemporaryBodyChild(a, () => {
+        a.click();
+      });
       URL.revokeObjectURL(url);
 
       toast.success("Verileriniz başarıyla indirildi");

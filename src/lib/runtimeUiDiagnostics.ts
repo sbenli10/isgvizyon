@@ -98,6 +98,10 @@ export const getExperimentId = () => {
 
 export const getRuntimeUiDiagnostics = (pathname: string) => {
   const domGuard = getDomGuardSnapshot();
+  const topOffenders = Object.entries(domGuard.routeComponentCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([key, count]) => ({ key, count }));
 
   return {
     componentName: getRouteComponentName(pathname),
@@ -109,5 +113,6 @@ export const getRuntimeUiDiagnostics = (pathname: string) => {
     domGuardFailed: domGuard.failureCount > 0,
     domGuardFailureCount: domGuard.failureCount,
     domGuardLastFailure: domGuard.lastFailure,
+    domGuardTopOffenders: topOffenders,
   };
 };

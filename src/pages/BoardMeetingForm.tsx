@@ -40,6 +40,7 @@ import type {
   AttendeeStatus,
   AgendaStatus,
 } from "@/types/boardMeeting";
+import { buildDeterministicClientId } from "@/lib/clientIdentity";
 
 interface Company {
   id: string;
@@ -54,6 +55,14 @@ interface Employee {
   job_title: string;
   department: string | null;
 }
+
+type EditableAttendee = Omit<MeetingAttendee, "id" | "meeting_id" | "created_at"> & {
+  client_id: string;
+};
+
+type EditableAgendaItem = Omit<MeetingAgenda, "id" | "meeting_id" | "created_at" | "updated_at"> & {
+  client_id: string;
+};
 
 export default function BoardMeetingForm() {
   const { id } = useParams();
@@ -83,14 +92,10 @@ export default function BoardMeetingForm() {
   });
 
   // Attendees
-  const [attendees, setAttendees] = useState<
-    Omit<MeetingAttendee, "id" | "meeting_id" | "created_at">[]
-  >([]);
+  const [attendees, setAttendees] = useState<EditableAttendee[]>([]);
 
   // Agenda Items
-  const [agendaItems, setAgendaItems] = useState<
-    Omit<MeetingAgenda, "id" | "meeting_id" | "created_at" | "updated_at">[]
-  >([]);
+  const [agendaItems, setAgendaItems] = useState<EditableAgendaItem[]>([]);
 
   // Selected company for employee filtering
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
@@ -174,8 +179,9 @@ export default function BoardMeetingForm() {
 
       // ✅ Çalışanları otomatik katılımcı olarak ekle (sadece yeni toplantıda)
       if (!isEditMode && typedEmployees.length > 0) {
-        const autoAttendees: Omit<MeetingAttendee, "id" | "meeting_id" | "created_at">[] = 
-          typedEmployees.map((emp) => ({
+        const autoAttendees: EditableAttendee[] = 
+          typedEmployees.map((emp, index) => ({
+            client_id: buildDeterministicClientId("board-attendee", [companyId, emp.id, emp.first_name, emp.last_name], index),
             employee_id: emp.id,
             external_name: null,
             role: "Diğer" as AttendeeRole, // Varsayılan rol
@@ -231,8 +237,9 @@ export default function BoardMeetingForm() {
 
       if (attendeesError) throw attendeesError;
 
-      const typedAttendees: Omit<MeetingAttendee, "id" | "meeting_id" | "created_at">[] =
-        (attendeesData || []).map((attendee: any) => ({
+      const typedAttendees: EditableAttendee[] =
+        (attendeesData || []).map((attendee: any, index: number) => ({
+          client_id: buildDeterministicClientId("board-attendee", [attendee.id, attendee.employee_id, attendee.external_name], index),
           employee_id: attendee.employee_id,
           external_name: attendee.external_name,
           role: attendee.role as AttendeeRole,
@@ -253,8 +260,9 @@ export default function BoardMeetingForm() {
 
       if (agendaError) throw agendaError;
 
-      const typedAgenda: Omit<MeetingAgenda, "id" | "meeting_id" | "created_at" | "updated_at">[] =
-        (agendaData || []).map((item) => ({
+      const typedAgenda: EditableAgendaItem[] =
+        (agendaData || []).map((item, index) => ({
+          client_id: buildDeterministicClientId("board-agenda", [item.id, item.agenda_number, item.topic], index),
           agenda_number: item.agenda_number,
           topic: item.topic,
           discussion: item.discussion,
@@ -289,8 +297,9 @@ export default function BoardMeetingForm() {
         employees.length
       );
 
-      const newAgendaItems: Omit<MeetingAgenda, "id" | "meeting_id" | "created_at" | "updated_at">[] =
+      const newAgendaItems: EditableAgendaItem[] =
         agenda.map((item, index) => ({
+          client_id: buildDeterministicClientId("board-agenda", [selectedCompany.id, item.topic, agendaItems.length + index + 1], index),
           agenda_number: agendaItems.length + index + 1,
           topic: item.topic,
           discussion: item.description,
@@ -314,7 +323,8 @@ export default function BoardMeetingForm() {
   };
 
   const addAttendee = () => {
-    const newAttendee: Omit<MeetingAttendee, "id" | "meeting_id" | "created_at"> = {
+    const newAttendee: EditableAttendee = {
+      client_id: buildDeterministicClientId("board-attendee", [formData.company_id, attendees.length, "manual"]),
       employee_id: null,
       external_name: null,
       role: "Diğer" as AttendeeRole,
@@ -345,7 +355,8 @@ export default function BoardMeetingForm() {
   };
 
   const addAgendaItem = () => {
-    const newItem: Omit<MeetingAgenda, "id" | "meeting_id" | "created_at" | "updated_at"> = {
+    const newItem: EditableAgendaItem = {
+      client_id: buildDeterministicClientId("board-agenda", [formData.company_id, agendaItems.length + 1, "manual"]),
       agenda_number: agendaItems.length + 1,
       topic: "",
       discussion: null,
@@ -443,9 +454,9 @@ export default function BoardMeetingForm() {
         const { error: attendeesError } = await supabase
           .from("meeting_attendees")
           .insert(
-            attendees.map((attendee) => ({
-              ...attendee,
+            attendees.map(({ client_id, ...attendee }) => ({
               meeting_id: meetingId,
+              ...attendee,
             }))
           );
 
@@ -456,9 +467,9 @@ export default function BoardMeetingForm() {
         const { error: agendaError } = await supabase
           .from("meeting_agenda")
           .insert(
-            agendaItems.map((item) => ({
-              ...item,
+            agendaItems.map(({ client_id, ...item }) => ({
               meeting_id: meetingId,
+              ...item,
             }))
           );
 
@@ -680,7 +691,7 @@ export default function BoardMeetingForm() {
                     : null;
 
                   return (
-                    <Card key={index} className="bg-slate-800/50 border-slate-700">
+                    <Card key={attendee.client_id} className="bg-slate-800/50 border-slate-700">
                       <CardContent className="p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -830,7 +841,7 @@ export default function BoardMeetingForm() {
                 </div>
               ) : (
                 agendaItems.map((item, index) => (
-                  <div key={index} className="p-4 bg-slate-800/50 rounded-lg border border-slate-700 space-y-3">
+                  <div key={item.client_id} className="p-4 bg-slate-800/50 rounded-lg border border-slate-700 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3 flex-1">
                         <Badge variant="outline" className="shrink-0">

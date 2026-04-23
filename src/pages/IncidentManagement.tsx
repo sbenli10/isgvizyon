@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useAccessRole } from "@/hooks/useAccessRole";
+import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { downloadCsv } from "@/lib/csvExport";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import {
@@ -255,6 +256,12 @@ export default function IncidentManagement() {
   const canDelete = role === "admin" || role === "inspector";
   const canClose = role === "admin" || role === "inspector";
   const canCreateCapa = role === "admin" || role === "inspector";
+
+  useRouteOverlayCleanup(() => {
+    setDialogOpen(false);
+    setDetailOpen(false);
+    setCloseDialogOpen(false);
+  });
 
   const loadCompanies = async () => {
     if (!user?.id) return;
@@ -2234,4 +2241,3 @@ export default function IncidentManagement() {
     </div>
   );
 }
-

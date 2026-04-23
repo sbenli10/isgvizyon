@@ -33,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import CookieConsent from "@/components/CookieConsent";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { SentryRuntimeContext } from "@/components/SentryRuntimeContext";
+import { OverlayPortalProvider } from "@/components/overlay/OverlayPortalProvider";
 
 // ============================================
 // CORE PAGES
@@ -360,19 +361,20 @@ const App = () => (
       disableTransitionOnChange
     >
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter
-          future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true,
-          }}
-        >
-          <AuthProvider>
-            <SentryRuntimeContext />
-            <RouteTimingObserver />
-            <CookieConsent />
-            <Routes>
+        <OverlayPortalProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
+            <AuthProvider>
+              <SentryRuntimeContext />
+              <RouteTimingObserver />
+              <CookieConsent />
+              <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/landing" element={<Index />} />
               <Route path="/landing/product" element={<LandingProduct />} />
@@ -413,9 +415,10 @@ const App = () => (
                 }
               />
               <Route path="/*" element={<ProtectedShell />} />
-            </Routes>
-          </AuthProvider>
-        </BrowserRouter>
+              </Routes>
+            </AuthProvider>
+          </BrowserRouter>
+        </OverlayPortalProvider>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>

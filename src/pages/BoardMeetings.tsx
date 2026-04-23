@@ -62,6 +62,19 @@ interface BoardMeetingListItem {
 
 const getBoardMeetingsCacheKey = (userId: string) =>
   `denetron:board-meetings:${userId}`;
+const BOARD_STAT_SKELETON_KEYS = [
+  "board-stat-skeleton-1",
+  "board-stat-skeleton-2",
+  "board-stat-skeleton-3",
+  "board-stat-skeleton-4",
+] as const;
+const BOARD_ROW_SKELETON_KEYS = [
+  "board-row-skeleton-1",
+  "board-row-skeleton-2",
+  "board-row-skeleton-3",
+  "board-row-skeleton-4",
+  "board-row-skeleton-5",
+] as const;
 
 export default function BoardMeetings() {
   const navigate = useNavigate();
@@ -240,18 +253,18 @@ export default function BoardMeetings() {
         <div className="h-12 animate-pulse rounded-xl bg-muted/70" />
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
+          {BOARD_STAT_SKELETON_KEYS.map((key) => (
             <div
-              key={index}
+              key={key}
               className="h-24 animate-pulse rounded-xl border border-border bg-muted/70"
             />
           ))}
         </div>
 
         <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, index) => (
+          {BOARD_ROW_SKELETON_KEYS.map((key) => (
             <div
-              key={index}
+              key={key}
               className="h-28 animate-pulse rounded-xl border border-border bg-muted/70"
             />
           ))}

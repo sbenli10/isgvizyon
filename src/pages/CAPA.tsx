@@ -49,6 +49,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { differenceInCalendarDays, format, isPast, parseISO } from "date-fns";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 
 type CAPAStatus = "Açık" | "Devam Ediyor" | "Tamamlandı";
 type CAPAPriority = "Düşük" | "Orta" | "Yüksek" | "Kritik";
@@ -962,9 +963,9 @@ export default function CAPA() {
       const link = document.createElement("a");
       link.href = blobUrl;
       link.download = url.split("/").pop() || "kanit-dosyasi";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      withTemporaryBodyChild(link, () => {
+        link.click();
+      });
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error("Evidence download error:", error);

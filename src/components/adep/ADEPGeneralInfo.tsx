@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
+import { buildDeterministicClientId } from "@/lib/clientIdentity";
 
 interface Company {
   id: string;
@@ -77,7 +78,11 @@ export default function ADEPGeneralInfo({
   const addPreparer = () => {
     const newPreparers = [
       ...planData.genel_bilgiler.hazirlayanlar,
-      { unvan: "", ad_soyad: "" }
+      {
+        client_id: buildDeterministicClientId("adep-preparer", [data.company_id, planData.genel_bilgiler.hazirlayanlar.length, "manual"]),
+        unvan: "",
+        ad_soyad: "",
+      }
     ];
     onPlanDataChange("genel_bilgiler", {
       ...planData.genel_bilgiler,
@@ -103,6 +108,13 @@ export default function ADEPGeneralInfo({
       hazirlayanlar: newPreparers,
     });
   };
+
+  const preparers = (planData.genel_bilgiler.hazirlayanlar || []).map((preparer: any, index: number) => ({
+    ...preparer,
+    client_id:
+      preparer.client_id ||
+      buildDeterministicClientId("adep-preparer", [preparer.unvan, preparer.ad_soyad, data.company_id], index),
+  }));
 
   return (
     <div className="space-y-6">
@@ -244,8 +256,8 @@ export default function ADEPGeneralInfo({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {planData.genel_bilgiler.hazirlayanlar.map((preparer: any, index: number) => (
-            <div key={index} className="flex gap-4 items-start">
+          {preparers.map((preparer: any, index: number) => (
+            <div key={preparer.client_id} className="flex gap-4 items-start">
               <div className="flex-1 grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Ünvan</Label>

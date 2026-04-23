@@ -73,6 +73,7 @@ export function SentryRuntimeContext() {
       dom_guard_failed: uiDiagnostics.domGuardFailed,
       dom_guard_failure_count: uiDiagnostics.domGuardFailureCount,
       dom_guard_last_failure: uiDiagnostics.domGuardLastFailure,
+      dom_guard_top_offenders: uiDiagnostics.domGuardTopOffenders,
     });
     Sentry.setTag("browser_name", deviceInfo.browserName);
     Sentry.setTag("browser_version", deviceInfo.browserVersion);

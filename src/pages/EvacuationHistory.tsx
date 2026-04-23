@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import { History, FileImage, FileDown, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { withTemporaryBodyChild } from "@/lib/safeDom";
 
 interface SavedProject {
   id: string;
@@ -21,9 +22,9 @@ function downloadDataUrl(dataUrl: string, fileName: string) {
   const link = document.createElement("a");
   link.href = dataUrl;
   link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
+  withTemporaryBodyChild(link, () => {
+    link.click();
+  });
 }
 
 export default function EvacuationHistory() {
