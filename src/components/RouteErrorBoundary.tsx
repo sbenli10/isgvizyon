@@ -2,10 +2,13 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, Home, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sentry } from "@/lib/sentry";
+import { getRuntimeDeviceInfo } from "@/lib/runtimeDeviceInfo";
+import { getRuntimeUiDiagnostics } from "@/lib/runtimeUiDiagnostics";
 
 type RouteErrorBoundaryProps = {
   children: ReactNode;
   routeKey: string;
+  componentName?: string;
 };
 
 type RouteErrorBoundaryState = {
@@ -27,18 +30,48 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : this.props.routeKey;
+    const runtimeDevice = getRuntimeDeviceInfo();
+    const runtimeUi = getRuntimeUiDiagnostics(currentPath);
+
     Sentry.captureException(error, {
       contexts: {
         react: {
           componentStack: errorInfo.componentStack,
         },
+        runtime_device: {
+          browser_name: runtimeDevice.browserName,
+          browser_version: runtimeDevice.browserVersion,
+          os_name: runtimeDevice.osName,
+          device_type: runtimeDevice.deviceType,
+          language: runtimeDevice.language,
+          user_agent: runtimeDevice.userAgent,
+        },
+        runtime_ui: {
+          component_name: this.props.componentName || runtimeUi.componentName,
+          page_translated: runtimeUi.pageTranslated,
+          mounted_overlay_count: runtimeUi.mountedOverlayCount,
+          item_count: runtimeUi.itemCount,
+          feature_flags: runtimeUi.featureFlags,
+          experiment_id: runtimeUi.experimentId,
+          dom_guard_failed: runtimeUi.domGuardFailed,
+          dom_guard_failure_count: runtimeUi.domGuardFailureCount,
+          dom_guard_last_failure: runtimeUi.domGuardLastFailure,
+        },
       },
       tags: {
         boundary: "route",
         routeKey: this.props.routeKey,
+        component_name: this.props.componentName || runtimeUi.componentName,
+        browser_name: runtimeDevice.browserName,
+        browser_version: runtimeDevice.browserVersion,
+        language: runtimeDevice.language,
+        page_translated: String(runtimeUi.pageTranslated),
+        dom_guard_failed: String(runtimeUi.domGuardFailed),
       },
       extra: {
         currentRoute: this.props.routeKey,
+        route: currentPath,
       },
     });
   }

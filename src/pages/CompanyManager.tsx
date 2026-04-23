@@ -64,6 +64,7 @@ import { NACE_DATABASE, searchNACE, type NACECode } from "@/utils/naceDatabase";
 import type { Company, Employee, RiskTemplate } from "@/types/companies";
 import { cn } from "@/lib/utils";
 import { useSafeMode } from "@/hooks/useSafeMode";
+import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 
 interface NACEVirtualListProps {
   items: NACECode[];
@@ -1965,8 +1966,14 @@ export default function CompanyManager() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {parsedEmployees.slice(0, 5).map((emp, idx) => (
-                        <TableRow key={idx}>
+                      {parsedEmployees.slice(0, 5).map((emp) => (
+                        <TableRow
+                          key={
+                            emp.tc_number ||
+                            emp.email ||
+                            `${emp.full_name || `${emp.first_name}-${emp.last_name}`}-${emp.start_date || "no-date"}`
+                          }
+                        >
                           <TableCell className="font-medium">
                             {emp.full_name || `${emp.first_name} ${emp.last_name}`.trim()}
                           </TableCell>
@@ -2130,6 +2137,7 @@ export default function CompanyManager() {
       </div>
 
       {workspaceMode === "wizard" && (
+        <RouteErrorBoundary routeKey="companies:wizard" componentName="CompanyManagerWizard">
         <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
           <CardHeader>
             <CardTitle className="text-xl font-black text-white">
@@ -2237,9 +2245,11 @@ export default function CompanyManager() {
             </div>
           </CardContent>
         </Card>
+        </RouteErrorBoundary>
       )}
 
       {workspaceMode === "import" && (
+        <RouteErrorBoundary routeKey="companies:import" componentName="CompanyManagerImport">
         <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
           <CardHeader>
             <CardTitle className="text-xl font-black text-white">Toplu Firma Ekle</CardTitle>
@@ -2277,8 +2287,10 @@ export default function CompanyManager() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {bulkCompanyRows.map((row, index) => (
-                        <TableRow key={`${row.company_name}-${index}`}>
+                      {bulkCompanyRows.map((row) => (
+                        <TableRow
+                          key={`${row.tax_number || "no-tax"}-${row.nace_code || "no-nace"}-${row.company_name}`}
+                        >
                           <TableCell className="font-medium">{row.company_name}</TableCell>
                           <TableCell>{row.tax_number || "-"}</TableCell>
                           <TableCell>{row.nace_code || "-"}</TableCell>
@@ -2304,10 +2316,12 @@ export default function CompanyManager() {
             </div>
           </CardContent>
         </Card>
+        </RouteErrorBoundary>
       )}
 
       {/* Stats */}
       {workspaceMode === "list" && (
+      <RouteErrorBoundary routeKey="companies:list" componentName="CompanyManagerList">
       <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card 
@@ -2483,7 +2497,11 @@ export default function CompanyManager() {
               </TableHeader>
               <TableBody>
                 {displayedCompanies.map((company) => (
-                  <TableRow key={company.id} className="border-white/10 hover:bg-white/[0.04]">
+                  <TableRow
+                    key={company.id}
+                    data-company-row
+                    className="border-white/10 hover:bg-white/[0.04]"
+                  >
                     <TableCell className="font-semibold text-white">
                       <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-cyan-200">
@@ -2565,6 +2583,7 @@ export default function CompanyManager() {
                 return (
                   <div
                     key={company.id}
+                    data-company-card
                     className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.82))] p-5 shadow-[0_18px_45px_rgba(2,6,23,0.32)] transition-all hover:-translate-y-0.5 hover:border-cyan-400/20 hover:shadow-[0_24px_60px_rgba(2,6,23,0.4)]"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -2674,10 +2693,12 @@ export default function CompanyManager() {
         </CardContent>
       </Card>
       </>
+      </RouteErrorBoundary>
       )}
 
       {/* View Modal */}
       {viewingCompany && (
+        <RouteErrorBoundary routeKey="companies:view-modal" componentName="CompanyManagerViewModal">
         <Dialog open={!!viewingCompany} onOpenChange={() => setViewingCompany(null)}>
           <DialogContent className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
             <DialogHeader>
@@ -2960,6 +2981,7 @@ export default function CompanyManager() {
             </div>
           </DialogContent>
         </Dialog>
+        </RouteErrorBoundary>
       )}
     </div>    
   );
