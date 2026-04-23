@@ -24,10 +24,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import * as pdfjsLib from 'pdfjs-dist';
 
 // ✅ PDF.js worker setup
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface FineKinneyAiResult {
   hazardDescription: string;
@@ -53,8 +51,21 @@ interface AnalysisHistory {
   updated_at: string;
 }
 
- const MAX_PHOTOS = 3;
+const MAX_PHOTOS = 3;
 const MAX_DOCUMENTS = 3;
+
+let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
+
+const loadPdfJs = async () => {
+  if (!pdfJsLoader) {
+    pdfJsLoader = import("pdfjs-dist").then((pdfjsLib) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      return pdfjsLib;
+    });
+  }
+
+  return pdfJsLoader;
+};
 
 function calculateRiskScore(probability: number, frequency: number, severity: number) {
   return Number(probability || 0) * Number(frequency || 0) * Number(severity || 0);
@@ -195,6 +206,7 @@ export default function Reports() {
 
   const extractPdfText = async (file: File): Promise<string> => {
     try {
+      const pdfjsLib = await loadPdfJs();
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let text = "";

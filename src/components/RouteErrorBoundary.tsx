@@ -37,6 +37,9 @@ export class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, Route
         boundary: "route",
         routeKey: this.props.routeKey,
       },
+      extra: {
+        currentRoute: this.props.routeKey,
+      },
     });
   }
 

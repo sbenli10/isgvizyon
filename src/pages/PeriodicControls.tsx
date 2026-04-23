@@ -1,6 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx";
 import {
   Download,
   Eye,
@@ -81,6 +80,7 @@ type ReportFormState = {
 };
 
 type PeriodicControlImportRow = Record<string, string>;
+const loadXlsx = () => import("xlsx");
 
 const emptyForm: ControlFormState = {
   companyId: "",
@@ -139,8 +139,9 @@ const normalizeHeader = (value: string) =>
 const readWorkbookRows = (file: File): Promise<PeriodicControlImportRow[]> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        const XLSX = await loadXlsx();
         const buffer = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(buffer, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -162,7 +163,8 @@ const readWorkbookRows = (file: File): Promise<PeriodicControlImportRow[]> =>
     reader.readAsArrayBuffer(file);
   });
 
-const downloadPeriodicControlTemplate = () => {
+const downloadPeriodicControlTemplate = async () => {
+  const XLSX = await loadXlsx();
   const rows = [
     ["company_name", "equipment_name", "control_category", "location", "responsible_vendor", "standard_reference", "last_control_date", "next_control_date", "status", "result_status", "notes"],
     ["Benli AS", "Forklift 07", "Kaldirma Ekipmani", "Depo - Hat 2", "ABC Kontrol", "TS EN 1459", "2026-01-15", "2026-07-15", "scheduled", "not_evaluated", "Yariyil kontrol planina alindi"],

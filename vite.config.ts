@@ -77,7 +77,7 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1500, // 1.5MB'a çıkar
     sourcemap: mode === 'development',
     minify: 'esbuild',
-    target: 'esnext',
+    target: 'es2020',
     cssCodeSplit: true,
     assetsInlineLimit: 4096,
   },

@@ -1,6 +1,5 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { FixedSizeList as List } from "react-window";
-import * as XLSX from "xlsx";
 import { 
   Building2, Users, FileSpreadsheet, Plus, Save, 
   ChevronRight, ChevronLeft, CheckCircle2, Upload,
@@ -64,6 +63,7 @@ import { parseEmployeeExcel, downloadEmployeeTemplate, type ParsedEmployee } fro
 import { NACE_DATABASE, searchNACE, type NACECode } from "@/utils/naceDatabase";
 import type { Company, Employee, RiskTemplate } from "@/types/companies";
 import { cn } from "@/lib/utils";
+import { useSafeMode } from "@/hooks/useSafeMode";
 
 interface NACEVirtualListProps {
   items: NACECode[];
@@ -239,6 +239,8 @@ const VISIT_FREQUENCY_OPTIONS = [
   "3 Ayda 1 Defa",
 ] as const;
 
+const loadXlsx = () => import("xlsx");
+
 function normalizeTemplateText(value: string) {
   return value
     .toLocaleLowerCase("tr-TR")
@@ -288,12 +290,15 @@ function normalizeHazardClass(value?: string | null): "Az Tehlikeli" | "Tehlikel
 
 export default function CompanyManager() {
   const { user } = useAuth();
+  const runtimeMode = useSafeMode();
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [hazardFilter, setHazardFilter] = useState<string | null>(null);
   const [companyViewMode, setCompanyViewMode] = useState<"table" | "cards">("table");
+  const [workspaceMode, setWorkspaceMode] = useState<"list" | "wizard" | "import">("list");
+  const [showAllCompanies, setShowAllCompanies] = useState(false);
   
   // Wizard State
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -377,6 +382,16 @@ export default function CompanyManager() {
       loadRiskTemplates();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (runtimeMode.safeMode) {
+      setCompanyViewMode("cards");
+    }
+  }, [runtimeMode.safeMode]);
+
+  useEffect(() => {
+    setShowAllCompanies(false);
+  }, [hazardFilter, searchQuery, runtimeMode.safeMode]);
 
   const loadCompanies = async () => {
     try {
@@ -737,6 +752,7 @@ export default function CompanyManager() {
     }
 
     setEditingCompanyId(company.id);
+    setWorkspaceMode("wizard");
     setWizardOpen(true);
     setCurrentStep(1);
     void loadExistingEmployees(company.id);
@@ -801,6 +817,7 @@ export default function CompanyManager() {
   };
 
   const parseBulkCompanyFile = async (file: File) => {
+    const XLSX = await loadXlsx();
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -914,6 +931,7 @@ export default function CompanyManager() {
 
       if (successCount > 0) {
         setBulkImportOpen(false);
+        setWorkspaceMode("list");
         setBulkCompanyRows([]);
         setBulkImportFileName("");
         await loadCompanies();
@@ -1074,6 +1092,7 @@ export default function CompanyManager() {
         });
 
         setWizardOpen(false);
+        setWorkspaceMode("list");
         setEditingCompanyId(null);
         resetWizard();
         loadCompanies();
@@ -1166,6 +1185,7 @@ export default function CompanyManager() {
       });
 
       setWizardOpen(false);
+      setWorkspaceMode("list");
       resetWizard();
       loadCompanies();
     } catch (e: unknown) {
@@ -1251,6 +1271,11 @@ export default function CompanyManager() {
 
     return result;
   }, [companies, hazardFilter, searchQuery]);
+
+  const displayedCompanies = useMemo(() => {
+    if (!runtimeMode.lowDataMode || showAllCompanies) return filteredCompanies;
+    return filteredCompanies.slice(0, runtimeMode.maxCompanyRows);
+  }, [filteredCompanies, runtimeMode.lowDataMode, runtimeMode.maxCompanyRows, showAllCompanies]);
 
   const stats = useMemo(() => {
     return {
@@ -2065,35 +2090,56 @@ export default function CompanyManager() {
       </section>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
         <div className="flex flex-wrap gap-3">
           <Button
-            variant="outline"
+            variant={workspaceMode === "list" ? "default" : "outline"}
             size="lg"
-            className="gap-2 rounded-2xl border-emerald-400/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/15"
-            onClick={() => setBulkImportOpen(true)}
+            className="gap-2 rounded-2xl"
+            onClick={() => setWorkspaceMode("list")}
+          >
+            <Rows3 className="h-5 w-5" />
+            Firma Listesi
+          </Button>
+          <Button
+            variant={workspaceMode === "wizard" ? "default" : "outline"}
+            size="lg"
+            className="gap-2 rounded-2xl"
+            onClick={() => {
+              if (!editingCompanyId) resetWizard();
+              setWorkspaceMode("wizard");
+            }}
+          >
+            <Plus className="h-5 w-5" />
+            Firma Sihirbazı
+          </Button>
+          <Button
+            variant={workspaceMode === "import" ? "default" : "outline"}
+            size="lg"
+            className="gap-2 rounded-2xl"
+            onClick={() => setWorkspaceMode("import")}
           >
             <Upload className="h-5 w-5" />
-            Toplu Firma Ekle
+            Toplu Aktarım
           </Button>
+        </div>
+        {runtimeMode.safeMode ? (
+          <Badge className="rounded-full border border-amber-400/20 bg-amber-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-amber-100">
+            Safe mode aktif · kart görünümü ve düşük veri modu açık
+          </Badge>
+        ) : null}
+      </div>
 
-          <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 text-white shadow-[0_18px_45px_rgba(56,189,248,0.28)] hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400" size="lg">
-                <Plus className="h-5 w-5" />
-                Yeni Firma Ekle
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black text-white">
-                {editingCompanyId ? "Firma Düzenle" : "Yeni Firma Ekle"}
-              </DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Firma kartını, ekip bilgisini ve operasyon ritmini tek ekranda tanımlayın.
-              </DialogDescription>
-            </DialogHeader>
-
+      {workspaceMode === "wizard" && (
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
+          <CardHeader>
+            <CardTitle className="text-xl font-black text-white">
+              {editingCompanyId ? "Firma Düzenle" : "Yeni Firma Ekle"}
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              Firma kartını, ekip bilgisini ve operasyon ritmini tek ekranda tanımlayın.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="mb-6 rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(15,23,42,0.62))] p-4 shadow-[0_18px_45px_rgba(2,6,23,0.24)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -2154,125 +2200,115 @@ export default function CompanyManager() {
               </div>
             </div>
 
-            {/* Step Content */}
             <div className="min-h-[400px]">
               {renderWizardStep()}
             </div>
 
-            {/* Navigation */}
-            <div className="flex justify-between pt-6 border-t">
-              <Button
-                variant="outline"
-                onClick={() => goToStep(currentStep - 1)}
-                disabled={currentStep === 1}
-                className="gap-2"
-              >
+            <div className="flex justify-between pt-6 border-t border-white/10">
+              <Button variant="outline" onClick={() => goToStep(currentStep - 1)} disabled={currentStep === 1} className="gap-2">
                 <ChevronLeft className="h-4 w-4" />
                 Geri
               </Button>
-
-              {currentStep < 3 ? (
-                <Button
-                  onClick={() => goToStep(currentStep + 1)}
-                  className="gap-2"
-                >
-                  İleri
-                  <ChevronRight className="h-4 w-4" />
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setWorkspaceMode("list")}>
+                  Listeye Dön
                 </Button>
-              ) : (
-                <Button
-                  onClick={handleSaveCompany}
-                  disabled={saving}
-                  className="gap-2 bg-success hover:bg-success/90"
-                >
-                  {saving ? (
-                    <>
-                      <Save className="h-4 w-4 animate-spin" />
-                      Kaydediliyor...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      Firmayı Kaydet
-                    </>
-                  )}
-                </Button>
-              )}
+                {currentStep < 3 ? (
+                  <Button onClick={() => goToStep(currentStep + 1)} className="gap-2">
+                    İleri
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button onClick={handleSaveCompany} disabled={saving} className="gap-2 bg-success hover:bg-success/90">
+                    {saving ? (
+                      <>
+                        <Save className="h-4 w-4 animate-spin" />
+                        Kaydediliyor...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        Firmayı Kaydet
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
-          </DialogContent>
-          </Dialog>
-        </div>
+          </CardContent>
+        </Card>
+      )}
 
-        <Dialog open={bulkImportOpen} onOpenChange={setBulkImportOpen}>
-          <DialogContent className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black text-white">Toplu Firma Ekle</DialogTitle>
-              <DialogDescription className="text-slate-400">
-                Excel veya CSV dosyasından firmaları tek seferde sisteme ekleyin. Çalışan aktarımı bu akışta yapılmaz.
-              </DialogDescription>
-            </DialogHeader>
+      {workspaceMode === "import" && (
+        <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
+          <CardHeader>
+            <CardTitle className="text-xl font-black text-white">Toplu Firma Ekle</CardTitle>
+            <CardDescription className="text-slate-400">
+              Excel veya CSV dosyasından firmaları tek seferde sisteme ekleyin. Çalışan aktarımı bu akışta yapılmaz.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.03] p-8 transition-colors hover:bg-white/[0.05]">
+              <Upload className="mb-3 h-10 w-10 text-cyan-300" />
+              <span className="text-sm font-semibold text-white">{bulkImportFileName || "Firma dosyası seçin"}</span>
+              <span className="mt-1 text-xs text-slate-400">Excel (.xlsx, .xls) veya CSV</span>
+              <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => void handleBulkCompanyFileUpload(e.target.files?.[0] || null)} />
+            </label>
 
-            <div className="space-y-4">
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/[0.03] p-8 transition-colors hover:bg-white/[0.05]">
-                <Upload className="mb-3 h-10 w-10 text-cyan-300" />
-                <span className="text-sm font-semibold text-white">{bulkImportFileName || "Firma dosyası seçin"}</span>
-                <span className="mt-1 text-xs text-slate-400">Excel (.xlsx, .xls) veya CSV</span>
-                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => void handleBulkCompanyFileUpload(e.target.files?.[0] || null)} />
-              </label>
+            {bulkCompanyRows.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-white">Önizleme ({bulkCompanyRows.length} firma)</p>
+                  <Button variant="ghost" size="sm" className="text-red-300 hover:text-red-200" onClick={() => { setBulkCompanyRows([]); setBulkImportFileName(""); }}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Temizle
+                  </Button>
+                </div>
 
-              {bulkCompanyRows.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">Önizleme ({bulkCompanyRows.length} firma)</p>
-                    <Button variant="ghost" size="sm" className="text-red-300 hover:text-red-200" onClick={() => { setBulkCompanyRows([]); setBulkImportFileName(""); }}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Temizle
-                    </Button>
-                  </div>
-
-                  <div className="max-h-80 overflow-auto rounded-2xl border border-white/10">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Firma</TableHead>
-                          <TableHead>Vergi No</TableHead>
-                          <TableHead>NACE</TableHead>
-                          <TableHead>Tehlike</TableHead>
-                          <TableHead>Çalışan</TableHead>
+                <div className="max-h-80 overflow-auto rounded-2xl border border-white/10">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Firma</TableHead>
+                        <TableHead>Vergi No</TableHead>
+                        <TableHead>NACE</TableHead>
+                        <TableHead>Tehlike</TableHead>
+                        <TableHead>Çalışan</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {bulkCompanyRows.map((row, index) => (
+                        <TableRow key={`${row.company_name}-${index}`}>
+                          <TableCell className="font-medium">{row.company_name}</TableCell>
+                          <TableCell>{row.tax_number || "-"}</TableCell>
+                          <TableCell>{row.nace_code || "-"}</TableCell>
+                          <TableCell>{row.hazard_class}</TableCell>
+                          <TableCell>{row.employee_count}</TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {bulkCompanyRows.map((row, index) => (
-                          <TableRow key={`${row.company_name}-${index}`}>
-                            <TableCell className="font-medium">{row.company_name}</TableCell>
-                            <TableCell>{row.tax_number || "-"}</TableCell>
-                            <TableCell>{row.nace_code || "-"}</TableCell>
-                            <TableCell>{row.hazard_class}</TableCell>
-                            <TableCell>{row.employee_count}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-4 text-sm text-slate-300">
-                  Beklenen alanlar: Firma unvanı, vergi no, NACE kodu, tehlike sınıfı, sektör, adres, şehir, telefon, e-posta, çalışan sayısı.
-                </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-4 text-sm text-slate-300">
+                Beklenen alanlar: Firma unvanı, vergi no, NACE kodu, tehlike sınıfı, sektör, adres, şehir, telefon, e-posta, çalışan sayısı.
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setBulkImportOpen(false)}>Kapat</Button>
+              <Button variant="outline" onClick={() => setWorkspaceMode("list")}>Listeye Dön</Button>
               <Button className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void handleBulkCompanyImport()} disabled={bulkImporting || bulkCompanyRows.length === 0}>
                 {bulkImporting ? "Ekleniyor..." : "Firmaları Ekle"}
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
+      {workspaceMode === "list" && (
+      <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card 
           className={cn(
@@ -2369,18 +2405,20 @@ export default function CompanyManager() {
           </Button>
         )}
         <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setCompanyViewMode("table")}
-            className={cn(
-              "h-10 rounded-xl px-3 text-slate-300 hover:bg-white/[0.08] hover:text-white",
-              companyViewMode === "table" && "bg-cyan-500/10 text-cyan-100"
-            )}
-          >
-            <Rows3 className="mr-2 h-4 w-4" />
-            Tablo
-          </Button>
+          {!runtimeMode.safeMode ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setCompanyViewMode("table")}
+              className={cn(
+                "h-10 rounded-xl px-3 text-slate-300 hover:bg-white/[0.08] hover:text-white",
+                companyViewMode === "table" && "bg-cyan-500/10 text-cyan-100"
+              )}
+            >
+              <Rows3 className="mr-2 h-4 w-4" />
+              Tablo
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -2395,11 +2433,19 @@ export default function CompanyManager() {
           </Button>
         </div>
       </div>
+      {runtimeMode.lowDataMode && filteredCompanies.length > displayedCompanies.length && (
+        <div className="rounded-2xl border border-amber-400/15 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+          Düşük veri modu nedeniyle ilk etapta {displayedCompanies.length} firma gösteriliyor.
+          <Button variant="link" className="ml-2 h-auto p-0 text-amber-200" onClick={() => setShowAllCompanies(true)}>
+            Tümünü yükle
+          </Button>
+        </div>
+      )}
 
       {/* Companies Table */}
       <Card className="overflow-hidden border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.9))] shadow-[0_24px_60px_rgba(2,6,23,0.38)]">
         <CardHeader>
-          <CardTitle className="text-white">Firmalar ({filteredCompanies.length})</CardTitle>
+          <CardTitle className="text-white">Firmalar ({displayedCompanies.length}{displayedCompanies.length !== filteredCompanies.length ? ` / ${filteredCompanies.length}` : ""})</CardTitle>
           <CardDescription className="text-slate-400">
             {hazardFilter 
               ? `${hazardFilter} sınıfındaki firmalar` 
@@ -2412,7 +2458,7 @@ export default function CompanyManager() {
             <div className="text-center py-12">
               <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" />
             </div>
-          ) : filteredCompanies.length === 0 ? (
+          ) : displayedCompanies.length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="mx-auto mb-4 h-12 w-12 text-slate-600" />
               <p className="text-slate-400">
@@ -2436,7 +2482,7 @@ export default function CompanyManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCompanies.map((company) => (
+                {displayedCompanies.map((company) => (
                   <TableRow key={company.id} className="border-white/10 hover:bg-white/[0.04]">
                     <TableCell className="font-semibold text-white">
                       <div className="flex items-center gap-3">
@@ -2512,7 +2558,7 @@ export default function CompanyManager() {
             </Table>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredCompanies.map((company) => {
+              {displayedCompanies.map((company) => {
                 const companyRisk = getCompanyRiskSummary(company);
                 const companyWorkflow = getCompanyWorkflowBadges(company);
 
@@ -2627,6 +2673,8 @@ export default function CompanyManager() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
 
       {/* View Modal */}
       {viewingCompany && (

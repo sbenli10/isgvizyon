@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 export interface ParsedEmployee {
   full_name?: string | null;
   first_name: string;
@@ -38,12 +36,11 @@ const parseExcelDate = (value: unknown) => {
   if (!value && value !== 0) return null;
 
   if (typeof value === "number") {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (!parsed) return null;
-    const year = String(parsed.y).padStart(4, "0");
-    const month = String(parsed.m).padStart(2, "0");
-    const day = String(parsed.d).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const milliseconds = Math.round(value * 24 * 60 * 60 * 1000);
+    const parsed = new Date(excelEpoch.getTime() + milliseconds);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toISOString().slice(0, 10);
   }
 
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -85,12 +82,15 @@ const splitFullName = (value: string) => {
   };
 };
 
+const loadXlsx = () => import("xlsx");
+
 export function parseEmployeeExcel(file: File): Promise<ParsedEmployee[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        const XLSX = await loadXlsx();
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: "array", cellDates: true });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -219,6 +219,7 @@ export function parseEmployeeExcel(file: File): Promise<ParsedEmployee[]> {
 }
 
 export function downloadEmployeeTemplate() {
+  return loadXlsx().then((XLSX) => {
   const template = [
     [
       "Adı Soyadı",
@@ -268,4 +269,5 @@ export function downloadEmployeeTemplate() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Calisanlar");
   XLSX.writeFile(wb, "calisanlar-sablonu.xlsx");
+  });
 }

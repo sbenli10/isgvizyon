@@ -1,5 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { Suspense, lazy } from "react";
 import { toast } from "sonner";
 import { BookOpenCheck, History, Layers3, Loader2, Route, Save, Sparkles, UploadCloud } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -12,17 +13,14 @@ import {
 } from "@/components/evacuation-editor/FabricCompat";
 
 import { CanvasWorkspace } from "@/components/evacuation-editor/CanvasWorkspace";
-import { SymbolLibrary, type EditorSymbol } from "@/components/evacuation-editor/SymbolLibrary";
+import type { EditorSymbol } from "@/components/evacuation-editor/SymbolLibrary";
 import { EditorToolbar, type ToolMode } from "@/components/evacuation-editor/EditorToolbar";
-import { PropertiesPanel } from "@/components/evacuation-editor/PropertiesPanel";
-import { LegendPanel, type LegendEntry } from "@/components/evacuation-editor/LegendPanel";
-import { LayerPanel, type LayerItem } from "@/components/evacuation-editor/LayerPanel";
+import type { LegendEntry } from "@/components/evacuation-editor/LegendPanel";
+import type { LayerItem } from "@/components/evacuation-editor/LayerPanel";
 import { HistoryManager } from "@/components/evacuation-editor/HistoryManager";
 import { GridSystem } from "@/components/evacuation-editor/GridSystem";
 import { SnapSystem } from "@/components/evacuation-editor/SnapSystem";
-import { ExportService } from "@/components/evacuation-editor/ExportService";
-import { generateEvacuationPlan, improveEvacuationPlan, type AIEvacuationPlan } from "@/lib/aiPlanGenerator";
-import { generateEvacuationImage } from "@/lib/aiEvacuationImageGenerator";
+import type { AIEvacuationPlan } from "@/lib/aiPlanGenerator";
 import { importAIPlan, validateAIPlan } from "@/lib/canvasAIImporter";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,12 +49,41 @@ interface SavedProject {
 
 const STORAGE_KEY = "evacuation-editor-projects";
 const LOAD_KEY = "evacuation-editor-load-project";
+const SymbolLibrary = lazy(() =>
+  import("@/components/evacuation-editor/SymbolLibrary").then((module) => ({ default: module.SymbolLibrary }))
+);
+const PropertiesPanel = lazy(() =>
+  import("@/components/evacuation-editor/PropertiesPanel").then((module) => ({ default: module.PropertiesPanel }))
+);
+const LegendPanel = lazy(() =>
+  import("@/components/evacuation-editor/LegendPanel").then((module) => ({ default: module.LegendPanel }))
+);
+const LayerPanel = lazy(() =>
+  import("@/components/evacuation-editor/LayerPanel").then((module) => ({ default: module.LayerPanel }))
+);
+const loadEvacuationExportService = () => import("@/components/evacuation-editor/ExportService");
+const loadAiPlanGenerator = () => import("@/lib/aiPlanGenerator");
+const loadAiEvacuationImageGenerator = () => import("@/lib/aiEvacuationImageGenerator");
 
 const initialFloor: FloorState = {
   id: "floor-ground",
   name: "Zemin Kat",
   canvasJson: null,
 };
+
+const PanelLoadingCard = ({ message, compact = false }: { message: string; compact?: boolean }) => (
+  <div
+    className={[
+      "flex h-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/60 px-4 text-center text-sm text-slate-300",
+      compact ? "min-h-[160px]" : "min-h-[220px]",
+    ].join(" ")}
+  >
+    <div className="flex items-center gap-3">
+      <Loader2 className="h-4 w-4 animate-spin text-cyan-300" />
+      {message}
+    </div>
+  </div>
+);
 
 export default function EvacuationEditor() {
   const navigate = useNavigate();
@@ -352,6 +379,7 @@ export default function EvacuationEditor() {
 
     try {
       setAiLoading(true);
+      const { generateEvacuationPlan } = await loadAiPlanGenerator();
       const plan = await generateEvacuationPlan(aiPrompt.trim());
       validateAIPlan(plan);
 
@@ -396,6 +424,7 @@ export default function EvacuationEditor() {
 
     try {
       setAiImproveLoading(true);
+      const { improveEvacuationPlan } = await loadAiPlanGenerator();
       const improvedPlan = await improveEvacuationPlan(currentPlan, aiImprovePrompt.trim());
       validateAIPlan(improvedPlan);
 
@@ -475,6 +504,7 @@ export default function EvacuationEditor() {
 
     try {
       setAiImageLoading(true);
+      const { generateEvacuationImage } = await loadAiEvacuationImageGenerator();
       const image = await generateEvacuationImage(aiImagePrompt.trim());
       setAiImageDataUrl(image.dataUrl);
       toast.success("AI 3D gorsel uretildi.");
@@ -780,6 +810,8 @@ export default function EvacuationEditor() {
     if (!canvas) return;
     const safeName = projectName.replace(/\s+/g, "-").toLowerCase();
 
+    const ExportService = await loadEvacuationExportService();
+
     if (formatName === "png") return ExportService.exportPNG(canvas, safeName);
     if (formatName === "svg") return ExportService.exportSVG(canvas, safeName);
 
@@ -1001,18 +1033,22 @@ export default function EvacuationEditor() {
         <div className="min-h-0 flex flex-1 gap-3 p-3 lg:p-4">
           <div className="flex min-h-0 w-[240px] shrink-0 flex-col gap-3">
             <div className="min-h-0 flex-1">
-              <SymbolLibrary onAddSymbol={handleAddSymbol} />
+              <Suspense fallback={<PanelLoadingCard message="Sembol kütüphanesi yükleniyor..." />}>
+                <SymbolLibrary onAddSymbol={handleAddSymbol} />
+              </Suspense>
             </div>
             <div className="h-[240px] min-h-[180px]">
-              <LayerPanel
-                layers={layers}
-                selectedLayerId={(selectedObject as any)?.denetronMeta?.layerId || null}
-                onSelectLayer={selectLayer}
-                onToggleVisibility={toggleLayerVisibility}
-                onToggleLock={toggleLayerLock}
-                onMoveLayer={moveLayer}
-                onDeleteLayer={deleteLayer}
-              />
+              <Suspense fallback={<PanelLoadingCard message="Katman paneli yükleniyor..." compact />}>
+                <LayerPanel
+                  layers={layers}
+                  selectedLayerId={(selectedObject as any)?.denetronMeta?.layerId || null}
+                  onSelectLayer={selectLayer}
+                  onToggleVisibility={toggleLayerVisibility}
+                  onToggleLock={toggleLayerLock}
+                  onMoveLayer={moveLayer}
+                  onDeleteLayer={deleteLayer}
+                />
+              </Suspense>
             </div>
           </div>
 
@@ -1038,7 +1074,9 @@ export default function EvacuationEditor() {
               </button>
               {legendOpen && (
                 <div className="mt-2 max-h-[220px] overflow-auto">
-                  <LegendPanel items={legendItems} />
+                  <Suspense fallback={<PanelLoadingCard message="Lejant yükleniyor..." compact />}>
+                    <LegendPanel items={legendItems} />
+                  </Suspense>
                 </div>
               )}
             </div>
@@ -1046,25 +1084,27 @@ export default function EvacuationEditor() {
 
           {!focusMode && (
             <div className="min-h-0 w-[260px] shrink-0">
-              <PropertiesPanel
-                selectedObject={selectedObject}
-                onUpdateObject={handleUpdateObject}
-                onDeleteObject={deleteSelected}
-                onDuplicateObject={duplicateSelected}
-                onBringForward={() => {
-                  const obj = getActiveObject();
-                  if (!obj) return;
-                  obj.bringForward();
-                  canvasRef.current?.requestRenderAll();
-                }}
-                onSendBackward={() => {
-                  const obj = getActiveObject();
-                  if (!obj) return;
-                  obj.sendBackwards();
-                  canvasRef.current?.requestRenderAll();
-                }}
-                onUploadBackground={handleUploadBackground}
-              />
+              <Suspense fallback={<PanelLoadingCard message="Özellik paneli yükleniyor..." />}>
+                <PropertiesPanel
+                  selectedObject={selectedObject}
+                  onUpdateObject={handleUpdateObject}
+                  onDeleteObject={deleteSelected}
+                  onDuplicateObject={duplicateSelected}
+                  onBringForward={() => {
+                    const obj = getActiveObject();
+                    if (!obj) return;
+                    obj.bringForward();
+                    canvasRef.current?.requestRenderAll();
+                  }}
+                  onSendBackward={() => {
+                    const obj = getActiveObject();
+                    if (!obj) return;
+                    obj.sendBackwards();
+                    canvasRef.current?.requestRenderAll();
+                  }}
+                  onUploadBackground={handleUploadBackground}
+                />
+              </Suspense>
             </div>
           )}
         </div>

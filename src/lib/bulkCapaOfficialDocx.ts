@@ -1,4 +1,5 @@
 import type { IBorderOptions } from "docx";
+import { getBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
 
 export interface BulkCapaOfficialEntry {
   id: string;

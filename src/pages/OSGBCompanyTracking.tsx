@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 import { BookOpen, Building2, Download, Link2, Plus, RefreshCcw, Search, ShieldAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -96,7 +95,10 @@ const formatMoney = (value: number) =>
 const normalizeHeader = (value: string) =>
   value.toLocaleLowerCase("tr-TR").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ı/g, "i").replace(/[^a-z0-9]/g, "");
 
+const loadXlsx = () => import("xlsx");
+
 const parseImportRows = async (file: File): Promise<OsgbCompanyManagementInput[]> => {
+  const XLSX = await loadXlsx();
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];

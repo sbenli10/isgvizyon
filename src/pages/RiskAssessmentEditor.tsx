@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { debounce } from "lodash";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,9 +75,6 @@ import {
 } from "@/types/risk-assessment";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { SendReportModal } from "@/components/SendReportModal";
-import * as XLSX from "xlsx";
-import { buildRiskAssessmentPdf } from "@/lib/riskAssessmentPdfExport";
 import { RISK_SECTOR_CATALOG, buildCatalogKey } from "@/lib/riskSectorCatalog";
 import {
   Dialog,
@@ -87,9 +85,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useSafeMode } from "@/hooks/useSafeMode";
 
 
 let scrollLock = 0;
+
+const SendReportModal = lazy(() =>
+  import("@/components/SendReportModal").then((module) => ({ default: module.SendReportModal }))
+);
+const loadXlsx = () => import("xlsx");
+const loadRiskAssessmentPdfExport = () => import("@/lib/riskAssessmentPdfExport");
 
 const SECTOR_UI_META: Record<string, { accent: string; hint: string }> = {
   otomotiv: { accent: "from-sky-500/20 to-cyan-500/10", hint: "Montaj, pres ve araç hattı riskleri" },
@@ -440,6 +445,7 @@ const COMMON_TEMPLATE_RISKS = [
 
 export default function RiskAssessmentEditor() {
   const { user, profile } = useAuth();
+  const runtimeMode = useSafeMode();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const createdFromWizard = Boolean((location.state as { createdFromWizard?: boolean } | null)?.createdFromWizard);
@@ -498,6 +504,9 @@ export default function RiskAssessmentEditor() {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [templateName, setTemplateName] = useState("");
   const [templateSaving, setTemplateSaving] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<"overview" | "editor" | "outputs">("overview");
+  const [editorPresentation, setEditorPresentation] = useState<"cards" | "table">("table");
+  const [showAllRiskRows, setShowAllRiskRows] = useState(false);
   const [riskTemplates, setRiskTemplates] = useState<RiskAssessmentTemplateRecord[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const templateFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1045,6 +1054,7 @@ useLayoutEffect(() => {
 
     try {
       const buffer = await file.arrayBuffer();
+      const XLSX = await loadXlsx();
       const workbook = XLSX.read(buffer, { type: "array" });
       const normalizeHeader = normalizeTemplateText;
 
@@ -3109,7 +3119,7 @@ useLayoutEffect(() => {
   };
 
   const RiskAnalysisTable = () => {
-    if (riskItems.length === 0) {
+    if (displayedRiskItems.length === 0) {
       return (
         <div className="flex h-96 items-center justify-center">
           <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] px-8 py-10 text-center shadow-[0_20px_45px_rgba(15,23,42,0.28)]">
@@ -3238,7 +3248,7 @@ useLayoutEffect(() => {
 
           {/* TABLE BODY */}
           <tbody>
-            {riskItems.map((item, idx) => (
+            {displayedRiskItems.map((item, idx) => (
               <tr
                 key={item.id}
                 className="border-b border-slate-800/70 transition-colors odd:bg-white/[0.015] even:bg-slate-950/35 hover:bg-white/[0.06]"
@@ -3776,6 +3786,179 @@ useLayoutEffect(() => {
     );
   };
 
+  const SimplifiedRiskCardList = () => {
+    if (displayedRiskItems.length === 0) {
+      return <RiskAnalysisTable />;
+    }
+
+    return (
+      <div className="space-y-4 p-4 lg:p-5">
+        {runtimeMode.lowDataMode && riskItems.length > displayedRiskItems.length ? (
+          <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Düşük veri modu aktif. İlk etapta {displayedRiskItems.length} madde gösteriliyor.
+            <Button
+              type="button"
+              variant="link"
+              className="ml-2 h-auto p-0 text-amber-200"
+              onClick={() => setShowAllRiskRows(true)}
+            >
+              Tüm maddeleri yükle
+            </Button>
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          {displayedRiskItems.map((item, idx) => (
+            <Card key={item.id} className="border border-white/10 bg-white/[0.04] shadow-[0_18px_45px_rgba(15,23,42,0.28)]">
+              <CardContent className="space-y-4 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
+                        {String(idx + 1).padStart(2, "0")}
+                      </Badge>
+                      <Badge className={`${getRiskClassColor(item.risk_class_1)} text-xs font-semibold`}>
+                        {getRiskClassLabel(item.risk_class_1)}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-sm font-semibold text-foreground">{item.department || "Faaliyet belirtilmedi"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Safe mode kart düzeni</p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => deleteRiskItem(item.id)}
+                    className="h-8 w-8 text-red-400 hover:bg-red-500/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Tehlike</p>
+                    {editingCell?.itemId === item.id && editingCell.field === "hazard" ? (
+                      <div className="mt-2 flex items-start gap-2">
+                        <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} className="min-h-[88px] border-white/10 bg-slate-900/80 text-foreground" />
+                        <div className="flex flex-col gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveEdit}><CheckCircle2 className="h-4 w-4 text-green-500" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}><X className="h-4 w-4 text-red-500" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => startEdit(item.id, "hazard", item.hazard)} className="mt-2 w-full text-left text-sm text-foreground">
+                        {item.hazard}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Risk</p>
+                    {editingCell?.itemId === item.id && editingCell.field === "risk" ? (
+                      <div className="mt-2 flex items-start gap-2">
+                        <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} className="min-h-[88px] border-white/10 bg-slate-900/80 text-foreground" />
+                        <div className="flex flex-col gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveEdit}><CheckCircle2 className="h-4 w-4 text-green-500" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}><X className="h-4 w-4 text-red-500" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button type="button" onClick={() => startEdit(item.id, "risk", item.risk)} className="mt-2 w-full text-left text-sm text-foreground">
+                        {item.risk}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Mevcut Durum</p>
+                    {editingCell?.itemId === item.id && editingCell.field === "existing_controls" ? (
+                      <div className="mt-2 flex items-start gap-2">
+                        <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} className="min-h-[88px] border-white/10 bg-slate-900/80 text-foreground" />
+                        <div className="flex flex-col gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveEdit}><CheckCircle2 className="h-4 w-4 text-green-500" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}><X className="h-4 w-4 text-red-500" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item.id, "existing_controls", item.existing_controls)}
+                        className="mt-2 w-full text-left text-sm text-foreground"
+                      >
+                        {item.existing_controls || "—"}
+                      </button>
+                    )}
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Önerilen Faaliyet</p>
+                    {editingCell?.itemId === item.id && editingCell.field === "proposed_controls" ? (
+                      <div className="mt-2 flex items-start gap-2">
+                        <Textarea value={editValue} onChange={(e) => setEditValue(e.target.value)} className="min-h-[88px] border-white/10 bg-slate-900/80 text-foreground" />
+                        <div className="flex flex-col gap-1">
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={saveEdit}><CheckCircle2 className="h-4 w-4 text-green-500" /></Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8" onClick={cancelEdit}><X className="h-4 w-4 text-red-500" /></Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item.id, "proposed_controls", item.proposed_controls)}
+                        className="mt-2 w-full text-left text-sm text-foreground"
+                      >
+                        {item.proposed_controls || "—"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Olasılık</Label>
+                    <Select value={item.probability_1.toString()} onValueChange={(value) => updateRiskItem(item.id, "probability_1", parseFloat(value), 1)}>
+                      <SelectTrigger className="mt-1 h-10 rounded-xl border-red-400/15 bg-red-500/5 text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>{FINE_KINNEY_SCALES.probability.map((scale) => <SelectItem key={scale.value} value={scale.value.toString()}>{scale.value}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Frekans</Label>
+                    <Select value={item.frequency_1.toString()} onValueChange={(value) => updateRiskItem(item.id, "frequency_1", parseFloat(value), 1)}>
+                      <SelectTrigger className="mt-1 h-10 rounded-xl border-red-400/15 bg-red-500/5 text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>{FINE_KINNEY_SCALES.frequency.map((scale) => <SelectItem key={scale.value} value={scale.value.toString()}>{scale.value}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Şiddet</Label>
+                    <Select value={item.severity_1.toString()} onValueChange={(value) => updateRiskItem(item.id, "severity_1", parseFloat(value), 1)}>
+                      <SelectTrigger className="mt-1 h-10 rounded-xl border-red-400/15 bg-red-500/5 text-foreground"><SelectValue /></SelectTrigger>
+                      <SelectContent>{FINE_KINNEY_SCALES.severity.map((scale) => <SelectItem key={scale.value} value={scale.value.toString()}>{scale.value}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Skor</p>
+                    <p className="mt-2 text-lg font-black text-foreground">{item.score_1}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Termin</p>
+                    <Input type="date" value={item.deadline || ""} onChange={(e) => updateRiskItem(item.id, "deadline", e.target.value)} className="mt-2 h-10 border-white/10 bg-slate-900/80 text-foreground" />
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">Sorumlu</p>
+                    <Input value={item.responsible_person || ""} onChange={(e) => updateRiskItem(item.id, "responsible_person", e.target.value)} className="mt-2 h-10 border-white/10 bg-slate-900/80 text-foreground" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   const exportToPDF = async () => {
     if (!assessment || riskItems.length === 0) {
       toast.error("PDF oluşturmak için veri yok");
@@ -3786,6 +3969,7 @@ useLayoutEffect(() => {
 
     try {
       const company = companies.find((c) => c.id === assessment.company_id);
+      const { buildRiskAssessmentPdf } = await loadRiskAssessmentPdfExport();
       const doc = await buildRiskAssessmentPdf({
         assessment,
         riskItems,
@@ -3814,6 +3998,7 @@ const exportToPDFAndShare = async () => {
     toast.info("PDF raporu oluşturuluyor...");
 
     const company = companies.find((c) => c.id === assessment?.company_id);
+    const { buildRiskAssessmentPdf } = await loadRiskAssessmentPdfExport();
     const doc = await buildRiskAssessmentPdf({
       assessment,
       riskItems,
@@ -4261,6 +4446,9 @@ const exportToPDFAndShare = async () => {
   const riskMetrics = useMemo(() => {
     const critical = riskItems.filter((item) => item.risk_class_1 === "Çok Yüksek").length;
     const high = riskItems.filter((item) => item.risk_class_1 === "Yüksek").length;
+    const notable = riskItems.filter(
+      (item) => item.risk_class_1 === "Önemli" || item.risk_class_1 === "Olası"
+    ).length;
     const acceptable = riskItems.filter(
       (item) => item.risk_class_2 === "Kabul Edilebilir" || item.risk_class_2 === "Olası"
     ).length;
@@ -4269,9 +4457,27 @@ const exportToPDFAndShare = async () => {
       total: riskItems.length,
       critical,
       high,
+      notable,
       acceptable,
     };
   }, [riskItems]);
+
+  const displayedRiskItems = useMemo(() => {
+    if (!runtimeMode.lowDataMode || showAllRiskRows) return riskItems;
+    return riskItems.slice(0, runtimeMode.maxRiskRows);
+  }, [riskItems, runtimeMode.lowDataMode, runtimeMode.maxRiskRows, showAllRiskRows]);
+
+  useEffect(() => {
+    if (runtimeMode.safeMode) {
+      setEditorPresentation("cards");
+      setShowOrderColumn(false);
+      setShowStatusColumns(false);
+    }
+  }, [runtimeMode.safeMode]);
+
+  useEffect(() => {
+    setShowAllRiskRows(false);
+  }, [assessment?.id, selectedCompany, runtimeMode.safeMode]);
 
   // ========================
   // MAIN RENDER
@@ -4554,6 +4760,87 @@ const exportToPDFAndShare = async () => {
           </div>
         </div>
       ) : (
+        <Tabs
+          value={workspaceTab}
+          onValueChange={(value) => setWorkspaceTab(value as "overview" | "editor" | "outputs")}
+          className="flex flex-1 flex-col"
+        >
+          <div className="border-b border-white/10 bg-slate-950/70 px-4 py-3">
+            <TabsList className="grid w-full max-w-xl grid-cols-3 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+              <TabsTrigger value="overview" className="rounded-xl data-[state=active]:bg-cyan-500 data-[state=active]:text-slate-950">
+                Özet
+              </TabsTrigger>
+              <TabsTrigger value="editor" className="rounded-xl data-[state=active]:bg-indigo-500 data-[state=active]:text-white">
+                Editör
+              </TabsTrigger>
+              <TabsTrigger value="outputs" className="rounded-xl data-[state=active]:bg-emerald-500 data-[state=active]:text-slate-950">
+                Çıktılar
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="overview" className="mt-0 flex-1 overflow-auto p-5">
+            <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+              <Card className="border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
+                <CardContent className="p-6">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-300/80">Çalışma Özeti</p>
+                  <h3 className="mt-3 text-2xl font-black text-foreground">Risk değerlendirme oturumu hazır</h3>
+                  <p className="mt-3 text-sm leading-6 text-foreground">
+                    Ağır tablo artık ayrı sekmede açılıyor. Bu özet ekranı ilk girişte daha hafif çalışır ve kullanıcıya mevcut risk baskısını hızlıca gösterir.
+                  </p>
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Firma</p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">{activeCompanyName}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Toplam Madde</p>
+                      <p className="mt-2 text-3xl font-black text-foreground">{riskMetrics.total}</p>
+                    </div>
+                    <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/80">Kritik + Yüksek</p>
+                      <p className="mt-2 text-3xl font-black text-red-100">{riskMetrics.critical + riskMetrics.high}</p>
+                    </div>
+                    <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/80">Güvenli</p>
+                      <p className="mt-2 text-3xl font-black text-emerald-100">{riskMetrics.acceptable}</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button type="button" onClick={() => setWorkspaceTab("editor")} className="gap-2">
+                      <Columns3 className="h-4 w-4" />
+                      Editöre Geç
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setWorkspaceTab("outputs")} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Çıktıları Aç
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="space-y-6">
+                <Card className="border border-white/10 bg-white/[0.04] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+                  <CardContent className="p-6">
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-violet-300/80">Risk Kompozisyonu</p>
+                    <div className="mt-4 space-y-3">
+                      <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-red-100">
+                        Kritik riskler: <span className="font-bold">{riskMetrics.critical}</span>
+                      </div>
+                      <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-amber-100">
+                        Yüksek riskler: <span className="font-bold">{riskMetrics.high}</span>
+                      </div>
+                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-cyan-100">
+                        Olası/Önemli: <span className="font-bold">{riskMetrics.notable}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="editor" className="mt-0 flex-1 data-[state=inactive]:hidden">
         <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden lg:flex-row lg:overflow-hidden">
           <div className="w-full shrink-0 lg:w-[24rem]">
             <RiskLibraryPanel />
@@ -4646,6 +4933,29 @@ const exportToPDFAndShare = async () => {
                   <Columns3 className="h-4 w-4" />
                   Pros
                 </Button>
+                <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] p-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={editorPresentation === "cards" ? "default" : "ghost"}
+                    onClick={() => setEditorPresentation("cards")}
+                    className="gap-2 rounded-lg"
+                  >
+                    <Columns3 className="h-4 w-4" />
+                    Kartlar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={editorPresentation === "table" ? "default" : "ghost"}
+                    onClick={() => setEditorPresentation("table")}
+                    className="gap-2 rounded-lg"
+                    disabled={runtimeMode.lowMemory}
+                  >
+                    <ListOrdered className="h-4 w-4" />
+                    Tam Tablo
+                  </Button>
+                </div>
                 <Button
                   type="button"
                   size="sm"
@@ -4691,6 +5001,12 @@ const exportToPDFAndShare = async () => {
                   Sil
                 </Button>
               </div>
+              {runtimeMode.safeMode ? (
+                <div className="mt-3 rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  Mobil / düşük RAM güvenli modu açık. Editör varsayılan olarak kart görünümüne alındı ve ağır kolonlar sadeleştirildi.
+                  {runtimeMode.lowMemory ? " Düşük bellek algılandığı için tam tablo görünümü kapalı tutuluyor." : ""}
+                </div>
+              ) : null}
             </div>
             <div className="border-b border-white/10 bg-slate-950/60 px-4 py-3 flex items-center justify-between gap-3 flex-shrink-0">
               <div className="flex items-center gap-2">
@@ -4727,16 +5043,100 @@ const exportToPDFAndShare = async () => {
               </Button>
             </div>
             <div className="relative flex-1 overflow-auto lg:overflow-hidden">
-              <div
-                ref={tableContainerRef}
-                className="min-h-[60vh] overflow-auto scroll-smooth lg:absolute lg:inset-0 lg:min-h-0"
-                onScroll={handleScroll}
-              >
-                <RiskAnalysisTable />
-              </div>
+              {editorPresentation === "cards" ? (
+                <div className="min-h-[60vh] overflow-auto lg:absolute lg:inset-0 lg:min-h-0">
+                  <SimplifiedRiskCardList />
+                </div>
+              ) : (
+                <div
+                  ref={tableContainerRef}
+                  className="min-h-[60vh] overflow-auto scroll-smooth lg:absolute lg:inset-0 lg:min-h-0"
+                  onScroll={handleScroll}
+                >
+                  <RiskAnalysisTable />
+                </div>
+              )}
             </div>
           </div>
         </div>
+          </TabsContent>
+
+          <TabsContent value="outputs" className="mt-0 flex-1 overflow-auto p-5">
+            <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <Card className="border border-white/10 bg-white/[0.04] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+                <CardContent className="p-6">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-emerald-300/80">Rapor Merkezi</p>
+                  <h3 className="mt-3 text-2xl font-black text-foreground">PDF, Excel ve şablon akışı</h3>
+                  <p className="mt-3 text-sm leading-6 text-foreground">
+                    Çıktı araçlarını editörden ayırdık. Böylece ilk açılışta tablo dışında kalan operasyonlar daha kontrollü yükleniyor.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Button
+                      variant="outline"
+                      className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
+                      onClick={exportToExcel}
+                      disabled={!assessment || riskItems.length === 0}
+                    >
+                      <Download className="h-4 w-4" />
+                      Excel Çıktısı
+                    </Button>
+                    <Button
+                      className="gap-2 bg-gradient-to-r from-emerald-500 to-cyan-500 text-foreground shadow-[0_14px_30px_rgba(16,185,129,0.28)] hover:from-emerald-400 hover:to-cyan-400"
+                      onClick={exportToPDFAndShare}
+                      disabled={!assessment || riskItems.length === 0}
+                    >
+                      <Share2 className="h-4 w-4" />
+                      PDF Oluştur ve Gönder
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="gap-2 border-cyan-400/25 bg-cyan-500/10 text-cyan-100"
+                      onClick={() => setShowTemplateDialog(true)}
+                    >
+                      <Upload className="h-4 w-4" />
+                      Şablonları Aç
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-white/10 bg-white/[0.04] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
+                <CardContent className="p-6">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-300/80">Yardım ve bakım</p>
+                  <div className="mt-4 space-y-3">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"
+                      onClick={() => setShowHelp(true)}
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      Nasıl kullanılır rehberini aç
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 border-amber-400/25 bg-amber-500/10 text-amber-100"
+                      onClick={() => {
+                        void autoSave();
+                        toast.success("Risk değerlendirmesi kaydedildi");
+                      }}
+                    >
+                      <Save className="h-4 w-4" />
+                      Oturumu şimdi kaydet
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-2 border-indigo-400/25 bg-indigo-500/10 text-indigo-100"
+                      onClick={() => setWorkspaceTab("editor")}
+                    >
+                      <Columns3 className="h-4 w-4" />
+                      Editör sekmesine dön
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       )}
         <Dialog open={showTemplateDialog} onOpenChange={setShowTemplateDialog}>
           <DialogContent className="max-w-3xl border border-white/10 bg-slate-950/95 text-foreground">
@@ -4903,19 +5303,20 @@ const exportToPDFAndShare = async () => {
         {/* AI Results Dialog */}
         <AIResultsDialog />
 
-
-        <SendReportModal
-          open={sendModalOpen}
-          onOpenChange={setSendModalOpen}
-          reportType="risk_assessment"
-          reportUrl={currentReportUrl}
-          reportFilename={
-            `Risk_Raporu_${companies.find((c) => c.id === assessment?.company_id)?.name || "Firma"}.pdf`
-          }
-          companyName={
-            companies.find((c) => c.id === assessment?.company_id)?.name || "Firma"
-          }
-        />
+        <Suspense fallback={null}>
+          <SendReportModal
+            open={sendModalOpen}
+            onOpenChange={setSendModalOpen}
+            reportType="risk_assessment"
+            reportUrl={currentReportUrl}
+            reportFilename={
+              `Risk_Raporu_${companies.find((c) => c.id === assessment?.company_id)?.name || "Firma"}.pdf`
+            }
+            companyName={
+              companies.find((c) => c.id === assessment?.company_id)?.name || "Firma"
+            }
+          />
+        </Suspense>
          <HelpDialog />
     </div>
   );

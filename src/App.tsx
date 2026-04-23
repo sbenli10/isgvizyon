@@ -32,6 +32,7 @@ import EmailHistory from "@/pages/EmailHistory";
 import { useAuth } from "@/contexts/AuthContext";
 import CookieConsent from "@/components/CookieConsent";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
+import { SentryRuntimeContext } from "@/components/SentryRuntimeContext";
 
 // ============================================
 // CORE PAGES
@@ -368,6 +369,7 @@ const App = () => (
           }}
         >
           <AuthProvider>
+            <SentryRuntimeContext />
             <RouteTimingObserver />
             <CookieConsent />
             <Routes>

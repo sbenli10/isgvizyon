@@ -1,6 +1,6 @@
 ﻿// src/pages/ADEPWizard.tsx
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,25 +48,22 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
-// ✅ Existing DB-first tabs
-import ADEPGeneralInfo from "@/components/adep/ADEPGeneralInfo";
-import ADEPLegislationTab from "@/components/adep/ADEPLegislationTab";
-import ADEPTeamsTab from "@/components/adep/ADEPTeamsTab";
-import ADEPScenariosTab from "@/components/adep/ADEPScenariosTab";
-import ADEPContactsTab from "@/components/adep/ADEPContactsTab";
-
-import ADEPPreventiveMeasuresTab from "@/components/adep/ADEPPreventiveMeasuresTab";
-import ADEPEquipmentTab from "@/components/adep/ADEPEquipmentTab";
-import ADEPDrillsTab from "@/components/adep/ADEPDrillsTab";
-import ADEPChecklistsTab from "@/components/adep/ADEPChecklistsTab";
-import ADEPRACITab from "@/components/adep/ADEPRACITab";
-import ADEPLegalReferencesTab from "@/components/adep/ADEPLegalReferencesTab";
-import ADEPRiskSourcesTab from "@/components/adep/ADEPRiskSourcesTab";
-import { SendReportModal } from "@/components/SendReportModal";
-
-
-// ✅ PDF Generator
-import { generateADEPPDF } from "@/components/adep/ADEPPDFGenerator";
+const ADEPGeneralInfo = lazy(() => import("@/components/adep/ADEPGeneralInfo"));
+const ADEPLegislationTab = lazy(() => import("@/components/adep/ADEPLegislationTab"));
+const ADEPTeamsTab = lazy(() => import("@/components/adep/ADEPTeamsTab"));
+const ADEPScenariosTab = lazy(() => import("@/components/adep/ADEPScenariosTab"));
+const ADEPContactsTab = lazy(() => import("@/components/adep/ADEPContactsTab"));
+const ADEPPreventiveMeasuresTab = lazy(() => import("@/components/adep/ADEPPreventiveMeasuresTab"));
+const ADEPEquipmentTab = lazy(() => import("@/components/adep/ADEPEquipmentTab"));
+const ADEPDrillsTab = lazy(() => import("@/components/adep/ADEPDrillsTab"));
+const ADEPChecklistsTab = lazy(() => import("@/components/adep/ADEPChecklistsTab"));
+const ADEPRACITab = lazy(() => import("@/components/adep/ADEPRACITab"));
+const ADEPLegalReferencesTab = lazy(() => import("@/components/adep/ADEPLegalReferencesTab"));
+const ADEPRiskSourcesTab = lazy(() => import("@/components/adep/ADEPRiskSourcesTab"));
+const SendReportModal = lazy(() =>
+  import("@/components/SendReportModal").then((module) => ({ default: module.SendReportModal }))
+);
+const loadAdeppdfGenerator = () => import("@/components/adep/ADEPPDFGenerator");
 
 // ------------------------------------
 // Types
@@ -224,6 +221,15 @@ const STEPS = [
   // === Final ===
   { id: 13, label: "PDF", icon: FileText, category: "final" },
 ] as const;
+
+const AdepStepFallback = () => (
+  <div className="flex min-h-[280px] items-center justify-center rounded-[24px] border border-white/10 bg-slate-950/45">
+    <div className="flex items-center gap-3 text-sm text-slate-300">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Adım yükleniyor...
+    </div>
+  </div>
+);
 
 export default function ADEPWizard() {
   const navigate = useNavigate();
@@ -1118,6 +1124,7 @@ export default function ADEPWizard() {
       });
 
       toast.info("PDF hazırlanıyor...");
+      const { generateADEPPDF } = await loadAdeppdfGenerator();
       const pdfDoc = await generateADEPPDF(planId);
       const pdfBlob = pdfDoc.output("blob");
 
@@ -1649,6 +1656,7 @@ export default function ADEPWizard() {
 
                       toast.info("PDF hazırlanıyor...");
                       try {
+                        const { generateADEPPDF } = await loadAdeppdfGenerator();
                         await generateADEPPDF(planId);
                         toast.success("PDF indirildi");
                       } catch (e: any) {
@@ -2069,7 +2077,7 @@ export default function ADEPWizard() {
 
         <CardContent className="bg-transparent pt-6 text-foreground dark:text-slate-100">
           <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-border [&_.bg-card]:bg-card [&_.shadow-sm]:shadow-sm [&_.text-card-foreground]:text-foreground [&_h3]:text-foreground [&_p.text-muted-foreground]:text-muted-foreground [&_label]:text-foreground [&_input]:border-border [&_input]:bg-background [&_input]:text-foreground [&_textarea]:border-border [&_textarea]:bg-background [&_textarea]:text-foreground [&_[role='combobox']]:border-border [&_[role='combobox']]:bg-background [&_[role='combobox']]:text-foreground [&_button.variant-outline]:border-border [&_button.variant-outline]:bg-background dark:[&_.border]:border-white/10 dark:[&_.bg-card]:bg-slate-950/55 dark:[&_.shadow-sm]:shadow-[0_18px_40px_rgba(2,6,23,0.18)] dark:[&_.text-card-foreground]:text-slate-100 dark:[&_h3]:text-white dark:[&_p.text-muted-foreground]:text-slate-400 dark:[&_label]:text-slate-200 dark:[&_input]:border-white/10 dark:[&_input]:bg-slate-950/60 dark:[&_input]:text-slate-100 dark:[&_textarea]:border-white/10 dark:[&_textarea]:bg-slate-950/60 dark:[&_textarea]:text-slate-100 dark:[&_[role='combobox']]:border-white/10 dark:[&_[role='combobox']]:bg-slate-950/60 dark:[&_[role='combobox']]:text-slate-100 dark:[&_button.variant-outline]:border-white/10 dark:[&_button.variant-outline]:bg-white/5">
-            {renderStep()}
+            <Suspense fallback={<AdepStepFallback />}>{renderStep()}</Suspense>
           </div>
         </CardContent>
       </Card>
@@ -2206,14 +2214,16 @@ export default function ADEPWizard() {
         )}
       </div>
 
-      <SendReportModal
-        open={sendModalOpen}
-        onOpenChange={setSendModalOpen}
-        reportType="adep"
-        reportUrl={currentReportUrl}
-        reportFilename={currentReportFilename}
-        companyName={planRow.company_name || "Firma"}
-      />
+      <Suspense fallback={null}>
+        <SendReportModal
+          open={sendModalOpen}
+          onOpenChange={setSendModalOpen}
+          reportType="adep"
+          reportUrl={currentReportUrl}
+          reportFilename={currentReportFilename}
+          companyName={planRow.company_name || "Firma"}
+        />
+      </Suspense>
     </div>
   );
 }

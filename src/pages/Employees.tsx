@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import * as XLSX from "xlsx";
-import { ArrowLeft, FileSpreadsheet, Plus, RefreshCcw, Shield, Trash2, Upload, Users } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileSpreadsheet, Plus, RefreshCcw, Shield, Trash2, Upload, Users } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { downloadCsv } from "@/lib/csvExport";
@@ -96,8 +95,6 @@ const emptyForm: EmployeeFormState = {
   email: "",
 };
 
-const PAGE_SIZE = 10;
-
 const normalizeHeader = (value: string) =>
   value
     .toLocaleLowerCase("tr-TR")
@@ -138,11 +135,14 @@ const splitFullName = (value: string) => {
   };
 };
 
+const loadXlsx = () => import("xlsx");
+
 const readWorkbookRows = (file: File): Promise<EmployeeImportRow[]> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
+        const XLSX = await loadXlsx();
         const buffer = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(buffer, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -164,7 +164,8 @@ const readWorkbookRows = (file: File): Promise<EmployeeImportRow[]> =>
     reader.readAsArrayBuffer(file);
   });
 
-const downloadAddTemplate = () => {
+const downloadAddTemplate = async () => {
+  const XLSX = await loadXlsx();
   const rows = [
     [
       "Firma",
@@ -189,7 +190,8 @@ const downloadAddTemplate = () => {
   XLSX.writeFile(wb, "calisan-ekleme-sablonu.xlsx");
 };
 
-const downloadRemoveTemplate = () => {
+const downloadRemoveTemplate = async () => {
+  const XLSX = await loadXlsx();
   const rows = [
     ["employee_id", "tc_number", "email"],
     ["", "12345678901", ""],
@@ -218,10 +220,9 @@ export default function Employees() {
   const [form, setForm] = useState<EmployeeFormState>(emptyForm);
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("ALL");
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("");
   const [employeePpeItems, setEmployeePpeItems] = useState<EmployeePpeRecord[]>([]);
   const [employeeHealthItems, setEmployeeHealthItems] = useState<EmployeeHealthRecord[]>([]);
-  const [activePage, setActivePage] = useState(1);
-  const [passivePage, setPassivePage] = useState(1);
   const addInputRef = useRef<HTMLInputElement | null>(null);
   const removeInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -288,31 +289,28 @@ export default function Employees() {
         const [mappedSelected] = mapEmployeeRows([selectedRow], companyMap);
         setSelectedEmployee(mappedSelected || null);
       } else {
-        const activeFrom = Math.max(0, (activePage - 1) * PAGE_SIZE);
-        const passiveFrom = Math.max(0, (passivePage - 1) * PAGE_SIZE);
-
         const [activeResult, passiveResult] = await Promise.all([
           applyEmployeeFilters(
-            (supabase as any).from("employees").select("*", { count: "exact" }),
+            (supabase as any).from("employees").select("*"),
             true,
           )
-            .order("first_name", { ascending: true })
-            .range(activeFrom, activeFrom + PAGE_SIZE - 1),
+            .order("first_name", { ascending: true }),
           applyEmployeeFilters(
-            (supabase as any).from("employees").select("*", { count: "exact" }),
+            (supabase as any).from("employees").select("*"),
             false,
           )
-            .order("first_name", { ascending: true })
-            .range(passiveFrom, passiveFrom + PAGE_SIZE - 1),
+            .order("first_name", { ascending: true }),
         ]);
 
         if (activeResult.error) throw activeResult.error;
         if (passiveResult.error) throw passiveResult.error;
 
-        setActiveEmployees(mapEmployeeRows((activeResult.data || []) as Array<Record<string, unknown>>, companyMap));
-        setPassiveEmployees(mapEmployeeRows((passiveResult.data || []) as Array<Record<string, unknown>>, companyMap));
-        setActiveCount(activeResult.count || 0);
-        setPassiveCount(passiveResult.count || 0);
+        const mappedActiveEmployees = mapEmployeeRows((activeResult.data || []) as Array<Record<string, unknown>>, companyMap);
+        const mappedPassiveEmployees = mapEmployeeRows((passiveResult.data || []) as Array<Record<string, unknown>>, companyMap);
+        setActiveEmployees(mappedActiveEmployees);
+        setPassiveEmployees(mappedPassiveEmployees);
+        setActiveCount(mappedActiveEmployees.length);
+        setPassiveCount(mappedPassiveEmployees.length);
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Çalışan verileri yüklenemedi.");
@@ -323,7 +321,7 @@ export default function Employees() {
 
   useEffect(() => {
     void loadData();
-  }, [user?.id, id, activePage, passivePage, search, companyFilter]);
+  }, [user?.id, id, search, companyFilter]);
 
   useEffect(() => {
     const loadEmployeePpe = async () => {
@@ -384,30 +382,74 @@ export default function Employees() {
   }, [id]);
 
   const filteredEmployees = useMemo(() => [...activeEmployees, ...passiveEmployees], [activeEmployees, passiveEmployees]);
-  const activeTotalPages = Math.max(1, Math.ceil(activeCount / PAGE_SIZE));
-  const passiveTotalPages = Math.max(1, Math.ceil(passiveCount / PAGE_SIZE));
+  const companyGroups = useMemo(() => {
+    const groups = new Map<string, {
+      companyId: string;
+      companyName: string;
+      activeEmployees: EmployeeRecord[];
+      passiveEmployees: EmployeeRecord[];
+      totalEmployees: number;
+      activeCount: number;
+      passiveCount: number;
+    }>();
+
+    filteredEmployees.forEach((employee) => {
+      const companyId = employee.company_id || "UNKNOWN";
+      const companyName = employee.company_name || "Firma bilgisi yok";
+      if (!groups.has(companyId)) {
+        groups.set(companyId, {
+          companyId,
+          companyName,
+          activeEmployees: [],
+          passiveEmployees: [],
+          totalEmployees: 0,
+          activeCount: 0,
+          passiveCount: 0,
+        });
+      }
+
+      const group = groups.get(companyId)!;
+      if (employee.is_active) {
+        group.activeEmployees.push(employee);
+        group.activeCount += 1;
+      } else {
+        group.passiveEmployees.push(employee);
+        group.passiveCount += 1;
+      }
+      group.totalEmployees += 1;
+    });
+
+    return Array.from(groups.values()).sort((left, right) => left.companyName.localeCompare(right.companyName, "tr"));
+  }, [filteredEmployees]);
+  const selectedCompanyGroup = useMemo(
+    () => companyGroups.find((group) => group.companyId === selectedCompanyId) || companyGroups[0] || null,
+    [companyGroups, selectedCompanyId],
+  );
   const summary = useMemo(
     () => ({
       total: activeCount + passiveCount,
       active: activeCount,
       passive: passiveCount,
-      filtered: activeCount + passiveCount,
+      filtered: filteredEmployees.length,
+      companies: companyGroups.length,
     }),
-    [activeCount, passiveCount],
+    [activeCount, passiveCount, filteredEmployees.length, companyGroups.length],
   );
 
   useEffect(() => {
-    setActivePage(1);
-    setPassivePage(1);
-  }, [search, companyFilter]);
-
-  useEffect(() => {
-    if (activePage > activeTotalPages) setActivePage(activeTotalPages);
-  }, [activePage, activeTotalPages]);
-
-  useEffect(() => {
-    if (passivePage > passiveTotalPages) setPassivePage(passiveTotalPages);
-  }, [passivePage, passiveTotalPages]);
+    if (id) return;
+    if (companyFilter !== "ALL") {
+      setSelectedCompanyId(companyFilter);
+      return;
+    }
+    if (!companyGroups.length) {
+      setSelectedCompanyId("");
+      return;
+    }
+    if (!companyGroups.some((group) => group.companyId === selectedCompanyId)) {
+      setSelectedCompanyId(companyGroups[0].companyId);
+    }
+  }, [companyFilter, companyGroups, id, selectedCompanyId]);
 
   const fetchAllEmployees = async (): Promise<EmployeeRecord[]> => {
     const [{ data: companyRows, error: companyError }, { data: employeeRows, error: employeeError }] = await Promise.all([
@@ -658,6 +700,7 @@ export default function Employees() {
         return;
       }
 
+      const XLSX = await loadXlsx();
       const sheet = XLSX.utils.aoa_to_sheet([headers, ...body]);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, "Calisanlar");
@@ -763,6 +806,12 @@ export default function Employees() {
             </CardHeader>
           </Card>
           <Card className="border-sky-500/20 bg-sky-500/5">
+            <CardHeader className="pb-2">
+              <CardDescription>Görünen firma</CardDescription>
+              <CardTitle className="text-3xl text-white">{summary.companies}</CardTitle>
+            </CardHeader>
+          </Card>
+          <Card className="border-emerald-500/20 bg-emerald-500/5">
             <CardHeader className="pb-2">
               <CardDescription>Filtre sonucu</CardDescription>
               <CardTitle className="text-3xl text-white">{summary.filtered}</CardTitle>
@@ -941,141 +990,188 @@ export default function Employees() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Tüm Çalışanlar</CardTitle>
+            <CardTitle>Firma Bazlı Çalışan Havuzu</CardTitle>
+            <CardDescription>
+              Önce firmayı seçin, sonra o firmaya ait tüm aktif ve pasif çalışanları tek ekranda yönetin.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="active" className="space-y-4">
-              <TabsList className="h-auto w-full justify-start rounded-xl bg-slate-900/70 p-1">
-                <TabsTrigger value="active">Aktif Çalışanlar ({activeCount})</TabsTrigger>
-                <TabsTrigger value="passive">Pasif Çalışanlar ({passiveCount})</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="active" className="mt-0">
-                <div className="rounded-2xl border border-slate-800">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Çalışan</TableHead>
-                        <TableHead>Firma</TableHead>
-                        <TableHead>Görev</TableHead>
-                        <TableHead>İletişim</TableHead>
-                        <TableHead>Durum</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">Çalışanlar yükleniyor...</TableCell>
-                        </TableRow>
-                      ) : activeEmployees.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">Filtreye uygun aktif çalışan yok.</TableCell>
-                        </TableRow>
-                      ) : (
-                        activeEmployees.map((employee) => (
-                          <TableRow key={employee.id} className="cursor-pointer" onClick={() => navigate(`/employees/${employee.id}`)}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-white">{employee.first_name} {employee.last_name}</p>
-                                <p className="text-xs text-slate-400">{employee.department || "Departman yok"}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{employee.company_name || "-"}</TableCell>
-                            <TableCell>{employee.job_title}</TableCell>
-                            <TableCell>{employee.phone || employee.email || "-"}</TableCell>
-                            <TableCell><Badge variant="outline">Aktif</Badge></TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+          <CardContent className="space-y-6">
+            {loading ? (
+              <div className="rounded-2xl border border-slate-800 py-16 text-center text-sm text-muted-foreground">
+                Firma kartları ve çalışanlar yükleniyor...
+              </div>
+            ) : companyGroups.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-700 py-16 text-center text-sm text-muted-foreground">
+                Bu filtrelere uygun firma veya çalışan bulunamadı.
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {companyGroups.map((group) => {
+                    const isSelected = selectedCompanyGroup?.companyId === group.companyId;
+                    return (
+                      <button
+                        key={group.companyId}
+                        type="button"
+                        onClick={() => setSelectedCompanyId(group.companyId)}
+                        className={`rounded-2xl border p-5 text-left transition ${
+                          isSelected
+                            ? "border-sky-400/60 bg-sky-500/10 shadow-lg shadow-sky-900/20"
+                            : "border-slate-800 bg-slate-950/50 hover:border-slate-700 hover:bg-slate-900/70"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <p className="text-lg font-semibold text-white">{group.companyName}</p>
+                            <p className="text-sm text-slate-400">
+                              {group.totalEmployees} çalışan, {group.activeCount} aktif, {group.passiveCount} pasif
+                            </p>
+                          </div>
+                          <ChevronRight className={`h-5 w-5 ${isSelected ? "text-sky-300" : "text-slate-500"}`} />
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Badge variant="outline" className="border-emerald-500/30 text-emerald-300">
+                            Aktif {group.activeCount}
+                          </Badge>
+                          <Badge variant="secondary">
+                            Pasif {group.passiveCount}
+                          </Badge>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-                {activeCount > PAGE_SIZE ? (
-                  <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-                    <span>Sayfa {activePage} / {activeTotalPages}</span>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setActivePage((page) => Math.max(1, page - 1))} disabled={activePage === 1}>
-                        Önceki
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setActivePage((page) => Math.min(activeTotalPages, page + 1))} disabled={activePage === activeTotalPages}>
-                        Sonraki
-                      </Button>
+
+                {selectedCompanyGroup ? (
+                  <div className="rounded-3xl border border-slate-800 bg-slate-950/50 p-5">
+                    <div className="flex flex-col gap-3 border-b border-slate-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
+                      <div>
+                        <h3 className="text-2xl font-bold text-white">{selectedCompanyGroup.companyName}</h3>
+                        <p className="text-sm text-slate-400">
+                          Bu firmaya bağlı tüm çalışanlar tek ekranda listelenir. Kart değiştirerek firma ekipleri arasında hızlıca geçebilirsiniz.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="border-sky-500/30 text-sky-300">
+                          Toplam {selectedCompanyGroup.totalEmployees}
+                        </Badge>
+                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-300">
+                          Aktif {selectedCompanyGroup.activeCount}
+                        </Badge>
+                        <Badge variant="secondary">
+                          Pasif {selectedCompanyGroup.passiveCount}
+                        </Badge>
+                      </div>
                     </div>
+
+                    <Tabs defaultValue="active" className="mt-5 space-y-4">
+                      <TabsList className="h-auto w-full justify-start rounded-xl bg-slate-900/70 p-1">
+                        <TabsTrigger value="active">
+                          Aktif Çalışanlar ({selectedCompanyGroup.activeCount})
+                        </TabsTrigger>
+                        <TabsTrigger value="passive">
+                          Pasif Çalışanlar ({selectedCompanyGroup.passiveCount})
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="active" className="mt-0">
+                        <div className="rounded-2xl border border-slate-800">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Çalışan</TableHead>
+                                <TableHead>Görev</TableHead>
+                                <TableHead>İletişim</TableHead>
+                                <TableHead>Durum</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedCompanyGroup.activeEmployees.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
+                                    Bu firmada aktif çalışan bulunmuyor.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                selectedCompanyGroup.activeEmployees.map((employee) => (
+                                  <TableRow key={employee.id} className="cursor-pointer" onClick={() => navigate(`/employees/${employee.id}`)}>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium text-white">{employee.first_name} {employee.last_name}</p>
+                                        <p className="text-xs text-slate-400">{employee.department || "Departman yok"}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{employee.job_title}</TableCell>
+                                    <TableCell>{employee.phone || employee.email || "-"}</TableCell>
+                                    <TableCell>
+                                      <Badge variant="outline">Aktif</Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="passive" className="mt-0">
+                        <div className="rounded-2xl border border-slate-800">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Çalışan</TableHead>
+                                <TableHead>Görev</TableHead>
+                                <TableHead>İletişim</TableHead>
+                                <TableHead>Durum</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {selectedCompanyGroup.passiveEmployees.length === 0 ? (
+                                <TableRow>
+                                  <TableCell colSpan={4} className="py-12 text-center text-sm text-muted-foreground">
+                                    Bu firmada pasif çalışan bulunmuyor.
+                                  </TableCell>
+                                </TableRow>
+                              ) : (
+                                selectedCompanyGroup.passiveEmployees.map((employee) => (
+                                  <TableRow key={employee.id} className="cursor-pointer" onClick={() => navigate(`/employees/${employee.id}`)}>
+                                    <TableCell>
+                                      <div>
+                                        <p className="font-medium text-white">{employee.first_name} {employee.last_name}</p>
+                                        <p className="text-xs text-slate-400">{employee.department || "Departman yok"}</p>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{employee.job_title}</TableCell>
+                                    <TableCell>{employee.phone || employee.email || "-"}</TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <Badge variant="secondary">Pasif</Badge>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          className="gap-2"
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            void handleReactivateEmployee(employee.id);
+                                          }}
+                                        >
+                                          <RefreshCcw className="h-4 w-4" />
+                                          Aktife Al
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
                   </div>
                 ) : null}
-              </TabsContent>
-
-              <TabsContent value="passive" className="mt-0">
-                <div className="rounded-2xl border border-slate-800">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Çalışan</TableHead>
-                        <TableHead>Firma</TableHead>
-                        <TableHead>Görev</TableHead>
-                        <TableHead>İletişim</TableHead>
-                        <TableHead>Durum</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loading ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">Çalışanlar yükleniyor...</TableCell>
-                        </TableRow>
-                      ) : passiveEmployees.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={5} className="py-12 text-center text-sm text-muted-foreground">Filtreye uygun pasif çalışan yok.</TableCell>
-                        </TableRow>
-                      ) : (
-                        passiveEmployees.map((employee) => (
-                          <TableRow key={employee.id} className="cursor-pointer" onClick={() => navigate(`/employees/${employee.id}`)}>
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-white">{employee.first_name} {employee.last_name}</p>
-                                <p className="text-xs text-slate-400">{employee.department || "Departman yok"}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{employee.company_name || "-"}</TableCell>
-                            <TableCell>{employee.job_title}</TableCell>
-                            <TableCell>{employee.phone || employee.email || "-"}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center justify-between gap-2">
-                                <Badge variant="secondary">Pasif</Badge>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-2"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    void handleReactivateEmployee(employee.id);
-                                  }}
-                                >
-                                  <RefreshCcw className="h-4 w-4" />
-                                  Aktife Al
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                {passiveCount > PAGE_SIZE ? (
-                  <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-                    <span>Sayfa {passivePage} / {passiveTotalPages}</span>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setPassivePage((page) => Math.max(1, page - 1))} disabled={passivePage === 1}>
-                        Önceki
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setPassivePage((page) => Math.min(passiveTotalPages, page + 1))} disabled={passivePage === passiveTotalPages}>
-                        Sonraki
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </TabsContent>
-            </Tabs>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
