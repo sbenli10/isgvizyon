@@ -1,7 +1,9 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { useAuth } from "@/contexts/AuthContext";
+import NotificationBell from "@/components/NotificationBell";
+import { SubscriptionBanner } from "@/components/SubscriptionBanner";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,13 +12,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import NotificationBell from "@/components/NotificationBell";
-import { LogOut, User, Settings, ChevronRight, ShieldCheck, Sparkles } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { SubscriptionBanner } from "@/components/SubscriptionBanner";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
+import { cn } from "@/lib/utils";
+import { ChevronRight, LogOut, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const routeMeta = [
   { match: "/companies", label: "Firma Yönetimi", section: "Operasyon" },
@@ -30,7 +31,12 @@ const routeMeta = [
   { match: "/profile", label: "Profil", section: "Hesap" },
 ];
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+const DESKTOP_SIDEBAR_WIDTH = "18rem";
+const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = "5.5rem";
+const NAVBAR_HEIGHT = "5.25rem";
+
+function AppLayoutShell({ children }: { children: React.ReactNode }) {
+  const { state } = useSidebar();
   const { user, signOut } = useAuth();
   const { plan, status } = useSubscription();
   const navigate = useNavigate();
@@ -55,19 +61,33 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const userDisplayName =
     user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Kullanıcı";
   const isPremiumMember = plan === "premium" && status !== "past_due";
+  const isCollapsed = state === "collapsed";
+  const desktopOffset = isCollapsed ? DESKTOP_SIDEBAR_COLLAPSED_WIDTH : DESKTOP_SIDEBAR_WIDTH;
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_24%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_22%),hsl(var(--background))]">
-        <AppSidebar />
+    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_24%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_22%),hsl(var(--background))]">
+      <AppSidebar />
 
-        <main className="flex flex-1 flex-col overflow-hidden">
-          <header className="sticky top-0 z-20 border-b border-border/60 bg-background/72 px-4 py-3 backdrop-blur-2xl lg:px-6">
+      <div
+        className={cn("relative min-h-screen transition-[padding] duration-200 ease-linear", "md:pl-0")}
+        style={{ paddingLeft: 0 }}
+      >
+        <div
+          className="relative z-0 hidden md:block"
+          style={{
+            paddingLeft: desktopOffset,
+          }}
+        >
+          <header
+            className="fixed right-0 top-0 z-50 border-b border-border/60 bg-background/78 px-4 py-3 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.22)] backdrop-blur-2xl lg:px-6"
+            style={{
+              left: desktopOffset,
+              height: NAVBAR_HEIGHT,
+            }}
+          >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_28%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.10),transparent_24%)]" />
-            <div className="relative flex items-center justify-between gap-4">
+            <div className="relative flex h-full items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <SidebarTrigger className="h-10 w-10 rounded-2xl border border-border/70 bg-background/80 text-foreground shadow-sm hover:bg-accent lg:hidden" />
-
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.22),rgba(255,255,255,0.92))] shadow-[0_16px_38px_-24px_hsl(var(--primary)/0.85)] dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.28),rgba(15,23,42,0.96))]">
                     <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-cyan-400 to-indigo-500 text-primary-foreground shadow-sm">
@@ -107,11 +127,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
               <div className="flex items-center gap-2">
                 <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 py-2 shadow-sm md:flex">
-                  <NotificationBell />
-                  <ThemeToggle />
-                </div>
-
-                <div className="flex items-center gap-2 md:hidden">
                   <NotificationBell />
                   <ThemeToggle />
                 </div>
@@ -180,20 +195,72 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto bg-transparent">
-            <div className="container max-w-screen-2xl px-4 pt-4 lg:px-6 lg:pt-6">
-              <div className="rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_24px_80px_-42px_rgba(15,23,42,0.26)] backdrop-blur-2xl lg:p-4">
+          <main
+            className="relative z-0 min-h-screen bg-transparent"
+            style={{
+              paddingTop: NAVBAR_HEIGHT,
+            }}
+          >
+            <div className="relative z-0 container max-w-screen-2xl px-4 pt-4 lg:px-6 lg:pt-6">
+              <div className="relative z-0 rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.24)] backdrop-blur-2xl lg:p-4">
                 <SubscriptionBanner />
               </div>
             </div>
-            <div className="container max-w-screen-2xl p-4 pt-3 lg:p-6 lg:pt-4">
-              <div className="rounded-[32px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-50px_rgba(15,23,42,0.22)] backdrop-blur-xl lg:px-2 lg:py-2">
+            <div className="relative z-0 container max-w-screen-2xl p-4 pt-3 lg:p-6 lg:pt-4">
+              <div className="relative z-0 rounded-[30px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.22)] backdrop-blur-xl lg:px-2 lg:py-2">
                 {children}
               </div>
             </div>
-          </div>
-        </main>
+          </main>
+        </div>
+
+        <div className="relative z-0 md:hidden">
+          <header className="sticky top-0 z-50 border-b border-border/60 bg-background/78 px-4 py-3 backdrop-blur-2xl">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_28%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.10),transparent_24%)]" />
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <SidebarTrigger className="h-10 w-10 rounded-2xl border border-border/70 bg-background/80 text-foreground shadow-sm hover:bg-accent" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                    <span>İSGVİZYON</span>
+                    <ChevronRight className="h-3 w-3" />
+                    <span className="truncate">{activeMeta.section}</span>
+                  </div>
+                  <div className="truncate text-lg font-semibold tracking-tight text-foreground">
+                    {activeMeta.label}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <NotificationBell />
+                <ThemeToggle />
+              </div>
+            </div>
+          </header>
+
+          <main className="relative z-0 min-h-screen bg-transparent">
+            <div className="relative z-0 container max-w-screen-2xl px-4 pt-4">
+              <div className="relative z-0 rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.24)] backdrop-blur-2xl">
+                <SubscriptionBanner />
+              </div>
+            </div>
+            <div className="relative z-0 container max-w-screen-2xl p-4 pt-3">
+              <div className="relative z-0 rounded-[30px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.22)] backdrop-blur-xl">
+                {children}
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
+    </div>
+  );
+}
+
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarProvider>
+      <AppLayoutShell>{children}</AppLayoutShell>
     </SidebarProvider>
   );
 }

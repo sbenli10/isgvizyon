@@ -5319,10 +5319,8 @@ const handleSaveAndExport = async () => {
                 )}
               </div>
             </ModuleCard>
-
           </div>
         </section>
-
         {entries.length > 0 && (
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
             <div className="min-w-0 rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6">

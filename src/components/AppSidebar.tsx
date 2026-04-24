@@ -84,7 +84,7 @@ interface MenuGroup {
 
 const badgeClassNames = (badge: MenuItem["badge"]) => {
   if (badge === "AI")
-    return "border-fuchsia-500/30 bg-fuchsia-500/12 text-fuchsia-800 dark:text-fuchsia-200";
+    return "border-fuchsia-500/35 bg-fuchsia-500/16 text-fuchsia-900 dark:text-fuchsia-100";
   if (badge === "Pro")
     return "border-amber-500/30 bg-amber-500/12 text-amber-900 dark:text-amber-200";
   if (badge === "Beta")
@@ -97,35 +97,35 @@ const badgeClassNames = (badge: MenuItem["badge"]) => {
 };
 
 const cardShell = cn(
-  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/92 text-sidebar-foreground backdrop-blur-2xl",
+  "rounded-[30px] border border-sidebar-border/80 bg-sidebar/92 text-sidebar-foreground backdrop-blur-2xl",
   "ring-1 ring-black/5 dark:ring-white/5",
-  "shadow-[0_28px_80px_-42px_rgba(2,6,23,0.40)] dark:shadow-[0_44px_120px_-62px_rgba(0,0,0,0.82)]",
+  "shadow-[0_20px_70px_-44px_rgba(15,23,42,0.24)] dark:shadow-[0_26px_88px_-52px_rgba(0,0,0,0.68)]",
 );
 
 const cardInnerGlow = cn(
   // light
-  "bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.10),_transparent_45%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.07),_transparent_40%)]",
+  "bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.07),_transparent_42%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.05),_transparent_36%)]",
   // dark
-  "dark:bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.18),_transparent_45%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.12),_transparent_40%)]",
+  "dark:bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.14),_transparent_42%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.08),_transparent_36%)]",
 );
 
 const sectionLabel =
-  "mb-1 flex items-center justify-between px-3 pt-4 pb-1 text-[10px] font-semibold uppercase tracking-[0.20em] text-muted-foreground/90";
+  "mb-1 flex items-center justify-between px-3 pt-5 pb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/95";
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex h-auto min-h-[4.5rem] w-full items-start gap-3 overflow-visible rounded-[22px] px-3 py-3 text-[13px] font-medium transition-all duration-200";
+  "group relative flex h-auto min-h-[4.75rem] w-full items-start gap-3 overflow-visible rounded-[22px] px-3.5 py-3.5 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle = cn(
   "text-foreground/85 hover:bg-muted/55 hover:text-foreground",
-  "hover:shadow-[0_12px_34px_-28px_rgba(15,23,42,0.50)]",
-  "dark:text-foreground/80 dark:hover:bg-muted/35 dark:hover:shadow-[0_18px_44px_-32px_rgba(0,0,0,0.70)]",
+  "hover:shadow-[0_10px_26px_-24px_rgba(15,23,42,0.32)]",
+  "dark:text-foreground/80 dark:hover:bg-muted/35 dark:hover:shadow-[0_14px_32px_-26px_rgba(0,0,0,0.52)]",
 );
 
 const menuItemActive = cn(
-  "border border-primary/20 bg-[linear-gradient(135deg,hsl(var(--primary)/0.22),transparent_72%)]",
-  "text-foreground shadow-[0_18px_44px_-30px_hsl(var(--primary)/0.75)]",
-  "dark:border-primary/22 dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.26),transparent_72%)]",
+  "border border-primary/18 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_72%)]",
+  "text-foreground shadow-[0_14px_34px_-26px_hsl(var(--primary)/0.50)]",
+  "dark:border-primary/18 dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.20),transparent_72%)]",
 );
 
 // İKON KUTUSU: daha büyük + daha görünür (renk ikona verilecek)
@@ -139,9 +139,9 @@ const iconWrapIdle = cn(
 );
 
 const iconWrapActive = cn(
-  "border-primary/35 bg-[linear-gradient(180deg,hsl(var(--primary)/0.22),hsl(var(--primary)/0.12))]",
-  "shadow-[0_24px_54px_-36px_hsl(var(--primary)/0.95)]",
-  "dark:bg-[linear-gradient(180deg,hsl(var(--primary)/0.26),hsl(var(--primary)/0.14))]",
+  "border-primary/28 bg-[linear-gradient(180deg,hsl(var(--primary)/0.18),hsl(var(--primary)/0.10))]",
+  "shadow-[0_18px_36px_-30px_hsl(var(--primary)/0.55)]",
+  "dark:bg-[linear-gradient(180deg,hsl(var(--primary)/0.20),hsl(var(--primary)/0.12))]",
 );
 
 const leftAccent =
@@ -150,14 +150,14 @@ const leftAccentActive = "opacity-100";
 
 const surfacePanel = cn(
   "rounded-[24px] border border-sidebar-border/70 bg-background/55 backdrop-blur-xl",
-  "shadow-[0_10px_24px_-18px_rgba(15,23,42,0.18)] dark:shadow-[0_14px_30px_-20px_rgba(0,0,0,0.55)]",
+  "shadow-[0_8px_18px_-16px_rgba(15,23,42,0.14)] dark:shadow-[0_10px_22px_-18px_rgba(0,0,0,0.42)]",
 );
 
 const collapsedUtilityButton = cn(
   "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70",
-  "text-foreground/80 shadow-[0_18px_34px_-26px_rgba(15,23,42,0.45)] backdrop-blur-xl transition",
+  "text-foreground/80 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl transition",
   "hover:border-primary/30 hover:bg-background hover:text-foreground",
-  "dark:text-foreground/85 dark:shadow-[0_18px_34px_-26px_rgba(0,0,0,0.78)]",
+  "dark:text-foreground/85 dark:shadow-[0_12px_24px_-18px_rgba(0,0,0,0.58)]",
 );
 
 function PillBadge({ value, active }: { value: string | number; active: boolean }) {
@@ -419,13 +419,14 @@ export function AppSidebar() {
   return (
     <Sidebar
       collapsible="icon"
+      desktopSpacer={false}
       style={
         {
-          "--sidebar-width": "22rem",
+          "--sidebar-width": "18rem",
           "--sidebar-width-icon": "5.5rem",
         } as React.CSSProperties
       }
-      className={cn("h-svh bg-transparent p-0 md:p-4")}
+      className={cn("top-0 z-[60] h-screen bg-transparent p-0 md:p-4")}
     >
       <div
         className={cn(
@@ -488,12 +489,12 @@ export function AppSidebar() {
               {isPremiumMember && (
                 <div
                   className={cn(
-                    "mt-4 rounded-[24px] border border-amber-400/20 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_42%),linear-gradient(145deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] p-4 shadow-[0_22px_50px_-34px_rgba(245,158,11,0.55)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_42%),linear-gradient(145deg,rgba(15,23,42,0.92),rgba(15,23,42,0.72))]",
+                    "mt-4 rounded-[24px] border border-amber-400/16 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_38%),linear-gradient(145deg,rgba(255,255,255,0.78),rgba(255,255,255,0.52))] p-3.5 shadow-[0_16px_34px_-28px_rgba(245,158,11,0.32)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_38%),linear-gradient(145deg,rgba(15,23,42,0.88),rgba(15,23,42,0.68))]",
                   )}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-amber-400/20 bg-amber-400/10">
-                      <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-300" />
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] border border-amber-400/18 bg-amber-400/8">
+                      <Sparkles className="h-4.5 w-4.5 text-amber-600 dark:text-amber-300" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -504,7 +505,7 @@ export function AppSidebar() {
                           Aktif
                         </span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold text-sidebar-foreground">
+                      <p className="mt-1.5 text-sm font-semibold text-sidebar-foreground">
                         Gelişmiş araçlar açık
                       </p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -543,7 +544,8 @@ export function AppSidebar() {
                   className={cn(
                     "h-11 rounded-[20px] border border-sidebar-border/70 bg-background/55 pl-9 text-sm text-sidebar-foreground shadow-none backdrop-blur-xl",
                     "placeholder:text-muted-foreground",
-                    "focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30",
+                    "hover:border-sidebar-border hover:bg-background/65",
+                    "focus-visible:border-primary/35 focus-visible:ring-2 focus-visible:ring-cyan-400/15 dark:focus-visible:ring-primary/20",
                   )}
                 />
               </div>
@@ -552,7 +554,7 @@ export function AppSidebar() {
         </SidebarHeader>
 
         {/* CONTENT */}
-        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1 overscroll-contain">
+        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1 overscroll-contain [scrollbar-color:hsl(var(--sidebar-border))_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-sidebar-border/70 hover:[&::-webkit-scrollbar-thumb]:bg-sidebar-border">
           {filteredMenuGroups.map((group) => (
             <SidebarGroup key={group.label} className="px-1">
               {!collapsed ? (
@@ -572,7 +574,7 @@ export function AppSidebar() {
               )}
 
               <SidebarGroupContent>
-                <SidebarMenu className="gap-1">
+                <SidebarMenu className="gap-1.5">
                   {group.items.map((item) => {
                     const hasChildren = Boolean(item.children?.length);
                     const active = isItemActive(item);
@@ -683,7 +685,7 @@ export function AppSidebar() {
         {/* FOOTER */}
         <SidebarFooter className="border-t border-sidebar-border/80 p-3">
           {!collapsed && user && (
-            <div className={cn(surfacePanel, "p-3")}>
+            <div className={cn("rounded-[22px] border border-sidebar-border/70 bg-background/72 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.16)] dark:bg-background/50 dark:shadow-[0_10px_20px_-18px_rgba(0,0,0,0.38)]", "p-3")}>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-sky-500 text-sm font-bold text-white shadow-sm">
                   {user.email ? user.email.charAt(0).toUpperCase() : "U"}
