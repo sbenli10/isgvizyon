@@ -5362,45 +5362,32 @@ const handleSaveAndExport = async () => {
                         <th className="border-b border-white/10 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em]">İşlem</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white">
+                    <tbody className="bg-white text-slate-900">
                       {entries.map((entry, idx) => {
                         const legalBasis = getBulkCapaLegalBasis({
-                          id: entry.id,
                           description: entry.description,
                           riskDefinition: entry.riskDefinition,
-                          correctiveAction: entry.correctiveAction,
-                          preventiveAction: entry.preventiveAction,
-                          importanceLevel: entry.importance_level,
-                          terminDate: entry.termin_date,
                           relatedDepartment: entry.related_department,
-                          notificationMethod: entry.notification_method,
-                          responsibleName: entry.responsible_name,
-                          responsibleRole: entry.responsible_role,
-                          approverName: entry.approver_name,
-                          approverTitle: entry.approver_title,
-                          includeStamp: entry.include_stamp,
-                          mediaUrls: entry.media_urls,
-                          aiAnalyzed: entry.ai_analyzed,
                         });
 
                         return (
                           <tr key={entry.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500" style={{ color: "#64748b" }}>
                               {idx + 1}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900" style={{ color: "#0f172a" }}>
                               {entry.description}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-rose-700">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-rose-700" style={{ color: "#be123c" }}>
                               {entry.riskDefinition}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-700">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-700" style={{ color: "#334155" }}>
                               {legalBasis}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900">
-                              <div>{entry.correctiveAction}</div>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900" style={{ color: "#0f172a" }}>
+                              <div style={{ color: "#0f172a" }}>{entry.correctiveAction}</div>
                               {entry.preventiveAction ? (
-                                <div className="mt-2 !text-slate-700">{entry.preventiveAction}</div>
+                                <div className="mt-2 !text-slate-700" style={{ color: "#334155" }}>{entry.preventiveAction}</div>
                               ) : null}
                             </td>
                             <td className="align-top border-b border-slate-200 px-3 py-3">
@@ -5412,10 +5399,10 @@ const handleSaveAndExport = async () => {
                                 >
                                   {entry.importance_level}
                                 </span>
-                                <span className="text-xs !text-slate-600">
+                                <span className="text-xs !text-slate-600" style={{ color: "#475569" }}>
                                   Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
                                 </span>
-                                <span className="text-xs !text-slate-600">
+                                <span className="text-xs !text-slate-600" style={{ color: "#475569" }}>
                                   Kanıt: {entry.media_urls.length} fotoğraf
                                 </span>
                               </div>
@@ -5427,6 +5414,8 @@ const handleSaveAndExport = async () => {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleEditExistingEntry(entry.id)}
+                                  className="border-slate-300 bg-white !text-slate-900 hover:bg-slate-100 hover:!text-slate-950"
+                                  style={{ color: "#0f172a" }}
                                 >
                                   Düzenle
                                 </Button>
