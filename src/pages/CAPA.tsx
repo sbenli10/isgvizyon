@@ -796,6 +796,7 @@ export default function CAPA() {
   const writeActivityLog = async ({
     capaRecordId,
     findingId,
+    companyId,
     actionType,
     title,
     description,
@@ -850,6 +851,7 @@ export default function CAPA() {
   const maybeWriteEscalationLog = async ({
     capaRecordId,
     findingId,
+    companyId,
     nextPriority,
     nextStatus,
     nextDeadline,
@@ -1482,7 +1484,7 @@ export default function CAPA() {
         <div className="relative grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-medium text-cyan-200">
-              <ShieldCheck className="h-3.5 w-3.5" /> CAPA operasyon merkezi
+              <ShieldCheck className="h-3.5 w-3.5" /> DÖF Operasyon Merkezi
             </div>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold tracking-tight text-foreground lg:text-4xl">Aksiyonları ata, takip et ve kapanışı standart bir akışla yönet.</h1>

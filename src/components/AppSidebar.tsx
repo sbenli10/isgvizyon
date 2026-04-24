@@ -208,7 +208,7 @@ function SubMenuIcon({
 // ====================================================
 
 export function AppSidebar() {
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
@@ -407,6 +407,12 @@ export function AppSidebar() {
     return sum + group.items.reduce((count, item) => count + 1 + (item.children?.length ?? 0), 0);
   }, 0);
 
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
+
   return (
     <Sidebar
       collapsible="icon"
@@ -416,9 +422,17 @@ export function AppSidebar() {
           "--sidebar-width-icon": "5.5rem",
         } as React.CSSProperties
       }
-      className={cn("h-svh bg-transparent p-3 md:p-4")}
+      className={cn("h-svh bg-transparent p-0 md:p-4")}
     >
-      <div className={cn(cardShell, cardInnerGlow, "flex h-full min-h-0 flex-col overflow-hidden")}>
+      <div
+        className={cn(
+          cardShell,
+          cardInnerGlow,
+          "flex h-full min-h-0 flex-col overflow-hidden",
+          isMobile &&
+            "rounded-none border-0 bg-sidebar text-sidebar-foreground ring-0 shadow-none backdrop-blur-none dark:bg-sidebar",
+        )}
+      >
         {collapsed && (
           <div className="flex items-center justify-center border-b border-sidebar-border/80 px-2 py-3">
             <button onClick={toggleSidebar} className={collapsedUtilityButton} title="Menüyü genişlet" type="button">
@@ -573,6 +587,7 @@ export function AppSidebar() {
                                   <SidebarMenuButton key={child.url} asChild tooltip={child.title}>
                                     <NavLink
                                       to={child.url}
+                                      onClick={closeMobileSidebar}
                                       className={cn(
                                         "flex h-auto min-h-[3rem] items-start gap-3 overflow-visible rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
                                         "text-foreground/80 hover:bg-muted/45 hover:text-foreground",
@@ -600,6 +615,7 @@ export function AppSidebar() {
                           <NavLink
                             to={item.url}
                             end={item.url === "/"}
+                            onClick={closeMobileSidebar}
                             className={cn(
                               menuItemBase,
                               "border border-transparent",
@@ -660,7 +676,10 @@ export function AppSidebar() {
             </button>
 
             <button
-              onClick={() => navigate("/settings")}
+              onClick={() => {
+                closeMobileSidebar();
+                navigate("/settings");
+              }}
               className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
               title="Ayarlar"
               type="button"
@@ -669,7 +688,10 @@ export function AppSidebar() {
             </button>
 
             <button
-              onClick={handleSignOut}
+              onClick={() => {
+                closeMobileSidebar();
+                void handleSignOut();
+              }}
               className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
               title="Çıkış yap"
               type="button"
