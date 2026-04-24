@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSubscription } from "@/hooks/useSubscription";
 import { backfillMyFeatureUsage, openBillingPortal, startPremiumCheckout, startPremiumTrial } from "@/lib/billing";
+import { getUserFacingError, getUserFacingErrorDescription } from "@/lib/userFacingError";
 import type { BillingCatalogPlan, BillingPeriod } from "@/types/subscription";
 
 interface UpgradeModalProps {
@@ -288,6 +289,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     try {
       await task();
     } catch (error) {
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      return;
       const message = error instanceof Error ? error.message : "İşlem tamamlanamadı.";
       toast.error("İşlem tamamlanamadı", { description: message });
     } finally {

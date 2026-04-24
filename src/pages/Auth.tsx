@@ -26,6 +26,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDashboardSnapshot, writeDashboardSnapshot } from "@/lib/dashboardCache";
 import { startNamedFlow } from "@/lib/perfTiming";
+import { getUserFacingError, getUserFacingErrorDescription, getUserFacingErrorMessage } from "@/lib/userFacingError";
 import { toast } from "sonner";
 import { isDeviceTrusted, trustCurrentDevice } from "@/utils/deviceFingerprint";
 
@@ -33,6 +34,7 @@ type AuthMode = "login" | "register" | "wait" | "mfa";
 type NoticeType = "info" | "success" | "warning" | "error";
 type AccountType = "individual" | "osgb";
 const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
+const APP_URL_FALLBACK = "https://www.isgvizyon.com";
 
 interface FormData {
   email: string;
@@ -49,17 +51,28 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+function getAppOrigin() {
+  const configuredUrl = (import.meta.env.VITE_PUBLIC_APP_URL as string | undefined)?.trim();
+  if (configuredUrl) {
+    return configuredUrl.replace(/\/+$/, "");
+  }
+
+  if (typeof window !== "undefined" && window.location.origin) {
+    const { origin, hostname } = window.location;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1"
+    ) {
+      return origin;
+    }
+  }
+
+  return APP_URL_FALLBACK;
+}
+
 function getErrorMessage(err: any): string {
-  const msg = String(err?.message ?? err ?? "").trim();
-  if (!msg) return "Beklenmeyen bir hata oluştu.";
-  if (msg.includes("Invalid login credentials")) return "E-posta veya şifre hatalı.";
-  if (msg.includes("Email not confirmed")) return "E-posta doğrulanmamış. Lütfen e-postanızı doğrulayın.";
-  if (msg.toLowerCase().includes("rate limit")) return "Çok fazla deneme yapıldı. Lütfen biraz sonra tekrar deneyin.";
-  if (msg.toLowerCase().includes("network") || msg.toLowerCase().includes("failed to fetch"))
-    return "Bağlantı sorunu. İnternetinizi kontrol edip tekrar deneyin.";
-  if (msg.toLowerCase().includes("invalid code")) return "Geçersiz doğrulama kodu.";
-  if (msg.toLowerCase().includes("expired")) return "Kod süresi dolmuş. Lütfen tekrar deneyin.";
-  return msg;
+  return getUserFacingErrorMessage(err);
 }
 
 function validateEmail(email: string) {
@@ -291,6 +304,11 @@ export default function Auth() {
 
   const isExtension = useMemo(() => new URLSearchParams(window.location.search).get("ext") === "true", []);
   const callbackUrl = useMemo(() => (isExtension ? "/auth/callback?ext=true" : "/auth/callback"), [isExtension]);
+  const appOrigin = useMemo(() => getAppOrigin(), []);
+  const authCallbackRedirect = useMemo(
+    () => `${appOrigin}${isExtension ? "/auth/callback?ext=true" : "/auth/callback"}`,
+    [appOrigin, isExtension],
+  );
   const isBusy = loading || googleLoading;
 
   const domainHint = useMemo(() => {
@@ -391,9 +409,9 @@ export default function Auth() {
       });
       if (error) throw error;
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      toast.error(msg);
-      setNotice({ type: "error", title: "Google ile giriş başlatılamadı", description: msg });
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      setNotice({ type: details.severity, title: details.title, description: getUserFacingErrorDescription(error) });
       setGoogleLoading(false);
     }
   };
@@ -527,9 +545,9 @@ export default function Auth() {
 
       navigate(callbackUrl);
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      toast.error(msg);
-      setNotice({ type: "error", title: "Giriş yapılamadı", description: msg });
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      setNotice({ type: details.severity, title: details.title, description: getUserFacingErrorDescription(error) });
     } finally {
       setLoading(false);
     }
@@ -575,10 +593,11 @@ export default function Auth() {
       setNotice({ type: "success", title: "Giriş başarılı", description: "Yönlendiriliyorsunuz..." });
       navigate(callbackUrl);
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      setFieldError("mfaCode", msg);
-      setNotice({ type: "error", title: "Doğrulama başarısız", description: msg });
-      toast.error(msg);
+      const details = getUserFacingError(error);
+      const description = getUserFacingErrorDescription(error);
+      setFieldError("mfaCode", `${details.title}. ${details.action}`);
+      setNotice({ type: details.severity, title: details.title, description });
+      toast.error(details.title, { description });
     } finally {
       setLoading(false);
     }
@@ -599,6 +618,7 @@ export default function Auth() {
         email: formData.email.trim(),
         password: formData.password,
         options: {
+          emailRedirectTo: authCallbackRedirect,
           data: {
             full_name: formData.fullName.trim(),
             account_type: formData.accountType,
@@ -621,19 +641,6 @@ export default function Auth() {
         });
 
         if (bootstrapError) throw new Error(`Organizasyon oluşturulamadı: ${bootstrapError.message}`);
-      } else {
-        const { error: profileBootstrapError } = await supabase
-          .from("profiles")
-          .upsert({
-            id: authData.user.id,
-            full_name: formData.fullName.trim(),
-            email: formData.email.trim(),
-            role: "staff",
-            organization_id: null,
-            is_active: true,
-          });
-
-        if (profileBootstrapError) throw new Error(`Profil oluşturulamadı: ${profileBootstrapError.message}`);
       }
 
       setVerifyEmail(formData.email.trim());
@@ -642,9 +649,9 @@ export default function Auth() {
       toast.success("Kayıt başarılı!", { description: "E-postanızı kontrol edin" });
       setNotice({ type: "success", title: "Kayıt başarılı", description: "Giriş yapabilmek için e-postanızı doğrulayın." });
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      toast.error(msg);
-      setNotice({ type: "error", title: "Kayıt sırasında hata", description: msg });
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      setNotice({ type: details.severity, title: details.title, description: getUserFacingErrorDescription(error) });
     } finally {
       setLoading(false);
     }
@@ -653,16 +660,22 @@ export default function Auth() {
   // ✅ Resend email (Supabase query unchanged)
   const handleResendEmail = async () => {
     try {
-      const { error } = await supabase.auth.resend({ type: "signup", email: verifyEmail });
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: verifyEmail,
+        options: {
+          emailRedirectTo: authCallbackRedirect,
+        },
+      });
       if (error) throw error;
 
       setResendCountdown(60);
       toast.success("E-posta yeniden gönderildi");
       setNotice({ type: "success", title: "E-posta yeniden gönderildi", description: "Gelen kutunuzu ve spam klasörünü kontrol edin." });
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      toast.error(msg);
-      setNotice({ type: "error", title: "E-posta gönderilemedi", description: msg });
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      setNotice({ type: details.severity, title: details.title, description: getUserFacingErrorDescription(error) });
     }
   };
 
@@ -686,7 +699,7 @@ export default function Auth() {
     setNotice({ type: "info", title: "Sıfırlama e-postası gönderiliyor", description: "Lütfen bekleyin..." });
 
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${appOrigin}/auth/callback`;
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
 
@@ -700,9 +713,9 @@ export default function Auth() {
       setForgotOpen(false);
       setForgotEmail("");
     } catch (error: any) {
-      const msg = getErrorMessage(error);
-      toast.error(msg);
-      setNotice({ type: "error", title: "Sıfırlama e-postası gönderilemedi", description: msg });
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+      setNotice({ type: details.severity, title: details.title, description: getUserFacingErrorDescription(error) });
     } finally {
       setLoading(false);
     }
