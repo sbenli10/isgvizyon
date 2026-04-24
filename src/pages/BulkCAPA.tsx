@@ -5324,9 +5324,9 @@ const handleSaveAndExport = async () => {
         </section>
 
         {entries.length > 0 && (
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-[24px] border border-border/60 bg-card/90 p-6">
-              <div className="flex items-center justify-between gap-3">
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
+            <div className="min-w-0 rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="text-lg font-bold text-foreground">
                     Eklenen Bulgular ({entries.length})
@@ -5337,7 +5337,7 @@ const handleSaveAndExport = async () => {
                       : "Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin."}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
                   <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                     Liste hazır
                   </span>
@@ -5348,9 +5348,87 @@ const handleSaveAndExport = async () => {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+              <div className="mt-4 space-y-3 md:hidden">
+                {entries.map((entry, idx) => {
+                  const legalBasis = getBulkCapaLegalBasis({
+                    description: entry.description,
+                    riskDefinition: entry.riskDefinition,
+                    relatedDepartment: entry.related_department,
+                  });
+
+                  return (
+                    <div key={`${entry.id}-mobile`} className="rounded-2xl border border-border/60 bg-background/90 p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            Bulgu {idx + 1}
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-foreground">{entry.related_department || "Genel Alan"}</p>
+                        </div>
+                        <span
+                          className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                            IMPORTANCE_LEVELS.find((level) => level.value === entry.importance_level)?.color
+                          }`}
+                        >
+                          {entry.importance_level}
+                        </span>
+                      </div>
+
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tespit Edilen Uygunsuzluk</p>
+                          <p className="mt-1 text-sm leading-6 text-foreground">{entry.description}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Risk Analizi</p>
+                          <p className="mt-1 text-sm leading-6 text-rose-600 dark:text-rose-300">{entry.riskDefinition}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mevzuat Dayanağı</p>
+                          <p className="mt-1 text-sm leading-6 text-muted-foreground">{legalBasis}</p>
+                        </div>
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Önerilen DÖF (Aksiyon)</p>
+                          <p className="mt-1 text-sm leading-6 text-foreground">{entry.correctiveAction}</p>
+                          {entry.preventiveAction ? (
+                            <p className="mt-2 text-sm leading-6 text-muted-foreground">{entry.preventiveAction}</p>
+                          ) : null}
+                        </div>
+                        <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/30 p-3">
+                          <p className="text-sm text-muted-foreground">
+                            Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">Kanıt: {entry.media_urls.length} fotoğraf</p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditExistingEntry(entry.id)}
+                            className="w-full border-slate-300 bg-background text-foreground hover:bg-muted sm:w-auto"
+                          >
+                            Düzenle
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteEntry(entry.id)}
+                            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Sil
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 hidden overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1120px] w-full border-collapse text-sm">
+                  <table className="w-full min-w-[960px] border-collapse text-sm xl:min-w-[1120px]">
                     <thead className="bg-slate-950 text-white dark:bg-slate-800">
                       <tr>
                         <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">No</th>
@@ -5437,12 +5515,12 @@ const handleSaveAndExport = async () => {
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="rounded-[24px] border border-border/60 bg-secondary/20 p-6 space-y-4">
+            <div className="min-w-0 space-y-6">
+              <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6 space-y-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="text-lg font-bold !text-slate-100">Genel Analiz</h3>
-                    <p className="mt-1 text-sm !text-slate-300">
+                    <h3 className="text-lg font-bold text-foreground">Genel Analiz</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
                       Tüm DÖF maddeleri için tek bir yönetici özeti ve genel değerlendirme üretin.
                     </p>
                   </div>
@@ -5469,29 +5547,29 @@ const handleSaveAndExport = async () => {
                   placeholder="Genel analiz burada yer alır. İsterseniz düzenleyebilirsiniz."
                   value={overallAnalysis}
                   onChange={(e) => setOverallAnalysis(e.target.value)}
-                  className="min-h-32 resize-y border-border/50 bg-secondary/50 !text-slate-100 placeholder:!text-slate-400"
+                  className="min-h-32 resize-y border-border/50 bg-background text-foreground placeholder:text-muted-foreground"
                 />
               </div>
 
-              <div className="rounded-[24px] border border-border/60 bg-background/60 p-6">
-                <div className="flex items-center justify-between gap-3">
+              <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
                       Çıktı Merkezi
                     </p>
-                    <h3 className="mt-2 text-lg font-bold !text-slate-100">
+                    <h3 className="mt-2 text-lg font-bold text-foreground">
                       Önizle, kaydet ve raporu indir
                     </h3>
                   </div>
-                    <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs !text-slate-400">
-                      Word çıktısı
-                    </span>
+                  <span className="w-fit rounded-full border border-border/60 bg-background px-3 py-1 text-xs text-muted-foreground">
+                    Word çıktısı
+                  </span>
                 </div>
 
-                <div className="mt-5 flex gap-3 pt-1">
+                <div className="mt-5 flex flex-col gap-3 pt-1 sm:flex-row">
                   <Button
                     variant="outline"
-                    className="h-11 flex-1 gap-2 !text-slate-100"
+                    className="h-11 flex-1 gap-2 text-foreground"
                     onClick={() => {
                       if (!generalInfoStepReady) {
                         toast.error("Önizleme için önce firma, rapor tarihi ve gözlem yapan bilgisini girin");
@@ -5529,7 +5607,7 @@ const handleSaveAndExport = async () => {
                   </Button>
                 </div>
 
-                <p className="mt-4 text-xs leading-6 !text-slate-400">
+                <p className="mt-4 text-xs leading-6 text-muted-foreground">
                   E-posta paylaşımı bu ekranda kaldırıldı. Raporu indirdikten sonra Denetimler sayfasındaki ilgili kayıt detayından paylaşabilirsiniz.
                 </p>
               </div>
