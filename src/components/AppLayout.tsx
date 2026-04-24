@@ -16,6 +16,7 @@ import { LogOut, User, Settings, ChevronRight, ShieldCheck, Sparkles } from "luc
 import { useLocation, useNavigate } from "react-router-dom";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { useSubscription } from "@/hooks/useSubscription";
 
 const routeMeta = [
   { match: "/companies", label: "Firma Yönetimi", section: "Operasyon" },
@@ -31,6 +32,7 @@ const routeMeta = [
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const { plan, status } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,6 +54,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const userDisplayName =
     user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Kullanıcı";
+  const isPremiumMember = plan === "premium" && status !== "past_due";
 
   return (
     <SidebarProvider>
@@ -90,6 +93,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   Sistem hazır
                 </div>
+                {isPremiumMember && (
+                  <div className="flex items-center gap-2 rounded-full border border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(251,191,36,0.08))] px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm dark:text-amber-200">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Premium aktif
+                  </div>
+                )}
                 <div className="flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-medium text-foreground/80">
                   <Sparkles className="h-3.5 w-3.5 text-primary" />
                   Yeni nesil operasyon arayüzü

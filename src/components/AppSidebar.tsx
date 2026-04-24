@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { useSubscription } from "@/hooks/useSubscription";
 import {
   Sidebar,
   SidebarContent,
@@ -212,6 +213,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
+  const { plan, status } = useSubscription();
   const {
     canViewAnalytics,
     canViewAutomation,
@@ -406,6 +408,7 @@ export function AppSidebar() {
   const totalVisibleItems = filteredMenuGroups.reduce((sum, group) => {
     return sum + group.items.reduce((count, item) => count + 1 + (item.children?.length ?? 0), 0);
   }, 0);
+  const isPremiumMember = plan === "premium" && status !== "past_due";
 
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -482,6 +485,36 @@ export function AppSidebar() {
 
           {!collapsed && (
             <>
+              {isPremiumMember && (
+                <div
+                  className={cn(
+                    "mt-4 rounded-[24px] border border-amber-400/20 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_42%),linear-gradient(145deg,rgba(255,255,255,0.82),rgba(255,255,255,0.58))] p-4 shadow-[0_22px_50px_-34px_rgba(245,158,11,0.55)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.18),transparent_42%),linear-gradient(145deg,rgba(15,23,42,0.92),rgba(15,23,42,0.72))]",
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-amber-400/20 bg-amber-400/10">
+                      <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700/80 dark:text-amber-200/80">
+                          Premium
+                        </span>
+                        <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-200">
+                          Aktif
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-sidebar-foreground">
+                        Gelişmiş araçlar açık
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        Bulk CAPA, yüksek limitler ve premium operasyon özellikleri hesabınızda aktif.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <div className={cn(surfacePanel, "p-3")}>
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
