@@ -313,7 +313,7 @@ export function AppSidebar() {
                   canViewKatip ? { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" } : null,
                   canViewPortal ? { title: "Müşteri Portalı", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" } : null,
                   canViewAnalytics ? { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null } : null,
-                ].filter((item): item is MenuItem => Boolean(item)),
+                ].filter((item): item is NonNullable<typeof item> => item !== null),
               },
             ],
           },
@@ -508,7 +508,7 @@ export function AppSidebar() {
                         Gelişmiş araçlar açık
                       </p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        Bulk CAPA, yüksek limitler ve premium operasyon özellikleri hesabınızda aktif.
+                        Yüksek limitler ve premium operasyon özellikleri hesabınızda aktif.
                       </p>
                     </div>
                   </div>
