@@ -30,6 +30,7 @@ import {
   PlusCircle,
   UserPlus,
   KeyRound,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -826,6 +827,75 @@ export default function Profile() {
     });
   }, [notes, noteSearch, noteFilter]);
 
+  const topOverviewCards = [
+    {
+      key: "companies",
+      label: "Firmalarım",
+      value: stats.companies,
+      icon: Building2,
+      iconWrap: "bg-blue-500/12 text-blue-600 dark:text-blue-300",
+    },
+    {
+      key: "employees",
+      label: "Çalışanlarım",
+      value: stats.employees,
+      icon: Users,
+      iconWrap: "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
+    },
+    {
+      key: "risks",
+      label: "Risklerim",
+      value: stats.risks,
+      icon: AlertTriangle,
+      iconWrap: "bg-amber-500/12 text-amber-600 dark:text-amber-300",
+    },
+    {
+      key: "notes",
+      label: "Notlarım",
+      value: notes.length,
+      icon: NotebookPen,
+      iconWrap: "bg-violet-500/12 text-violet-600 dark:text-violet-300",
+    },
+    {
+      key: "reports",
+      label: "Raporlarım",
+      value: stats.inspections,
+      icon: FileText,
+      iconWrap: "bg-rose-500/12 text-rose-600 dark:text-rose-300",
+    },
+  ] as const;
+
+  const tabMeta: Array<{ value: ProfileTab; label: string; icon: typeof User }> = [
+    { value: "profile", label: "Genel Bakış", icon: User },
+    { value: "workspace", label: "Çalışma Alanı", icon: Building2 },
+    { value: "avatar", label: "Avatar", icon: Sparkles },
+    { value: "notebook", label: "Not Defteri", icon: NotebookPen },
+  ];
+
+  const profileShortcutCards = [
+    {
+      title: "Güvenlik ve Oturum",
+      description: "Şifre, oturum ve hesap güvenliğini yönetin.",
+      icon: Shield,
+      actionLabel: "Ayarları Aç",
+      onClick: () => navigate("/settings"),
+    },
+    {
+      title: "Plan ve Faturalandırma",
+      description: "Abonelik durumunu ve planınızı hızlıca görün.",
+      icon: CreditCard,
+      actionLabel: "Planı Yönet",
+      onClick: () => navigate("/settings"),
+    },
+    {
+      title: "Bildirim Merkezi",
+      description: "E-posta ve uygulama bildirim tercihlerini güncelleyin.",
+      icon: Bell,
+      actionLabel: "Bildirimler",
+      onClick: () => navigate("/settings"),
+    },
+  ] as const;
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -866,19 +936,19 @@ export default function Profile() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div className="rounded-2xl border bg-gradient-to-br from-card via-card to-card/60 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+    <div className="mx-auto max-w-7xl space-y-5 px-3 pb-6 pt-2 sm:px-4 lg:px-6">
+      <div className="rounded-[28px] border border-border/70 bg-[radial-gradient(circle_at_top_left,hsl(var(--primary)/0.10),transparent_28%),linear-gradient(180deg,hsl(var(--card)),hsl(var(--card)/0.88))] p-4 shadow-[0_24px_70px_-50px_rgba(15,23,42,0.35)] sm:p-5 lg:p-6">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex items-start gap-4">
             <div className="relative">
               {profile?.avatar_url ? (
                 <img
                   src={profile.avatar_url}
                   alt="Avatar"
-                  className="h-24 w-24 rounded-2xl object-cover border"
+                  className="h-20 w-20 rounded-2xl object-cover border border-border/70 sm:h-24 sm:w-24"
                 />
               ) : (
-                <div className="h-24 w-24 rounded-2xl bg-primary/15 border grid place-items-center text-2xl font-bold text-primary">
+                <div className="grid h-20 w-20 place-items-center rounded-2xl border border-primary/20 bg-primary/15 text-2xl font-bold text-primary sm:h-24 sm:w-24">
                   {getInitials(profile?.full_name || "K")}
                 </div>
               )}
@@ -895,7 +965,7 @@ export default function Profile() {
 
             <div className="space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold">{profile?.full_name}</h1>
+                <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profile?.full_name}</h1>
                 <Badge variant={profile?.is_active ? "default" : "secondary"}>
                   {profile?.is_active ? "Aktif" : "Pasif"}
                 </Badge>
@@ -913,12 +983,12 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => navigate("/settings")}> 
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={() => navigate("/settings")}> 
               <Settings className="h-4 w-4 mr-2" />
               Ayarlar
             </Button>
-            <Button variant="ghost" className="text-destructive hover:text-destructive" onClick={handleLogout}>
+            <Button variant="ghost" className="rounded-xl text-destructive hover:text-destructive" onClick={handleLogout}>
               <LogOut className="h-4 w-4 mr-2" />
               Çıkış
             </Button>
@@ -935,18 +1005,19 @@ export default function Profile() {
 
         <Separator className="my-5" />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {statItems.map((item) => {
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          {topOverviewCards.map((item) => {
             const Icon = item.icon;
-            const value = stats[item.key as keyof StatsData];
             return (
-              <Card key={item.key} className={`border ${item.borderColor}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <Icon className={`h-4 w-4 ${item.textColor}`} />
-                    <span className="text-xl font-bold">{value}</span>
+              <Card key={item.key} className="border-border/70 bg-background/88 shadow-sm">
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${item.iconWrap}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm text-muted-foreground">{item.label}</p>
+                    <p className="text-3xl font-bold leading-none tracking-tight">{item.value}</p>
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -955,112 +1026,175 @@ export default function Profile() {
       </div>
 
       <Tabs value={currentTab} onValueChange={(v) => setCurrentTab(v as ProfileTab)}>
-        <TabsList className="grid grid-cols-4 w-full max-w-2xl">
-          <TabsTrigger value="profile">Profil</TabsTrigger>
-          <TabsTrigger value="workspace">Çalışma Alanı</TabsTrigger>
-          <TabsTrigger value="avatar">İSGVizyon Avatar</TabsTrigger>
-          <TabsTrigger value="notebook">Not Defteri</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="inline-flex h-auto min-w-max gap-2 rounded-2xl border border-border/70 bg-background/70 p-1">
+            {tabMeta.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="rounded-xl px-3 py-2 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:px-4"
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {tab.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
 
         <TabsContent value="profile" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Profil Bilgileri</CardTitle>
-                <CardDescription>Kişisel iletişim ve görev bilgilerinizi güncelleyin.</CardDescription>
-              </div>
-              {!editing && (
-                <Button variant="outline" onClick={() => setEditing(true)}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Düzenle
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {editing ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Ad Soyad</Label>
-                      <Input
-                        value={formData.full_name}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Telefon</Label>
-                      <Input
-                        value={formData.phone}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
-                        placeholder="+90 5XX XXX XX XX"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Pozisyon</Label>
-                      <Input
-                        value={formData.position}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, position: e.target.value }))}
-                        placeholder="İSG Uzmanı"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Departman</Label>
-                      <Input
-                        value={formData.department}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))}
-                        placeholder="İSG Departmanı"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={handleUpdateProfile} disabled={saving || !formData.full_name.trim()}>
-                      {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                      Kaydet
-                    </Button>
-                    <Button
-                      variant="outline"
-                      disabled={saving}
-                      onClick={() => {
-                        setEditing(false);
-                        setFormData({
-                          full_name: profile?.full_name || "",
-                          phone: profile?.phone || "",
-                          position: profile?.position || "",
-                          department: profile?.department || "",
-                        });
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      İptal
-                    </Button>
-                  </div>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
+            <Card className="border-border/70 shadow-sm">
+              <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-xl">Kişisel Bilgiler</CardTitle>
+                  <CardDescription>Profil bilgilerinizi kolayca güncelleyin.</CardDescription>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Ad Soyad</p>
-                    <p className="font-medium">{profile?.full_name || "-"}</p>
+                {!editing && (
+                  <Button variant="outline" className="rounded-xl" onClick={() => setEditing(true)}>
+                    <Edit2 className="mr-2 h-4 w-4" />
+                    Düzenle
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent>
+                {editing ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Ad Soyad</Label>
+                        <Input
+                          value={formData.full_name}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, full_name: e.target.value }))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Telefon</Label>
+                        <Input
+                          value={formData.phone}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                          placeholder="+90 5XX XXX XX XX"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Pozisyon</Label>
+                        <Input
+                          value={formData.position}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, position: e.target.value }))}
+                          placeholder="İSG Uzmanı"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Departman</Label>
+                        <Input
+                          value={formData.department}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, department: e.target.value }))}
+                          placeholder="İSG Departmanı"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button className="rounded-xl" onClick={handleUpdateProfile} disabled={saving || !formData.full_name.trim()}>
+                        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Bilgileri Kaydet
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="rounded-xl"
+                        disabled={saving}
+                        onClick={() => {
+                          setEditing(false);
+                          setFormData({
+                            full_name: profile?.full_name || "",
+                            phone: profile?.phone || "",
+                            position: profile?.position || "",
+                            department: profile?.department || "",
+                          });
+                        }}
+                      >
+                        <X className="mr-2 h-4 w-4" />
+                        İptal
+                      </Button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Telefon</p>
-                    <p className="font-medium">{profile?.phone || "-"}</p>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                      <p className="text-xs text-muted-foreground">Ad Soyad</p>
+                      <p className="mt-2 font-medium">{profile?.full_name || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                      <p className="text-xs text-muted-foreground">Telefon</p>
+                      <p className="mt-2 font-medium">{profile?.phone || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                      <p className="text-xs text-muted-foreground">Pozisyon</p>
+                      <p className="mt-2 font-medium">{profile?.position || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                      <p className="text-xs text-muted-foreground">Departman</p>
+                      <p className="mt-2 font-medium">{profile?.department || "-"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4 md:col-span-2">
+                      <p className="text-xs text-muted-foreground">E-posta</p>
+                      <p className="mt-2 font-medium">{profile?.email || "-"}</p>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Pozisyon</p>
-                    <p className="font-medium">{profile?.position || "-"}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="space-y-4">
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Hızlı Erişim</CardTitle>
+                  <CardDescription>Sık kullandığınız hesap özellikleri burada.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {profileShortcutCards.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.title}
+                        type="button"
+                        onClick={item.onClick}
+                        className="flex w-full items-center justify-between rounded-2xl border border-border/60 bg-background/80 px-4 py-3 text-left transition hover:border-primary/30 hover:bg-background"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{item.title}</p>
+                            <p className="text-sm text-muted-foreground">{item.description}</p>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Profil Skoru</CardTitle>
+                  <CardDescription>Hesap bilgilerinizin tamamlanma düzeyi.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">Tamamlanma</p>
+                    <p className="text-2xl font-bold">%{completionScore}</p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Departman</p>
-                    <p className="font-medium">{profile?.department || "-"}</p>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full bg-primary transition-all" style={{ width: `${completionScore}%` }} />
                   </div>
-                  <div className="space-y-1 md:col-span-2">
-                    <p className="text-xs text-muted-foreground">E-posta</p>
-                    <p className="font-medium">{profile?.email || "-"}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="workspace" className="mt-4 space-y-4">

@@ -97,60 +97,60 @@ const badgeClassNames = (badge: MenuItem["badge"]) => {
 };
 
 const cardShell = cn(
-  "rounded-[30px] border border-sidebar-border/80 bg-sidebar/92 text-sidebar-foreground backdrop-blur-2xl",
+  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/95 text-sidebar-foreground backdrop-blur-xl",
   "ring-1 ring-black/5 dark:ring-white/5",
-  "shadow-[0_20px_70px_-44px_rgba(15,23,42,0.24)] dark:shadow-[0_26px_88px_-52px_rgba(0,0,0,0.68)]",
+  "shadow-[0_18px_54px_-40px_rgba(15,23,42,0.18)] dark:shadow-[0_20px_64px_-42px_rgba(0,0,0,0.52)]",
 );
 
 const cardInnerGlow = cn(
   // light
-  "bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.07),_transparent_42%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.05),_transparent_36%)]",
+  "bg-[radial-gradient(700px_circle_at_10%_0%,_hsl(var(--primary)/0.05),_transparent_34%),radial-gradient(520px_circle_at_82%_8%,_hsl(var(--primary)/0.04),_transparent_30%)]",
   // dark
-  "dark:bg-[radial-gradient(900px_circle_at_10%_0%,_hsl(var(--primary)/0.14),_transparent_42%),radial-gradient(700px_circle_at_80%_10%,_hsl(var(--primary)/0.08),_transparent_36%)]",
+  "dark:bg-[radial-gradient(700px_circle_at_10%_0%,_hsl(var(--primary)/0.10),_transparent_34%),radial-gradient(520px_circle_at_82%_8%,_hsl(var(--primary)/0.06),_transparent_30%)]",
 );
 
 const sectionLabel =
-  "mb-1 flex items-center justify-between px-3 pt-5 pb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/95";
+  "mb-1 flex items-center justify-between px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/90";
 
 // ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex h-auto min-h-[4.75rem] w-full items-start gap-3 overflow-visible rounded-[22px] px-3.5 py-3.5 text-[13px] font-medium transition-all duration-200";
+  "group relative flex h-auto min-h-[3.5rem] w-full items-center gap-3 overflow-visible rounded-[18px] px-3 py-2.5 text-[13px] font-medium transition-all duration-200";
 
 const menuItemIdle = cn(
-  "text-foreground/85 hover:bg-muted/55 hover:text-foreground",
-  "hover:shadow-[0_10px_26px_-24px_rgba(15,23,42,0.32)]",
-  "dark:text-foreground/80 dark:hover:bg-muted/35 dark:hover:shadow-[0_14px_32px_-26px_rgba(0,0,0,0.52)]",
+  "text-foreground hover:bg-muted/55 hover:text-foreground",
+  "hover:shadow-[0_8px_20px_-18px_rgba(15,23,42,0.20)]",
+  "dark:text-white dark:hover:bg-muted/34 dark:hover:shadow-[0_10px_24px_-20px_rgba(0,0,0,0.34)]",
 );
 
 const menuItemActive = cn(
-  "border border-primary/18 bg-[linear-gradient(135deg,hsl(var(--primary)/0.18),transparent_72%)]",
-  "text-foreground shadow-[0_14px_34px_-26px_hsl(var(--primary)/0.50)]",
-  "dark:border-primary/18 dark:bg-[linear-gradient(135deg,hsl(var(--primary)/0.20),transparent_72%)]",
+  "border border-primary/18 bg-[linear-gradient(90deg,hsl(var(--primary)/0.94),hsl(var(--primary)/0.76))]",
+  "text-primary-foreground shadow-[0_10px_24px_-18px_hsl(var(--primary)/0.42)]",
+  "dark:border-primary/18 dark:bg-[linear-gradient(90deg,hsl(var(--primary)/0.94),hsl(var(--primary)/0.76))]",
 );
 
 // İKON KUTUSU: daha büyük + daha görünür (renk ikona verilecek)
 const iconWrapBase = 
-  "relative mt-0.5 flex h-12 w-12 min-w-12 basis-12 shrink-0 items-center justify-center overflow-visible rounded-[20px] border transition-all duration-200";
+  "relative flex h-9 w-9 min-w-9 basis-9 shrink-0 items-center justify-center overflow-visible rounded-[12px] border transition-all duration-200";
 
 const iconWrapIdle = cn(
-  "border-sidebar-border/80 bg-background/55",
-  "shadow-sm group-hover:border-primary/45 group-hover:bg-background/80",
-  "dark:border-white/10 dark:bg-white/5"
+  "border-sidebar-border/75 bg-background/72",
+  "shadow-none group-hover:border-primary/40 group-hover:bg-background/92",
+  "dark:border-white/12 dark:bg-white/8"
 );
 
 const iconWrapActive = cn(
-  "border-primary/28 bg-[linear-gradient(180deg,hsl(var(--primary)/0.18),hsl(var(--primary)/0.10))]",
-  "shadow-[0_18px_36px_-30px_hsl(var(--primary)/0.55)]",
-  "dark:bg-[linear-gradient(180deg,hsl(var(--primary)/0.20),hsl(var(--primary)/0.12))]",
+  "border-white/15 bg-white/10",
+  "shadow-none",
+  "dark:bg-white/10",
 );
 
 const leftAccent =
-  "absolute left-1 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-full bg-primary/85 opacity-0 transition-opacity";
+  "absolute right-2 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-white/80 opacity-0 transition-opacity";
 const leftAccentActive = "opacity-100";
 
 const surfacePanel = cn(
-  "rounded-[24px] border border-sidebar-border/70 bg-background/55 backdrop-blur-xl",
-  "shadow-[0_8px_18px_-16px_rgba(15,23,42,0.14)] dark:shadow-[0_10px_22px_-18px_rgba(0,0,0,0.42)]",
+  "rounded-[18px] border border-sidebar-border/70 bg-background/60 backdrop-blur-xl",
+  "shadow-[0_6px_16px_-14px_rgba(15,23,42,0.10)] dark:shadow-[0_8px_18px_-16px_rgba(0,0,0,0.24)]",
 );
 
 const collapsedUtilityButton = cn(
@@ -181,7 +181,7 @@ function MenuIcon({ Icon, active }: { Icon: React.ComponentType<{ className?: st
         "relative z-20 h-6 w-6 stroke-[2.5] transition-all duration-200",
         active
           ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)] dark:text-white"
-          : "text-foreground/90 dark:text-white/70"
+          : "text-foreground dark:text-white"
       )}
     />
   );
@@ -198,7 +198,7 @@ function SubMenuIcon({
     <Icon
       className={cn(
         "mt-0.5 h-[18px] w-[18px] stroke-[2.25]",
-        active ? "text-primary" : "text-foreground/70 dark:text-foreground/80",
+        active ? "text-primary" : "text-foreground/80 dark:text-white/90",
       )}
     />
   );
@@ -446,22 +446,22 @@ export function AppSidebar() {
         )}
 
         {/* HEADER */}
-        <SidebarHeader className={cn("border-b border-sidebar-border/80 px-3 py-4", collapsed && "hidden")}>
+        <SidebarHeader className={cn("border-b border-sidebar-border/70 px-3 py-3", collapsed && "hidden")}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-3">
-              <div className={cn(surfacePanel, "flex h-12 w-12 shrink-0 items-center justify-center rounded-[22px] p-1")}>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 text-white shadow-sm">
-                  <Shield className="h-4 w-4 stroke-[2.2]" />
+              <div className={cn(surfacePanel, "flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] p-1")}>
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 text-white">
+                  <Shield className="h-3.5 w-3.5 stroke-[2.2]" />
                 </div>
               </div>
 
               {!collapsed && (
                 <div className="min-w-0">
-                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
                     İSGVİZYON
                   </div>
-                  <div className="text-sm font-semibold text-sidebar-foreground">Operasyon merkezi</div>
-                  <div className="text-xs text-muted-foreground">Hızlı erişim ve görev takibi</div>
+                  <div className="text-sm font-semibold text-sidebar-foreground">Operasyon Merkezi</div>
+                  <div className="text-[11px] text-muted-foreground">Hızlı erişim ve görev takibi</div>
                 </div>
               )}
             </div>
@@ -486,52 +486,35 @@ export function AppSidebar() {
 
           {!collapsed && (
             <>
-              {isPremiumMember && (
-                <div
-                  className={cn(
-                    "mt-4 rounded-[24px] border border-amber-400/16 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_38%),linear-gradient(145deg,rgba(255,255,255,0.78),rgba(255,255,255,0.52))] p-3.5 shadow-[0_16px_34px_-28px_rgba(245,158,11,0.32)] dark:bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.12),transparent_38%),linear-gradient(145deg,rgba(15,23,42,0.88),rgba(15,23,42,0.68))]",
-                  )}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] border border-amber-400/18 bg-amber-400/8">
-                      <Sparkles className="h-4.5 w-4.5 text-amber-600 dark:text-amber-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700/80 dark:text-amber-200/80">
-                          Premium
-                        </span>
-                        <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-200">
-                          Aktif
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-sm font-semibold text-sidebar-foreground">
-                        Gelişmiş araçlar açık
-                      </p>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        Yüksek limitler ve premium operasyon özellikleri hesabınızda aktif.
-                      </p>
-                    </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {isPremiumMember && (
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Premium
                   </div>
+                )}
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-200">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Hazır
                 </div>
-              )}
+              </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <div className={cn(surfacePanel, "p-3")}>
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     <Activity className="h-3.5 w-3.5" />
                     Görünen
                   </div>
-                  <div className="mt-2 text-xl font-semibold text-sidebar-foreground">{totalVisibleItems}</div>
-                  <div className="text-xs text-muted-foreground">aktif menü bağlantısı</div>
+                  <div className="mt-1.5 text-2xl font-semibold text-sidebar-foreground">{totalVisibleItems}</div>
+                  <div className="text-[11px] text-muted-foreground">aktif menü</div>
                 </div>
                 <div className={cn(surfacePanel, "p-3")}>
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                     <Command className="h-3.5 w-3.5" />
                     Durum
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-sidebar-foreground">Hazır</div>
-                  <div className="text-xs text-muted-foreground">tek panelden hızlı erişim</div>
+                  <div className="mt-1.5 text-sm font-semibold text-sidebar-foreground">Hazır</div>
+                  <div className="text-[11px] text-muted-foreground">hızlı erişim</div>
                 </div>
               </div>
 
@@ -542,7 +525,7 @@ export function AppSidebar() {
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Menüde ara..."
                   className={cn(
-                    "h-11 rounded-[20px] border border-sidebar-border/70 bg-background/55 pl-9 text-sm text-sidebar-foreground shadow-none backdrop-blur-xl",
+                    "h-10 rounded-[16px] border border-sidebar-border/70 bg-background/65 pl-9 text-sm text-sidebar-foreground shadow-none backdrop-blur-xl",
                     "placeholder:text-muted-foreground",
                     "hover:border-sidebar-border hover:bg-background/65",
                     "focus-visible:border-primary/35 focus-visible:ring-2 focus-visible:ring-cyan-400/15 dark:focus-visible:ring-primary/20",
@@ -563,7 +546,7 @@ export function AppSidebar() {
                     <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>{group.label}</span>
                   </div>
-                  <span className="rounded-full border border-sidebar-border/70 bg-background/55 px-2 py-0.5 text-[10px] font-semibold tracking-normal text-muted-foreground">
+                  <span className="rounded-full border border-sidebar-border/70 bg-background/65 px-2 py-0.5 text-[10px] font-semibold tracking-normal text-foreground/75 dark:text-white/75">
                     {group.items.length}
                   </span>
                 </div>
@@ -685,25 +668,25 @@ export function AppSidebar() {
         {/* FOOTER */}
         <SidebarFooter className="border-t border-sidebar-border/80 p-3">
           {!collapsed && user && (
-            <div className={cn("rounded-[22px] border border-sidebar-border/70 bg-background/72 shadow-[0_8px_18px_-16px_rgba(15,23,42,0.16)] dark:bg-background/50 dark:shadow-[0_10px_20px_-18px_rgba(0,0,0,0.38)]", "p-3")}>
+            <div className={cn("rounded-[18px] border border-sidebar-border/70 bg-background/80 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.12)] dark:bg-background/55 dark:shadow-[0_8px_18px_-16px_rgba(0,0,0,0.24)]", "p-3")}>
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-sky-500 text-sm font-bold text-white shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-sky-500 text-sm font-bold text-white">
                   {user.email ? user.email.charAt(0).toUpperCase() : "U"}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="text-sm font-semibold text-sidebar-foreground">{user.email?.split("@")[0]}</div>
-                  <div className="text-[10px] font-medium text-muted-foreground">{user.email}</div>
+                  <div className="truncate text-[10px] font-medium text-muted-foreground">{user.email}</div>
                 </div>
-                <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <div className="h-2 w-2 rounded-full bg-emerald-500" />
               </div>
             </div>
           )}
 
-          <div className={cn(surfacePanel, "mt-2 flex items-center justify-between gap-2 p-2")}>
+          <div className={cn(surfacePanel, "mt-2 flex items-center justify-between gap-1.5 p-2")}>
             <ThemeToggle />
 
             <button
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
               title="Yardım"
               type="button"
             >
@@ -715,7 +698,7 @@ export function AppSidebar() {
                 closeMobileSidebar();
                 navigate("/settings");
               }}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
               title="Ayarlar"
               type="button"
             >
@@ -727,7 +710,7 @@ export function AppSidebar() {
                 closeMobileSidebar();
                 void handleSignOut();
               }}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
               title="Çıkış yap"
               type="button"
             >
