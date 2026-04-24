@@ -5325,22 +5325,22 @@ const handleSaveAndExport = async () => {
 
         {entries.length > 0 && (
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <div className="rounded-[24px] border border-border/60 bg-background/60 p-6">
+            <div className="rounded-[24px] border border-border/60 bg-card/90 p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-bold !text-slate-100">
+                  <h3 className="text-lg font-bold text-foreground">
                     Eklenen Bulgular ({entries.length})
                   </h3>
-                  <p className="mt-1 text-sm !text-slate-300">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {createMode === "bulk"
                       ? "Yüklenen fotoğraflardan otomatik üretilen uygunsuzluklar burada listelenir. Gerekirse tek tek düzenleyebilir veya silebilirsiniz."
                       : "Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                      Liste hazır
-                    </span>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    Liste hazır
+                  </span>
                   <Button type="button" onClick={handleOpenBulkPreview} className="h-10 rounded-2xl border-0 gradient-primary font-semibold text-slate-950">
                     <Eye className="mr-2 h-4 w-4" />
                     Önizlemeye Geç
@@ -5348,10 +5348,10 @@ const handleSaveAndExport = async () => {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                 <div className="overflow-x-auto">
                   <table className="min-w-[1120px] w-full border-collapse text-sm">
-                    <thead className="bg-slate-950 text-white">
+                    <thead className="bg-slate-950 text-white dark:bg-slate-800">
                       <tr>
                         <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">No</th>
                         <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Tespit Edilen Uygunsuzluk</th>
@@ -5362,7 +5362,7 @@ const handleSaveAndExport = async () => {
                         <th className="border-b border-white/10 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em]">İşlem</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white text-slate-900">
+                    <tbody className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
                       {entries.map((entry, idx) => {
                         const legalBasis = getBulkCapaLegalBasis({
                           description: entry.description,
@@ -5371,26 +5371,26 @@ const handleSaveAndExport = async () => {
                         });
 
                         return (
-                          <tr key={entry.id} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500" style={{ color: "#64748b" }}>
+                          <tr key={entry.id} className={idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50 dark:bg-slate-800/70"}>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400">
                               {idx + 1}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900" style={{ color: "#0f172a" }}>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:border-slate-700 dark:text-slate-100">
                               {entry.description}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-rose-700" style={{ color: "#be123c" }}>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-rose-700 dark:border-slate-700 dark:text-rose-300">
                               {entry.riskDefinition}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-700" style={{ color: "#334155" }}>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700 dark:border-slate-700 dark:text-slate-300">
                               {legalBasis}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900" style={{ color: "#0f172a" }}>
-                              <div style={{ color: "#0f172a" }}>{entry.correctiveAction}</div>
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:border-slate-700 dark:text-slate-100">
+                              <div className="text-slate-900 dark:text-slate-100">{entry.correctiveAction}</div>
                               {entry.preventiveAction ? (
-                                <div className="mt-2 !text-slate-700" style={{ color: "#334155" }}>{entry.preventiveAction}</div>
+                                <div className="mt-2 text-slate-700 dark:text-slate-300">{entry.preventiveAction}</div>
                               ) : null}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 dark:border-slate-700">
                               <div className="flex flex-col gap-2">
                                 <span
                                   className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -5399,23 +5399,22 @@ const handleSaveAndExport = async () => {
                                 >
                                   {entry.importance_level}
                                 </span>
-                                <span className="text-xs !text-slate-600" style={{ color: "#475569" }}>
+                                <span className="text-xs text-slate-600 dark:text-slate-400">
                                   Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
                                 </span>
-                                <span className="text-xs !text-slate-600" style={{ color: "#475569" }}>
+                                <span className="text-xs text-slate-600 dark:text-slate-400">
                                   Kanıt: {entry.media_urls.length} fotoğraf
                                 </span>
                               </div>
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 dark:border-slate-700">
                               <div className="flex justify-end gap-2">
                                 <Button
                                   type="button"
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleEditExistingEntry(entry.id)}
-                                  className="border-slate-300 bg-white !text-slate-900 hover:bg-slate-100 hover:!text-slate-950"
-                                  style={{ color: "#0f172a" }}
+                                  className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100 hover:text-slate-950 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
                                 >
                                   Düzenle
                                 </Button>
