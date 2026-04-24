@@ -51,13 +51,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     };
 
   const userDisplayName =
-    user?.user_metadata?.full_name ||
-    user?.email?.split("@")[0] ||
-    "Kullanıcı";
+    user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Kullanıcı";
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
+      <div className="flex min-h-screen w-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_24%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_22%),hsl(var(--background))]">
         <AppSidebar />
 
         <main className="flex flex-1 flex-col overflow-hidden">
@@ -173,11 +171,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <div className="flex-1 overflow-auto bg-background">
+          <div className="flex-1 overflow-auto bg-transparent">
             <div className="container max-w-screen-2xl px-4 pt-4 lg:px-6 lg:pt-6">
-              <SubscriptionBanner />
+              <div className="rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_24px_80px_-42px_rgba(15,23,42,0.26)] backdrop-blur-2xl lg:p-4">
+                <SubscriptionBanner />
+              </div>
             </div>
-            <div className="container max-w-screen-2xl p-4 pt-3 lg:p-6 lg:pt-4">{children}</div>
+            <div className="container max-w-screen-2xl p-4 pt-3 lg:p-6 lg:pt-4">
+              <div className="rounded-[32px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-50px_rgba(15,23,42,0.22)] backdrop-blur-xl lg:px-2 lg:py-2">
+                {children}
+              </div>
+            </div>
           </div>
         </main>
       </div>
