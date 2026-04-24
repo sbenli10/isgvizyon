@@ -5328,19 +5328,19 @@ const handleSaveAndExport = async () => {
             <div className="rounded-[24px] border border-border/60 bg-background/60 p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-900">
+                  <h3 className="text-lg font-bold !text-slate-100">
                     Eklenen Bulgular ({entries.length})
                   </h3>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-600">
+                  <p className="mt-1 text-sm !text-slate-300">
                     {createMode === "bulk"
                       ? "Yüklenen fotoğraflardan otomatik üretilen uygunsuzluklar burada listelenir. Gerekirse tek tek düzenleyebilir veya silebilirsiniz."
                       : "Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin."}
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                    Liste hazir
-                  </span>
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                      Liste hazır
+                    </span>
                   <Button type="button" onClick={handleOpenBulkPreview} className="h-10 rounded-2xl border-0 gradient-primary font-semibold text-slate-950">
                     <Eye className="mr-2 h-4 w-4" />
                     Önizlemeye Geç
@@ -5388,19 +5388,19 @@ const handleSaveAndExport = async () => {
                             <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500">
                               {idx + 1}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:text-slate-900">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900">
                               {entry.description}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-rose-700 dark:text-rose-700">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-rose-700">
                               {entry.riskDefinition}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-600 dark:text-slate-600">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-700">
                               {legalBasis}
                             </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:text-slate-900">
+                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 !text-slate-900">
                               <div>{entry.correctiveAction}</div>
                               {entry.preventiveAction ? (
-                                <div className="mt-2 text-slate-600 dark:text-slate-600">{entry.preventiveAction}</div>
+                                <div className="mt-2 !text-slate-700">{entry.preventiveAction}</div>
                               ) : null}
                             </td>
                             <td className="align-top border-b border-slate-200 px-3 py-3">
@@ -5412,10 +5412,10 @@ const handleSaveAndExport = async () => {
                                 >
                                   {entry.importance_level}
                                 </span>
-                                <span className="text-xs text-slate-500 dark:text-slate-500">
+                                <span className="text-xs !text-slate-600">
                                   Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
                                 </span>
-                                <span className="text-xs text-slate-500 dark:text-slate-500">
+                                <span className="text-xs !text-slate-600">
                                   Kanıt: {entry.media_urls.length} fotoğraf
                                 </span>
                               </div>
@@ -5453,35 +5453,35 @@ const handleSaveAndExport = async () => {
               <div className="rounded-[24px] border border-border/60 bg-secondary/20 p-6 space-y-4">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-foreground">Genel Analiz</h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Tüm DÖF maddeleri için tek bir yönetici özeti ve genel degerlendirme üretin.
+                    <h3 className="text-lg font-bold !text-slate-100">Genel Analiz</h3>
+                    <p className="mt-1 text-sm !text-slate-300">
+                      Tüm DÖF maddeleri için tek bir yönetici özeti ve genel değerlendirme üretin.
                     </p>
                   </div>
                   <Button
                     type="button"
                     onClick={generateOverallAnalysis}
                     disabled={overallAnalyzing || entries.length === 0}
-                    className="gap-2 border-0 text-foreground font-semibold h-11 gradient-primary"
+                    className="h-11 gap-2 border-0 gradient-primary font-semibold !text-slate-950"
                   >
                     {overallAnalyzing ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Genel analiz hazirlaniyor...
+                        Genel analiz hazırlanıyor...
                       </>
                     ) : (
                       <>
                         <Sparkles className="h-4 w-4" />
-                        AI ile Genel Analiz Olustur
+                        AI ile Genel Analiz Oluştur
                       </>
                     )}
                   </Button>
                 </div>
                 <Textarea
-                  placeholder="Genel analiz burada yer alir. Isterseniz düzenleyebilirsiniz."
+                  placeholder="Genel analiz burada yer alır. İsterseniz düzenleyebilirsiniz."
                   value={overallAnalysis}
                   onChange={(e) => setOverallAnalysis(e.target.value)}
-                  className="bg-secondary/50 border-border/50 min-h-32 resize-y"
+                  className="min-h-32 resize-y border-border/50 bg-secondary/50 !text-slate-100 placeholder:!text-slate-400"
                 />
               </div>
 
@@ -5491,19 +5491,19 @@ const handleSaveAndExport = async () => {
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
                       Çıktı Merkezi
                     </p>
-                    <h3 className="mt-2 text-lg font-bold text-foreground">
+                    <h3 className="mt-2 text-lg font-bold !text-slate-100">
                       Önizle, kaydet ve raporu indir
                     </h3>
                   </div>
-                  <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs text-muted-foreground">
-                    Word çıktısı
-                  </span>
+                    <span className="rounded-full border border-border/60 bg-background px-3 py-1 text-xs !text-slate-400">
+                      Word çıktısı
+                    </span>
                 </div>
 
                 <div className="mt-5 flex gap-3 pt-1">
                   <Button
                     variant="outline"
-                    className="gap-2 flex-1 h-11"
+                    className="h-11 flex-1 gap-2 !text-slate-100"
                     onClick={() => {
                       if (!generalInfoStepReady) {
                         toast.error("Önizleme için önce firma, rapor tarihi ve gözlem yapan bilgisini girin");
@@ -5521,10 +5521,10 @@ const handleSaveAndExport = async () => {
                   <Button
                     onClick={handleSaveAndExport}
                     disabled={saving || entries.length === 0 || !reportCompanyName.trim() || !generalInfoStepReady}
-                    className={`gap-2 flex-1 border-0 text-foreground font-semibold h-11 ${
+                    className={`h-11 flex-1 gap-2 border-0 font-semibold ${
                       saving || entries.length === 0 || !reportCompanyName.trim() || !generalInfoStepReady
-                        ? "bg-gray-500 cursor-not-allowed opacity-50"
-                        : "gradient-primary"
+                        ? "cursor-not-allowed bg-gray-500 !text-slate-200 opacity-50"
+                        : "gradient-primary !text-slate-950"
                     }`}
                   >
                     {saving ? (
@@ -5541,7 +5541,7 @@ const handleSaveAndExport = async () => {
                   </Button>
                 </div>
 
-                <p className="mt-4 text-xs leading-6 text-muted-foreground">
+                <p className="mt-4 text-xs leading-6 !text-slate-400">
                   E-posta paylaşımı bu ekranda kaldırıldı. Raporu indirdikten sonra Denetimler sayfasındaki ilgili kayıt detayından paylaşabilirsiniz.
                 </p>
               </div>

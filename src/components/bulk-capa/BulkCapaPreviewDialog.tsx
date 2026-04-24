@@ -1,4 +1,4 @@
-import { CheckCircle2, Eye, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -89,25 +89,29 @@ export default function BulkCapaPreviewDialog({
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto border-border/50 bg-slate-200/95 p-0 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.45)] dark:text-slate-900">
+      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto border-border/50 bg-slate-200/95 p-0 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.45)]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 border-b border-slate-300 bg-white px-6 py-4 text-xl text-slate-900">
+          <DialogTitle className="flex items-center gap-2 border-b border-slate-300 bg-white px-6 py-4 text-xl font-semibold text-slate-900">
             {previewFocusEntryId ? "Tekli DÖF Önizlemesi" : "Rapor Önizlemesi"}
-            {previewFocusEntryId ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <Sparkles className="h-5 w-5 text-yellow-500" />}
+            {previewFocusEntryId ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+            ) : (
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+            )}
           </DialogTitle>
           <DialogDescription className="sr-only">
             Oluşturulan DÖF raporunu inceleyin, düzenlemeye dönün veya Word çıktısını indirin.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(92vh-76px)] overflow-y-auto bg-slate-200 px-4 py-6 text-slate-900 md:px-8 dark:text-slate-900">
+        <div className="max-h-[calc(92vh-76px)] overflow-y-auto bg-slate-200 px-4 py-6 text-slate-900 md:px-8">
           {previewFocusEntryId && focusedPreviewEntry ? (
             <div className="mx-auto mb-6 flex max-w-[794px] flex-col gap-3 rounded-[24px] border border-emerald-200 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-600">
                   Tekli Kayıt Aksiyonları
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-slate-700">
                   Tekli DÖF kaydı hazır. Bu kaydı arşivleyip kompakt Word çıktısını hemen indirebilirsiniz.
                 </p>
               </div>
@@ -117,7 +121,8 @@ export default function BulkCapaPreviewDialog({
                     type="button"
                     variant="outline"
                     onClick={() => onOpenInspection(lastSingleInspectionId)}
-                    className="border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100"
+                    className="border-violet-300 bg-violet-50 !text-violet-950 hover:bg-violet-100 hover:!text-violet-950 disabled:!text-violet-900/80"
+                    style={{ color: "#2e1065" }}
                   >
                     Denetimler Kaydını Aç
                   </Button>
@@ -126,7 +131,8 @@ export default function BulkCapaPreviewDialog({
                   type="button"
                   variant="outline"
                   onClick={onReturnSinglePreviewToEdit}
-                  className="border-cyan-300 bg-cyan-50 text-cyan-900 hover:bg-cyan-100"
+                  className="border-cyan-300 bg-cyan-50 !text-cyan-950 hover:bg-cyan-100 hover:!text-cyan-950 disabled:!text-cyan-900/80"
+                  style={{ color: "#164e63" }}
                 >
                   Düzenlemeye Geri Dön
                 </Button>
@@ -134,7 +140,8 @@ export default function BulkCapaPreviewDialog({
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  className="border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                  className="border-slate-300 bg-white !text-slate-800 hover:bg-slate-100 hover:!text-slate-900 disabled:!text-slate-600"
+                  style={{ color: "#1e293b" }}
                 >
                   Kapat
                 </Button>
@@ -142,7 +149,7 @@ export default function BulkCapaPreviewDialog({
                   type="button"
                   onClick={() => void onSaveSinglePreviewExport()}
                   disabled={saving}
-                  className="bg-emerald-500 text-white shadow-[0_18px_40px_rgba(16,185,129,0.2)] hover:bg-emerald-400"
+                  className="bg-emerald-500 !text-white shadow-[0_18px_40px_rgba(16,185,129,0.2)] hover:bg-emerald-400 hover:!text-white"
                 >
                   {saving ? (
                     <>
@@ -169,24 +176,38 @@ export default function BulkCapaPreviewDialog({
                 Firma: {reportCompanyName || "Belirtilmedi"}
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">
-                Oluşturulma Saati: {lastSingleCreatedAt ? new Date(lastSingleCreatedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) : "Henüz yok"}
+                Oluşturulma Saati:{" "}
+                {lastSingleCreatedAt
+                  ? new Date(lastSingleCreatedAt).toLocaleTimeString("tr-TR", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "Henüz yok"}
               </span>
             </div>
           ) : null}
 
           <div
-            className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14 [&_p]:text-slate-900 [&_span]:text-inherit [&_td]:text-slate-900 [&_h2]:text-slate-800 [&_h3]:text-[#1d3760] [&_th]:text-white"
+            className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14 [&_h2]:text-slate-800 [&_h3]:text-[#1d3760] [&_p]:!text-slate-900 [&_span]:text-inherit [&_td]:!text-slate-900 [&_th]:!text-white"
             style={{ color: "#0f172a" }}
           >
             <div className="flex items-center justify-end border-b border-slate-300 pb-2 text-[11px] text-slate-500">
               <span>İSG TESPİT VE DÖF RAPORU</span>
               <span className="mx-2">|</span>
-              <span>{generalInfo.report_date ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR")}</span>
+              <span>
+                {generalInfo.report_date
+                  ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR")
+                  : new Date().toLocaleDateString("tr-TR")}
+              </span>
             </div>
 
             <div className="mt-8 text-center">
-              <h2 className="text-[28px] font-bold tracking-tight text-slate-800">İŞ SAĞLIĞI VE GÜVENLİĞİ</h2>
-              <p className="mt-2 text-[17px] font-semibold text-slate-800">TESPİT VE DÜZELTİCİ / ÖNLEYİCİ FAALİYET (DÖF) RAPORU</p>
+              <h2 className="text-[28px] font-bold tracking-tight text-slate-800">
+                İŞ SAĞLIĞI VE GÜVENLİĞİ
+              </h2>
+              <p className="mt-2 text-[17px] font-semibold text-slate-800">
+                TESPİT VE DÜZELTİCİ / ÖNLEYİCİ FAALİYET (DÖF) RAPORU
+              </p>
             </div>
 
             <div className="mt-5 border-b-2 border-red-500" />
@@ -195,14 +216,37 @@ export default function BulkCapaPreviewDialog({
               <table className="w-full max-w-[560px] border-collapse text-sm">
                 <tbody>
                   {[
-                    ["Rapor Tarihi", generalInfo.report_date ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR") : new Date().toLocaleDateString("tr-TR")],
-                    ["Hazırlayan", `${generalInfo.observer_name || profileContext?.full_name || "İsim Soyisim"} - ${profileContext?.position || "İş Güvenliği Uzmanı"}`],
+                    [
+                      "Rapor Tarihi",
+                      generalInfo.report_date
+                        ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR")
+                        : new Date().toLocaleDateString("tr-TR"),
+                    ],
+                    [
+                      "Hazırlayan",
+                      `${generalInfo.observer_name || profileContext?.full_name || "İsim Soyisim"} - ${
+                        profileContext?.position || "İş Güvenliği Uzmanı"
+                      }`,
+                    ],
                     ["Konu", `${generalInfo.area_region || "Genel Çalışma Sahası"} Risk Analizi`],
-                    ["Tehlike Sınıfı", (selectedCompany?.notes || selectedCompany?.industry || "Çok Tehlikeli").toString().toLocaleUpperCase("tr-TR")],
+                    [
+                      "Tehlike Sınıfı",
+                      (selectedCompany?.notes || selectedCompany?.industry || "Çok Tehlikeli")
+                        .toString()
+                        .toLocaleUpperCase("tr-TR"),
+                    ],
                   ].map(([label, value], index) => (
                     <tr key={label}>
-                      <td className="w-[32%] border border-slate-400 bg-[#1d3760] px-3 py-2 font-semibold text-white">{label}</td>
-                      <td className={`border border-slate-400 px-3 py-2 ${index === 3 ? "font-bold text-red-600" : "text-slate-900"}`}>{value}</td>
+                      <td className="w-[32%] border border-slate-400 bg-[#1d3760] px-3 py-2 font-semibold text-white">
+                        {label}
+                      </td>
+                      <td
+                        className={`border border-slate-400 px-3 py-2 ${
+                          index === 3 ? "font-bold text-red-600" : "text-slate-900"
+                        }`}
+                      >
+                        {value}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -232,16 +276,32 @@ export default function BulkCapaPreviewDialog({
               return (
                 <div key={entry.id} className="mt-10">
                   {entry.media_urls.length > 0 ? (
-                    <div className={`grid gap-3 ${entry.media_urls.length === 1 ? "grid-cols-1 justify-items-center" : entry.media_urls.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+                    <div
+                      className={`grid gap-3 ${
+                        entry.media_urls.length === 1
+                          ? "grid-cols-1 justify-items-center"
+                          : entry.media_urls.length === 2
+                            ? "grid-cols-2"
+                            : "grid-cols-3"
+                      }`}
+                    >
                       {entry.media_urls.map((imageUrl, imgIdx) => (
-                        <div key={buildMediaKey(imageUrl, imgIdx)} className="border border-slate-400 bg-white p-2">
+                        <div
+                          key={buildMediaKey(imageUrl, imgIdx)}
+                          className="border border-slate-400 bg-white p-2"
+                        >
                           <img
                             src={imageUrl}
                             alt={`Fotoğraf ${imgIdx + 1}`}
-                            className={`mx-auto object-cover ${entry.media_urls.length === 1 ? "h-[240px] w-[240px]" : "h-[190px] w-full"}`}
+                            className={`mx-auto object-cover ${
+                              entry.media_urls.length === 1
+                                ? "h-[240px] w-[240px]"
+                                : "h-[190px] w-full"
+                            }`}
                           />
                           <p className="mt-2 text-center text-[11px] leading-4 text-slate-700">
-                            Görsel Tanım — {entry.related_department || "Genel Alan"}<br />
+                            Görsel Tanım — {entry.related_department || "Genel Alan"}
+                            <br />
                             {entry.description}
                           </p>
                         </div>
@@ -259,8 +319,16 @@ export default function BulkCapaPreviewDialog({
                     <table className="w-full border-collapse text-[13px]">
                       <thead>
                         <tr>
-                          {["TESPİT EDİLEN UYGUNSUZLUK", "RİSK ANALİZİ", "MEVZUAT DAYANAĞI", "ÖNERİLEN DÖF (AKSİYON)"].map((title) => (
-                            <th key={title} className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white">
+                          {[
+                            "TESPİT EDİLEN UYGUNSUZLUK",
+                            "RİSK ANALİZİ",
+                            "MEVZUAT DAYANAĞI",
+                            "ÖNERİLEN DÖF (AKSİYON)",
+                          ].map((title) => (
+                            <th
+                              key={title}
+                              className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white"
+                            >
                               {title}
                             </th>
                           ))}
@@ -268,14 +336,28 @@ export default function BulkCapaPreviewDialog({
                       </thead>
                       <tbody>
                         <tr>
-                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{entry.description}</td>
-                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{entry.riskDefinition}</td>
-                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">{legalBasis}</td>
                           <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">
-                            <span className={entry.importance_level === "Kritik" ? "font-bold text-red-600" : "text-slate-900"}>
+                            {entry.description}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">
+                            {entry.riskDefinition}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">
+                            {legalBasis}
+                          </td>
+                          <td className="border border-slate-400 px-2 py-2 align-top text-slate-900">
+                            <span
+                              className={
+                                entry.importance_level === "Kritik"
+                                  ? "font-bold text-red-600"
+                                  : "text-slate-900"
+                              }
+                            >
                               {entry.correctiveAction}
                             </span>
-                            {entry.preventiveAction ? <div className="mt-1 text-slate-700">{entry.preventiveAction}</div> : null}
+                            {entry.preventiveAction ? (
+                              <div className="mt-1 text-slate-700">{entry.preventiveAction}</div>
+                            ) : null}
                           </td>
                         </tr>
                       </tbody>
@@ -300,7 +382,10 @@ export default function BulkCapaPreviewDialog({
                 <thead>
                   <tr>
                     {["RİSK SEVİYESİ", "TERMİN", "YAPILACAK İŞLEMLER"].map((title) => (
-                      <th key={title} className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white">
+                      <th
+                        key={title}
+                        className="border border-slate-400 bg-[#1d3760] px-2 py-2 text-center font-bold text-white"
+                      >
                         {title}
                       </th>
                     ))}
@@ -314,17 +399,26 @@ export default function BulkCapaPreviewDialog({
                         : entry.importance_level === "Orta"
                           ? "bg-orange-500 text-white"
                           : "bg-green-700 text-white";
+
                     return (
                       <tr key={`${entry.id}-action`}>
                         <td className={`border border-slate-400 px-2 py-2 text-center font-bold ${riskColors}`}>
-                          {entry.importance_level === "Kritik" || entry.importance_level === "Yüksek" ? "YÜKSEK RİSK" : entry.importance_level === "Orta" ? "ORTA RİSK" : "DÜŞÜK RİSK"}
+                          {entry.importance_level === "Kritik" || entry.importance_level === "Yüksek"
+                            ? "YÜKSEK RİSK"
+                            : entry.importance_level === "Orta"
+                              ? "ORTA RİSK"
+                              : "DÜŞÜK RİSK"}
                         </td>
                         <td className="border border-slate-400 px-2 py-2 text-center font-bold text-slate-900">
-                          {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
+                          {entry.termin_date
+                            ? new Date(entry.termin_date).toLocaleDateString("tr-TR")
+                            : "-"}
                         </td>
                         <td className="border border-slate-400 px-2 py-2 text-slate-900">
                           {entry.correctiveAction}
-                          {entry.preventiveAction ? <div className="mt-1 text-slate-700">{entry.preventiveAction}</div> : null}
+                          {entry.preventiveAction ? (
+                            <div className="mt-1 text-slate-700">{entry.preventiveAction}</div>
+                          ) : null}
                         </td>
                       </tr>
                     );
@@ -338,12 +432,15 @@ export default function BulkCapaPreviewDialog({
             </div>
 
             <div className="mt-4 border-2 border-red-500 bg-[#fff7f7] px-5 py-4">
-              <p className="text-[13px] font-bold text-red-600">6331 Sayılı İş Sağlığı ve Güvenliği Kanunu gereğince:</p>
+              <p className="text-[13px] font-bold text-red-600">
+                6331 Sayılı İş Sağlığı ve Güvenliği Kanunu gereğince:
+              </p>
               <p className="mt-3 text-center text-[13px] font-bold leading-6 text-slate-900">
-                İŞVEREN, ÇALIŞANLARIN BAĞLILIĞINI VE GÜVENLİĞİNİ SAĞLAMAKLA YÜKÜMLÜDÜR.
+                İŞVEREN, ÇALIŞANLARIN SAĞLIĞINI VE GÜVENLİĞİNİ SAĞLAMAKLA YÜKÜMLÜDÜR.
               </p>
               <p className="mt-4 text-[13px] leading-6 text-slate-800">
-                {overallAnalysis.trim() || "Bu raporda fotoğraf kanıtlarıyla sunulan uygunsuzlukların giderilmemesi durumunda meydana gelebilecek iş kazalarında işveren, ilgili mevzuat kapsamında idari ve hukuki sorumlulukla karşılaşabilir."}
+                {overallAnalysis.trim() ||
+                  "Bu raporda fotoğraf kanıtlarıyla sunulan uygunsuzlukların giderilmemesi durumunda meydana gelebilecek iş kazalarında işveren, ilgili mevzuat kapsamında idari ve hukuki sorumlulukla karşılaşabilir."}
               </p>
             </div>
 
@@ -353,26 +450,24 @@ export default function BulkCapaPreviewDialog({
               <div className="text-center">
                 <div className="mx-auto h-px w-full max-w-[220px] bg-slate-800" />
                 <p className="mt-3 text-[13px] font-semibold text-slate-900">Hazırlayan</p>
-                <p className="mt-1 text-[12px] text-slate-600">{generalInfo.observer_name || profileContext?.full_name || "İş Güvenliği Uzmanı"}</p>
+                <p className="mt-1 text-[12px] text-slate-600">
+                  {generalInfo.observer_name || profileContext?.full_name || "İş Güvenliği Uzmanı"}
+                </p>
               </div>
               <div className="text-center">
                 <div className="mx-auto h-px w-full max-w-[220px] bg-slate-800" />
                 <p className="mt-3 text-[13px] font-semibold text-slate-900">Onaylayan</p>
-                <p className="mt-1 text-[12px] text-slate-600">{generalInfo.employer_representative_name || "İşveren / İşveren Vekili"}</p>
+                <p className="mt-1 text-[12px] text-slate-600">
+                  {generalInfo.employer_representative_name || "İşveren / İşveren Vekili"}
+                </p>
               </div>
             </div>
 
-            <div className="mt-16 text-center text-[11px] text-slate-400">
-              Sayfa 1 / 1
-            </div>
+            <div className="mt-16 text-center text-[11px] text-slate-400">Sayfa 1 / 1</div>
           </div>
         </div>
 
-        <Button
-          onClick={onClose}
-          className="m-4 mt-0 w-[calc(100%-2rem)]"
-          variant="outline"
-        >
+        <Button onClick={onClose} className="m-4 mt-0 w-[calc(100%-2rem)]" variant="outline">
           Kapat
         </Button>
       </DialogContent>
