@@ -57,7 +57,7 @@ const STANDARD_TEAMS = [
   { name: "Yangın Söndürme Ekibi", icon: "🔥" },
   { name: "İlk Yardım Ekibi", icon: "🚑" },
   { name: "Arama Kurtarma Ekibi", icon: "⛑️" },
-  { name: "Güvenlik Ekibi", icon: "🛡️" },
+  { name: "Koruma Ekibi", icon: "🛡️" },
 ];
 
 export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
@@ -80,6 +80,9 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
     }
     fetchEmployees();
   }, [planId]);
+
+  const normalizeTeamName = (teamName: string) =>
+    teamName.trim() === "Güvenlik Ekibi" ? "Koruma Ekibi" : teamName.trim();
 
   const fetchEmployees = async () => {
     if (!user) return;
@@ -127,7 +130,7 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
       // ✅ Type conversion: Json -> string[]
       const typedTeams: Team[] = (data || []).map(team => ({
         id: team.id,
-        team_name: team.team_name,
+        team_name: normalizeTeamName(team.team_name),
         team_leader_id: team.team_leader_id,
         members: Array.isArray(team.members) 
           ? (team.members as string[])
@@ -176,7 +179,7 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
     try {
       const teamData = {
         plan_id: planId,
-        team_name: teamForm.team_name,
+        team_name: normalizeTeamName(teamForm.team_name),
         team_leader_id: teamForm.team_leader_id || null,
         members: selectedEmployees,
       };

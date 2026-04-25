@@ -1,16 +1,27 @@
-// src/components/adep/ADEPGeneralInfo.tsx
-
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Plus, Trash2 } from "lucide-react";
 import { buildDeterministicClientId } from "@/lib/clientIdentity";
+import type { ADEPPlanData, ADEPRolePerson } from "@/lib/adepPlanSchema";
 
 interface Company {
   id: string;
@@ -19,129 +30,215 @@ interface Company {
   phone: string;
   employee_count: number;
   industry: string;
+  hazard_class?: string | null;
 }
 
 interface ADEPGeneralInfoProps {
-  data: any;
-  planData: any;
-  onChange: (section: string, data: any) => void;
-  onPlanDataChange: (section: string, data: any) => void;
+  data: {
+    company_id?: string;
+    plan_name: string;
+    company_name: string;
+    hazard_class: string;
+    employee_count: number;
+    sector: string;
+  };
+  planData: ADEPPlanData;
+  onChange: (field: string, value: string | number) => void;
+  onPlanDataChange: <K extends keyof ADEPPlanData>(section: K, data: ADEPPlanData[K]) => void;
 }
 
-export default function ADEPGeneralInfo({ 
-  data, 
-  planData, 
-  onChange, 
-  onPlanDataChange 
+const roleCards: Array<{
+  key: keyof ADEPPlanData["gorevli_bilgileri"];
+  title: string;
+  description: string;
+}> = [
+  {
+    key: "isveren_vekil",
+    title: "İşveren / İşveren Vekili",
+    description: "Planın işveren tarafındaki sorumlusu.",
+  },
+  {
+    key: "isg_uzmani",
+    title: "İş Güvenliği Uzmanı",
+    description: "Belge numarası, iletişim ve unvan bilgileri.",
+  },
+  {
+    key: "isyeri_hekimi",
+    title: "İşyeri Hekimi",
+    description: "Hekim iletişim ve sertifika bilgileri.",
+  },
+  {
+    key: "calisan_temsilcisi",
+    title: "Çalışan Temsilcisi",
+    description: "Temsilci ve eğitim bilgileri.",
+  },
+  {
+    key: "destek_elemani",
+    title: "Destek Elemanı / Koordinatör",
+    description: "Acil durum koordinasyon desteği veren kişi.",
+  },
+  {
+    key: "bilgi_sahibi_kisi",
+    title: "Bilgi Sahibi Kişi",
+    description: "Birimler ve işyeri işleyişi hakkında bilgi sahibi kişi.",
+  },
+];
+
+export default function ADEPGeneralInfo({
+  data,
+  planData,
+  onChange,
+  onPlanDataChange,
 }: ADEPGeneralInfoProps) {
   const { user } = useAuth();
   const [companies, setCompanies] = useState<Company[]>([]);
 
-  useEffect(() => {
-    fetchCompanies();
-  }, [user]);
+  const readableInputClassName =
+    "border-white/10 bg-slate-900/80 !text-white placeholder:text-slate-400 focus-visible:border-cyan-400 focus-visible:ring-cyan-400/20 focus-visible:ring-offset-0";
 
-  const fetchCompanies = async () => {
+  const fetchCompanies = useCallback(async () => {
     if (!user) return;
 
     try {
       const { data: companiesData, error } = await supabase
         .from("companies")
-        .select("*")
+        .select("id, name, address, phone, employee_count, industry, hazard_class")
         .eq("user_id", user.id)
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("name");
 
       if (error) throw error;
-      setCompanies(companiesData || []);
+      setCompanies((companiesData as Company[]) || []);
     } catch (error) {
       console.error("Companies fetch error:", error);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    void fetchCompanies();
+  }, [fetchCompanies]);
+
+  const preparers = useMemo(
+    () =>
+      (planData.genel_bilgiler.hazirlayanlar || []).map((preparer, index) => ({
+        ...preparer,
+        client_id:
+          preparer.client_id ||
+          buildDeterministicClientId("adep-preparer", [
+            data.company_id || "no-company",
+            index,
+            "fallback",
+          ]),
+      })),
+    [data.company_id, planData.genel_bilgiler.hazirlayanlar],
+  );
 
   const handleCompanySelect = (companyId: string) => {
-    const company = companies.find((c) => c.id === companyId);
+    const company = companies.find((item) => item.id === companyId);
     if (!company) return;
 
     onChange("company_id", companyId);
     onChange("company_name", company.name);
-    onChange("employee_count", company.employee_count);
-    onChange("sector", company.industry);
+    onChange("employee_count", company.employee_count || 0);
+    onChange("sector", company.industry || "");
 
-    // İşyeri bilgilerini doldur
+    const nextHazardClass = company.hazard_class || data.hazard_class || "Tehlikeli";
+    onChange("hazard_class", nextHazardClass);
+
     onPlanDataChange("isyeri_bilgileri", {
       ...planData.isyeri_bilgileri,
       adres: company.address || "",
       telefon: company.phone || "",
+      tehlike_sinifi: nextHazardClass,
+      is_kolu: company.industry || "",
+    });
+  };
+
+  const updateNestedSection = <K extends keyof ADEPPlanData>(section: K, patch: Partial<ADEPPlanData[K]>) => {
+    onPlanDataChange(section, {
+      ...planData[section],
+      ...patch,
+    });
+  };
+
+  const updateResponsiblePerson = (
+    role: keyof ADEPPlanData["gorevli_bilgileri"],
+    field: keyof ADEPRolePerson,
+    value: string,
+  ) => {
+    onPlanDataChange("gorevli_bilgileri", {
+      ...planData.gorevli_bilgileri,
+      [role]: {
+        ...planData.gorevli_bilgileri[role],
+        [field]: value,
+      },
     });
   };
 
   const addPreparer = () => {
-    const newPreparers = [
-      ...planData.genel_bilgiler.hazirlayanlar,
-      {
-        client_id: buildDeterministicClientId("adep-preparer", [data.company_id, planData.genel_bilgiler.hazirlayanlar.length, "manual"]),
-        unvan: "",
-        ad_soyad: "",
-      }
-    ];
     onPlanDataChange("genel_bilgiler", {
       ...planData.genel_bilgiler,
-      hazirlayanlar: newPreparers,
+      hazirlayanlar: [
+        ...preparers,
+        {
+          client_id: buildDeterministicClientId("adep-preparer", [
+            data.company_id || "no-company",
+            preparers.length,
+            "manual",
+          ]),
+          unvan: "",
+          ad_soyad: "",
+        },
+      ],
     });
   };
 
   const removePreparer = (index: number) => {
-    const newPreparers = planData.genel_bilgiler.hazirlayanlar.filter(
-      (_: any, i: number) => i !== index
-    );
     onPlanDataChange("genel_bilgiler", {
       ...planData.genel_bilgiler,
-      hazirlayanlar: newPreparers,
+      hazirlayanlar: preparers.filter((_, preparerIndex) => preparerIndex !== index),
     });
   };
 
-  const updatePreparer = (index: number, field: string, value: string) => {
-    const newPreparers = [...planData.genel_bilgiler.hazirlayanlar];
-    newPreparers[index][field] = value;
+  const updatePreparer = (index: number, field: "unvan" | "ad_soyad", value: string) => {
+    const nextPreparers = [...preparers];
+    nextPreparers[index] = {
+      ...nextPreparers[index],
+      [field]: value,
+    };
+
     onPlanDataChange("genel_bilgiler", {
       ...planData.genel_bilgiler,
-      hazirlayanlar: newPreparers,
+      hazirlayanlar: nextPreparers,
     });
   };
-
-  const preparers = (planData.genel_bilgiler.hazirlayanlar || []).map((preparer: any, index: number) => ({
-    ...preparer,
-    client_id:
-      preparer.client_id ||
-      buildDeterministicClientId("adep-preparer", [preparer.unvan, preparer.ad_soyad, data.company_id], index),
-  }));
 
   return (
     <div className="space-y-6">
-      {/* Plan Adı ve Firma Seçimi */}
       <Card>
         <CardHeader>
-          <CardTitle>1. İşyeri Bilgileri</CardTitle>
+          <CardTitle>İşyeri ve Belge Bilgileri</CardTitle>
           <CardDescription>
-            Plan adı ve firma bilgilerini girin
+            Acil durum planının kapak, işyeri ve belge özetinde kullanılacak temel alanları doldurun.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="plan_name">Plan Adı *</Label>
+              <Label htmlFor="plan_name">Plan Adı</Label>
               <Input
                 id="plan_name"
                 value={data.plan_name}
                 onChange={(e) => onChange("plan_name", e.target.value)}
-                placeholder="Örn: 2026 Acil Durum Eylem Planı"
+                placeholder="2026 Acil Durum Eylem Planı"
+                className={readableInputClassName}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="company">Firma Seç *</Label>
-              <Select value={data.company_id} onValueChange={handleCompanySelect}>
-                <SelectTrigger>
+              <Label htmlFor="company">Firma</Label>
+              <Select value={data.company_id || ""} onValueChange={handleCompanySelect}>
+                <SelectTrigger className={readableInputClassName}>
                   <SelectValue placeholder="Firma seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -157,32 +254,25 @@ export default function ADEPGeneralInfo({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="address">Adres</Label>
+              <Label htmlFor="company_name">İşyeri Ünvanı</Label>
               <Input
-                id="address"
-                value={planData.isyeri_bilgileri.adres}
-                onChange={(e) =>
-                  onPlanDataChange("isyeri_bilgileri", {
-                    ...planData.isyeri_bilgileri,
-                    adres: e.target.value,
-                  })
-                }
-                placeholder="İşyeri adresi"
+                id="company_name"
+                value={data.company_name}
+                onChange={(e) => onChange("company_name", e.target.value)}
+                placeholder="Firma ünvanı"
+                className={readableInputClassName}
               />
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="phone">Telefon</Label>
+              <Label htmlFor="sgk_sicil_no">SGK Sicil No</Label>
               <Input
-                id="phone"
-                value={planData.isyeri_bilgileri.telefon}
+                id="sgk_sicil_no"
+                value={planData.isyeri_bilgileri.sgk_sicil_no}
                 onChange={(e) =>
-                  onPlanDataChange("isyeri_bilgileri", {
-                    ...planData.isyeri_bilgileri,
-                    telefon: e.target.value,
-                  })
+                  updateNestedSection("isyeri_bilgileri", { sgk_sicil_no: e.target.value })
                 }
-                placeholder="0212 123 45 67"
+                placeholder="26 haneli sicil numarası"
+                className={readableInputClassName}
               />
             </div>
           </div>
@@ -194,13 +284,10 @@ export default function ADEPGeneralInfo({
                 value={data.hazard_class}
                 onValueChange={(value) => {
                   onChange("hazard_class", value);
-                  onPlanDataChange("isyeri_bilgileri", {
-                    ...planData.isyeri_bilgileri,
-                    tehlike_sinifi: value,
-                  });
+                  updateNestedSection("isyeri_bilgileri", { tehlike_sinifi: value });
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={readableInputClassName}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -217,36 +304,215 @@ export default function ADEPGeneralInfo({
                 id="employee_count"
                 type="number"
                 value={data.employee_count}
-                onChange={(e) => onChange("employee_count", parseInt(e.target.value) || 0)}
+                onChange={(e) => onChange("employee_count", Number.parseInt(e.target.value, 10) || 0)}
+                className={readableInputClassName}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="sgk_sicil">SGK Sicil No</Label>
+              <Label htmlFor="is_kolu">İşkolu / Sektör</Label>
               <Input
-                id="sgk_sicil"
-                value={planData.isyeri_bilgileri.sgk_sicil_no}
+                id="is_kolu"
+                value={planData.isyeri_bilgileri.is_kolu}
+                onChange={(e) => {
+                  onChange("sector", e.target.value);
+                  updateNestedSection("isyeri_bilgileri", { is_kolu: e.target.value });
+                }}
+                placeholder="İşyeri faaliyet alanı"
+                className={readableInputClassName}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="address">Adres</Label>
+              <Textarea
+                id="address"
+                value={planData.isyeri_bilgileri.adres}
+                onChange={(e) => updateNestedSection("isyeri_bilgileri", { adres: e.target.value })}
+                placeholder="İşyeri adresi"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Telefon</Label>
+              <Input
+                id="phone"
+                value={planData.isyeri_bilgileri.telefon}
+                onChange={(e) => updateNestedSection("isyeri_bilgileri", { telefon: e.target.value })}
+                placeholder="0212 000 00 00"
+                className={readableInputClassName}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="hazirlanma_tarihi">Hazırlama Tarihi</Label>
+              <Input
+                id="hazirlanma_tarihi"
+                type="date"
+                value={planData.genel_bilgiler.hazirlanma_tarihi}
                 onChange={(e) =>
-                  onPlanDataChange("isyeri_bilgileri", {
-                    ...planData.isyeri_bilgileri,
-                    sgk_sicil_no: e.target.value,
-                  })
+                  updateNestedSection("genel_bilgiler", { hazirlanma_tarihi: e.target.value })
                 }
-                placeholder="12345678"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gecerlilik_tarihi">Geçerlilik Tarihi</Label>
+              <Input
+                id="gecerlilik_tarihi"
+                type="date"
+                value={planData.genel_bilgiler.gecerlilik_tarihi}
+                onChange={(e) =>
+                  updateNestedSection("genel_bilgiler", { gecerlilik_tarihi: e.target.value })
+                }
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="revizyon_no">Revizyon No</Label>
+              <Input
+                id="revizyon_no"
+                value={planData.genel_bilgiler.revizyon_no}
+                onChange={(e) => updateNestedSection("genel_bilgiler", { revizyon_no: e.target.value })}
+                placeholder="Rev. 0"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="revizyon_tarihi">Revizyon Tarihi</Label>
+              <Input
+                id="revizyon_tarihi"
+                type="date"
+                value={planData.genel_bilgiler.revizyon_tarihi}
+                onChange={(e) =>
+                  updateNestedSection("genel_bilgiler", { revizyon_tarihi: e.target.value })
+                }
+                className={readableInputClassName}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-2">
+              <Label htmlFor="plan_basligi">Kapak Başlığı</Label>
+              <Input
+                id="plan_basligi"
+                value={planData.dokuman_bilgileri.plan_basligi}
+                onChange={(e) =>
+                  updateNestedSection("dokuman_bilgileri", { plan_basligi: e.target.value })
+                }
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="plan_alt_basligi">Alt Başlık</Label>
+              <Input
+                id="plan_alt_basligi"
+                value={planData.dokuman_bilgileri.plan_alt_basligi}
+                onChange={(e) =>
+                  updateNestedSection("dokuman_bilgileri", { plan_alt_basligi: e.target.value })
+                }
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ay_yil">Ay / Yıl</Label>
+              <Input
+                id="ay_yil"
+                value={planData.dokuman_bilgileri.ay_yil}
+                onChange={(e) => updateNestedSection("dokuman_bilgileri", { ay_yil: e.target.value })}
+                placeholder="Nisan 2026"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dokuman_tarihi">Doküman Tarihi</Label>
+              <Input
+                id="dokuman_tarihi"
+                type="date"
+                value={planData.dokuman_bilgileri.dokuman_tarihi}
+                onChange={(e) =>
+                  updateNestedSection("dokuman_bilgileri", { dokuman_tarihi: e.target.value })
+                }
+                className={readableInputClassName}
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Hazırlayanlar */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <CardTitle>OSGB Bilgileri</CardTitle>
+          <CardDescription>
+            Word şablonundaki OSGB başlığında kullanılacak kurum bilgilerini girin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="osgb_unvan">OSGB Ünvanı</Label>
+            <Input
+              id="osgb_unvan"
+              value={planData.osgb_bilgileri.unvan}
+              onChange={(e) => updateNestedSection("osgb_bilgileri", { unvan: e.target.value })}
+              placeholder="OSGB firma adı"
+              className={readableInputClassName}
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="osgb_adres">OSGB Adresi</Label>
+            <Textarea
+              id="osgb_adres"
+              value={planData.osgb_bilgileri.adres}
+              onChange={(e) => updateNestedSection("osgb_bilgileri", { adres: e.target.value })}
+              placeholder="OSGB merkez adresi"
+              className={readableInputClassName}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="osgb_telefon">Telefon</Label>
+            <Input
+              id="osgb_telefon"
+              value={planData.osgb_bilgileri.telefon}
+              onChange={(e) => updateNestedSection("osgb_bilgileri", { telefon: e.target.value })}
+              placeholder="0212 000 00 00"
+              className={readableInputClassName}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="osgb_web">Web</Label>
+            <Input
+              id="osgb_web"
+              value={planData.osgb_bilgileri.web}
+              onChange={(e) => updateNestedSection("osgb_bilgileri", { web: e.target.value })}
+              placeholder="www.isgvizyon.com"
+              className={readableInputClassName}
+            />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="osgb_email">E-posta</Label>
+            <Input
+              id="osgb_email"
+              value={planData.osgb_bilgileri.email}
+              onChange={(e) => updateNestedSection("osgb_bilgileri", { email: e.target.value })}
+              placeholder="info@isgvizyon.com"
+              className={readableInputClassName}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle>Hazırlayan Kişiler</CardTitle>
               <CardDescription>
-                Planı hazırlayan ve onaylayan kişilerin bilgilerini girin
+                Planı hazırlayan ve onay sürecine dahil olan kişileri ekleyin.
               </CardDescription>
             </div>
             <Button onClick={addPreparer} size="sm" className="gap-2">
@@ -256,15 +522,16 @@ export default function ADEPGeneralInfo({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {preparers.map((preparer: any, index: number) => (
-            <div key={preparer.client_id} className="flex gap-4 items-start">
-              <div className="flex-1 grid gap-4 md:grid-cols-2">
+          {preparers.map((preparer, index) => (
+            <div key={preparer.client_id} className="flex items-start gap-4">
+              <div className="grid flex-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Ünvan</Label>
                   <Input
                     value={preparer.unvan}
                     onChange={(e) => updatePreparer(index, "unvan", e.target.value)}
                     placeholder="İş Güvenliği Uzmanı"
+                    className={readableInputClassName}
                   />
                 </div>
                 <div className="space-y-2">
@@ -273,117 +540,194 @@ export default function ADEPGeneralInfo({
                     value={preparer.ad_soyad}
                     onChange={(e) => updatePreparer(index, "ad_soyad", e.target.value)}
                     placeholder="Ahmet Yılmaz"
+                    className={readableInputClassName}
                   />
                 </div>
               </div>
-              {index > 0 && (
+              {index > 0 ? (
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   onClick={() => removePreparer(index)}
-                  className="text-red-600 hover:text-red-700"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
-              )}
+              ) : null}
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Tarihler ve Revizyon */}
       <Card>
         <CardHeader>
-          <CardTitle>Tarihler ve Revizyon Bilgileri</CardTitle>
+          <CardTitle>Görevli Kişiler</CardTitle>
+          <CardDescription>
+            Word şablonundaki resmi görevli tablosunu doldurmak için temel rol sahiplerini tanımlayın.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-2">
-              <Label htmlFor="hazirlanma_tarihi">Hazırlanma Tarihi</Label>
-              <Input
-                id="hazirlanma_tarihi"
-                type="date"
-                value={planData.genel_bilgiler.hazirlanma_tarihi}
-                onChange={(e) =>
-                  onPlanDataChange("genel_bilgiler", {
-                    ...planData.genel_bilgiler,
-                    hazirlanma_tarihi: e.target.value,
-                  })
-                }
-              />
-            </div>
+        <CardContent className="grid gap-4 xl:grid-cols-2">
+          {roleCards.map((roleCard) => {
+            const roleValue = planData.gorevli_bilgileri[roleCard.key];
 
-            <div className="space-y-2">
-              <Label htmlFor="gecerlilik_tarihi">Geçerlilik Tarihi</Label>
-              <Input
-                id="gecerlilik_tarihi"
-                type="date"
-                value={planData.genel_bilgiler.gecerlilik_tarihi}
-                onChange={(e) =>
-                  onPlanDataChange("genel_bilgiler", {
-                    ...planData.genel_bilgiler,
-                    gecerlilik_tarihi: e.target.value,
-                  })
-                }
-              />
-            </div>
+            return (
+              <div key={roleCard.key} className="rounded-2xl border border-slate-200/80 p-4 dark:border-slate-800">
+                <div className="mb-4">
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {roleCard.title}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {roleCard.description}
+                  </div>
+                </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="revizyon_no">Revizyon No</Label>
-              <Input
-                id="revizyon_no"
-                value={planData.genel_bilgiler.revizyon_no}
-                onChange={(e) =>
-                  onPlanDataChange("genel_bilgiler", {
-                    ...planData.genel_bilgiler,
-                    revizyon_no: e.target.value,
-                  })
-                }
-                placeholder="Rev. 0"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="revizyon_tarihi">Revizyon Tarihi</Label>
-              <Input
-                id="revizyon_tarihi"
-                type="date"
-                value={planData.genel_bilgiler.revizyon_tarihi}
-                onChange={(e) =>
-                  onPlanDataChange("genel_bilgiler", {
-                    ...planData.genel_bilgiler,
-                    revizyon_tarihi: e.target.value,
-                  })
-                }
-              />
-            </div>
-          </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Ad Soyad</Label>
+                    <Input
+                      value={roleValue.ad_soyad}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "ad_soyad", e.target.value)
+                      }
+                      placeholder="Ad Soyad"
+                      className={readableInputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ünvan / Görev</Label>
+                    <Input
+                      value={roleValue.unvan}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "unvan", e.target.value)
+                      }
+                      placeholder="Görev tanımı"
+                      className={readableInputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Telefon</Label>
+                    <Input
+                      value={roleValue.telefon}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "telefon", e.target.value)
+                      }
+                      placeholder="05xx xxx xx xx"
+                      className={readableInputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>TC No</Label>
+                    <Input
+                      value={roleValue.tc_no}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "tc_no", e.target.value)
+                      }
+                      placeholder="11 haneli TC"
+                      className={readableInputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Belge / Sertifika No</Label>
+                    <Input
+                      value={roleValue.belge_no}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "belge_no", e.target.value)
+                      }
+                      placeholder="Varsa belge numarası"
+                      className={readableInputClassName}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Eğitim Tarihi</Label>
+                    <Input
+                      type="date"
+                      value={roleValue.egitim_tarihi}
+                      onChange={(e) =>
+                        updateResponsiblePerson(roleCard.key, "egitim_tarihi", e.target.value)
+                      }
+                      className={readableInputClassName}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
-      {/* Toplanma Yeri */}
       <Card>
         <CardHeader>
-          <CardTitle>3. Toplanma Yeri</CardTitle>
+          <CardTitle>Toplanma Yeri ve Ek Notları</CardTitle>
           <CardDescription>
-            İşyerinizin acil durum toplanma noktası bilgilerini girin
+            Toplanma alanı açıklamasını ve şablondaki ekler bölümünde yer alacak notları girin.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="toplanma_yeri">Toplanma Yeri Açıklaması</Label>
-            <Textarea
-              id="toplanma_yeri"
-              value={planData.toplanma_yeri.aciklama}
-              onChange={(e) =>
-                onPlanDataChange("toplanma_yeri", {
-                  ...planData.toplanma_yeri,
-                  aciklama: e.target.value,
-                })
-              }
-              placeholder="Toplanma yerinin konumu ve özellikleri..."
-              rows={3}
-            />
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="toplanma_yeri">Toplanma Yeri Açıklaması</Label>
+              <Textarea
+                id="toplanma_yeri"
+                value={planData.toplanma_yeri.aciklama}
+                onChange={(e) => updateNestedSection("toplanma_yeri", { aciklama: e.target.value })}
+                placeholder="Tahliye sonrası toplanma alanının açıklaması"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="harita_url">Harita / Kroki Bağlantısı</Label>
+              <Textarea
+                id="harita_url"
+                value={planData.toplanma_yeri.harita_url}
+                onChange={(e) => updateNestedSection("toplanma_yeri", { harita_url: e.target.value })}
+                placeholder="Kroki veya harita bağlantısı"
+                className={readableInputClassName}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="organizasyon_semasi_notu">Organizasyon Şeması Notu</Label>
+              <Textarea
+                id="organizasyon_semasi_notu"
+                value={planData.ekler.organizasyon_semasi_notu}
+                onChange={(e) => updateNestedSection("ekler", { organizasyon_semasi_notu: e.target.value })}
+                placeholder="Ek-1 organizasyon yapısı notu"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="tahliye_plani_notu">Tahliye Planı Notu</Label>
+              <Textarea
+                id="tahliye_plani_notu"
+                value={planData.ekler.tahliye_plani_notu}
+                onChange={(e) => updateNestedSection("ekler", { tahliye_plani_notu: e.target.value })}
+                placeholder="Ek-8 tahliye planı notu"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="kroki_notu">Kroki Notu</Label>
+              <Textarea
+                id="kroki_notu"
+                value={planData.ekler.kroki_notu}
+                onChange={(e) => updateNestedSection("ekler", { kroki_notu: e.target.value })}
+                placeholder="Ek-9 kroki bilgisi"
+                className={readableInputClassName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ek_notlar">Ek Notlar</Label>
+              <Textarea
+                id="ek_notlar"
+                value={planData.ekler.ek_notlar}
+                onChange={(e) => updateNestedSection("ekler", { ek_notlar: e.target.value })}
+                placeholder="Belgede yer almasını istediğiniz ek açıklamalar"
+                className={readableInputClassName}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

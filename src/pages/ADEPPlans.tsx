@@ -1,4 +1,5 @@
 ﻿
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -17,6 +18,8 @@ import {
   FileText,
   LayoutTemplate,
   Layers3,
+  MapPin,
+  Phone,
   Plus,
   Shield,
   Sparkles,
@@ -45,6 +48,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const loadAdepWordGenerator = () => import("@/lib/adepOfficialDocx");
+
 interface ADEPPlan {
   id: string;
   plan_name: string;
@@ -57,12 +62,85 @@ interface ADEPPlan {
   next_review_date: string | null;
   created_at: string;
   updated_at: string;
-  plan_data?: {
+    plan_data?: {
+    genel_bilgiler?: {
+      hazirlayanlar?: Array<{
+        unvan?: string;
+        ad_soyad?: string;
+      }>;
+      hazirlanma_tarihi?: string;
+      gecerlilik_tarihi?: string;
+      revizyon_no?: string;
+      revizyon_tarihi?: string;
+    };
+      isyeri_bilgileri?: {
+        adres?: string;
+        telefon?: string;
+        tehlike_sinifi?: string;
+        sgk_sicil_no?: string;
+        is_kolu?: string;
+      };
+      osgb_bilgileri?: {
+        unvan?: string;
+        adres?: string;
+        telefon?: string;
+        web?: string;
+        email?: string;
+      };
+      gorevli_bilgileri?: {
+        isveren_vekil?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+        isg_uzmani?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+        isyeri_hekimi?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+        calisan_temsilcisi?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+        destek_elemani?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+        bilgi_sahibi_kisi?: { ad_soyad?: string; unvan?: string; telefon?: string; tc_no?: string; belge_no?: string; egitim_tarihi?: string };
+      };
+      dokuman_bilgileri?: {
+        plan_basligi?: string;
+        plan_alt_basligi?: string;
+        ay_yil?: string;
+        dokuman_tarihi?: string;
+        yenilenme_periyodu?: string;
+      };
+      ekler?: {
+        kroki_notu?: string;
+        tahliye_plani_notu?: string;
+        organizasyon_semasi_notu?: string;
+        ek_notlar?: string;
+      };
+      toplanma_yeri?: {
+        aciklama?: string;
+        harita_url?: string;
+    };
     export_preferences?: {
       cover_style?: string;
     };
   } | null;
 }
+
+type PreviewTeam = {
+  id: string;
+  team_name: string;
+  members: string[] | null;
+  team_leader?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    job_title?: string | null;
+    phone?: string | null;
+  } | null;
+};
+
+type PreviewContact = {
+  id: string;
+  institution_name: string;
+  phone_number: string;
+};
+
+type PreviewScenario = {
+  id: string;
+  hazard_type: string;
+  action_steps: string;
+};
 
 type CoverMeta = {
   label: string;
@@ -81,6 +159,18 @@ const ADEP_CARD_SKELETON_KEYS = [
   "plan-skeleton-4",
   "plan-skeleton-5",
   "plan-skeleton-6",
+] as const;
+
+const PREVIEW_APPENDICES = [
+  "Ek-1: Acil Durum Organizasyon Yapısı",
+  "Ek-2: Acil Durum Telefon Numaraları",
+  "Ek-3: İş Kazası Müdahale Planı",
+  "Ek-4: Besin Zehirlenmesi Müdahale Planı",
+  "Ek-5: Gaz Zehirlenmesi Müdahale Planı",
+  "Ek-6: Yanık Müdahale Planı",
+  "Ek-7: Elektrik Çarpması Müdahale Planı",
+  "Ek-8: İşyeri Tahliye Planı",
+  "Ek-9: İşyeri Krokisi",
 ] as const;
 
 const getHazardTone = (hazardClass: string) => {
@@ -186,6 +276,36 @@ const getCoverStyleMeta = (coverStyle?: string): CoverMeta => {
   }
 };
 
+const formatDateOrDash = (value?: string | null, pattern: string = "dd.MM.yyyy") => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return format(date, pattern, { locale: tr });
+};
+
+const getTeamLeadName = (team: PreviewTeam) => {
+  const firstName = team.team_leader?.first_name?.trim() || "";
+  const lastName = team.team_leader?.last_name?.trim() || "";
+  const fullName = `${firstName} ${lastName}`.trim();
+  return fullName || "Atanmadı";
+};
+
+const getTeamDutyLabel = (teamName: string) => {
+  if (teamName.toLocaleLowerCase("tr-TR").includes("yangın")) {
+    return "Söndürme ve ilk müdahale";
+  }
+  if (teamName.toLocaleLowerCase("tr-TR").includes("ilk yardım")) {
+    return "İlk yardım ve sağlık yönlendirmesi";
+  }
+  if (teamName.toLocaleLowerCase("tr-TR").includes("arama")) {
+    return "Arama, kurtarma ve tahliye desteği";
+  }
+  if (teamName.toLocaleLowerCase("tr-TR").includes("güvenlik")) {
+    return "Güvenlik çevresi ve yönlendirme";
+  }
+  return "Acil durum görev ekibi";
+};
+
 export default function ADEPPlans() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -194,15 +314,33 @@ export default function ADEPPlans() {
   const [previewPlan, setPreviewPlan] = useState<ADEPPlan | null>(null);
   const [companyLogos, setCompanyLogos] = useState<Record<string, string>>({});
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState("");
+  const [previewTeams, setPreviewTeams] = useState<PreviewTeam[]>([]);
+  const [previewContacts, setPreviewContacts] = useState<PreviewContact[]>([]);
+  const [previewScenarios, setPreviewScenarios] = useState<PreviewScenario[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     void fetchPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
     void fetchBrandingAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, plans]);
+
+  useEffect(() => {
+    if (!previewPlan?.id) {
+      setPreviewTeams([]);
+      setPreviewContacts([]);
+      setPreviewScenarios([]);
+      setPreviewLoading(false);
+      return;
+    }
+
+    void fetchPreviewDetails(previewPlan.id);
+  }, [previewPlan?.id]);
 
   const fetchPlans = async () => {
     if (!user) return;
@@ -294,6 +432,48 @@ export default function ADEPPlans() {
     }
   };
 
+  const fetchPreviewDetails = async (planId: string) => {
+    setPreviewLoading(true);
+
+    try {
+      const [teamsResult, contactsResult, scenariosResult] = await Promise.all([
+        supabase
+          .from("adep_teams")
+          .select(
+            "id, team_name, members, team_leader:employees!team_leader_id(first_name, last_name, job_title, phone)"
+          )
+          .eq("plan_id", planId)
+          .order("created_at"),
+        supabase
+          .from("adep_emergency_contacts")
+          .select("id, institution_name, phone_number")
+          .eq("plan_id", planId)
+          .order("institution_name"),
+        supabase
+          .from("adep_scenarios")
+          .select("id, hazard_type, action_steps")
+          .eq("plan_id", planId)
+          .order("hazard_type"),
+      ]);
+
+      if (teamsResult.error) throw teamsResult.error;
+      if (contactsResult.error) throw contactsResult.error;
+      if (scenariosResult.error) throw scenariosResult.error;
+
+      setPreviewTeams((teamsResult.data as PreviewTeam[] | null) || []);
+      setPreviewContacts((contactsResult.data as PreviewContact[] | null) || []);
+      setPreviewScenarios((scenariosResult.data as PreviewScenario[] | null) || []);
+    } catch (error) {
+      console.error("ADEP preview details fetch error:", error);
+      toast.error("ADEP önizleme detayları yüklenemedi");
+      setPreviewTeams([]);
+      setPreviewContacts([]);
+      setPreviewScenarios([]);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   const dashboardSummary = useMemo(() => {
     const total = plans.length;
     const completed = plans.filter((plan) => plan.status === "completed").length;
@@ -317,6 +497,67 @@ export default function ADEPPlans() {
 
     return { total, completed, withPdf, critical, upcomingReview, topHazard };
   }, [plans]);
+
+  const previewPreparedByRows = useMemo(() => {
+    const preparers = previewPlan?.plan_data?.genel_bilgiler?.hazirlayanlar || [];
+    const roleRows = Object.entries(previewPlan?.plan_data?.gorevli_bilgileri || {})
+      .filter(([, value]) =>
+        [value?.ad_soyad, value?.unvan, value?.telefon, value?.belge_no]
+          .some((item) => item?.trim()),
+      )
+      .map(
+      ([roleKey, value]) => {
+        const roleMap: Record<string, string> = {
+          isveren_vekil: "İşveren / İşveren Vekili",
+          isg_uzmani: "İş Güvenliği Uzmanı",
+          isyeri_hekimi: "İşyeri Hekimi",
+          calisan_temsilcisi: "Çalışan Temsilcisi",
+          destek_elemani: "Destek Elemanı / Koordinatör",
+          bilgi_sahibi_kisi: "Bilgi Sahibi Kişi",
+        };
+
+        return {
+          role: roleMap[roleKey] || "Görevli",
+          name: value?.ad_soyad?.trim() || "-",
+          duty:
+            [value?.unvan?.trim(), value?.telefon?.trim(), value?.belge_no?.trim()]
+              .filter(Boolean)
+              .join(" • ") || "Görev bilgisi bekleniyor",
+        };
+      },
+    );
+
+    return preparers
+      .filter((item) => item?.unvan?.trim() || item?.ad_soyad?.trim())
+      .map((item) => ({
+        role: item.unvan?.trim() || "Hazırlayan",
+        name: item.ad_soyad?.trim() || "-",
+        duty: "Plan hazırlama ve gözden geçirme",
+      }))
+      .concat(roleRows);
+  }, [previewPlan]);
+
+  const previewTeamRows = useMemo(() => {
+    return previewTeams.map((team) => ({
+      role: team.team_name,
+      name: getTeamLeadName(team),
+      duty: `${getTeamDutyLabel(team.team_name)} • ${team.members?.length || 0} üye`,
+    }));
+  }, [previewTeams]);
+
+  const previewPlanSections = useMemo(() => {
+    return previewScenarios.slice(0, 4).map((scenario) => ({
+      title: scenario.hazard_type,
+      summary:
+        scenario.action_steps
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(" ")
+          .slice(0, 220) || "Senaryo adımları plan içinde tanımlı.",
+    }));
+  }, [previewScenarios]);
 
   if (loading) {
     return (
@@ -730,6 +971,42 @@ export default function ADEPPlans() {
                   companyLogos[previewPlan.company_name.toLocaleLowerCase("tr-TR")] ||
                   organizationLogoUrl ||
                   "";
+                const workplaceInfo = previewPlan.plan_data?.isyeri_bilgileri;
+                const generalInfo = previewPlan.plan_data?.genel_bilgiler;
+                const osgbInfo = previewPlan.plan_data?.osgb_bilgileri;
+                const documentInfo = previewPlan.plan_data?.dokuman_bilgileri;
+                const meetingPoint = previewPlan.plan_data?.toplanma_yeri;
+                const documentRows = [
+                  { label: "İşyeri Ünvanı", value: previewPlan.company_name },
+                  { label: "Adresi", value: workplaceInfo?.adres || "-" },
+                  { label: "SGK Sicil No", value: workplaceInfo?.sgk_sicil_no || "-" },
+                  { label: "İşkolu", value: workplaceInfo?.is_kolu || previewPlan.sector || "-" },
+                  {
+                    label: "Tehlike Sınıfı",
+                    value: workplaceInfo?.tehlike_sinifi || previewPlan.hazard_class,
+                  },
+                  {
+                    label: "Çalışan Sayısı",
+                    value: `${previewPlan.employee_count || 0} kişi`,
+                  },
+                  {
+                    label: "Hazırlama Tarihi",
+                    value: formatDateOrDash(generalInfo?.hazirlanma_tarihi || previewPlan.created_at),
+                  },
+                  {
+                    label: "Geçerlilik Tarihi",
+                    value: formatDateOrDash(generalInfo?.gecerlilik_tarihi),
+                  },
+                  {
+                    label: "Revizyon",
+                    value: generalInfo?.revizyon_no || "Rev. 0",
+                  },
+                  {
+                    label: "Ay / Yıl",
+                    value: documentInfo?.ay_yil || "-",
+                  },
+                ];
+                const personnelRows = [...previewPreparedByRows, ...previewTeamRows];
                 return (
                   <>
               <DialogHeader className="border-b border-white/10 bg-white/[0.03] px-6 py-5">
@@ -737,23 +1014,24 @@ export default function ADEPPlans() {
                   Belge Önizleme
                 </DialogTitle>
                 <DialogDescription className="text-slate-400">
-                  {previewPlan.plan_name} için hazırlanmış ADEP PDF görünümü.
+                  {previewPlan.plan_name} için Word ve PDF çıktısıyla uyumlu belge önizlemesi.
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="grid gap-0 lg:grid-cols-[0.88fr_1.12fr]">
+              <div className="grid gap-0 lg:grid-cols-[0.84fr_1.16fr]">
                 <div className="border-b border-white/10 p-6 lg:border-b-0 lg:border-r">
-                  <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,rgba(8,47,73,0.96),rgba(15,23,42,0.96)_55%,rgba(2,6,23,0.98))] p-6 shadow-[0_24px_65px_rgba(2,6,23,0.35)]">
+                  <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(165deg,rgba(11,28,53,0.96),rgba(15,23,42,0.96)_55%,rgba(2,6,23,0.98))] p-6 shadow-[0_24px_65px_rgba(2,6,23,0.35)]">
                     <div className="flex items-center justify-between gap-3">
                       <Badge className="border-cyan-400/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
-                        ADEP Kapak
+                        Word Yapısı
                       </Badge>
                       <Badge className={`${getCoverStyleMeta(previewPlan.plan_data?.export_preferences?.cover_style).className} border`}>
                         {getCoverStyleMeta(previewPlan.plan_data?.export_preferences?.cover_style).label}
                       </Badge>
                     </div>
-                    <div className="mt-10 rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
-                      <div className="mb-5 flex items-center justify-between gap-4">
+
+                    <div className="mt-8 rounded-[24px] border border-white/10 bg-white/[0.04] p-6">
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/95 p-2 shadow-[0_10px_24px_rgba(2,6,23,0.22)]">
                           {previewLogo ? (
                             <img
@@ -765,49 +1043,43 @@ export default function ADEPPlans() {
                             <Building2 className="h-7 w-7 text-slate-500" />
                           )}
                         </div>
-                        <div className="flex flex-col gap-2 text-right">
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
-                            Rev. 0
-                          </span>
-                          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
-                            Hazırlanma {format(new Date(previewPlan.created_at), "dd.MM.yyyy", { locale: tr })}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-slate-400">
-                        Acil Durum Eylem Planı
-                      </div>
-                      <h3 className="mt-4 text-2xl font-semibold tracking-[-0.03em] text-white">
-                        {previewPlan.plan_name}
-                      </h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-300">
-                        {previewPlan.company_name} için hazırlanan planın kapak dili, risk tonu ve belge kimliği burada özetlenir.
-                      </p>
-                      <div className="mt-8 space-y-3">
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Durum</span>
-                          <span className="text-sm font-medium text-white">{getStatusConfig(previewPlan.status).label}</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Tehlike Sınıfı</span>
-                          <span className="text-sm font-medium text-white">{getHazardTone(previewPlan.hazard_class).label}</span>
-                        </div>
-                        <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Çalışan</span>
-                          <span className="text-sm font-medium text-white">{previewPlan.employee_count} kişi</span>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                            <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Sektör</span>
-                            <div className="mt-1 text-sm font-medium text-white">
-                              {previewPlan.sector || "Belirtilmedi"}
-                            </div>
+                        <div className="space-y-2 text-right">
+                          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+                            {generalInfo?.revizyon_no || "Rev. 0"}
                           </div>
-                          <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
-                            <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Tehlike</span>
-                            <div className="mt-1 text-sm font-medium text-white">
-                              {getHazardTone(previewPlan.hazard_class).label}
-                            </div>
+                          <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-slate-300">
+                            {formatDateOrDash(generalInfo?.hazirlanma_tarihi || previewPlan.created_at)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-10 text-center">
+                        <div className="text-[11px] uppercase tracking-[0.3em] text-slate-400">
+                          Acil Durum Planı
+                        </div>
+                        <h3 className="mt-4 text-3xl font-semibold tracking-[-0.03em] text-white">
+                          {previewPlan.company_name}
+                        </h3>
+                        <p className="mt-4 text-sm uppercase tracking-[0.25em] text-slate-300">
+                          Acil Durum Eylem Planı
+                        </p>
+                      </div>
+
+                      <div className="mt-10 space-y-3">
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Plan Adı</div>
+                          <div className="mt-1 text-sm font-medium text-white">{previewPlan.plan_name}</div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Tehlike Sınıfı</div>
+                          <div className="mt-1 text-sm font-medium text-white">
+                            {workplaceInfo?.tehlike_sinifi || previewPlan.hazard_class}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-slate-950/45 px-4 py-3">
+                          <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Toplanma Yeri</div>
+                          <div className="mt-1 text-sm font-medium leading-6 text-white">
+                            {meetingPoint?.aciklama || "Toplanma alanı henüz tanımlanmadı"}
                           </div>
                         </div>
                       </div>
@@ -819,43 +1091,194 @@ export default function ADEPPlans() {
                   <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div>
-                        <div className={eyebrowClass}>Belge meta</div>
+                        <div className={eyebrowClass}>Belge akışı</div>
                         <div className="mt-1 text-lg font-semibold text-white">
-                          Hazır PDF görünümü
+                          Word doküman yapısına uyarlanmış önizleme
                         </div>
                       </div>
                       <Badge className="border-emerald-400/25 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/10">
-                        Önizlenebilir
+                        {previewLoading ? "Yükleniyor" : "Hazır"}
                       </Badge>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                        <div className={eyebrowClass}>Şirket</div>
-                        <div className="mt-2 text-sm font-medium text-white">{previewPlan.company_name}</div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/45 p-4">
-                        <div className={eyebrowClass}>Son Güncelleme</div>
-                        <div className="mt-2 text-sm font-medium text-white">
-                          {format(new Date(previewPlan.updated_at), "dd MMMM yyyy", { locale: tr })}
-                        </div>
+                    <div className="rounded-[24px] border border-slate-200 bg-white p-4 text-slate-900 shadow-[0_20px_45px_rgba(15,23,42,0.16)]">
+                      <div className="space-y-6">
+                        <section className="rounded-2xl border border-slate-200">
+                          <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                            Kapak ve İşletme Bilgileri
+                          </div>
+                          <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+                            {documentRows.map((row) => (
+                              <div key={row.label} className="bg-white px-4 py-3">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  {row.label}
+                                </div>
+                                <div className="mt-1 text-sm font-medium leading-6 text-slate-900">
+                                  {row.value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200">
+                          <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                            OSGB Bilgileri
+                          </div>
+                          <div className="grid gap-px bg-slate-200 sm:grid-cols-2">
+                            {[
+                              { label: "OSGB Ünvanı", value: osgbInfo?.unvan || "-" },
+                              { label: "Adres", value: osgbInfo?.adres || "-" },
+                              { label: "Telefon", value: osgbInfo?.telefon || "-" },
+                              { label: "Web", value: osgbInfo?.web || "-" },
+                              { label: "E-posta", value: osgbInfo?.email || "-" },
+                            ].map((row) => (
+                              <div key={row.label} className="bg-white px-4 py-3">
+                                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                  {row.label}
+                                </div>
+                                <div className="mt-1 text-sm font-medium leading-6 text-slate-900">
+                                  {row.value}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200">
+                          <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                            İşyeri ve Görevli Bilgileri
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                              <thead className="bg-slate-50">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                    Görev / Ünvan
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                    Adı Soyadı
+                                  </th>
+                                  <th className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                    Sorumluluk
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200 bg-white">
+                                {personnelRows.length > 0 ? (
+                                  personnelRows.map((row) => (
+                                    <tr key={`${row.role}-${row.name}`}>
+                                      <td className="px-4 py-3 font-medium text-slate-900">{row.role}</td>
+                                      <td className="px-4 py-3 text-slate-700">{row.name}</td>
+                                      <td className="px-4 py-3 text-slate-700">{row.duty}</td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td className="px-4 py-4 text-slate-500" colSpan={3}>
+                                      Hazırlayan veya ekip bilgisi eklenmemiş.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+
+                        <section className="grid gap-4 lg:grid-cols-[1.02fr_0.98fr]">
+                          <div className="rounded-2xl border border-slate-200">
+                            <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                              Acil Durum Telefon Numaraları
+                            </div>
+                            <div className="space-y-2 p-4">
+                              {previewContacts.length > 0 ? (
+                                previewContacts.slice(0, 8).map((contact) => (
+                                  <div
+                                    key={contact.id}
+                                    className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2"
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      <Phone className="mt-0.5 h-4 w-4 text-slate-500" />
+                                      <span className="text-sm font-medium text-slate-800">
+                                        {contact.institution_name}
+                                      </span>
+                                    </div>
+                                    <span className="text-sm text-slate-600">{contact.phone_number}</span>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">
+                                  Henüz acil durum iletişim rehberi tanımlanmamış.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-200">
+                            <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                              Müdahale ve Tahliye Özeti
+                            </div>
+                            <div className="space-y-3 p-4">
+                              {previewPlanSections.length > 0 ? (
+                                previewPlanSections.map((section) => (
+                                  <div key={section.title} className="rounded-xl border border-slate-200 p-3">
+                                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                      {section.title}
+                                    </div>
+                                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                                      {section.summary}
+                                    </p>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">
+                                  Senaryo verisi bulunamadı. Senaryolar eklendiğinde bu alan Word şablonundaki müdahale planı gibi dolar.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200">
+                          <div className="border-b border-slate-200 bg-slate-900 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-white">
+                            4.2. Ekler
+                          </div>
+                          <div className="grid gap-px bg-slate-200 md:grid-cols-2">
+                            {PREVIEW_APPENDICES.map((item) => (
+                              <div key={item} className="flex items-center gap-3 bg-white px-4 py-3">
+                                <MapPin className="h-4 w-4 text-slate-400" />
+                                <span className="text-sm text-slate-700">{item}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </section>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="overflow-hidden rounded-[26px] border border-white/10 bg-slate-950/70">
-                    <iframe
-                      src={previewPlan.pdf_url ?? ""}
-                      title={`${previewPlan.plan_name} PDF önizleme`}
-                      className="h-[540px] w-full bg-white"
-                    />
                   </div>
 
                   <div className="flex flex-wrap justify-end gap-3">
                     <Button
                       variant="outline"
                       className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-                      onClick={() => window.open(previewPlan.pdf_url ?? "", "_blank")}
+                      onClick={async () => {
+                        try {
+                          const { downloadADEPWordDocument } = await loadAdepWordGenerator();
+                          await downloadADEPWordDocument(previewPlan.id);
+                        } catch (error: any) {
+                          console.error(error);
+                          toast.error(error?.message || "Word belgesi oluşturulamadı");
+                        }
+                      }}
+                    >
+                      <Download className="h-4 w-4" />
+                      Word İndir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                      onClick={() => previewPlan.pdf_url && window.open(previewPlan.pdf_url, "_blank")}
+                      disabled={!previewPlan.pdf_url}
                     >
                       <Download className="h-4 w-4" />
                       PDF Aç

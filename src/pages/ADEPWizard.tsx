@@ -1,5 +1,5 @@
 ﻿// src/pages/ADEPWizard.tsx
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -47,6 +47,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import {
+  type ADEPPlanData,
+  type ADEPPlanRow,
+  DEFAULT_ADEP_PLAN_DATA,
+  mergeADEPPlanData,
+} from "@/lib/adepPlanSchema";
 
 const ADEPGeneralInfo = lazy(() => import("@/components/adep/ADEPGeneralInfo"));
 const ADEPLegislationTab = lazy(() => import("@/components/adep/ADEPLegislationTab"));
@@ -64,96 +70,9 @@ const SendReportModal = lazy(() =>
   import("@/components/SendReportModal").then((module) => ({ default: module.SendReportModal }))
 );
 const loadAdeppdfGenerator = () => import("@/components/adep/ADEPPDFGenerator");
+const loadAdepWordGenerator = () => import("@/lib/adepOfficialDocx");
 
-// ------------------------------------
-// Types
-// ------------------------------------
-type HazardClass = "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli";
-type ADEPStatus = "draft" | "completed";
-
-type ADEPPlanData = {
-  mevzuat: {
-    amac: string;
-    kapsam: string;
-    dayanak: string;
-    tanimlar: string;
-  };
-  genel_bilgiler: {
-    hazirlayanlar: Array<{ unvan: string; ad_soyad: string }>;
-    hazirlanma_tarihi: string;
-    gecerlilik_tarihi: string;
-    revizyon_no: string;
-    revizyon_tarihi: string;
-  };
-  isyeri_bilgileri: {
-    adres: string;
-    telefon: string;
-    tehlike_sinifi: string;
-    sgk_sicil_no: string;
-  };
-  toplanma_yeri: {
-    aciklama: string;
-    harita_url: string;
-  };
-  export_preferences?: {
-    cover_style:
-      | "classic"
-      | "gold"
-      | "blueprint"
-      | "minimal"
-      | "nature"
-      | "official-red"
-      | "shadow";
-  };
-};
-
-type ADEPPlanRow = {
-  id?: string;
-  user_id: string;
-  plan_name: string;
-  company_name: string;
-  sector?: string | null;
-  hazard_class: HazardClass;
-  employee_count: number;
-  status: ADEPStatus;
-  completion_percentage: number;
-  plan_data: ADEPPlanData;
-  next_review_date?: string | null;
-  pdf_url?: string | null;
-};
-
-const DEFAULT_PLAN_DATA: ADEPPlanData = {
-  mevzuat: {
-    amac:
-      "Bu Acil Durum Eylem Planı (ADEP), işyerinde meydana gelebilecek acil durumlara karşı hazırlıklı olmak, can kaybını ve yaralanmaları önlemek, olası zararları en aza indirmek amacıyla hazırlanmıştır.",
-    kapsam:
-      "Bu plan işyerinde bulunan tüm çalışanları, ziyaretçileri ve taşeron personeli kapsar. İşyerindeki tüm bina/eklentiler, çalışma alanları ve ortak alanlar bu plan kapsamındadır.",
-    dayanak:
-      "6331 sayılı İş Sağlığı ve Güvenliği Kanunu ve Acil Durumlar Hakkında Yönetmelik başta olmak üzere ilgili mevzuat hükümlerine dayanılarak hazırlanmıştır.",
-    tanimlar:
-      "Acil Durum: Yangın, patlama, kimyasal yayılım, doğal afet vb. durumlar.\nTahliye: Kişilerin güvenli alana kontrollü çıkarılması.\nToplanma Alanı: Tahliye sonrası yoklama yapılan güvenli bölge.\nEkip Lideri: Müdahale ekiplerinin koordinasyonundan sorumlu kişi.",
-  },
-  genel_bilgiler: {
-    hazirlayanlar: [{ unvan: "", ad_soyad: "" }],
-    hazirlanma_tarihi: "",
-    gecerlilik_tarihi: "",
-    revizyon_no: "Rev. 0",
-    revizyon_tarihi: "",
-  },
-  isyeri_bilgileri: {
-    adres: "",
-    telefon: "",
-    tehlike_sinifi: "Tehlikeli",
-    sgk_sicil_no: "",
-  },
-  toplanma_yeri: {
-    aciklama: "",
-    harita_url: "",
-  },
-  export_preferences: {
-    cover_style: "shadow",
-  },
-};
+const DEFAULT_PLAN_DATA: ADEPPlanData = DEFAULT_ADEP_PLAN_DATA;
 
 const ADEP_COVER_STYLES = [
   {
@@ -231,6 +150,9 @@ const AdepStepFallback = () => (
   </div>
 );
 
+const getAdepDraftStorageKey = (userId: string, draftId: string) =>
+  `adep-wizard-draft:${userId}:${draftId}`;
+
 export default function ADEPWizard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -251,6 +173,7 @@ export default function ADEPWizard() {
   const [moduleCountsLoading, setModuleCountsLoading] = useState<boolean>(false);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string>("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string>("");
+  const [draftHydrated, setDraftHydrated] = useState(false);
 
   const canUseWizard = !!user;
 
@@ -266,33 +189,7 @@ export default function ADEPWizard() {
     return true;
   };
 
-  const safeMergePlanData = (incoming: any): ADEPPlanData => {
-    const d = incoming || {};
-    return {
-      mevzuat: { ...DEFAULT_PLAN_DATA.mevzuat, ...(d.mevzuat || {}) },
-      genel_bilgiler: {
-        ...DEFAULT_PLAN_DATA.genel_bilgiler,
-        ...(d.genel_bilgiler || {}),
-        hazirlayanlar:
-          Array.isArray(d?.genel_bilgiler?.hazirlayanlar) &&
-          d.genel_bilgiler.hazirlayanlar.length > 0
-            ? d.genel_bilgiler.hazirlayanlar
-            : DEFAULT_PLAN_DATA.genel_bilgiler.hazirlayanlar,
-      },
-      isyeri_bilgileri: {
-        ...DEFAULT_PLAN_DATA.isyeri_bilgileri,
-        ...(d.isyeri_bilgileri || {}),
-      },
-      toplanma_yeri: {
-        ...DEFAULT_PLAN_DATA.toplanma_yeri,
-        ...(d.toplanma_yeri || {}),
-      },
-      export_preferences: {
-        ...DEFAULT_PLAN_DATA.export_preferences!,
-        ...(d.export_preferences || {}),
-      },
-    };
-  };
+  const safeMergePlanData = (incoming: any): ADEPPlanData => mergeADEPPlanData(incoming);
 
   // ------------------------------------
   // Load existing plan
@@ -306,6 +203,7 @@ export default function ADEPWizard() {
     } else {
       const draft: ADEPPlanRow = {
         user_id: user!.id,
+        company_id: null,
         plan_name: "",
         company_name: "",
         sector: null,
@@ -323,6 +221,69 @@ export default function ADEPWizard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.id || !planRow || draftHydrated) return;
+
+    const draftId = searchParams.get("id") || "new";
+    const storageKey = getAdepDraftStorageKey(user.id, draftId);
+    const rawDraft = window.localStorage.getItem(storageKey);
+
+    if (rawDraft) {
+      try {
+        const parsedDraft = JSON.parse(rawDraft) as Partial<ADEPPlanRow>;
+        setPlanRow((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            ...parsedDraft,
+            plan_data: safeMergePlanData(parsedDraft.plan_data || prev.plan_data),
+          };
+        });
+      } catch (error) {
+        console.warn("ADEP draft hydrate failed:", error);
+      }
+    }
+
+    setDraftHydrated(true);
+  }, [draftHydrated, planRow, searchParams, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !planRow || !draftHydrated) return;
+
+    const draftId = planId || searchParams.get("id") || "new";
+    const storageKey = getAdepDraftStorageKey(user.id, draftId);
+
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        company_id: planRow.company_id || null,
+        plan_name: planRow.plan_name,
+        company_name: planRow.company_name,
+        sector: planRow.sector || null,
+        hazard_class: planRow.hazard_class,
+        employee_count: planRow.employee_count,
+        status: planRow.status,
+        completion_percentage: planRow.completion_percentage,
+        next_review_date: planRow.next_review_date || null,
+        pdf_url: planRow.pdf_url || null,
+        plan_data: planRow.plan_data,
+      }),
+    );
+  }, [draftHydrated, planId, planRow, searchParams, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !planId) return;
+
+    const newDraftKey = getAdepDraftStorageKey(user.id, "new");
+    const savedDraftKey = getAdepDraftStorageKey(user.id, planId);
+    const newDraft = window.localStorage.getItem(newDraftKey);
+
+    if (newDraft && !window.localStorage.getItem(savedDraftKey)) {
+      window.localStorage.setItem(savedDraftKey, newDraft);
+      window.localStorage.removeItem(newDraftKey);
+    }
+  }, [planId, user?.id]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -399,6 +360,7 @@ export default function ADEPWizard() {
 
       setPlanRow(merged);
       setPlanId((data as any).id);
+      setDraftHydrated(false);
       toast.success("Plan yüklendi");
     } catch (e: any) {
       console.error(e);
@@ -476,6 +438,25 @@ export default function ADEPWizard() {
         plan_data: safeMergePlanData(saved.plan_data),
       };
       setPlanRow(merged);
+      if (user?.id) {
+        const persistedKey = getAdepDraftStorageKey(user.id, saved.id);
+        window.localStorage.setItem(
+          persistedKey,
+          JSON.stringify({
+            company_id: merged.company_id || null,
+            plan_name: merged.plan_name,
+            company_name: merged.company_name,
+            sector: merged.sector || null,
+            hazard_class: merged.hazard_class,
+            employee_count: merged.employee_count,
+            status: merged.status,
+            completion_percentage: merged.completion_percentage,
+            next_review_date: merged.next_review_date || null,
+            pdf_url: merged.pdf_url || null,
+            plan_data: merged.plan_data,
+          }),
+        );
+      }
 
       if (!silent) toast.success("Kaydedildi");
       return saved as ADEPPlanRow;
@@ -1198,6 +1179,7 @@ export default function ADEPWizard() {
         return (
           <ADEPGeneralInfo
             data={{
+              company_id: planRow.company_id || "",
               plan_name: planRow.plan_name,
               company_name: planRow.company_name,
               hazard_class: planRow.hazard_class,
@@ -1669,6 +1651,34 @@ export default function ADEPWizard() {
                   >
                     <Download className="h-4 w-4" />
                     PDF İndir
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                    disabled={saving || !planId}
+                    onClick={async () => {
+                      if (!planId) return;
+                      await savePlan({
+                        silent: true,
+                        markCompleted: progress >= 100,
+                      });
+
+                      toast.info("Word belgesi hazırlanıyor...");
+                      try {
+                        const { downloadADEPWordDocument } = await loadAdepWordGenerator();
+                        await downloadADEPWordDocument(planId);
+                        toast.success("Word indirildi");
+                      } catch (e: any) {
+                        console.error(e);
+                        toast.error("Word oluşturma hatası", {
+                          description: e.message || "Bilinmeyen hata",
+                        });
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4" />
+                    Word İndir
                   </Button>
                   <Button
                     size="lg"

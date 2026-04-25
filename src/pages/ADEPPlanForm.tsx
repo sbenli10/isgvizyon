@@ -1,4 +1,5 @@
 ﻿
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,32 +24,13 @@ import ADEPTeamsTab from "@/components/adep/ADEPTeamsTab";
 import ADEPContactsTab from "@/components/adep/ADEPContactsTab";
 import ADEPScenariosTab from "@/components/adep/ADEPScenariosTab";
 import { generateADEPPDF } from "@/components/adep/ADEPPDFGenerator";
+import {
+  type ADEPPlanData,
+  DEFAULT_ADEP_PLAN_DATA,
+  mergeADEPPlanData,
+} from "@/lib/adepPlanSchema";
 
-interface ADEPPlanData {
-  mevzuat: {
-    amac: string;
-    kapsam: string;
-    dayanak: string;
-    tanimlar: string;
-  };
-  genel_bilgiler: {
-    hazirlayanlar: Array<{ unvan: string; ad_soyad: string }>;
-    hazirlanma_tarihi: string;
-    gecerlilik_tarihi: string;
-    revizyon_no: string;
-    revizyon_tarihi: string;
-  };
-  isyeri_bilgileri: {
-    adres: string;
-    telefon: string;
-    tehlike_sinifi: string;
-    sgk_sicil_no: string;
-  };
-  toplanma_yeri: {
-    aciklama: string;
-    harita_url: string;
-  };
-}
+const loadAdepWordGenerator = () => import("@/lib/adepOfficialDocx");
 
 interface ADEPFormData {
   plan_name: string;
@@ -60,31 +42,7 @@ interface ADEPFormData {
   plan_data: ADEPPlanData;
 }
 
-const DEFAULT_PLAN_DATA: ADEPPlanData = {
-  mevzuat: {
-    amac: "Bu Acil Durum Eylem Planı, işyerinde meydana gelebilecek acil durumlarda çalışanların ve işyerinin güvenliğini sağlamak, can ve mal kayıplarını en aza indirmek amacıyla hazırlanmıştır.",
-    kapsam: "Bu plan, işyerinde çalışan tüm personeli, ziyaretçileri ve işyeri tesislerini kapsar.",
-    dayanak: "6331 sayılı İş Sağlığı ve Güvenliği Kanunu ve Acil Durumlar Hakkında Yönetmelik hükümlerine göre hazırlanmıştır.",
-    tanimlar: "Acil Durum: İşyerinde meydana gelen ve derhal müdahale edilmesi gereken olaylar.\nTahliye: Acil durumda çalışanların güvenli alana yönlendirilmesi.\nToplanma Yeri: Tahliye sonrası çalışanların güvenli bir şekilde bir araya geldiği alan.",
-  },
-  genel_bilgiler: {
-    hazirlayanlar: [{ unvan: "İş Güvenliği Uzmanı", ad_soyad: "" }],
-    hazirlanma_tarihi: new Date().toISOString().split("T")[0],
-    gecerlilik_tarihi: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-    revizyon_no: "Rev. 0",
-    revizyon_tarihi: new Date().toISOString().split("T")[0],
-  },
-  isyeri_bilgileri: {
-    adres: "",
-    telefon: "",
-    tehlike_sinifi: "Çok Tehlikeli",
-    sgk_sicil_no: "",
-  },
-  toplanma_yeri: {
-    aciklama: "İşyerinin önündeki açık alan toplanma noktası olarak belirlenmiştir.",
-    harita_url: "",
-  },
-};
+const DEFAULT_PLAN_DATA: ADEPPlanData = DEFAULT_ADEP_PLAN_DATA;
 
 export default function ADEPPlanForm() {
   const navigate = useNavigate();
@@ -108,6 +66,7 @@ export default function ADEPPlanForm() {
     if (id) {
       void fetchPlan();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchPlan = async () => {
@@ -125,7 +84,7 @@ export default function ADEPPlanForm() {
 
       const planData =
         typeof data.plan_data === "object" && data.plan_data !== null
-          ? (data.plan_data as unknown as ADEPPlanData)
+          ? mergeADEPPlanData(data.plan_data)
           : DEFAULT_PLAN_DATA;
 
       setFormData({
@@ -229,6 +188,23 @@ export default function ADEPPlanForm() {
     } catch (error: any) {
       console.error("PDF generation error:", error);
       toast.error("PDF oluşturulamadı");
+    }
+  };
+
+  const handleGenerateWord = async () => {
+    if (!id) {
+      toast.error("Önce planı kaydedin");
+      return;
+    }
+
+    try {
+      toast.info("Word belgesi hazırlanıyor...");
+      const { downloadADEPWordDocument } = await loadAdepWordGenerator();
+      await downloadADEPWordDocument(id);
+      toast.success("Word belgesi indirildi");
+    } catch (error: any) {
+      console.error("Word generation error:", error);
+      toast.error(error?.message || "Word oluşturulamadı");
     }
   };
 
@@ -345,6 +321,16 @@ export default function ADEPPlanForm() {
                   >
                     <FileDown className="h-4 w-4" />
                     PDF İndir
+                  </Button>
+                )}
+                {id && (
+                  <Button
+                    onClick={handleGenerateWord}
+                    variant="outline"
+                    className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Word İndir
                   </Button>
                 )}
               </div>
