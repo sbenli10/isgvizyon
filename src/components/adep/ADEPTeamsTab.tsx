@@ -1,6 +1,7 @@
-// src/components/adep/ADEPTeamsTab.tsx
+import { useEffect, useState } from "react";
+import { Plus, Edit, Trash2, Users, Shield, UserPlus } from "lucide-react";
+import { toast } from "sonner";
 
-import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -8,12 +9,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
   Dialog,
@@ -24,8 +25,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Edit, Trash2, Users, Shield, UserPlus } from "lucide-react";
-import { toast } from "sonner";
 
 interface Employee {
   id: string;
@@ -33,7 +32,7 @@ interface Employee {
   last_name: string;
   job_title: string;
   department: string;
-  company_id?: string;
+  company_id?: string | null;
 }
 
 interface Team {
@@ -60,54 +59,62 @@ const STANDARD_TEAMS = [
   { name: "Koruma Ekibi", icon: "🛡️" },
 ];
 
+const normalizeTeamName = (teamName: string) =>
+  teamName.trim() === "Güvenlik Ekibi" ? "Koruma Ekibi" : teamName.trim();
+
 export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
   const { user } = useAuth();
   const [teams, setTeams] = useState<Team[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [planCompanyId, setPlanCompanyId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState<Team | null>(null);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  
   const [teamForm, setTeamForm] = useState({
     team_name: "",
     team_leader_id: "",
   });
 
   useEffect(() => {
-    if (planId) {
-      fetchTeams();
-    }
-    fetchEmployees();
+    if (!planId) return;
+
+    fetchTeams();
+    fetchEmployeesForPlan();
   }, [planId]);
 
-  const normalizeTeamName = (teamName: string) =>
-    teamName.trim() === "Güvenlik Ekibi" ? "Koruma Ekibi" : teamName.trim();
-
-  const fetchEmployees = async () => {
-    if (!user) return;
+  const fetchEmployeesForPlan = async () => {
+    if (!user || !planId) return;
 
     try {
+      const { data: plan, error: planError } = await supabase
+        .from("adep_plans")
+        .select("company_id")
+        .eq("id", planId)
+        .single();
+
+      if (planError) throw planError;
+
+      const selectedCompanyId = plan?.company_id || null;
+      setPlanCompanyId(selectedCompanyId);
+
+      if (!selectedCompanyId) {
+        setEmployees([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("employees")
         .select("id, first_name, last_name, job_title, department, company_id")
+        .eq("company_id", selectedCompanyId)
         .eq("is_active", true)
         .order("first_name");
 
       if (error) throw error;
-
-      // User'ın şirketlerinin çalışanlarını filtrele
-      const { data: companies } = await supabase
-        .from("companies")
-        .select("id")
-        .eq("user_id", user.id);
-
-      const companyIds = companies?.map(c => c.id) || [];
-      const filteredEmployees = data?.filter(e => companyIds.includes(e.company_id || "")) || [];
-
-      setEmployees(filteredEmployees);
+      setEmployees(data || []);
     } catch (error: any) {
       console.error("Employees fetch error:", error);
+      setEmployees([]);
     }
   };
 
@@ -127,20 +134,19 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
 
       if (error) throw error;
 
-      // ✅ Type conversion: Json -> string[]
-      const typedTeams: Team[] = (data || []).map(team => ({
+      const typedTeams: Team[] = (data || []).map((team) => ({
         id: team.id,
         team_name: normalizeTeamName(team.team_name),
         team_leader_id: team.team_leader_id,
-        members: Array.isArray(team.members) 
-          ? (team.members as string[])
-          : [],
-        team_leader: team.team_leader ? {
-          id: team.team_leader.id,
-          first_name: team.team_leader.first_name,
-          last_name: team.team_leader.last_name,
-          job_title: team.team_leader.job_title,
-        } : undefined,
+        members: Array.isArray(team.members) ? (team.members as string[]) : [],
+        team_leader: team.team_leader
+          ? {
+              id: team.team_leader.id,
+              first_name: team.team_leader.first_name,
+              last_name: team.team_leader.last_name,
+              job_title: team.team_leader.job_title,
+            }
+          : undefined,
       }));
 
       setTeams(typedTeams);
@@ -185,7 +191,6 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
       };
 
       if (editingTeam) {
-        // Update
         const { error } = await supabase
           .from("adep_teams")
           .update(teamData)
@@ -194,10 +199,7 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
         if (error) throw error;
         toast.success("Ekip güncellendi");
       } else {
-        // Create
-        const { error } = await supabase
-          .from("adep_teams")
-          .insert([teamData]);
+        const { error } = await supabase.from("adep_teams").insert([teamData]);
 
         if (error) throw error;
         toast.success("Ekip oluşturuldu");
@@ -215,10 +217,7 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
     if (!confirm("Bu ekibi silmek istediğinizden emin misiniz?")) return;
 
     try {
-      const { error } = await supabase
-        .from("adep_teams")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("adep_teams").delete().eq("id", id);
 
       if (error) throw error;
       toast.success("Ekip silindi");
@@ -230,14 +229,12 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
 
   const toggleEmployeeSelection = (employeeId: string) => {
     setSelectedEmployees((prev) =>
-      prev.includes(employeeId)
-        ? prev.filter((id) => id !== employeeId)
-        : [...prev, employeeId]
+      prev.includes(employeeId) ? prev.filter((id) => id !== employeeId) : [...prev, employeeId],
     );
   };
 
   const getEmployeeName = (employeeId: string) => {
-    const employee = employees.find((e) => e.id === employeeId);
+    const employee = employees.find((entry) => entry.id === employeeId);
     return employee ? `${employee.first_name} ${employee.last_name}` : "Bilinmeyen";
   };
 
@@ -255,12 +252,11 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">Acil Durum Ekipleri</h3>
           <p className="text-sm text-muted-foreground">
-            İşyerinizin acil durum ekiplerini oluşturun ve yönetin
+            Seçtiğiniz işyerine ait çalışanlardan ekipleri hızlıca oluşturun ve yönetin
           </p>
         </div>
 
@@ -274,29 +270,23 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
 
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {editingTeam ? "Ekibi Düzenle" : "Yeni Ekip Oluştur"}
-              </DialogTitle>
+              <DialogTitle>{editingTeam ? "Ekibi Düzenle" : "Yeni Ekip Oluştur"}</DialogTitle>
               <DialogDescription>
                 Ekip adı, lider ve üyeleri belirleyin
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">
-              {/* Ekip Adı */}
               <div className="space-y-2">
                 <Label htmlFor="team_name">Ekip Adı *</Label>
                 <Input
                   id="team_name"
                   value={teamForm.team_name}
-                  onChange={(e) =>
-                    setTeamForm({ ...teamForm, team_name: e.target.value })
-                  }
+                  onChange={(e) => setTeamForm({ ...teamForm, team_name: e.target.value })}
                   placeholder="Örn: Yangın Söndürme Ekibi"
                 />
               </div>
 
-              {/* Standart Ekipler */}
               <div className="flex flex-wrap gap-2">
                 {STANDARD_TEAMS.map((team) => (
                   <Badge
@@ -310,14 +300,11 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
                 ))}
               </div>
 
-              {/* Ekip Lideri */}
               <div className="space-y-2">
                 <Label htmlFor="team_leader">Ekip Lideri</Label>
                 <Select
                   value={teamForm.team_leader_id}
-                  onValueChange={(value) =>
-                    setTeamForm({ ...teamForm, team_leader_id: value })
-                  }
+                  onValueChange={(value) => setTeamForm({ ...teamForm, team_leader_id: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Ekip lideri seçin" />
@@ -332,13 +319,16 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
                 </Select>
               </div>
 
-              {/* Ekip Üyeleri */}
               <div className="space-y-2">
                 <Label>Ekip Üyeleri ({selectedEmployees.length})</Label>
                 <div className="border rounded-lg p-4 max-h-60 overflow-y-auto space-y-2">
-                  {employees.length === 0 ? (
+                  {!planCompanyId ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      Henüz çalışan kaydı bulunmuyor
+                      Ekip oluşturmadan önce ilk adımda bir firma seçin.
+                    </p>
+                  ) : employees.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Bu firmaya ait aktif çalışan kaydı bulunmuyor
                     </p>
                   ) : (
                     employees.map((employee) => (
@@ -382,7 +372,6 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
         </Dialog>
       </div>
 
-      {/* Teams List */}
       {loading ? (
         <Card>
           <CardContent className="py-12">
@@ -397,9 +386,7 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
             <div className="text-center text-muted-foreground">
               <Users className="h-16 w-16 mx-auto mb-4 opacity-20" />
               <p className="text-lg mb-2">Henüz ekip oluşturulmadı</p>
-              <p className="text-sm mb-6">
-                İlk acil durum ekibinizi oluşturun
-              </p>
+              <p className="text-sm mb-6">İlk acil durum ekibinizi oluşturun</p>
               <Button onClick={() => openDialog()} className="gap-2">
                 <Plus className="h-4 w-4" />
                 İlk Ekibi Oluştur
@@ -415,16 +402,10 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
                 <div className="flex items-start justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-lg">{team.team_name}</CardTitle>
-                    <CardDescription>
-                      {team.members?.length || 0} üye
-                    </CardDescription>
+                    <CardDescription>{team.members?.length || 0} üye</CardDescription>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openDialog(team)}
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => openDialog(team)}>
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
@@ -440,7 +421,6 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Ekip Lideri */}
                 {team.team_leader_id && team.team_leader && (
                   <div className="flex items-center gap-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
                     <Shield className="h-5 w-5 text-primary" />
@@ -449,14 +429,11 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
                       <p className="font-medium">
                         {team.team_leader.first_name} {team.team_leader.last_name}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {team.team_leader.job_title}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{team.team_leader.job_title}</p>
                     </div>
                   </div>
                 )}
 
-                {/* Ekip Üyeleri */}
                 {team.members && team.members.length > 0 && (
                   <div>
                     <p className="text-sm font-medium mb-2">Ekip Üyeleri:</p>
