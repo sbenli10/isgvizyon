@@ -62,7 +62,7 @@ let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
 const loadPdfJs = async () => {
   if (!pdfJsLoader) {
     pdfJsLoader = import("pdfjs-dist").then((pdfjsLib) => {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
       return pdfjsLib;
     });
   }
