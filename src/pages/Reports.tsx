@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 // ✅ PDF.js worker setup
 
@@ -62,7 +63,7 @@ let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
 const loadPdfJs = async () => {
   if (!pdfJsLoader) {
     pdfJsLoader = import("pdfjs-dist").then((pdfjsLib) => {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+      pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
       return pdfjsLib;
     });
   }
