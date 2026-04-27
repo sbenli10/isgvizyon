@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { generateHazardAnalysisPdf } from "@/lib/reportsPdfExport";
+import { generateHazardAnalysisWord } from "@/lib/reportsWordExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -745,6 +746,45 @@ export default function Reports() {
     toast.success("✅ Toplu PDF raporu indirildi!");
   };
 
+  const generateRichWord = async (
+    analysis: FineKinneyAiResult,
+    originalDescription: string,
+    imageUrl?: string,
+  ) => {
+    await generateHazardAnalysisWord({
+      analyses: [
+        {
+          ...analysis,
+          hazardDescription: analysis.hazardDescription || originalDescription,
+          imageUrl,
+          sourceLabel: analysis.photoNumber ? `Foto?raf ${analysis.photoNumber} Analizi` : "Analiz Raporu",
+        },
+      ],
+      title: "Profesyonel Fine-Kinney Risk Analiz Raporu",
+      subtitle: "Analiz edilen g?rsel, risk puan?, aksiyon plan? ve mevzuat dayana?? d?zenli bir Word raporunda sunulur.",
+      fileName: `isg-analiz-raporu-${Date.now()}.docx`,
+      supportingDocuments: uploadedFiles.map((file) => file.name),
+    });
+    toast.success("? Rapor Word olarak indirildi!");
+  };
+
+  const generateCombinedWord = async () => {
+    if (!aiResults.length) return;
+
+    await generateHazardAnalysisWord({
+      analyses: aiResults.map((result, idx) => ({
+        ...result,
+        imageUrl: imageUrls[idx],
+        sourceLabel: `Foto?raf ${result.photoNumber || idx + 1} Analizi`,
+      })),
+      title: "Toplu Foto?raf Risk Analiz Raporu",
+      subtitle: `${aiResults.length} foto?raf i?in bulgular, risk seviyeleri ve aksiyon planlar? tek Word dosyas?nda birle?tirilir.`,
+      fileName: `isg-toplu-analiz-raporu-${Date.now()}.docx`,
+      supportingDocuments: uploadedFiles.map((file) => file.name),
+    });
+    toast.success("? Toplu Word raporu indirildi!");
+  };
+
   const deleteAnalysis = async (id: string) => {
     if (!confirm("Bu analizi silmek istediğinize emin misiniz?")) return;
     try {
@@ -1072,7 +1112,7 @@ export default function Reports() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4 border-t border-border">
+                <div className="flex flex-wrap gap-3 pt-4 border-t border-border [&>button:nth-child(n+4)]:hidden">
                   <Button 
                     size="sm" 
                     onClick={() => sendToCapa(result, `Fotoğraf ${result.photoNumber}`)}
@@ -1092,6 +1132,18 @@ export default function Reports() {
                   >
                     <Download className="h-4 w-4" /> PDF İndir
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateRichWord(
+                      result,
+                      `Foto?raf ${result.photoNumber}: ${result.hazardDescription}`,
+                      imageUrls[idx],
+                    )}
+                    className="gap-2 flex-1 h-11 border-2"
+                  >
+                    <FileText className="h-4 w-4" /> Word ?ndir
+                  </Button>
                 </div>
               </div>
             ))}
@@ -1100,11 +1152,11 @@ export default function Reports() {
               <div className="glass-card p-6 border-2 border-primary/30 bg-gradient-to-br from-primary/10 to-transparent rounded-2xl">
                 <h4 className="font-bold text-xl mb-5 flex items-center gap-3">
                   <TrendingUp className="h-6 w-6 text-primary" />
-                  Genel Değerlendirme Özeti
+                  Genel De?erlendirme ?zeti
                 </h4>
                 <div className="grid grid-cols-3 gap-6 text-center">
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground font-medium">Analiz Edilen Fotoğraf</p>
+                    <p className="text-sm text-muted-foreground font-medium">Analiz Edilen Foto?raf</p>
                     <p className="text-5xl font-black text-foreground">{aiResults.length}</p>
                   </div>
                   <div className="space-y-2">
@@ -1120,7 +1172,7 @@ export default function Reports() {
                     </p>
                   </div>
                 </div>
-                <div className="mt-6 flex justify-end">
+                <div className="mt-6 flex flex-wrap justify-end gap-3">
                   <Button
                     onClick={generateCombinedPDF}
                     className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
@@ -1198,9 +1250,12 @@ export default function Reports() {
                             <p className="font-bold text-blue-500 text-xs uppercase tracking-wider flex items-center gap-1"><Gavel className="h-3 w-3"/> İlgili Mevzuat</p>
                             <p className="text-blue-700 dark:text-blue-300 font-medium bg-blue-500/10 p-3 rounded border border-blue-500/20">{aiData.legalReference}</p>
                           </div>
-                          <div className="flex justify-end pt-2">
+                          <div className="flex flex-wrap justify-end gap-2 pt-2">
                             <Button size="sm" variant="outline" className="gap-2" onClick={() => generateRichPDF(aiData, aiData.hazardDescription)}>
                               <Download className="h-4 w-4" /> PDF Rapor
+                            </Button>
+                            <Button size="sm" variant="outline" className="gap-2" onClick={() => generateRichWord(aiData, aiData.hazardDescription)}>
+                              <FileText className="h-4 w-4" /> Word Rapor
                             </Button>
                           </div>
                         </>

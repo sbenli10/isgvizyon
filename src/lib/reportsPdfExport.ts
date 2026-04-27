@@ -148,6 +148,18 @@ function calcCardHeight(doc: jsPDF, body: string, width: number) {
   return Math.max(24, 14 + lines.length * 4.8);
 }
 
+function getSectionCardHeight(lineCount: number) {
+  return Math.max(24, 14 + lineCount * 4.8);
+}
+
+function ensureContentSpace(doc: jsPDF, y: number, needed: number, pageTitle?: string) {
+  if (y > 45 && y + needed > contentBottom()) {
+    return addNewContentPage(doc, pageTitle);
+  }
+
+  return y;
+}
+
 function drawSectionCard(
   doc: jsPDF,
   title: string,
@@ -178,6 +190,63 @@ function drawSectionCard(
   doc.text(lines, x + 4, y + 12);
 
   return y + height;
+}
+
+function drawPaginatedSectionCard(
+  doc: jsPDF,
+  title: string,
+  body: string,
+  x: number,
+  y: number,
+  width: number,
+  accent: readonly [number, number, number],
+  pageTitle = "Risk Analiz Maddeleri",
+) {
+  const allLines = splitLines(doc, body || "-", width - 8) as string[];
+  const lineHeight = 4.8;
+  const textStartOffset = 12;
+  const cardPaddingBottom = 4;
+  const minCardHeight = 24;
+  let remainingLines = [...allLines];
+  let cursorY = y;
+  let firstChunk = true;
+
+  while (remainingLines.length > 0) {
+    const availableHeight = contentBottom() - cursorY;
+    const reservedHeight = Math.max(minCardHeight, textStartOffset + lineHeight + cardPaddingBottom);
+    const maxTextHeight = Math.max(lineHeight, availableHeight - textStartOffset - cardPaddingBottom);
+    const linesThatFit = Math.max(1, Math.floor(maxTextHeight / lineHeight));
+    const chunkSize = Math.max(1, Math.min(remainingLines.length, linesThatFit));
+    const currentLines = remainingLines.splice(0, chunkSize);
+    const currentHeight = Math.max(
+      minCardHeight,
+      textStartOffset + currentLines.length * lineHeight + cardPaddingBottom,
+    );
+
+    cursorY = ensureContentSpace(doc, cursorY, currentHeight, pageTitle);
+
+    setRgbFill(doc, [255, 255, 255]);
+    setRgbDraw(doc, COLORS.border);
+    doc.roundedRect(x, cursorY, width, currentHeight, 4, 4, "FD");
+
+    setRgbFill(doc, accent);
+    doc.roundedRect(x, cursorY, width, 6, 4, 4, "F");
+
+    setFont(doc, "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(firstChunk ? title : `${title} (devam)`, x + 4, cursorY + 4.5);
+
+    setFont(doc, "normal");
+    doc.setFontSize(9.5);
+    setRgbText(doc, COLORS.body);
+    doc.text(currentLines, x + 4, cursorY + textStartOffset);
+
+    cursorY += currentHeight + 8;
+    firstChunk = false;
+  }
+
+  return cursorY;
 }
 
 async function imageToJpegData(url: string) {
@@ -368,11 +437,33 @@ async function drawAnalysisBlock(doc: jsPDF, analysis: HazardReportPdfItem, y: n
     y += 26;
   }
 
-  const hazardBottom = drawSectionCard(doc, "Tespit Edilen Tehlike", analysis.hazardDescription || "-", PAGE.marginX, y, pageInnerWidth, COLORS.slate);
-  y = hazardBottom + 8;
+  y = drawPaginatedSectionCard(
+    doc,
+    "Tespit Edilen Tehlike",
+    analysis.hazardDescription || "-",
+    PAGE.marginX,
+    y,
+    pageInnerWidth,
+    COLORS.slate,
+  );
 
   const halfWidth = (pageInnerWidth - 6) / 2;
-  const leftBottom = drawSectionCard(doc, "Anlik Duzeltici Aksiyon", analysis.immediateAction || "-", PAGE.marginX, y, halfWidth, COLORS.critical);
+  const actionRowHeight = Math.max(
+    getSectionCardHeight(splitLines(doc, analysis.immediateAction || "-", halfWidth - 8).length),
+    getSectionCardHeight(splitLines(doc, analysis.preventiveAction || "-", halfWidth - 8).length),
+  );
+
+  y = ensureContentSpace(doc, y, actionRowHeight, "Risk Analiz Maddeleri");
+
+  const leftBottom = drawSectionCard(
+    doc,
+    "Anlik Duzeltici Aksiyon",
+    analysis.immediateAction || "-",
+    PAGE.marginX,
+    y,
+    halfWidth,
+    COLORS.critical,
+  );
   const rightBottom = drawSectionCard(
     doc,
     "Kalici Onleyici Aksiyon",
@@ -384,10 +475,26 @@ async function drawAnalysisBlock(doc: jsPDF, analysis: HazardReportPdfItem, y: n
   );
   y = Math.max(leftBottom, rightBottom) + 8;
 
-  y = drawSectionCard(doc, "Yasal Mevzuat ve Dayanak", analysis.legalReference || "Belirtilmedi", PAGE.marginX, y, pageInnerWidth, [37, 99, 235]) + 8;
+  y = drawPaginatedSectionCard(
+    doc,
+    "Yasal Mevzuat ve Dayanak",
+    analysis.legalReference || "Belirtilmedi",
+    PAGE.marginX,
+    y,
+    pageInnerWidth,
+    [37, 99, 235],
+  );
 
   if (analysis.justification) {
-    y = drawSectionCard(doc, "Uzman Gerekcesi", analysis.justification, PAGE.marginX, y, pageInnerWidth, [71, 85, 105]) + 8;
+    y = drawPaginatedSectionCard(
+      doc,
+      "Uzman Gerekcesi",
+      analysis.justification,
+      PAGE.marginX,
+      y,
+      pageInnerWidth,
+      [71, 85, 105],
+    );
   }
 
   return Math.max(y, blockStart + estimatedHeight) + 6;
