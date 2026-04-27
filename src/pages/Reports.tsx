@@ -1,10 +1,10 @@
 ﻿//src\pages\Reports.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   Brain, FileText, CheckCircle, Clock, AlertTriangle, 
   Download, Loader2, ShieldCheck, PlusCircle, Trash2,
   Eye, Filter, Search, TrendingUp, BarChart3, Lightbulb,
-  Upload, Image as ImageIcon, Sparkles, Copy, Share2, History, X, FileUp, Calculator, Gavel, Hammer, ArrowRight, Badge, Map
+  Upload, Image as ImageIcon, Sparkles, Copy, Share2, History, X, FileUp, Calculator, Gavel, Hammer, ArrowRight, Badge, Map, CircleHelp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -104,10 +104,10 @@ const riskColors: Record<string, string> = {
 };
 
 const tips = [
-  `Maksimum ${MAX_PHOTOS} fotoğraf ve ${MAX_DOCUMENTS} belge yükleyebilirsiniz.`,
-  "Mevzuat PDF'leri yükleyerek AI'ın doğrudan kendi kütüphanenizden atıf yapmasını sağlayabilirsiniz.",
+  `Maksimum ${MAX_PHOTOS} fotoğraf ve ${MAX_DOCUMENTS} destekleyici belge yükleyebilirsiniz.`,
+  "Fotoğraf veya saha gözlemi açıklaması ana analiz girdisidir.",
+  "PDF/DOCX belgeleri yalnızca mevzuat bağlamı ve dayanak üretmek için kullanılır.",
   "Bağlamı netleştirin: 'Ne oldu?', 'Nerede?', 'Kimler etkilendi?'",
-  "Aşağıdaki Isı Haritası (Heatmap) en sık karşılaştığınız risk yoğunluğunu gösterir.",
 ];
 
 // --- HEATMAP COMPONENT ---
@@ -165,6 +165,9 @@ export default function Reports() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
+  const imagePickerRef = useRef<HTMLInputElement | null>(null);
+  const cameraCaptureRef = useRef<HTMLInputElement | null>(null);
+  const documentPickerRef = useRef<HTMLInputElement | null>(null);
   const activeCompanyId = searchParams.get("companyId") || "";
   const [hazardInput, setHazardInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
@@ -462,9 +465,16 @@ export default function Reports() {
   };
 
   const analyzeHazard = async () => {
-    // ✅ Validation: En az bir girdi olmalı
-    if (!hazardInput.trim() && uploadedFiles.length === 0 && imageUrls.length === 0) {
-      toast.error("Lütfen bir açıklama, döküman veya fotoğraf ekleyin.");
+    // ✅ Validation: PDF/DOCX sadece baglamdir, analiz girdisi degil
+    if (!hazardInput.trim() && imageUrls.length === 0 && uploadedFiles.length === 0) {
+      toast.error("Lütfen bir saha gözlemi açıklaması veya fotoğraf ekleyin.");
+      return;
+    }
+
+    if (!hazardInput.trim() && imageUrls.length === 0 && uploadedFiles.length > 0) {
+      toast.error("Mevzuat/PDF dosyaları tek başına analiz edilmez.", {
+        description: "Önce saha gözlemi yazın veya fotoğraf yükleyin. Belgeler yalnızca analize mevzuat bağlamı ekler.",
+      });
       return;
     }
 
@@ -944,13 +954,23 @@ Yasal Atıf: ${analysis.legalReference}`,
   return (
     <div className="space-y-8">
       {/* HEADER */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-          AI İş Güvenliği Uzmanı (A Sınıfı)
-        </h1>
-        <p className="text-sm text-muted-foreground mt-2">
-          Mevzuat destekli çoklu görsel analizi ve Fine-Kinney Risk Isı Haritası.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+            Saha Risk Analizi
+          </h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Fotoğraf, saha notu ve destekleyici mevzuat belgeleri ile Fine-Kinney risk analizi oluşturun.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          onClick={() => navigate("/reports/guide")}
+        >
+          <CircleHelp className="h-4 w-4" /> Nasıl Kullanılır?
+        </Button>
       </div>
 
       {activeCompanyId ? (
@@ -1011,7 +1031,7 @@ Yasal Atıf: ${analysis.legalReference}`,
           <div className="flex items-start gap-3">
             <Lightbulb className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-semibold text-blue-700 mb-2">Gelişmiş Analiz İpuçları</p>
+              <p className="text-sm font-semibold text-blue-700 mb-2">Bu ekran nasıl kullanılır?</p>
               <div className="space-y-1">
                 {tips.map((tip, idx) => (
                   <p key={idx} className="text-xs text-blue-600">• {tip}</p>
@@ -1024,10 +1044,10 @@ Yasal Atıf: ${analysis.legalReference}`,
         <div className="space-y-5">
           <div>
             <Label className="text-sm font-semibold mb-2 flex items-center gap-2">
-              📝 Saha Gözlemi / Tehlike Bildirimi
+              📝 Saha Gözlemi / Uygunsuzluk Açıklaması
             </Label>
             <Textarea
-              placeholder="Sahada gördüğünüz uygunsuzluğu detaylandırın. (Örn: Depo alanında çatlak zemin ve devrilmek üzere olan paletler var)"
+              placeholder="Sahada gördüğünüz uygunsuzluğu detaylandırın. (Örn: Elektrik panosu açık, kablolar düzensiz ve yetkisiz erişim mümkün.)"
               value={hazardInput}
               onChange={(e) => setHazardInput(e.target.value)}
               className="min-h-[100px] bg-secondary/50 border-border/50 focus:border-primary/50 transition-colors text-base"
@@ -1035,22 +1055,45 @@ Yasal Atıf: ${analysis.legalReference}`,
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <label 
+            <div 
               className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all
                 ${imageUrls.length >= MAX_PHOTOS ?
                   'border-border/30 bg-secondary/10 opacity-50 cursor-not-allowed' 
-                  : 'border-primary/30 bg-primary/5 hover:bg-primary/10 cursor-pointer'
+                  : 'border-primary/30 bg-primary/5'
                 }
               `}
             >
               <Upload className={`h-8 w-8 mb-3 ${imageUrls.length >= MAX_PHOTOS ? "text-muted-foreground" : "text-primary"}`} />
               <span className="text-sm font-semibold text-foreground">
-                {imageUrls.length >= MAX_PHOTOS ? "Fotoğraf Limiti Doldu" : `Fotoğraf Ekle (Max ${MAX_PHOTOS})`}
+                {imageUrls.length >= MAX_PHOTOS ? "Fotoğraf Limiti Doldu" : `Saha Fotoğrafı Ekle (Max ${MAX_PHOTOS})`}
               </span>
               <span className="text-xs text-muted-foreground mt-1">
                 {imageUrls.length}/{MAX_PHOTOS} fotoğraf
               </span>
+              <span className="text-[11px] text-muted-foreground mt-1 text-center">
+                Galeriden secin veya sahada dogrudan kamera ile cekip ekleyin.
+              </span>
+              <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  disabled={imageUrls.length >= MAX_PHOTOS}
+                  onClick={() => imagePickerRef.current?.click()}
+                >
+                  Galeriden Seç
+                </Button>
+                <Button
+                  type="button"
+                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
+                  disabled={imageUrls.length >= MAX_PHOTOS}
+                  onClick={() => cameraCaptureRef.current?.click()}
+                >
+                  Kamerayla Çek
+                </Button>
+              </div>
               <input 
+                ref={imagePickerRef}
                 type="file" 
                 multiple 
                 accept="image/*" 
@@ -1058,14 +1101,23 @@ Yasal Atıf: ${analysis.legalReference}`,
                 className="hidden"
                 disabled={imageUrls.length >= MAX_PHOTOS}
               />
-            </label>
+              <input
+                ref={cameraCaptureRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileUpload}
+                className="hidden"
+                disabled={imageUrls.length >= MAX_PHOTOS}
+              />
+            </div>
 
             {/* BELGE UPLOAD (LİMİT KONTROLÜ İLE) */}
-            <label 
+            <div 
               className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all
                 ${uploadedFiles.length >= MAX_DOCUMENTS ?
                   "border-border/30 bg-secondary/10 opacity-50 cursor-not-allowed"
-                  : "border-border/50 bg-secondary/20 hover:bg-secondary/40 cursor-pointer"
+                  : "border-border/50 bg-secondary/20"
                 }
               `}
             >
@@ -1076,7 +1128,20 @@ Yasal Atıf: ${analysis.legalReference}`,
               <span className="text-xs text-muted-foreground mt-1">
                 {uploadedFiles.length}/{MAX_DOCUMENTS} belge
               </span>
+              <span className="text-[11px] text-muted-foreground mt-1 text-center">
+                Destekleyici mevzuat bağlamı icin kullanilir, tek basina risk analizi baslatmaz.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-4 w-full"
+                disabled={uploadedFiles.length >= MAX_DOCUMENTS}
+                onClick={() => documentPickerRef.current?.click()}
+              >
+                Belge Seç
+              </Button>
               <input 
+                ref={documentPickerRef}
                 type="file" 
                 multiple 
                 accept=".pdf,.docx" 
@@ -1084,7 +1149,7 @@ Yasal Atıf: ${analysis.legalReference}`,
                 className="hidden"
                 disabled={uploadedFiles.length >= MAX_DOCUMENTS}
               />
-            </label>
+            </div>
           </div>
 
           {imageUrls.length > 0 && (
@@ -1142,7 +1207,7 @@ Yasal Atıf: ${analysis.legalReference}`,
           {loading || extracting ? (
             <><Loader2 className="h-6 w-6 animate-spin" /> {extracting ? "Mevzuat Taranıyor..." : "Derin Analiz Yapılıyor..."}</>
           ) : (
-            <><Brain className="h-6 w-6" /> A Sınıfı Uzman ile Analiz Et</>
+            <><Brain className="h-6 w-6" /> Saha Riskini Analiz Et</>
           )}
         </Button>
 

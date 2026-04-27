@@ -42,6 +42,7 @@ const loadDashboardPage = () => import("./pages/Dashboard");
 const loadInspectionsPage = () => import("./pages/Inspections");
 const loadFormBuilderPage = () => import("./pages/FormBuilder");
 const loadReportsPage = () => import("./pages/Reports");
+const loadReportsGuidePage = () => import("./pages/ReportsGuide");
 const loadCapaPage = () => import("./pages/CAPA");
 const loadBulkCapaPage = () => import("./pages/BulkCAPA");
 const loadBulkCapaHowToPage = () => import("./pages/BulkCAPAHowTo");
@@ -49,6 +50,7 @@ const Dashboard = lazyWithRetry("dashboard", loadDashboardPage);
 const Inspections = lazyWithRetry("inspections", loadInspectionsPage);
 const FormBuilder = lazyWithRetry("form-builder", loadFormBuilderPage);
 const Reports = lazyWithRetry("reports", loadReportsPage);
+const ReportsGuide = lazyWithRetry("reports-guide", loadReportsGuidePage);
 const CAPA = lazyWithRetry("capa", loadCapaPage);
 const BulkCAPA = lazyWithRetry("bulk-capa", loadBulkCapaPage);
 const BulkCAPAHowTo = lazyWithRetry("bulk-capa-how-to", loadBulkCapaHowToPage);
@@ -240,6 +242,7 @@ const ProtectedShell = () => {
             <Route path="/settings" element={<Settings />} />
             <Route path="/notifications" element={<NotificationCenter />} />
             <Route path="/email-history" element={<EmailHistory />} />
+            <Route path="/reports/guide" element={<ReportsGuide />} />
             {/* ============================================ */}
             {/* RISK ASSESSMENTS */}
             {/* ============================================ */}
