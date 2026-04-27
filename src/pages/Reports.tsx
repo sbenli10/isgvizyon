@@ -299,7 +299,11 @@ export default function Reports() {
         return text;
       } catch (ocrError) {
         console.error("PDF OCR hatası:", ocrError);
-        throw new Error("PDF okunamadı");
+        const message =
+          ocrError instanceof Error && ocrError.message.trim().length > 0
+            ? ocrError.message
+            : "PDF okunamadı";
+        throw new Error(message);
       }
     }
   };
@@ -421,9 +425,11 @@ export default function Reports() {
     setImageUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  const extractFilesContent = async (): Promise<string> => {
+  const extractFilesContent = async (): Promise<{ content: string; successCount: number; failedCount: number }> => {
     let allContent = "";
     const MAX_CHARS_PER_FILE = 10000; // 10k karakter/dosya
+    let successCount = 0;
+    let failedCount = 0;
 
     for (const file of uploadedFiles) {
       try {
@@ -443,13 +449,15 @@ export default function Reports() {
         }
         
         allContent += `\n--- ${file.name} İçeriği (MEVZUAT/KANIT) ---\n${content}\n`;
+        successCount += 1;
       } catch (error: any) {
+        failedCount += 1;
         toast.error(`❌ ${file.name} okunamadı: ${error.message}`);
       }
     }
     
     setExtracting(false);
-    return allContent;
+    return { content: allContent, successCount, failedCount };
   };
 
   const analyzeHazard = async () => {
@@ -475,7 +483,16 @@ export default function Reports() {
       // ✅ Belge içeriğini ekle (varsa)
       if (uploadedFiles.length > 0) {
         toast.info("📄 Dökümanlar ve Mevzuat taranıyor...");
-        const fileContent = await extractFilesContent();
+        const { content: fileContent, successCount, failedCount } = await extractFilesContent();
+
+        if (successCount === 0) {
+          throw new Error(
+            failedCount > 0
+              ? "Yüklenen belgeler okunamadı. PDF scan ise OCR ayarını, düz PDF ise dosya içeriğini kontrol edin."
+              : "Yüklenen belgelerden okunabilir içerik alınamadı.",
+          );
+        }
+
         analysisText = `${analysisText}\n\n[SİSTEM KÜTÜPHANESİ DÖKÜMANLARI - BUNLARDAN ATIF YAP]:\n${fileContent}`;
       }
 
