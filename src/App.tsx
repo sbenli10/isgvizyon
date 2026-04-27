@@ -43,6 +43,7 @@ const loadInspectionsPage = () => import("./pages/Inspections");
 const loadFormBuilderPage = () => import("./pages/FormBuilder");
 const loadReportsPage = () => import("./pages/Reports");
 const loadReportsGuidePage = () => import("./pages/ReportsGuide");
+const loadDocumentAnalysisPage = () => import("./pages/DocumentAnalysis");
 const loadCapaPage = () => import("./pages/CAPA");
 const loadBulkCapaPage = () => import("./pages/BulkCAPA");
 const loadBulkCapaHowToPage = () => import("./pages/BulkCAPAHowTo");
@@ -51,6 +52,7 @@ const Inspections = lazyWithRetry("inspections", loadInspectionsPage);
 const FormBuilder = lazyWithRetry("form-builder", loadFormBuilderPage);
 const Reports = lazyWithRetry("reports", loadReportsPage);
 const ReportsGuide = lazyWithRetry("reports-guide", loadReportsGuidePage);
+const DocumentAnalysis = lazyWithRetry("document-analysis", loadDocumentAnalysisPage);
 const CAPA = lazyWithRetry("capa", loadCapaPage);
 const BulkCAPA = lazyWithRetry("bulk-capa", loadBulkCapaPage);
 const BulkCAPAHowTo = lazyWithRetry("bulk-capa-how-to", loadBulkCapaHowToPage);
@@ -275,6 +277,7 @@ const ProtectedShell = () => {
             {/* REPORTS */}
             {/* ============================================ */}
             <Route path="/reports" element={<Reports />} />
+            <Route path="/document-analysis" element={<DocumentAnalysis />} />
 
             {/* ============================================ */}
             {/* CAPA */}
