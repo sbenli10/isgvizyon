@@ -5,8 +5,10 @@ import {
   Camera,
   CheckCircle2,
   CircleHelp,
+  FileSearch,
   FileText,
   ImageIcon,
+  ScanSearch,
   ShieldCheck,
   Sparkles,
   TriangleAlert,
@@ -57,6 +59,108 @@ const wrongWays = [
   "Belirsiz veya çok genel açıklamalarla analiz çalıştırmayın.",
   "Aynı kayıtta farklı alanlara ait ilgisiz fotoğrafları karıştırmayın.",
   "AI sonucunu hiç kontrol etmeden doğrudan resmi rapor olarak paylaşmayın.",
+];
+
+const flowExamples = [
+  {
+    title: "1. Saha Gözlemi Gir",
+    desc: "Uygunsuzluğu kısa ve net yazın. AI için en güçlü başlangıç budur.",
+    icon: FileSearch,
+    accent: "from-cyan-500/20 to-blue-500/10",
+    mock: (
+      <div className="rounded-xl border border-slate-700/70 bg-slate-950/90 p-3">
+        <div className="mb-2 flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-cyan-400" />
+          <div className="h-2 w-2 rounded-full bg-slate-600" />
+          <div className="h-2 w-2 rounded-full bg-slate-600" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-3 w-28 rounded bg-slate-700" />
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3 text-[11px] leading-5 text-slate-300">
+            Elektrik panosu açık, canlı parçalara temas riski var.
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: "2. Fotoğraf Ekle veya Çek",
+    desc: "Galeriden seçin ya da mobilde doğrudan kamerayla sahadan çekin.",
+    icon: Camera,
+    accent: "from-violet-500/20 to-indigo-500/10",
+    mock: (
+      <div className="rounded-xl border border-slate-700/70 bg-slate-950/90 p-3">
+        <div className="grid grid-cols-3 gap-2">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="aspect-[4/3] rounded-lg border border-slate-700 bg-gradient-to-br from-slate-800 to-slate-900 p-2">
+              <div className="h-full w-full rounded-md border border-dashed border-slate-600/80 bg-slate-900/60" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <div className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-center text-[11px] text-slate-300">
+            Galeriden Seç
+          </div>
+          <div className="flex-1 rounded-lg bg-primary px-3 py-2 text-center text-[11px] font-semibold text-primary-foreground">
+            Kamerayla Çek
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: "3. Mevzuat Bağlamı Ekle",
+    desc: "PDF/DOCX dosyası zorunlu değil; sadece mevzuat dayanağını güçlendirir.",
+    icon: ScanSearch,
+    accent: "from-emerald-500/20 to-teal-500/10",
+    mock: (
+      <div className="rounded-xl border border-slate-700/70 bg-slate-950/90 p-3">
+        <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+          <div className="mb-2 h-3 w-32 rounded bg-slate-700" />
+          <div className="flex items-center gap-2 rounded-md border border-slate-700 bg-slate-950 px-2 py-2">
+            <FileText className="h-4 w-4 text-cyan-300" />
+            <div className="min-w-0 flex-1">
+              <div className="h-2 w-24 rounded bg-slate-700" />
+              <div className="mt-1 h-2 w-16 rounded bg-slate-800" />
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-400">Destekleyici mevzuat baglami</p>
+      </div>
+    ),
+  },
+  {
+    title: "4. Analiz ve Çıktı",
+    desc: "Risk puanı, mevzuat dayanağı ve aksiyonlarla raporu üretin.",
+    icon: Brain,
+    accent: "from-amber-500/20 to-orange-500/10",
+    mock: (
+      <div className="rounded-xl border border-slate-700/70 bg-slate-950/90 p-3">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-2 text-center">
+            <div className="text-[10px] text-slate-400">İhtimal</div>
+            <div className="mt-1 text-sm font-bold text-slate-100">6</div>
+          </div>
+          <div className="rounded-lg border border-slate-700 bg-slate-900/70 p-2 text-center">
+            <div className="text-[10px] text-slate-400">Frekans</div>
+            <div className="mt-1 text-sm font-bold text-slate-100">3</div>
+          </div>
+          <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-2 text-center">
+            <div className="text-[10px] text-rose-200">Toplam Risk</div>
+            <div className="mt-1 text-sm font-bold text-rose-100">720</div>
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2">
+          <div className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-center text-[11px] text-slate-300">
+            PDF İndir
+          </div>
+          <div className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-center text-[11px] text-slate-300">
+            Word İndir
+          </div>
+        </div>
+      </div>
+    ),
+  },
 ];
 
 export default function ReportsGuide() {
@@ -226,6 +330,36 @@ export default function ReportsGuide() {
             <p>Rapor geçmişte saklanır, çıktı alınır ve gerekirse DÖF sürecine bağlanır.</p>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4 lg:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slate-100 lg:text-xl">Örnek Akış Kartları</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Ekranda göreceğiniz akışın sadeleştirilmiş örnekleri. Kullanıcı neyi, hangi sırayla yapacağını tek bakışta anlar.
+            </p>
+          </div>
+          <Badge className="border-slate-600 bg-slate-900/70 text-slate-200">Hızlı Onboarding</Badge>
+        </div>
+        <Separator className="mb-4 bg-slate-700/70" />
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {flowExamples.map((example) => (
+            <Card key={example.title} className={`overflow-hidden border-slate-700/70 bg-gradient-to-br ${example.accent}`}>
+              <CardContent className="p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-slate-950/60 text-slate-100">
+                    <example.icon className="h-4 w-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-100">{example.title}</h3>
+                </div>
+                <p className="mb-4 text-xs leading-5 text-slate-300">{example.desc}</p>
+                {example.mock}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-700/70 bg-slate-950/50 p-4">
