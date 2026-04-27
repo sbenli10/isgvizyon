@@ -30,19 +30,24 @@ const sheet = workbook.Sheets[firstSheetName];
 const rows = xlsx.utils.sheet_to_json(sheet, {
   defval: "",
   raw: false,
+  header: 1,
 });
 
-const CODE_HEADERS = ["NACE Rev.2 Kodu", "NACE Kodu", "NACE Code"];
-const TITLE_HEADERS = ["NACE Rev.2 Tanımı", "NACE Tanımı", "Faaliyet Tanımı"];
+const CODE_HEADERS = ["NACE Rev.2 Kodu", "NACE Kodu", "NACE Code", "NACE Rev.2_Altılı Kod"];
+const TITLE_HEADERS = ["NACE Rev.2 Tanımı", "NACE Tanımı", "Faaliyet Tanımı", "NACE Rev.2_Altılı Tanım"];
 const HAZARD_HEADERS = ["Tehlike Sınıfı", "Tehlike Sinifi"];
 
-function getCell(row, headers) {
-  for (const header of headers) {
-    if (row[header] != null && String(row[header]).trim()) {
-      return String(row[header]).trim();
-    }
-  }
-  return "";
+function normalizeHeader(value) {
+  return String(value || "")
+    .trim()
+    .replaceAll("\n", " ")
+    .replaceAll("_", " ")
+    .replace(/\s+/g, " ");
+}
+
+function findHeaderIndex(headerRow, candidates) {
+  const normalizedCandidates = candidates.map((candidate) => normalizeHeader(candidate).toLocaleLowerCase("tr-TR"));
+  return headerRow.findIndex((cell) => normalizedCandidates.includes(normalizeHeader(cell).toLocaleLowerCase("tr-TR")));
 }
 
 function escapeTs(value) {
@@ -59,16 +64,40 @@ function normalizeHazardClass(value) {
     .toLocaleLowerCase("tr-TR")
     .replaceAll("ı", "i");
 
-  if (normalized.includes("cok tehlikeli")) return "Çok Tehlikeli";
+  if (normalized.includes("çok tehlikeli") || normalized.includes("cok tehlikeli")) return "Çok Tehlikeli";
   if (normalized.includes("tehlikeli") && !normalized.includes("az")) return "Tehlikeli";
   return "Az Tehlikeli";
 }
 
+function isValidCode(code) {
+  return /^\d{2}(?:\.\d{2}(?:\.\d{2})?)?$/.test(code);
+}
+
+const headerRowIndex = rows.findIndex((row) => {
+  const cells = Array.isArray(row) ? row : [];
+  return (
+    findHeaderIndex(cells, CODE_HEADERS) !== -1 &&
+    findHeaderIndex(cells, TITLE_HEADERS) !== -1 &&
+    findHeaderIndex(cells, HAZARD_HEADERS) !== -1
+  );
+});
+
+if (headerRowIndex === -1) {
+  throw new Error("Excel dosyasında NACE başlık satırı bulunamadı.");
+}
+
+const headerRow = rows[headerRowIndex];
+const codeIndex = findHeaderIndex(headerRow, CODE_HEADERS);
+const titleIndex = findHeaderIndex(headerRow, TITLE_HEADERS);
+const hazardIndex = findHeaderIndex(headerRow, HAZARD_HEADERS);
+
 const parsedRows = rows
+  .slice(headerRowIndex + 1)
   .map((row) => {
-    const code = getCell(row, CODE_HEADERS);
-    const name = getCell(row, TITLE_HEADERS);
-    const hazard = normalizeHazardClass(getCell(row, HAZARD_HEADERS));
+    const cells = Array.isArray(row) ? row : [];
+    const code = String(cells[codeIndex] || "").trim();
+    const name = String(cells[titleIndex] || "").trim();
+    const hazard = normalizeHazardClass(String(cells[hazardIndex] || "").trim());
 
     return {
       code,
@@ -77,7 +106,7 @@ const parsedRows = rows
       industry_sector: name,
     };
   })
-  .filter((row) => row.code && row.name);
+  .filter((row) => row.code && row.name && isValidCode(row.code));
 
 const dedupedRows = Array.from(
   parsedRows.reduce((map, row) => {

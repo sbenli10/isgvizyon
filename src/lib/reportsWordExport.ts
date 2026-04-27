@@ -24,7 +24,7 @@ const toDisplayDate = (value?: string | null) => {
 };
 
 const sanitizeFileName = (value: string) =>
-  value.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
+  value.replace(/[^ws-]/g, "").trim().replace(/s+/g, "-");
 
 const inferDocxImageType = (value?: string | null): DocxImageKind => {
   if (!value) return "png";
@@ -56,6 +56,11 @@ const fetchImageBytes = async (url?: string | null) => {
 
 export async function generateHazardAnalysisWord(options: HazardReportWordExportOptions) {
   const { analyses, title, subtitle, fileName, supportingDocuments = [] } = options;
+
+  if (!analyses.length) {
+    throw new Error("Word raporu için en az bir analiz gereklidir.");
+  }
+
   const {
     AlignmentType,
     BorderStyle,
@@ -63,7 +68,6 @@ export async function generateHazardAnalysisWord(options: HazardReportWordExport
     HeadingLevel,
     ImageRun,
     Packer,
-    PageBreak,
     Paragraph,
     Table,
     TableCell,
@@ -150,12 +154,12 @@ export async function generateHazardAnalysisWord(options: HazardReportWordExport
     });
 
   const analysesSections = analyses.flatMap((analysis, index) => {
-    const blocks: Array<any> = [];
+    const blocks: any[] = [];
     const imageMeta = analysisImages[index];
 
     blocks.push(
       new Paragraph({
-        pageBreakBefore: index > 0,
+        pageBreakBefore: true,
         heading: HeadingLevel.HEADING_1,
         spacing: { after: 140 },
         children: [
@@ -211,7 +215,19 @@ export async function generateHazardAnalysisWord(options: HazardReportWordExport
         children: [
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            spacing: { before: 480, after: 120 },
+            spacing: { before: 360, after: 120 },
+            children: [
+              new TextRun({
+                text: "Risk Değerlendirme Raporu Kapağı",
+                bold: true,
+                color: accentColor,
+                size: 28,
+              }),
+            ],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 140 },
             children: [
               new TextRun({
                 text: title || "Profesyonel Fine-Kinney Risk Analiz Raporu",
@@ -321,7 +337,6 @@ export async function generateHazardAnalysisWord(options: HazardReportWordExport
               }),
             ],
           }),
-          new Paragraph({ children: [new PageBreak()] }),
           ...analysesSections,
           ...(supportingDocuments.length
             ? [
