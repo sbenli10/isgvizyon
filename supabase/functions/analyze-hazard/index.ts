@@ -1,5 +1,9 @@
 ﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getGoogleModelChain, getGoogleLiteModel } from "../_shared/gemini.ts";
+import {
+  getGoogleFallbackModel,
+  getGoogleLiteModel,
+  getGoogleRobustModel,
+} from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +18,14 @@ const MAX_INCOMPLETE_RESPONSE_RETRIES = 2;
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const getModelCandidates = (primaryModel: string) => {
-  return [primaryModel, ...getGoogleModelChain("lite")]
-    .filter((model, index, list): model is string => Boolean(model) && list.indexOf(model) === index);
+const getModelCandidates = () => {
+  const primaryModel = getGoogleLiteModel("gemini-1.5-flash");
+  const robustModel = getGoogleRobustModel("gemini-1.5-pro");
+  const fallbackModel = getGoogleFallbackModel("gemini-2.5-flash");
+
+  return [primaryModel, robustModel, fallbackModel].filter(
+    (model, index, list): model is string => Boolean(model) && list.indexOf(model) === index,
+  );
 };
 
 const shouldRetryProviderStatus = (status: number) => status === 429 || status === 503;
@@ -34,6 +43,9 @@ const getRiskLevel = (score: number) => {
 
 const hasEnoughDetail = (value: unknown, minLength = 40) =>
   typeof value === "string" && value.trim().length >= minLength;
+
+const ensureDetailedText = (value: unknown, fallback: string) =>
+  typeof value === "string" && value.trim().length > 0 ? value.trim() : fallback;
 
 async function invokeGoogleAIWithRetry({
   requestId,
@@ -129,7 +141,7 @@ async function invokeGoogleAIUntilParsed({
       context: `${context}-attempt-${parseAttempt}`,
     });
 
-    console.log(`âœ… [${requestId}] YanÄ±t alÄ±ndÄ±`, { context, model, parseAttempt });
+    console.log(`✅ [${requestId}] Yanıt alındı`, { context, model, parseAttempt });
     const contentText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
 
     try {
@@ -137,17 +149,19 @@ async function invokeGoogleAIUntilParsed({
       return { parsed, model };
     } catch (parseError) {
       lastError = parseError;
-      console.warn(`âš ï¸ [${requestId}] Eksik/yetersiz yanÄ±t, yeniden denenecek...`, {
-        context,
-        parseAttempt,
-        reason: parseError instanceof Error ? parseError.message : String(parseError),
-      });
+      if (parseAttempt <= MAX_INCOMPLETE_RESPONSE_RETRIES) {
+        console.warn(`⚠️ [${requestId}] Eksik/yetersiz yanıt, yeniden denenecek...`, {
+          context,
+          parseAttempt,
+          reason: parseError instanceof Error ? parseError.message : String(parseError),
+        });
+      }
     }
   }
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("AI yanÄ±tÄ± parse edilemedi");
+    : new Error("AI yanıtı parse edilemedi");
 }
 
 function parseAIResponse(contentText: string, requestId: string): any {
@@ -280,9 +294,18 @@ function parseAIResponse(contentText: string, requestId: string): any {
     if (!parsedResult.frequency) parsedResult.frequency = 6;
     if (!parsedResult.severity) parsedResult.severity = 15;
     if (!parsedResult.legalReference) parsedResult.legalReference = "6331 Sayılı İSG Kanunu";
-    if (!parsedResult.immediateAction) parsedResult.immediateAction = "Acil müdahale gerekli";
-    if (!parsedResult.preventiveAction) parsedResult.preventiveAction = "Kalıcı önlem alınmalı";
-    if (!parsedResult.justification) parsedResult.justification = "Risk analizi yapılmıştır";
+    parsedResult.immediateAction = ensureDetailedText(
+      parsedResult.immediateAction,
+      "İlgili alan derhal güvenli hale getirilmeli, yetkisiz erişim sınırlandırılmalı ve geçici koruyucu önlem uygulanmalıdır."
+    );
+    parsedResult.preventiveAction = ensureDetailedText(
+      parsedResult.preventiveAction,
+      "Kalıcı düzeltici faaliyet planlanmalı, teknik iyileştirme tamamlanmalı ve sorumlu kişi ile termin tarihi tanımlanmalıdır."
+    );
+    parsedResult.justification = ensureDetailedText(
+      parsedResult.justification,
+      "Risk değerlendirmesi mevcut maruziyet, olası sonuç ve sahadaki kontrol eksiklikleri birlikte değerlendirilerek oluşturulmuştur."
+    );
     
     // 11. Tip kontrolü
     parsedResult.riskScore = typeof parsedResult.riskScore === 'number' 
@@ -308,13 +331,7 @@ function parseAIResponse(contentText: string, requestId: string): any {
     );
     parsedResult.riskLevel = getRiskLevel(parsedResult.riskScore);
     
-    if (
-      responseWasRecovered ||
-      !hasEnoughDetail(parsedResult.hazardDescription, 80) ||
-      !hasEnoughDetail(parsedResult.immediateAction, 60) ||
-      !hasEnoughDetail(parsedResult.preventiveAction, 60) ||
-      !hasEnoughDetail(parsedResult.justification, 60)
-    ) {
+    if (!hasEnoughDetail(parsedResult.hazardDescription, 80)) {
       throw new Error("AI yanıtı eksik veya yetersiz detayda geldi");
     }
     
@@ -328,6 +345,15 @@ function parseAIResponse(contentText: string, requestId: string): any {
       else parsedResult.riskLevel = "Kabul Edilebilir";
     }
     
+    if (
+      responseWasRecovered ||
+      !hasEnoughDetail(parsedResult.immediateAction, 60) ||
+      !hasEnoughDetail(parsedResult.preventiveAction, 60) ||
+      !hasEnoughDetail(parsedResult.justification, 60)
+    ) {
+      parsedResult.analysisError = "AI yanıtı kısmen eksikti; içerik sistem tarafından güvenli varsayılan metinlerle tamamlandı.";
+    }
+
     return parsedResult;
     
   } catch (parseError: any) {
@@ -361,16 +387,31 @@ function parseAIResponse(contentText: string, requestId: string): any {
       const desperate = JSON.parse(lastResort);
       
       // Eksik alanları doldur
+      if (!desperate.hazardDescription) {
+        desperate.hazardDescription = "Görseldeki uygunsuzluk tam olarak çözümlenemedi. Sahanın yerinde incelenmesi ve tehlike kaynağının manuel olarak doğrulanması önerilir.";
+      }
       if (!desperate.probability) desperate.probability = 3;
       if (!desperate.frequency) desperate.frequency = 6;
       if (!desperate.severity) desperate.severity = 15;
       if (!desperate.legalReference) desperate.legalReference = "6331 Sayılı İSG Kanunu";
-      if (!desperate.immediateAction) desperate.immediateAction = "Acil müdahale gerekli";
-      if (!desperate.preventiveAction) desperate.preventiveAction = "Kalıcı önlem alınmalı";
-      if (!desperate.justification) desperate.justification = "Risk analizi yapılmıştır";
+      desperate.immediateAction = ensureDetailedText(
+        desperate.immediateAction,
+        "Alan geçici olarak güvenli hale getirilmeli, yetkisiz erişim önlenmeli ve ilgili tehlike kaynağı için acil kontrol yapılmalıdır."
+      );
+      desperate.preventiveAction = ensureDetailedText(
+        desperate.preventiveAction,
+        "Kalıcı önlem planı oluşturulmalı, teknik düzeltme uygulanmalı ve sahada tekrar kontrol ile kayıt altına alınmalıdır."
+      );
+      desperate.justification = ensureDetailedText(
+        desperate.justification,
+        "AI yanıtı kesik geldiği için sonuç güvenli varsayılan metinlerle tamamlandı; kesin değerlendirme için saha doğrulaması gereklidir."
+      );
+      desperate.riskScore = calculateRiskScore(desperate.probability, desperate.frequency, desperate.severity);
+      desperate.riskLevel = getRiskLevel(desperate.riskScore);
+      desperate.analysisError = "AI yanıtı kesik geldi; içerik sistem tarafından kurtarıldı ve güvenli varsayılan metinlerle tamamlandı.";
       
       console.log(`✅ [${requestId}] Son çare başarılı!`);
-      throw new Error("AI yanıtı kesik geldi; varsayılan metinle kabul edilmeyecek");
+      return desperate;
       
     } catch (desperateError) {
       throw new Error(`JSON parse hatası: ${parseError.message}`);
@@ -416,8 +457,8 @@ serve(async (req) => {
 
     // ✅ Environment Variables
     const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
-    const GOOGLE_MODEL = getGoogleLiteModel();
-    const MODEL_CANDIDATES = getModelCandidates(GOOGLE_MODEL);
+    const MODEL_CANDIDATES = getModelCandidates();
+    const GOOGLE_MODEL = MODEL_CANDIDATES[0];
 
     if (!GOOGLE_API_KEY) {
       console.error(`❌ [${requestId}] GOOGLE_API_KEY bulunamadı!`);
@@ -430,8 +471,8 @@ serve(async (req) => {
       throw new Error("Google API Key geçersiz format. Lütfen AI Studio'dan yeni key alın.");
     }
 
-    console.log(`🤖 [${requestId}] Model: ${GOOGLE_MODEL}`);
-    console.log(`🪜 [${requestId}] Yedek modeller:`, MODEL_CANDIDATES.slice(1));
+    console.log(`🤖 [${requestId}] Birincil model: ${GOOGLE_MODEL}`);
+    console.log(`🪜 [${requestId}] Model zinciri:`, MODEL_CANDIDATES);
 
     const systemPrompt = `Sen 20 yıl sahada çalışmış, sertifikalı A Sınıfı İş Güvenliği Uzmanısın. Türkiye İSG mevzuatına hakimsin ve Fine-Kinney risk değerlendirmesinde uzmansın.
 
@@ -672,7 +713,20 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
 
       } catch (err: any) {
         console.error(`❌ [${requestId}] Fotoğraf ${photoNumber} hatası:`, err.message);
-        // Hata olsa bile devam et, diğer fotoğrafları dene
+        photoAnalyses.push({
+          photoNumber,
+          hazardDescription: `Fotoğraf ${photoNumber} otomatik olarak tam analiz edilemedi. Görselin manuel olarak kontrol edilmesi ve ilgili uygunsuzluğun sahada yeniden değerlendirilmesi önerilir.`,
+          probability: 3,
+          frequency: 3,
+          severity: 15,
+          riskScore: calculateRiskScore(3, 3, 15),
+          riskLevel: getRiskLevel(calculateRiskScore(3, 3, 15)),
+          legalReference: "6331 Sayılı İSG Kanunu",
+          immediateAction: "Görseldeki alan güvenli hale getirilmeli, yetkisiz erişim sınırlandırılmalı ve sahada yerinde doğrulama yapılmalıdır.",
+          preventiveAction: "Fotoğraf kalitesi ve çekim açısı iyileştirilerek yeniden kayıt alınmalı, ilgili alan için periyodik kontrol ve sorumlu ataması yapılmalıdır.",
+          justification: `Fotoğraf ${photoNumber} için AI analizi teknik hata nedeniyle tamamlanamadı. Sürecin izlenebilirliği için kayıt rapora eklendi ve manuel değerlendirme gereklidir.`,
+          analysisError: err.message || "Bilinmeyen analiz hatası",
+        });
         continue;
       }
     }
@@ -690,7 +744,8 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
     }
 
     console.log(`\n🎉 [${requestId}] ===== ANALİZ TAMAMLANDI =====`);
-    console.log(`📊 [${requestId}] Sonuç: ${photoAnalyses.length}/${images.length} fotoğraf başarıyla analiz edildi`);
+    const failedCount = photoAnalyses.filter((analysis) => analysis.analysisError).length;
+    console.log(`📊 [${requestId}] Sonuç: ${photoAnalyses.length}/${images.length} fotoğraf işlendi, ${failedCount} tanesi fallback ile tamamlandı`);
     console.log(`⏱️  [${requestId}] Süre: ${Math.round((Date.now() - startTime) / 1000)}s`);
 
     const responseData = {
@@ -698,6 +753,7 @@ Yanıtın MUTLAKA şu formatta olmalı (başka hiçbir şey yazma):
       summary: {
         totalPhotos: images.length,
         analyzedPhotos: photoAnalyses.length,
+        failedPhotos: failedCount,
         highestRisk: Math.max(...photoAnalyses.map(p => p.riskScore)),
         processingTime: Math.round((Date.now() - startTime) / 1000)
       }

@@ -40,6 +40,7 @@ interface FineKinneyAiResult {
   preventiveAction: string;
   justification: string;
   photoNumber?: number;
+  analysisError?: string;
 }
 
 interface AnalysisHistory {
@@ -54,6 +55,7 @@ interface AnalysisHistory {
 
 const MAX_PHOTOS = 3;
 const MAX_DOCUMENTS = 3;
+const MAX_PDF_OCR_PAGES = 5;
 
 let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
 
@@ -205,20 +207,100 @@ export default function Reports() {
     }
   };
 
+  const openPdfDocument = async (file: File) => {
+    const pdfjsLib = await loadPdfJs();
+    const arrayBuffer = await file.arrayBuffer();
+    const documentOptions = {
+      data: new Uint8Array(arrayBuffer),
+      disableWorker: true,
+      isEvalSupported: false,
+      useWorkerFetch: false,
+    };
+
+    return pdfjsLib.getDocument(documentOptions as any).promise;
+  };
+
+  const extractPdfTextDirect = async (file: File): Promise<string> => {
+    const pdf = await openPdfDocument(file);
+    let text = "";
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map((item: any) => item.str).join(" ") + "\n";
+    }
+
+    return text.trim();
+  };
+
+  const renderPdfPagesForOcr = async (file: File): Promise<string[]> => {
+    const pdf = await openPdfDocument(file);
+    const pageCount = Math.min(pdf.numPages, MAX_PDF_OCR_PAGES);
+    const renderedPages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1.6 });
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("PDF sayfası OCR için hazırlanamadı.");
+      }
+
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      await page.render({
+        canvas,
+        canvasContext: context,
+        viewport,
+      }).promise;
+
+      renderedPages.push(canvas.toDataURL("image/jpeg", 0.82));
+    }
+
+    return renderedPages;
+  };
+
   const extractPdfText = async (file: File): Promise<string> => {
     try {
-      const pdfjsLib = await loadPdfJs();
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let text = "";
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(" ") + "\n";
+      const directText = await extractPdfTextDirect(file);
+      if (directText) {
+        return directText;
       }
-      return text;
-    } catch (error) {
-      throw new Error("PDF okunamadı");
+      throw new Error("PDF içinde okunabilir metin bulunamadı");
+    } catch (directError) {
+      console.warn("PDF metin extraction başarısız, OCR deneniyor:", directError);
+      toast.info(`📷 ${file.name} taranmış PDF olabilir, OCR ile okunuyor...`, {
+        duration: 5000,
+      });
+
+      try {
+        const images = await renderPdfPagesForOcr(file);
+        const { data, error } = await supabase.functions.invoke("extract-pdf-ocr", {
+          body: {
+            fileName: file.name,
+            images,
+            languageHints: ["tr", "en"],
+          },
+        });
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        const text = typeof data?.text === "string" ? data.text.trim() : "";
+        if (!text) {
+          throw new Error(data?.message || "OCR metin üretemedi");
+        }
+
+        toast.success(`📄 ${file.name} OCR ile okundu`);
+        return text;
+      } catch (ocrError) {
+        console.error("PDF OCR hatası:", ocrError);
+        throw new Error("PDF okunamadı");
+      }
     }
   };
 
@@ -266,7 +348,8 @@ export default function Reports() {
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.currentTarget.files;
+    const input = e.currentTarget;
+    const files = input.files;
     if (!files) return;
 
     const imageFiles: File[] = [];
@@ -329,7 +412,9 @@ export default function Reports() {
       toast.success(`${acceptedDocuments.length} belge yüklendi`);
     }
 
-    e.currentTarget.value = "";
+    if (input) {
+      input.value = "";
+    }
   };
 
   const removeImage = (index: number) => {
@@ -427,7 +512,14 @@ export default function Reports() {
         
         await fetchHistory();
         
-        toast.success(`✅ ${data.photoAnalyses.length} fotoğraf başarıyla analiz edildi!`, {
+        const failedAnalyses = normalizedAnalyses.filter((analysis) => analysis.analysisError);
+        if (failedAnalyses.length > 0) {
+          toast.warning(`${failedAnalyses.length} fotoğraf tam analiz edilemedi; manuel kontrol notu ile rapora eklendi.`, {
+            duration: 6000,
+          });
+        }
+
+        toast.success(`✅ ${normalizedAnalyses.length} fotoğraf işlendi!`, {
           action: {
             label: "Formu Temizle",
             onClick: () => {
@@ -755,7 +847,7 @@ Yasal Atıf: ${analysis.legalReference}`,
     await generateHazardAnalysisPdf({
       analyses: aiResults.map((result, idx) => ({
         ...result,
-        imageUrl: imageUrls[idx],
+        imageUrl: imageUrls[(result.photoNumber || idx + 1) - 1],
         sourceLabel: `Fotoğraf ${result.photoNumber || idx + 1} Analizi`,
       })),
       title: "Toplu Fotoğraf Risk Analiz Raporu",
@@ -793,7 +885,7 @@ Yasal Atıf: ${analysis.legalReference}`,
     await generateHazardAnalysisWord({
       analyses: aiResults.map((result, idx) => ({
         ...result,
-        imageUrl: imageUrls[idx],
+        imageUrl: imageUrls[(result.photoNumber || idx + 1) - 1],
         sourceLabel: `Fotoğraf ${result.photoNumber || idx + 1} Analizi`,
       })),
       title: "Toplu Fotoğraf Risk Analiz Raporu",
@@ -1065,10 +1157,10 @@ Yasal Atıf: ${analysis.legalReference}`,
                   </div>
                 </div>
 
-                {imageUrls[idx] && (
+                {imageUrls[(result.photoNumber || idx + 1) - 1] && (
                   <div className="w-40 h-32 rounded-xl overflow-hidden border-2 border-primary/30 shadow-md">
                     <img 
-                      src={imageUrls[idx]} 
+                      src={imageUrls[(result.photoNumber || idx + 1) - 1]} 
                       alt={`Fotoğraf ${result.photoNumber}`} 
                       className="w-full h-full object-cover"
                     />
@@ -1099,8 +1191,13 @@ Yasal Atıf: ${analysis.legalReference}`,
                     <AlertTriangle className="h-5 w-5 text-warning" />
                     Tespit Edilen Tehlike
                   </h5>
-                  <p className="text-base text-foreground leading-relaxed">{result.hazardDescription}</p>
-                </div>
+                    <p className="text-base text-foreground leading-relaxed">{result.hazardDescription}</p>
+                    {result.analysisError ? (
+                      <p className="mt-3 text-sm font-medium text-warning">
+                        Not: Bu görsel otomatik analiz sırasında hata aldı. Sonuç manuel kontrol uyarısıyla rapora eklendi.
+                      </p>
+                    ) : null}
+                  </div>
 
                 <div className="grid md:grid-cols-2 gap-5">
                   <div className="glass-card p-5 border-destructive/30 bg-destructive/5">
@@ -1145,7 +1242,7 @@ Yasal Atıf: ${analysis.legalReference}`,
                     onClick={() => generateRichPDF(
                       result,
                       `Fotoğraf ${result.photoNumber}: ${result.hazardDescription}`,
-                      imageUrls[idx],
+                      imageUrls[(result.photoNumber || idx + 1) - 1],
                     )}
                     className="gap-2 flex-1 h-11 border-2"
                   >
@@ -1157,7 +1254,7 @@ Yasal Atıf: ${analysis.legalReference}`,
                     onClick={() => generateRichWord(
                       result,
                       `Fotoğraf ${result.photoNumber}: ${result.hazardDescription}`,
-                      imageUrls[idx],
+                      imageUrls[(result.photoNumber || idx + 1) - 1],
                     )}
                     className="gap-2 flex-1 h-11 border-2"
                   >
