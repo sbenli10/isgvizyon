@@ -89,7 +89,7 @@ export default function BulkCapaPreviewDialog({
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto border-border/50 bg-slate-200/95 p-0 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.45)]">
+      <DialogContent className="max-h-[94vh] w-[calc(100vw-0.75rem)] max-w-[calc(100vw-0.75rem)] overflow-y-auto border-border/50 bg-slate-200/95 p-0 text-slate-900 shadow-[0_40px_120px_rgba(15,23,42,0.45)] sm:w-full sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 border-b border-slate-300 bg-white px-6 py-4 text-xl font-semibold text-slate-900">
             {previewFocusEntryId ? "Tekli DÖF Önizlemesi" : "Rapor Önizlemesi"}
@@ -104,7 +104,7 @@ export default function BulkCapaPreviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(92vh-76px)] overflow-y-auto bg-slate-200 px-4 py-6 text-slate-900 md:px-8">
+        <div className="max-h-[calc(94vh-76px)] overflow-y-auto bg-slate-200 px-3 py-4 text-slate-900 sm:px-4 sm:py-6 md:px-8">
           {previewFocusEntryId && focusedPreviewEntry ? (
             <div className="mx-auto mb-6 flex max-w-[794px] flex-col gap-3 rounded-[24px] border border-emerald-200 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] md:flex-row md:items-center md:justify-between">
               <div>
@@ -115,7 +115,7 @@ export default function BulkCapaPreviewDialog({
                   Tekli DÖF kaydı hazır. Bu kaydı arşivleyip kompakt Word çıktısını hemen indirebilirsiniz.
                 </p>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                 {lastSingleInspectionId ? (
                   <Button
                     type="button"
@@ -188,7 +188,7 @@ export default function BulkCapaPreviewDialog({
           ) : null}
 
           <div
-            className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-8 py-10 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] md:px-14 md:py-14 [&_h2]:text-slate-800 [&_h3]:text-[#1d3760] [&_p]:!text-slate-900 [&_span]:text-inherit [&_td]:!text-slate-900 [&_th]:!text-white"
+            className="mx-auto min-h-[1123px] max-w-[794px] rounded-[6px] bg-white px-4 py-6 text-slate-900 shadow-[0_24px_80px_rgba(15,23,42,0.18)] sm:px-6 sm:py-8 md:px-14 md:py-14 [&_h2]:text-slate-800 [&_h3]:text-[#1d3760] [&_p]:!text-slate-900 [&_span]:text-inherit [&_td]:!text-slate-900 [&_th]:!text-white"
             style={{ color: "#0f172a" }}
           >
             <div className="flex items-center justify-end border-b border-slate-300 pb-2 text-[11px] text-slate-500">
@@ -283,7 +283,7 @@ export default function BulkCapaPreviewDialog({
                           : entry.media_urls.length === 2
                             ? "grid-cols-2"
                             : "grid-cols-3"
-                      }`}
+                      } max-sm:grid-cols-1`}
                     >
                       {entry.media_urls.map((imageUrl, imgIdx) => (
                         <div
@@ -446,7 +446,7 @@ export default function BulkCapaPreviewDialog({
 
             <p className="mt-12 text-right text-[13px] text-slate-700">Onayınıza arz ederim.</p>
 
-            <div className="mt-16 grid grid-cols-2 gap-10">
+            <div className="mt-16 grid grid-cols-1 gap-6 sm:grid-cols-2 sm:gap-10">
               <div className="text-center">
                 <div className="mx-auto h-px w-full max-w-[220px] bg-slate-800" />
                 <p className="mt-3 text-[13px] font-semibold text-slate-900">Hazırlayan</p>
@@ -467,7 +467,7 @@ export default function BulkCapaPreviewDialog({
           </div>
         </div>
 
-        <Button onClick={onClose} className="m-4 mt-0 w-[calc(100%-2rem)]" variant="outline">
+        <Button onClick={onClose} className="m-3 mt-0 w-[calc(100%-1.5rem)] sm:m-4 sm:w-[calc(100%-2rem)]" variant="outline">
           Kapat
         </Button>
       </DialogContent>

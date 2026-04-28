@@ -54,6 +54,7 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
+import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
@@ -192,6 +193,12 @@ interface BulkCAPADraftSnapshot {
   createStep: "general" | "items";
 }
 
+interface BulkCAPABootstrapCache {
+  companies: CompanyOption[];
+  orgData: OrganizationData | null;
+  profileContext: ProfileContext | null;
+}
+
 type ErrorBoundaryProps = {
   children: ReactNode;
 };
@@ -213,6 +220,7 @@ const BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX = "bulk-capa-draft";
 const BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:fallback`;
 const BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:last-key`;
 const BULK_SOURCE_IMAGE_LIMIT = 12;
+const BULK_CAPA_CACHE_TTL_MS = 5 * 60 * 1000;
 const BulkCapaPreviewDialog = lazy(() => import("@/components/bulk-capa/BulkCapaPreviewDialog"));
 const loadBulkCapaAi = () => import("@/lib/ai/analyzeBulkCapa");
 const loadBulkCapaDocx = () => import("@/lib/bulkCapaOfficialDocx");
@@ -245,6 +253,24 @@ const fetchImageBytes = async (url: string) => {
     return new Uint8Array(arrayBuffer);
   } catch (error) {
     console.warn("Stamp image could not be loaded for export:", error);
+    return null;
+  }
+};
+
+const readStoredBulkCapaDraft = () => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const preferredKey =
+      window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
+      BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
+    const raw =
+      window.localStorage.getItem(preferredKey) ||
+      window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
+
+    if (!raw) return null;
+    return JSON.parse(raw) as Partial<BulkCAPADraftSnapshot>;
+  } catch {
     return null;
   }
 };
@@ -1723,6 +1749,7 @@ const generateWordDocument = async (
 function BulkCAPAContent() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const initialDraftSnapshotRef = useRef<Partial<BulkCAPADraftSnapshot> | null>(readStoredBulkCapaDraft());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkFileInputRef = useRef<HTMLInputElement>(null);
   const clientLogoInputRef = useRef<HTMLInputElement>(null);
@@ -1730,17 +1757,19 @@ function BulkCAPAContent() {
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const activeAnalysisRef = useRef(0);
   const draftHydratedRef = useRef(false);
-  const [entries, setEntries] = useState<HazardEntry[]>([]);
+  const [entries, setEntries] = useState<HazardEntry[]>(() => initialDraftSnapshotRef.current?.entries || []);
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
   const [profileContext, setProfileContext] = useState<ProfileContext | null>(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [historicalFindings, setHistoricalFindings] = useState<HistoricalFinding[]>([]);
   const [historicalLoading, setHistoricalLoading] = useState(false);
-  const [companyInputMode, setCompanyInputMode] = useState<"existing" | "manual">("existing");
-  const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  const [manualCompanyName, setManualCompanyName] = useState("");
+  const [companyInputMode, setCompanyInputMode] = useState<"existing" | "manual">(
+    initialDraftSnapshotRef.current?.companyInputMode === "manual" ? "manual" : "existing",
+  );
+  const [selectedCompanyId, setSelectedCompanyId] = useState(() => initialDraftSnapshotRef.current?.selectedCompanyId || "");
+  const [manualCompanyName, setManualCompanyName] = useState(() => initialDraftSnapshotRef.current?.manualCompanyName || "");
   const [companyComboboxOpen, setCompanyComboboxOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !initialDraftSnapshotRef.current);
   const [saving, setSaving] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewFocusEntryId, setPreviewFocusEntryId] = useState<string | null>(null);
@@ -1749,13 +1778,19 @@ function BulkCAPAContent() {
   const [lastSingleCreatedAt, setLastSingleCreatedAt] = useState<string | null>(null);
   const [editBaselineEntry, setEditBaselineEntry] = useState<HazardEntry | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createMode, setCreateMode] = useState<"single" | "bulk">("single");
-  const [createStep, setCreateStep] = useState<"general" | "items">("general");
-  const [bulkSourceImages, setBulkSourceImages] = useState<string[]>([]);
+  const [createMode, setCreateMode] = useState<"single" | "bulk">(
+    initialDraftSnapshotRef.current?.createMode === "bulk" ? "bulk" : "single",
+  );
+  const [createStep, setCreateStep] = useState<"general" | "items">(
+    initialDraftSnapshotRef.current?.createStep === "items" ? "items" : "general",
+  );
+  const [bulkSourceImages, setBulkSourceImages] = useState<string[]>(
+    () => initialDraftSnapshotRef.current?.bulkSourceImages || [],
+  );
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [overallAnalysis, setOverallAnalysis] = useState("");
+  const [overallAnalysis, setOverallAnalysis] = useState(() => initialDraftSnapshotRef.current?.overallAnalysis || "");
   const [overallAnalyzing, setOverallAnalyzing] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [templateDialogMode, setTemplateDialogMode] = useState<"general" | "item">("general");
@@ -1775,47 +1810,26 @@ function BulkCAPAContent() {
     setTemplateDialogOpen(false);
   });
 
-  const loadCompanyOptions = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("companies")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      throw error;
-    }
-
-    const rows = data || [];
-    const withSignedUrls = await Promise.all(
-      rows.map(async (company) => ({
-        id: company.id,
-        name: company.name,
-        industry: company.industry,
-        employee_count: company.employee_count,
-        notes: company.notes,
-        logo_url: await resolveMaybeSignedUrl("company-logos", (company as { logo_url?: string | null }).logo_url),
-      }))
-    );
-
-    setCompanies(withSignedUrls);
-  };
+  const getBootstrapCacheKey = (userId: string) => `${userId}:bulk-capa:bootstrap`;
   const [itemTemplateTags, setItemTemplateTags] = useState<string[]>([]);
-  const [generalInfo, setGeneralInfo] = useState<BulkCAPAGeneralInfo>({
-    company_name: "",
-    company_logo_url: null,
-    provider_logo_url: null,
-    area_region: "",
-    observation_range: "",
-    report_date: new Date().toISOString().split("T")[0],
-    observer_name: "",
-    observer_certificate_no: "",
-    responsible_person: "İŞVEREN / İŞVEREN VEKİLİ",
-    employer_representative_title: "İşveren / İşveren Vekili",
-    employer_representative_name: "",
-    report_no: "",
-  });
+  const [generalInfo, setGeneralInfo] = useState<BulkCAPAGeneralInfo>(() => ({
+    company_name: initialDraftSnapshotRef.current?.generalInfo?.company_name || "",
+    company_logo_url: initialDraftSnapshotRef.current?.generalInfo?.company_logo_url || null,
+    provider_logo_url: initialDraftSnapshotRef.current?.generalInfo?.provider_logo_url || null,
+    area_region: initialDraftSnapshotRef.current?.generalInfo?.area_region || "",
+    observation_range: initialDraftSnapshotRef.current?.generalInfo?.observation_range || "",
+    report_date:
+      initialDraftSnapshotRef.current?.generalInfo?.report_date || new Date().toISOString().split("T")[0],
+    observer_name: initialDraftSnapshotRef.current?.generalInfo?.observer_name || "",
+    observer_certificate_no: initialDraftSnapshotRef.current?.generalInfo?.observer_certificate_no || "",
+    responsible_person:
+      initialDraftSnapshotRef.current?.generalInfo?.responsible_person || "İŞVEREN / İŞVEREN VEKİLİ",
+    employer_representative_title:
+      initialDraftSnapshotRef.current?.generalInfo?.employer_representative_title || "İşveren / İşveren Vekili",
+    employer_representative_name:
+      initialDraftSnapshotRef.current?.generalInfo?.employer_representative_name || "",
+    report_no: initialDraftSnapshotRef.current?.generalInfo?.report_no || "",
+  }));
   const [companySearch, setCompanySearch] = useState("");
   const draftStorageKey = user ? `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:${user.id}` : null;
   const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
@@ -1899,24 +1913,24 @@ function BulkCAPAContent() {
     };
   }, []);
 
-  const [newEntry, setNewEntry] = useState<HazardEntry>({
-    id: "",
-    description: "",
-    riskDefinition: "",
-    correctiveAction: "",
-    preventiveAction: "",
-    importance_level: "Orta",
-    termin_date: "",
-    related_department: "Diger",
-    notification_method: "E-mail", // ? DEFAULT DEGER
-    responsible_name: "",
-    responsible_role: "",
-    approver_name: "",
-    approver_title: "İş Güvenliği Uzmanı",
-    include_stamp: true,
-    media_urls: [],
-    ai_analyzed: false,
-  });
+  const [newEntry, setNewEntry] = useState<HazardEntry>(() => ({
+    id: initialDraftSnapshotRef.current?.newEntry?.id || "",
+    description: initialDraftSnapshotRef.current?.newEntry?.description || "",
+    riskDefinition: initialDraftSnapshotRef.current?.newEntry?.riskDefinition || "",
+    correctiveAction: initialDraftSnapshotRef.current?.newEntry?.correctiveAction || "",
+    preventiveAction: initialDraftSnapshotRef.current?.newEntry?.preventiveAction || "",
+    importance_level: initialDraftSnapshotRef.current?.newEntry?.importance_level || "Orta",
+    termin_date: initialDraftSnapshotRef.current?.newEntry?.termin_date || "",
+    related_department: initialDraftSnapshotRef.current?.newEntry?.related_department || "Diger",
+    notification_method: initialDraftSnapshotRef.current?.newEntry?.notification_method || "E-mail",
+    responsible_name: initialDraftSnapshotRef.current?.newEntry?.responsible_name || "",
+    responsible_role: initialDraftSnapshotRef.current?.newEntry?.responsible_role || "",
+    approver_name: initialDraftSnapshotRef.current?.newEntry?.approver_name || "",
+    approver_title: initialDraftSnapshotRef.current?.newEntry?.approver_title || "İş Güvenliği Uzmanı",
+    include_stamp: initialDraftSnapshotRef.current?.newEntry?.include_stamp ?? true,
+    media_urls: initialDraftSnapshotRef.current?.newEntry?.media_urls || [],
+    ai_analyzed: initialDraftSnapshotRef.current?.newEntry?.ai_analyzed || false,
+  }));
 
   const requiredFieldChecks = useMemo(() => [
     { label: "Bulgu açiklamasi", ready: newEntry.description.trim().length > 0 },
@@ -2972,13 +2986,29 @@ ${generatedEntries
     const fetchOrgData = async () => {
       if (!user) {
         setCompanies([]);
+        setOrgData(null);
+        setProfileContext(null);
         setLoading(false);
         return;
       }
 
+      const cacheKey = getBootstrapCacheKey(user.id);
+      const cached = readOsgbPageCache<BulkCAPABootstrapCache>(cacheKey, BULK_CAPA_CACHE_TTL_MS);
+      if (cached) {
+        setCompanies(cached.companies || []);
+        setOrgData(cached.orgData || null);
+        setProfileContext(cached.profileContext || null);
+        setLoading(false);
+      }
+
       try {
-        const [, profileResponse] = await Promise.all([
-          loadCompanyOptions(user.id),
+        const [companyRows, profileResponse] = await Promise.all([
+          supabase
+            .from("companies")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("is_active", true)
+            .order("created_at", { ascending: false }),
           supabase
             .from("profiles")
             .select("organization_id, full_name, position, avatar_url, stamp_url")
@@ -2992,12 +3022,26 @@ ${generatedEntries
           console.warn("Profile context could not be loaded:", profileError);
         }
 
-        setProfileContext({
+        const resolvedCompanies = await Promise.all(
+          (companyRows.data || []).map(async (company) => ({
+            id: company.id,
+            name: company.name,
+            industry: company.industry,
+            employee_count: company.employee_count,
+            notes: company.notes,
+            logo_url: await resolveMaybeSignedUrl("company-logos", (company as { logo_url?: string | null }).logo_url),
+          })),
+        );
+
+        setCompanies(resolvedCompanies);
+
+        const nextProfileContext = {
           full_name: profile?.full_name ?? null,
           position: profile?.position ?? null,
           avatar_url: profile?.avatar_url ?? null,
           stamp_url: profile?.stamp_url ?? null,
-        });
+        };
+        setProfileContext(nextProfileContext);
 
         setNewEntry((prev) => ({
           ...prev,
@@ -3011,6 +3055,7 @@ ${generatedEntries
           provider_logo_url: prev.provider_logo_url || null,
         }));
 
+        let nextOrgData: OrganizationData | null = null;
         if (profile?.organization_id) {
           const [orgResponse] = await Promise.all([
             supabase
@@ -3024,9 +3069,16 @@ ${generatedEntries
           const { data: org } = orgResponse;
 
           if (org) {
+            nextOrgData = org;
             setOrgData(org);
           }
         }
+
+        writeOsgbPageCache<BulkCAPABootstrapCache>(cacheKey, {
+          companies: resolvedCompanies,
+          orgData: nextOrgData,
+          profileContext: nextProfileContext,
+        });
       } catch (error) {
         console.error("Error fetching org data:", error);
       } finally {
@@ -3582,7 +3634,7 @@ ${entries
         }
       }
 
-      const compactWordBlob = await generateWordDocument(
+      const singleWordBlob = await generateWordDocument(
         [focusedPreviewEntry],
         effectiveLocation,
         reportCompanyName,
@@ -3592,8 +3644,7 @@ ${entries
         orgData?.id || user?.id || null,
         focusedPreviewEntry.preventiveAction || overallAnalysis,
         profileContext,
-        generalInfo,
-        { compact: true }
+        generalInfo
       );
 
       const today = new Date();
@@ -3613,7 +3664,7 @@ ${entries
         const storagePath = `${reportStorageOwnerId}/${singleFileName}`;
         const { data: uploadData, error } = await supabase.storage
           .from("dof-reports")
-          .upload(storagePath, compactWordBlob, {
+          .upload(storagePath, singleWordBlob, {
             contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             upsert: true,
           });
@@ -3663,7 +3714,7 @@ ${entries
         }
       }
 
-      await downloadBlob(compactWordBlob, singleFileName);
+      await downloadBlob(singleWordBlob, singleFileName);
       toast.success(
         createdInspectionId
           ? "Tekli DÖF kaydedildi, Denetimler kaydına bağlandı ve Word çıktısı indirildi."
@@ -4184,9 +4235,9 @@ const handleSaveAndExport = async () => {
             if (!open) setCreateStep(createMode === "bulk" ? "general" : "items");
           }}
         >
-          <DialogContent className={cn("flex flex-col overflow-hidden border-primary/20 bg-slate-950/95 p-0 text-slate-100", createMode === "single" ? "max-h-[84vh] sm:max-w-xl lg:max-w-[860px]" : "max-h-[88vh] sm:max-w-2xl lg:max-w-3xl")}>
-            <DialogHeader className={cn("border-b border-white/10 text-left", createMode === "single" ? "bg-[linear-gradient(135deg,rgba(8,145,178,0.92),rgba(16,185,129,0.86))] px-5 py-3.5" : "bg-[linear-gradient(135deg,rgba(124,58,237,0.92),rgba(168,85,247,0.86))] px-6 py-4")}>
-              <div className="flex items-start justify-between gap-4">
+          <DialogContent className={cn("flex max-h-[90vh] w-[calc(100vw-0.75rem)] max-w-[calc(100vw-0.75rem)] flex-col overflow-hidden border-primary/20 bg-slate-950/95 p-0 text-slate-100 sm:w-full", createMode === "single" ? "sm:max-w-xl lg:max-w-[860px]" : "sm:max-w-2xl lg:max-w-3xl")}>
+            <DialogHeader className={cn("border-b border-white/10 text-left", createMode === "single" ? "bg-[linear-gradient(135deg,rgba(8,145,178,0.92),rgba(16,185,129,0.86))] px-4 py-3 sm:px-5 sm:py-3.5" : "bg-[linear-gradient(135deg,rgba(124,58,237,0.92),rgba(168,85,247,0.86))] px-4 py-3 sm:px-6 sm:py-4")}>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                 <div>
                   <div className={cn("flex flex-wrap items-center gap-2", createMode === "single" ? "mb-2" : "mb-3")}>
                     <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-white/90">
@@ -4212,7 +4263,7 @@ const handleSaveAndExport = async () => {
                       : "Önce rapor bilgilerini girin, sonra birden fazla bulguyu sırayla ekleyin."}
                   </DialogDescription>
                 </div>
-                <div className={cn("hidden rounded-2xl border border-white/15 bg-white/10 text-right text-xs text-white/80 sm:block", createMode === "single" ? "px-3 py-2.5" : "px-4 py-3")}>
+                <div className={cn("rounded-2xl border border-white/15 bg-white/10 text-left text-xs text-white/80 sm:text-right", createMode === "single" ? "px-3 py-2.5" : "px-4 py-3")}>
                   <p className="font-semibold text-white">Aktif firma</p>
                   <p className="mt-1">{reportCompanyName || "Henüz seçilmedi"}</p>
                 </div>
@@ -4220,8 +4271,8 @@ const handleSaveAndExport = async () => {
             </DialogHeader>
 
             {createMode === "bulk" ? (
-              <div className="border-b border-white/10 bg-slate-950/70 px-6 py-3">
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+              <div className="border-b border-white/10 bg-slate-950/70 px-4 py-3 sm:px-6">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold sm:gap-2.5">
                   {[
                     { key: "general", label: "Genel Bilgiler" },
                     { key: "items", label: `Maddeler (${entries.length})` },
@@ -4272,7 +4323,7 @@ const handleSaveAndExport = async () => {
               </div>
             ) : null}
 
-            <div className={cn("min-h-0 flex-1 overflow-y-auto px-4 sm:px-6", createMode === "single" ? "py-3.5 sm:py-4" : "py-4 sm:py-5")}>
+            <div className={cn("min-h-0 flex-1 overflow-y-auto px-3 sm:px-6", createMode === "single" ? "py-3 sm:py-4" : "py-3.5 sm:py-5")}>
               {createMode === "bulk" && createStep === "general" ? (
                 <div className="space-y-5">
                   <div className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/10 p-4 text-sm leading-6 text-emerald-100">
@@ -4521,7 +4572,7 @@ const handleSaveAndExport = async () => {
                     </div>
                   </div>
 
-                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px]">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_220px]">
                     <Button
                       type="button"
                       variant="outline"
@@ -4543,11 +4594,11 @@ const handleSaveAndExport = async () => {
                     </Button>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+                  <div className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <span className={`rounded-full px-3 py-1.5 text-xs font-semibold ${generalInfoStepReady ? "bg-emerald-500/10 text-emerald-300" : "bg-amber-500/10 text-amber-300"}`}>
                       {generalInfoStepReady ? "Madde girişine hazır" : "Zorunlu başlangıç alanları eksik"}
                     </span>
-                    <Button type="button" disabled={!generalInfoStepReady} onClick={() => setCreateStep("items")} className="h-12 rounded-2xl bg-emerald-500 px-6 font-semibold text-white hover:bg-emerald-400">
+                    <Button type="button" disabled={!generalInfoStepReady} onClick={() => setCreateStep("items")} className="h-12 w-full rounded-2xl bg-emerald-500 px-6 font-semibold text-white hover:bg-emerald-400 sm:w-auto">
                       Madde Eklemeye Geç
                     </Button>
                   </div>
@@ -4565,7 +4616,7 @@ const handleSaveAndExport = async () => {
                         : "Tek bir maddeyi hazırlayıp listeye ekleyin veya kayıtlı madde şablonlarından hızlı başlangıç yapın."}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                     <Button
                       type="button"
                       variant="outline"
@@ -5564,7 +5615,7 @@ const handleSaveAndExport = async () => {
                   </span>
                 </div>
 
-                <div className="mt-5 flex flex-col gap-3 pt-1 sm:flex-row">
+                  <div className="mt-5 flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap">
                   <Button
                     variant="outline"
                     className="h-11 flex-1 gap-2 text-foreground"
