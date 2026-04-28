@@ -11,6 +11,11 @@ import {
 const TEMPLATE_PATH = "/templates/Atilla_Coskun_Acil_Durum_Plani_2026.docx";
 const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
+const PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
+const DOC_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const PIC_NS = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 
 const ADEP_DEFINITION_ROWS: Array<[string, string]> = [
   [
@@ -100,6 +105,33 @@ const getTextNodes = (parent: ParentNode) => getElements(parent, "t");
 const createParagraph = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:p");
 const createRun = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:r");
 const createText = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:t");
+const createRelationshipsElement = (xml: XMLDocument) =>
+  xml.createElementNS(PACKAGE_REL_NS, "Relationships");
+
+const dataUrlToUint8Array = (dataUrl: string) => {
+  const base64 = dataUrl.split(",")[1] || "";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+};
+
+const getImageDimensions = (dataUrl: string) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      resolve({
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      });
+    };
+    image.onerror = () => reject(new Error("Kroki görsel ölçüleri okunamadı."));
+    image.src = dataUrl;
+  });
+
+const pxToEmu = (value: number) => Math.round(value * 9525);
 
 const getOrCreateTextNode = (cell: Element) => {
   const xml = cell.ownerDocument;
@@ -306,6 +338,181 @@ const fillSimpleRows = (
   }
 };
 
+const appendParagraphWithText = (
+  xml: XMLDocument,
+  body: Element,
+  text: string,
+  options?: { bold?: boolean },
+) => {
+  const paragraph = createParagraph(xml);
+  const run = createRun(xml);
+
+  if (options?.bold) {
+    const runProps = xml.createElementNS(WORD_NS, "w:rPr");
+    runProps.appendChild(xml.createElementNS(WORD_NS, "w:b"));
+    run.appendChild(runProps);
+  }
+
+  const textNode = createText(xml);
+  setTextNodeValue(textNode, text);
+  run.appendChild(textNode);
+  paragraph.appendChild(run);
+  body.appendChild(paragraph);
+};
+
+const appendSketchImageToBody = async (
+  xml: XMLDocument,
+  body: Element,
+  relsXml: XMLDocument,
+  zip: JSZip,
+  selectedSketch: NonNullable<ADEPDocumentBundle["plan"]["plan_data"]["ekler"]["secili_kroki"]>,
+) => {
+  const relationshipsRoot =
+    relsXml.documentElement.localName === "Relationships"
+      ? relsXml.documentElement
+      : createRelationshipsElement(relsXml);
+
+  if (!relsXml.documentElement || relsXml.documentElement.localName !== "Relationships") {
+    relsXml.appendChild(relationshipsRoot);
+  }
+
+  const relationshipIds = Array.from(relationshipsRoot.childNodes)
+    .filter((node): node is Element => node.nodeType === Node.ELEMENT_NODE)
+    .map((node) => node.getAttribute("Id") || "")
+    .filter(Boolean);
+
+  let relationshipIndex = 1;
+  while (relationshipIds.includes(`rId${relationshipIndex}`)) {
+    relationshipIndex += 1;
+  }
+  const relationshipId = `rId${relationshipIndex}`;
+  const mediaFileName = `adep-sketch-${selectedSketch.id || Date.now()}.png`;
+  zip.file(`word/media/${mediaFileName}`, dataUrlToUint8Array(selectedSketch.thumbnail_data_url));
+
+  const relationship = relsXml.createElementNS(PACKAGE_REL_NS, "Relationship");
+  relationship.setAttribute("Id", relationshipId);
+  relationship.setAttribute(
+    "Type",
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+  );
+  relationship.setAttribute("Target", `media/${mediaFileName}`);
+  relationshipsRoot.appendChild(relationship);
+
+  const contentTypesXml = await zip.file("[Content_Types].xml")?.async("string");
+  if (contentTypesXml) {
+    const contentTypes = parseXml(contentTypesXml);
+    const root = contentTypes.documentElement;
+    const hasPngDefault = Array.from(root.childNodes).some((node) => {
+      if (node.nodeType !== Node.ELEMENT_NODE) return false;
+      const element = node as Element;
+      return element.localName === "Default" && element.getAttribute("Extension") === "png";
+    });
+
+    if (!hasPngDefault) {
+      const defaultNode = contentTypes.createElementNS(
+        root.namespaceURI || "http://schemas.openxmlformats.org/package/2006/content-types",
+        "Default",
+      );
+      defaultNode.setAttribute("Extension", "png");
+      defaultNode.setAttribute("ContentType", "image/png");
+      root.appendChild(defaultNode);
+      zip.file("[Content_Types].xml", serializeXml(contentTypes));
+    }
+  }
+
+  const { width, height } = await getImageDimensions(selectedSketch.thumbnail_data_url);
+  const maxWidthPx = 520;
+  const maxHeightPx = 700;
+  const ratio = Math.min(maxWidthPx / width, maxHeightPx / height, 1);
+  const cx = pxToEmu(width * ratio);
+  const cy = pxToEmu(height * ratio);
+  const drawingId = Date.now();
+
+  appendParagraphWithText(xml, body, "");
+  appendParagraphWithText(xml, body, "Ek-9 Kroki", { bold: true });
+  appendParagraphWithText(xml, body, selectedSketch.project_name || "Seçilen kroki");
+
+  const paragraph = createParagraph(xml);
+  const run = createRun(xml);
+  const drawing = xml.createElementNS(WORD_NS, "w:drawing");
+  const inline = xml.createElementNS(WP_NS, "wp:inline");
+  inline.setAttribute("distT", "0");
+  inline.setAttribute("distB", "0");
+  inline.setAttribute("distL", "0");
+  inline.setAttribute("distR", "0");
+
+  const extent = xml.createElementNS(WP_NS, "wp:extent");
+  extent.setAttribute("cx", String(cx));
+  extent.setAttribute("cy", String(cy));
+  inline.appendChild(extent);
+
+  const effectExtent = xml.createElementNS(WP_NS, "wp:effectExtent");
+  effectExtent.setAttribute("l", "0");
+  effectExtent.setAttribute("t", "0");
+  effectExtent.setAttribute("r", "0");
+  effectExtent.setAttribute("b", "0");
+  inline.appendChild(effectExtent);
+
+  const docPr = xml.createElementNS(WP_NS, "wp:docPr");
+  docPr.setAttribute("id", String(drawingId));
+  docPr.setAttribute("name", `ADEP Kroki ${drawingId}`);
+  inline.appendChild(docPr);
+
+  const cNvGraphicFramePr = xml.createElementNS(WP_NS, "wp:cNvGraphicFramePr");
+  const graphicFrameLocks = xml.createElementNS(A_NS, "a:graphicFrameLocks");
+  graphicFrameLocks.setAttribute("noChangeAspect", "1");
+  cNvGraphicFramePr.appendChild(graphicFrameLocks);
+  inline.appendChild(cNvGraphicFramePr);
+
+  const graphic = xml.createElementNS(A_NS, "a:graphic");
+  const graphicData = xml.createElementNS(A_NS, "a:graphicData");
+  graphicData.setAttribute("uri", PIC_NS);
+
+  const pic = xml.createElementNS(PIC_NS, "pic:pic");
+  const nvPicPr = xml.createElementNS(PIC_NS, "pic:nvPicPr");
+  const cNvPr = xml.createElementNS(PIC_NS, "pic:cNvPr");
+  cNvPr.setAttribute("id", "0");
+  cNvPr.setAttribute("name", mediaFileName);
+  const cNvPicPr = xml.createElementNS(PIC_NS, "pic:cNvPicPr");
+  nvPicPr.appendChild(cNvPr);
+  nvPicPr.appendChild(cNvPicPr);
+  pic.appendChild(nvPicPr);
+
+  const blipFill = xml.createElementNS(PIC_NS, "pic:blipFill");
+  const blip = xml.createElementNS(A_NS, "a:blip");
+  blip.setAttributeNS(DOC_REL_NS, "r:embed", relationshipId);
+  const stretch = xml.createElementNS(A_NS, "a:stretch");
+  stretch.appendChild(xml.createElementNS(A_NS, "a:fillRect"));
+  blipFill.appendChild(blip);
+  blipFill.appendChild(stretch);
+  pic.appendChild(blipFill);
+
+  const spPr = xml.createElementNS(PIC_NS, "pic:spPr");
+  const xfrm = xml.createElementNS(A_NS, "a:xfrm");
+  const off = xml.createElementNS(A_NS, "a:off");
+  off.setAttribute("x", "0");
+  off.setAttribute("y", "0");
+  const ext = xml.createElementNS(A_NS, "a:ext");
+  ext.setAttribute("cx", String(cx));
+  ext.setAttribute("cy", String(cy));
+  xfrm.appendChild(off);
+  xfrm.appendChild(ext);
+  const prstGeom = xml.createElementNS(A_NS, "a:prstGeom");
+  prstGeom.setAttribute("prst", "rect");
+  prstGeom.appendChild(xml.createElementNS(A_NS, "a:avLst"));
+  spPr.appendChild(xfrm);
+  spPr.appendChild(prstGeom);
+  pic.appendChild(spPr);
+
+  graphicData.appendChild(pic);
+  graphic.appendChild(graphicData);
+  inline.appendChild(graphic);
+  drawing.appendChild(inline);
+  run.appendChild(drawing);
+  paragraph.appendChild(run);
+  body.appendChild(paragraph);
+};
+
 const buildSignatureRows = (bundle: ADEPDocumentBundle) => {
   const responsible = bundle.plan.plan_data.gorevli_bilgileri;
   const general = bundle.plan.plan_data.genel_bilgiler;
@@ -368,6 +575,7 @@ const replaceWordTemplate = async (bundle: ADEPDocumentBundle) => {
 
   const zip = await JSZip.loadAsync(await templateResponse.arrayBuffer());
   const documentXml = await zip.file("word/document.xml")?.async("string");
+  const documentRelsXml = await zip.file("word/_rels/document.xml.rels")?.async("string");
   const headerXml = await zip.file("word/header1.xml")?.async("string");
   const footerXml = await zip.file("word/footer1.xml")?.async("string");
 
@@ -386,6 +594,10 @@ const replaceWordTemplate = async (bundle: ADEPDocumentBundle) => {
   const workplaceAddress = safeText(workplace.adres);
 
   const xml = parseXml(documentXml);
+  const relsXml = parseXml(
+    documentRelsXml ||
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+  );
   const tables = getTables(xml);
   const paragraphs = getParagraphs(xml);
 
@@ -618,7 +830,14 @@ const replaceWordTemplate = async (bundle: ADEPDocumentBundle) => {
   }
   fillSimpleRows(tables[11], equipmentPairs, 1, 1);
 
-  setTableCell(tables, 12, 1, 1, safeText(plan.plan_data.toplanma_yeri.aciklama));
+  const selectedSketch = plan.plan_data.ekler.secili_kroki;
+  const meetingPointDetails = [
+    safeText(plan.plan_data.toplanma_yeri.aciklama),
+    selectedSketch?.project_name ? `Seçili kroki: ${selectedSketch.project_name}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  setTableCell(tables, 12, 1, 1, meetingPointDetails);
 
   const signatureRows = buildSignatureRows(bundle).map((entry, index) => [
     String(index + 1),
@@ -630,7 +849,27 @@ const replaceWordTemplate = async (bundle: ADEPDocumentBundle) => {
   ]);
   fillSimpleRows(tables[13], signatureRows, 1, 1);
 
+  if (selectedSketch?.thumbnail_data_url) {
+    const body = xml.getElementsByTagNameNS(WORD_NS, "body")[0];
+    if (body) {
+      const sectionProperties = Array.from(body.childNodes).find(
+        (node): node is Element =>
+          node.nodeType === Node.ELEMENT_NODE && (node as Element).localName === "sectPr",
+      );
+      if (sectionProperties) {
+        body.removeChild(sectionProperties);
+      }
+
+      await appendSketchImageToBody(xml, body, relsXml, zip, selectedSketch);
+
+      if (sectionProperties) {
+        body.appendChild(sectionProperties);
+      }
+    }
+  }
+
   zip.file("word/document.xml", serializeXml(xml));
+  zip.file("word/_rels/document.xml.rels", serializeXml(relsXml));
 
   if (headerXml) {
     const header = parseXml(headerXml);

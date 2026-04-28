@@ -304,6 +304,56 @@ export const generateADEPPDF = async (planId: string) => {
       addWrappedText(doc, model.notes.map((item) => `• ${item}`).join("\n"), y + 2, { interLoaded });
     }
 
+    if (model.selectedSketch?.thumbnail_data_url) {
+      doc.addPage();
+      y = 18;
+      y = addSectionHeading(doc, y, "Ek-9 Kroki", interLoaded);
+      y = addWrappedText(
+        doc,
+        [
+          model.selectedSketch.project_name
+            ? `Seçili kroki: ${model.selectedSketch.project_name}`
+            : "Sistemde oluşturulan kroki",
+          model.selectedSketch.created_at
+            ? `Kayıt tarihi: ${formatDateOrDash(model.selectedSketch.created_at)}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        y + 2,
+        { interLoaded },
+      );
+
+      try {
+        const imageProps = doc.getImageProperties(model.selectedSketch.thumbnail_data_url);
+        const maxWidth = pageWidth - 30;
+        const maxHeight = pageHeight - y - 25;
+        const ratio = Math.min(maxWidth / imageProps.width, maxHeight / imageProps.height);
+        const drawWidth = imageProps.width * ratio;
+        const drawHeight = imageProps.height * ratio;
+        const drawX = (pageWidth - drawWidth) / 2;
+
+        doc.addImage(
+          model.selectedSketch.thumbnail_data_url,
+          "PNG",
+          drawX,
+          y + 4,
+          drawWidth,
+          drawHeight,
+          undefined,
+          "FAST",
+        );
+      } catch (imageError) {
+        console.error("ADEP kroki görseli PDF'e eklenemedi:", imageError);
+        addWrappedText(
+          doc,
+          "Seçilen kroki önizlemesi PDF çıktısına eklenemedi. Kroki bilgisi plan notlarında korunmuştur.",
+          y + 12,
+          { interLoaded, color: colors.muted },
+        );
+      }
+    }
+
     const totalPages = doc.getNumberOfPages();
     for (let page = 1; page <= totalPages; page += 1) {
       doc.setPage(page);

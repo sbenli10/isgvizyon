@@ -108,6 +108,7 @@ export interface ADEPDocumentViewModel {
   legislation: ADEPPlanData["mevzuat"];
   meetingPoint: string;
   notes: string[];
+  selectedSketch: ADEPPlanData["ekler"]["secili_kroki"];
   source: ADEPDocumentBundle;
 }
 
@@ -332,6 +333,9 @@ export const buildADEPDocumentViewModel = (
     appendixNotes.tahliye_plani_notu,
     appendixNotes.kroki_notu,
     appendixNotes.ek_notlar,
+    appendixNotes.secili_kroki?.project_name
+      ? `Sistemde seçilen kroki: ${appendixNotes.secili_kroki.project_name}`
+      : "",
   ]
     .map((item) => item?.trim())
     .filter((item): item is string => Boolean(item));
@@ -390,6 +394,7 @@ export const buildADEPDocumentViewModel = (
       drills.length ? `${drills.length} adet tatbikat planı mevcut.` : "",
       checklists.length ? `${checklists.length} adet kontrol listesi maddesi mevcut.` : "",
     ].filter(Boolean),
+    selectedSketch: appendixNotes.secili_kroki,
     source: bundle,
   };
 };

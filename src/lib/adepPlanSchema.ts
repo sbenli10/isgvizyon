@@ -54,6 +54,12 @@ export interface ADEPAttachmentsInfo {
   tahliye_plani_notu: string;
   organizasyon_semasi_notu: string;
   ek_notlar: string;
+  secili_kroki: {
+    id: string;
+    project_name: string;
+    thumbnail_data_url: string;
+    created_at: string;
+  } | null;
 }
 
 export interface ADEPPlanData {
@@ -184,6 +190,7 @@ export const DEFAULT_ADEP_PLAN_DATA: ADEPPlanData = {
     tahliye_plani_notu: "",
     organizasyon_semasi_notu: "",
     ek_notlar: "",
+    secili_kroki: null,
   },
   export_preferences: {
     cover_style: "shadow",

@@ -337,7 +337,9 @@ export function AppSidebar() {
           { title: "Mevzuat Belge Analizi", url: "/document-analysis", icon: Gavel, badge: "AI" },
           { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
           { title: "Tahliye Kroki Editörü", url: "/evacuation-editor", icon: MapPinned, badge: "NEW" },
+          { title: "Kroki Geçmişleri", url: "/evacuation-editor/history", icon: History, badge: null },
           { title: "AI Kroki Analizi", url: "/blueprint-analyzer", icon: Search, badge: "AI" },
+          { title: "Kroki Kullanım Rehberi", url: "/blueprint-analyzer/how-to", icon: CircleHelp, badge: null },
         ],
       },
       {
