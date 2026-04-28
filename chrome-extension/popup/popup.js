@@ -8,12 +8,14 @@ import { assertExtensionApi } from "../shared/extension-api.js";
 
 const POPUP_DEBUG = true;
 const POPUP_LOG_PREFIX = "[Denetron Popup]";
+const WEB_APP_URL = "https://www.isgvizyon.com";
+const ISGKATIP_URL = "https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim";
 
 function popupLog(step, data = {}) {
   if (!POPUP_DEBUG) return;
 
   try {
-    console.log(POPUP_LOG_PREFIX, {
+    console.log(`${POPUP_LOG_PREFIX} ${step}`, {
       step,
       time: new Date().toISOString(),
       ...data,
@@ -26,18 +28,15 @@ function popupLog(step, data = {}) {
 function popupWarn(step, data = {}) {
   if (!POPUP_DEBUG) return;
 
-  const payload = {
+  console.log(`${POPUP_LOG_PREFIX} WARN ${step}`, {
     step,
     time: new Date().toISOString(),
     ...data,
-  };
-
-  // Normal akış uyarılarını Chrome extension "Hatalar" ekranına düşürmemek için warn değil log kullanıyoruz.
-  console.log(`${POPUP_LOG_PREFIX} WARN ${step}`, payload);
+  });
 }
 
 function popupError(step, error, data = {}) {
-  const payload = {
+  console.warn(`${POPUP_LOG_PREFIX} ERROR ${step}`, {
     step,
     time: new Date().toISOString(),
     error: {
@@ -46,9 +45,7 @@ function popupError(step, error, data = {}) {
       stack: error?.stack || null,
     },
     ...data,
-  };
-
-  console.error(`${POPUP_LOG_PREFIX} ERROR ${step}`, payload);
+  });
 }
 
 function maskValue(value, visibleStart = 6, visibleEnd = 4) {
@@ -57,33 +54,33 @@ function maskValue(value, visibleStart = 6, visibleEnd = 4) {
   return `${value.slice(0, visibleStart)}...${value.slice(-visibleEnd)}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function summarizeAuthData(authData) {
-  if (!authData) {
-    return {
-      exists: false,
-    };
-  }
+  if (!authData) return { exists: false };
 
   const session = authData.session || authData;
+  const accessToken = authData.accessToken || authData.access_token || session.access_token;
+  const refreshToken = authData.refreshToken || authData.refresh_token || session.refresh_token;
+  const user = authData.user || session.user || null;
 
   return {
     exists: true,
-    hasAccessToken: Boolean(authData.accessToken || session.access_token),
-    accessTokenMasked: maskValue(authData.accessToken || session.access_token),
-    hasRefreshToken: Boolean(authData.refreshToken || session.refresh_token),
-    refreshTokenMasked: maskValue(authData.refreshToken || session.refresh_token),
-    hasUser: Boolean(authData.user || session.user),
-    userId: authData.user?.id || session.user?.id || null,
-    userEmail: authData.user?.email || session.user?.email || null,
+    hasAccessToken: Boolean(accessToken),
+    accessTokenMasked: maskValue(accessToken),
+    hasRefreshToken: Boolean(refreshToken),
+    refreshTokenMasked: maskValue(refreshToken),
+    hasUser: Boolean(user),
+    userId: user?.id || null,
+    userEmail: user?.email || null,
     hasSession: Boolean(authData.session),
-    expiresAt:
-      authData.expiresAt ||
-      (session.expires_at ? session.expires_at * 1000 : null) ||
-      null,
-    expiresAtIso:
-      authData.expiresAt || session.expires_at
-        ? new Date(authData.expiresAt || session.expires_at * 1000).toISOString()
-        : null,
   };
 }
 
@@ -108,17 +105,21 @@ class PopupController {
 
     this.extension = assertExtensionApi("Popup");
     this.authHandler = new AuthHandler();
+
     this.supabaseUrl = DEFAULT_SUPABASE_URL;
     this.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
+
     this.orgId = null;
     this.userId = null;
+    this.organizationName = null;
+    this.userProfile = null;
+
     this.lastSyncedAt = null;
-    this.systemStatus = "Hazirlaniyor";
-    this.stats = {
-      totalCompanies: 0,
-      warningCount: 0,
-      criticalCount: 0,
-    };
+    this.systemStatus = "Hazırlanıyor";
+    this.serviceHealth = "Kontrol ediliyor";
+    this.companies = [];
+
+    this.stats = this.buildDashboardStats([]);
 
     popupLog("constructor:done", {
       hasExtensionApi: Boolean(this.extension),
@@ -137,57 +138,32 @@ class PopupController {
     try {
       this.showLoading();
 
-      popupLog("init:autoConfigureDefaults:start");
       await this.autoConfigureDefaults();
-      popupLog("init:autoConfigureDefaults:done");
-
-      popupLog("init:authHandler:init:start");
       await this.authHandler.init();
-      popupLog("init:authHandler:init:done");
-
-      popupLog("init:checkLocalStorageAuth:start");
       await this.checkLocalStorageAuth();
-      popupLog("init:checkLocalStorageAuth:done");
 
-      popupLog("init:loadConfig:start");
       const configLoaded = await this.loadConfig();
-      popupLog("init:loadConfig:done", {
-        configLoaded,
-        supabaseUrl: this.supabaseUrl,
-        hasSupabaseKey: Boolean(this.supabaseKey),
-        supabaseKeyMasked: maskValue(this.supabaseKey),
-        orgId: this.orgId,
-        userId: this.userId,
-      });
-
-      popupLog("init:isAuthenticated:start");
       const isAuthenticated = await this.authHandler.isAuthenticated();
-      popupLog("init:isAuthenticated:done", {
+
+      popupLog("init:auth-check", {
+        configLoaded,
         isAuthenticated,
       });
 
       if (!isAuthenticated) {
-        popupLog("init:not-authenticated:show-auth-screen");
         this.showAuthScreen();
         return;
       }
 
       if (!configLoaded) {
-        popupWarn("init:config-not-loaded:show-auth-screen");
-        this.showAuthScreen("Eklenti yapilandirmasi hazirlaniyor. Lutfen tekrar deneyin.");
+        this.showAuthScreen("Eklenti yapılandırması hazırlanıyor. Lütfen tekrar deneyin.");
         return;
       }
 
-      popupLog("init:syncOrgIdWithUser:start");
       await this.syncOrgIdWithUser();
-      popupLog("init:syncOrgIdWithUser:done", {
-        orgId: this.orgId,
-        userId: this.userId,
-      });
-
-      popupLog("init:showMainApp:start");
       await this.showMainApp();
-      popupLog("init:showMainApp:done");
+
+      popupLog("init:done");
     } catch (error) {
       popupError("init:error", error);
       this.showFatalAuthFallback(error);
@@ -196,128 +172,76 @@ class PopupController {
   }
 
   async autoConfigureDefaults() {
-    popupLog("autoConfigureDefaults:start");
-
     try {
       const config = await this.extension.storage.local.get(["supabaseUrl", "supabaseKey"]);
       const payload = {};
 
-      popupLog("autoConfigureDefaults:current-config", {
-        hasSupabaseUrl: Boolean(config.supabaseUrl),
-        supabaseUrl: config.supabaseUrl || null,
-        hasSupabaseKey: Boolean(config.supabaseKey),
-        supabaseKeyMasked: maskValue(config.supabaseKey),
-      });
-
       if (!config.supabaseUrl) payload.supabaseUrl = DEFAULT_SUPABASE_URL;
       if (!config.supabaseKey) payload.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
 
-      popupLog("autoConfigureDefaults:payload", {
-        keys: Object.keys(payload),
-        supabaseUrl: payload.supabaseUrl || null,
-        hasSupabaseKey: Boolean(payload.supabaseKey),
-        supabaseKeyMasked: maskValue(payload.supabaseKey),
-      });
-
       if (Object.keys(payload).length > 0) {
         await this.extension.storage.local.set(payload);
-        popupLog("autoConfigureDefaults:storage-set:done");
-      } else {
-        popupLog("autoConfigureDefaults:no-changes-needed");
       }
+
+      popupLog("autoConfigureDefaults:done", {
+        payloadKeys: Object.keys(payload),
+      });
     } catch (error) {
       popupError("autoConfigureDefaults:error", error);
-      console.error("Auto-configure hatasi:", error);
     }
   }
 
   async loadConfig() {
-    popupLog("loadConfig:start");
-
     try {
       const config = await this.extension.storage.local.get([
         "supabaseUrl",
         "supabaseKey",
         "orgId",
         "userId",
+        "organizationName",
       ]);
-
-      popupLog("loadConfig:storage-result", {
-        keys: Object.keys(config || {}),
-        hasSupabaseUrl: Boolean(config.supabaseUrl),
-        supabaseUrl: config.supabaseUrl || null,
-        hasSupabaseKey: Boolean(config.supabaseKey),
-        supabaseKeyMasked: maskValue(config.supabaseKey),
-        orgId: config.orgId || null,
-        userId: config.userId || null,
-      });
 
       this.supabaseUrl = config.supabaseUrl || DEFAULT_SUPABASE_URL;
       this.supabaseKey = config.supabaseKey || DEFAULT_SUPABASE_ANON_KEY;
       this.orgId = config.orgId || null;
       this.userId = config.userId || null;
+      this.organizationName = config.organizationName || null;
 
       const result = Boolean(this.supabaseUrl && this.supabaseKey);
 
-      popupLog("loadConfig:return", {
+      popupLog("loadConfig:done", {
         result,
-        resolvedSupabaseUrl: this.supabaseUrl,
-        hasResolvedSupabaseKey: Boolean(this.supabaseKey),
-        resolvedSupabaseKeyMasked: maskValue(this.supabaseKey),
+        supabaseUrl: this.supabaseUrl,
+        hasSupabaseKey: Boolean(this.supabaseKey),
+        supabaseKeyMasked: maskValue(this.supabaseKey),
+        orgId: this.orgId,
+        userId: this.userId,
+        organizationName: this.organizationName,
       });
 
       return result;
     } catch (error) {
       popupError("loadConfig:error", error);
 
-      console.error("Config load hatasi:", error);
       this.supabaseUrl = DEFAULT_SUPABASE_URL;
       this.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
-
-      popupWarn("loadConfig:return:true:fallback-defaults", {
-        supabaseUrl: this.supabaseUrl,
-        hasSupabaseKey: Boolean(this.supabaseKey),
-        supabaseKeyMasked: maskValue(this.supabaseKey),
-      });
 
       return true;
     }
   }
 
   async checkLocalStorageAuth() {
-    popupLog("checkLocalStorageAuth:start", {
-      urls: ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"],
-    });
-
     try {
       const tabs = await this.extension.tabs.query({
         url: ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"],
       });
 
-      popupLog("checkLocalStorageAuth:tabs-result", {
+      popupLog("checkLocalStorageAuth:tabs", {
         tabCount: tabs.length,
-        tabs: tabs.map((tab) => ({
-          id: tab.id,
-          url: tab.url,
-          title: tab.title,
-          active: tab.active,
-          status: tab.status,
-        })),
       });
 
       for (const tab of tabs) {
-        popupLog("checkLocalStorageAuth:tab:start", {
-          tabId: tab.id,
-          url: tab.url,
-          title: tab.title,
-        });
-
-        if (!tab.id) {
-          popupWarn("checkLocalStorageAuth:tab:skip:no-tab-id", {
-            tab,
-          });
-          continue;
-        }
+        if (!tab.id) continue;
 
         try {
           const result = await this.extension.scripting.executeScript({
@@ -338,13 +262,14 @@ class PopupController {
                 };
               }
 
-              localStorage.removeItem(key);
-
               try {
+                const parsed = JSON.parse(auth);
+                localStorage.removeItem(key);
+
                 return {
                   found: true,
                   key,
-                  parsed: JSON.parse(auth),
+                  parsed,
                   rawLength: auth.length,
                 };
               } catch (error) {
@@ -359,223 +284,102 @@ class PopupController {
             },
           });
 
-          popupLog("checkLocalStorageAuth:executeScript:result", {
-            tabId: tab.id,
-            rawResult: result,
-          });
-
           const scriptResult = result?.[0]?.result || null;
 
           popupLog("checkLocalStorageAuth:script-result", {
             tabId: tab.id,
             found: Boolean(scriptResult?.found),
-            key: scriptResult?.key || null,
             parseError: scriptResult?.parseError || null,
-            localStorageLength: scriptResult?.localStorageLength || null,
-            availableKeys: scriptResult?.availableKeys || null,
             authDataSummary: summarizeAuthData(scriptResult?.parsed),
           });
 
-          if (scriptResult?.parseError) {
-            popupWarn("checkLocalStorageAuth:parse-error", {
-              tabId: tab.id,
-              parseError: scriptResult.parseError,
-              rawPreview: scriptResult.rawPreview,
-              rawLength: scriptResult.rawLength,
-            });
-            continue;
-          }
+          if (scriptResult?.parseError) continue;
 
           const authData = scriptResult?.parsed || null;
 
           if (authData) {
-            popupLog("checkLocalStorageAuth:saveAuth:start", {
-              tabId: tab.id,
-              authDataSummary: summarizeAuthData(authData),
-            });
-
             await this.authHandler.saveAuth(authData);
-
-            popupLog("checkLocalStorageAuth:saveAuth:done", {
-              tabId: tab.id,
-            });
-
+            popupLog("checkLocalStorageAuth:saveAuth:done", { tabId: tab.id });
             return;
           }
-
-          popupLog("checkLocalStorageAuth:tab:no-auth-data", {
-            tabId: tab.id,
-          });
         } catch (error) {
-          popupError("checkLocalStorageAuth:tab:error", error, {
+          popupWarn("checkLocalStorageAuth:tab:error", {
             tabId: tab.id,
-            url: tab.url,
+            message: error?.message || String(error),
           });
-
-          console.warn("Tab auth erisimi basarisiz:", error?.message || error);
         }
       }
-
-      popupWarn("checkLocalStorageAuth:done:no-auth-found-in-tabs");
     } catch (error) {
-      popupError("checkLocalStorageAuth:error", error);
-      console.error("Web auth aktarimi basarisiz:", error);
+      popupWarn("checkLocalStorageAuth:error", {
+        message: error?.message || String(error),
+      });
     }
   }
 
   showLoading() {
-    popupLog("showLoading");
-    this.toggleScreens("loading");
+    document.body.innerHTML = `
+      <main class="premium-popup premium-popup--center">
+        <section class="loading-card">
+          <div class="loader-ring"></div>
+          <div>
+            <div class="loading-title">ISGVizyon hazırlanıyor</div>
+            <div class="loading-text">Oturum ve firma verileri kontrol ediliyor.</div>
+          </div>
+        </section>
+      </main>
+    `;
   }
 
- showAuthScreen(message = "") {
-  popupLog("showAuthScreen:forced-render:start", {
-    message,
-    loginUrl: this.authHandler.getLoginUrl(),
-  });
+  showAuthScreen(message = "") {
+    const loginUrl = this.authHandler.getLoginUrl();
 
-  document.body.innerHTML = `
-    <div style="
-      width: 360px;
-      min-height: 520px;
-      box-sizing: border-box;
-      background: #07111f;
-      color: #ffffff;
-      font-family: Arial, sans-serif;
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-    ">
-      <div style="width: 100%;">
-        <div style="
-          width: 56px;
-          height: 56px;
-          margin: 0 auto 18px;
-          border-radius: 18px;
-          background: rgba(255,255,255,0.12);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 24px;
-          font-weight: 700;
-        ">
-          İ
-        </div>
-
-        <h1 style="
-          font-size: 22px;
-          line-height: 1.25;
-          margin: 0 0 10px;
-          color: #ffffff;
-        ">
-          ISGVizyon
-        </h1>
-
-        <p style="
-          font-size: 14px;
-          line-height: 1.45;
-          margin: 0 0 22px;
-          color: rgba(255,255,255,0.78);
-        ">
-          ${
-            message ||
-            "Uzantıyı kullanmak için ISGVizyon hesabınızla giriş yapmanız gerekiyor."
-          }
-        </p>
-
-        <button id="btnLoginFallback" style="
-          width: 100%;
-          border: 0;
-          border-radius: 12px;
-          padding: 12px 16px;
-          background: #ffffff;
-          color: #07111f;
-          font-size: 14px;
-          font-weight: 700;
-          cursor: pointer;
-        ">
-          Giriş Yap
-        </button>
-
-        <button id="btnOpenAppFallback" style="
-          width: 100%;
-          border: 1px solid rgba(255,255,255,0.25);
-          border-radius: 12px;
-          padding: 11px 16px;
-          background: transparent;
-          color: #ffffff;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          margin-top: 10px;
-        ">
-          ISGVizyon'u Aç
-        </button>
-
-        <div style="
-          margin-top: 16px;
-          font-size: 12px;
-          line-height: 1.4;
-          color: rgba(255,255,255,0.55);
-        ">
-          Login sonrası popup'ı tekrar açın.
-        </div>
-      </div>
-    </div>
-  `;
-
-  const loginUrl = this.authHandler.getLoginUrl();
-
-  document.getElementById("btnLoginFallback")?.addEventListener("click", () => {
-    popupLog("showAuthScreen:btnLoginFallback:click", { loginUrl });
-
-    this.extension.tabs.create({
-      url: loginUrl,
+    popupLog("showAuthScreen", {
+      loginUrl,
+      message,
     });
 
-    window.close();
-  });
+    document.body.innerHTML = `
+      <main class="premium-popup premium-popup--center">
+        <section class="auth-premium-card">
+          <div class="auth-logo">İ</div>
+          <div class="auth-kicker">ISGVizyon Uzantısı</div>
+          <h1>İSG Bot hesabınıza bağlanın</h1>
+          <p>
+            ${escapeHtml(message || "Firmalarınızı, uyum durumunuzu ve İSG-KATİP senkron durumunu görüntülemek için giriş yapın.")}
+          </p>
 
-  document.getElementById("btnOpenAppFallback")?.addEventListener("click", () => {
-    popupLog("showAuthScreen:btnOpenAppFallback:click");
+          <button id="btnLoginFallback" class="primary-action">Giriş Yap</button>
+          <button id="btnOpenAppFallback" class="secondary-action full">ISGVizyon'u Aç</button>
 
-    this.extension.tabs.create({
-      url: "https://www.isgvizyon.com",
+          <div class="auth-note">Giriş tamamlandıktan sonra uzantıyı tekrar açın.</div>
+        </section>
+      </main>
+    `;
+
+    document.getElementById("btnLoginFallback")?.addEventListener("click", () => {
+      this.extension.tabs.create({ url: loginUrl });
+      window.close();
     });
 
-    window.close();
-  });
-
-  popupLog("showAuthScreen:forced-render:done");
-}
+    document.getElementById("btnOpenAppFallback")?.addEventListener("click", () => {
+      this.extension.tabs.create({ url: WEB_APP_URL });
+      window.close();
+    });
+  }
 
   showFatalAuthFallback(error) {
     popupError("showFatalAuthFallback", error);
 
     document.body.innerHTML = `
-      <div style="
-        min-height: 100vh;
-        width: 100vw;
-        box-sizing: border-box;
-        background: #07111f;
-        color: white;
-        font-family: Arial, sans-serif;
-        padding: 20px;
-      ">
-        <h2 style="margin-top: 0;">Uzantı başlatılamadı</h2>
-        <p style="opacity: 0.85;">${error?.message || "Bilinmeyen hata oluştu."}</p>
-        <button id="btnRetryPopup" style="
-          padding: 10px 14px;
-          border: 0;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 700;
-        ">
-          Tekrar Dene
-        </button>
-      </div>
+      <main class="premium-popup premium-popup--center">
+        <section class="auth-premium-card">
+          <div class="auth-logo danger">!</div>
+          <div class="auth-kicker">Başlatma hatası</div>
+          <h1>Uzantı başlatılamadı</h1>
+          <p>${escapeHtml(error?.message || "Bilinmeyen hata oluştu.")}</p>
+          <button id="btnRetryPopup" class="primary-action">Tekrar Dene</button>
+        </section>
+      </main>
     `;
 
     document.getElementById("btnRetryPopup")?.addEventListener("click", () => {
@@ -586,171 +390,115 @@ class PopupController {
   async showMainApp() {
     popupLog("showMainApp:start");
 
-    this.toggleScreens("main");
+    await this.loadDashboardData();
+    this.renderProfessionalDashboard();
 
-    popupLog("showMainApp:setupEventListeners:start");
-    this.setupEventListeners();
-    popupLog("showMainApp:setupEventListeners:done");
-
-    popupLog("showMainApp:renderUserProfile:start");
-    await this.renderUserProfile();
-    popupLog("showMainApp:renderUserProfile:done");
-
-    popupLog("showMainApp:loadStats:start");
-    await this.loadStats();
-    popupLog("showMainApp:loadStats:done", {
+    popupLog("showMainApp:done", {
       stats: this.stats,
+      companyCount: this.companies.length,
       lastSyncedAt: this.lastSyncedAt,
       systemStatus: this.systemStatus,
-    });
-
-    popupLog("showMainApp:renderStatusPanel:start");
-    await this.renderStatusPanel();
-    popupLog("showMainApp:renderStatusPanel:done");
-
-    popupLog("showMainApp:loadActivities:start");
-    await this.loadActivities();
-    popupLog("showMainApp:loadActivities:done");
-
-    this.updateStatsUI();
-
-    popupLog("showMainApp:done");
-  }
-
-  toggleScreens(target) {
-    popupLog("toggleScreens:start", {
-      target,
-    });
-
-    const loadingScreen = document.getElementById("loadingScreen");
-    const authScreen = document.getElementById("authScreen");
-    const mainApp = document.getElementById("mainApp");
-
-    popupLog("toggleScreens:dom-check", {
-      hasLoadingScreen: Boolean(loadingScreen),
-      hasAuthScreen: Boolean(authScreen),
-      hasMainApp: Boolean(mainApp),
-      loadingScreenCurrentDisplay: loadingScreen?.style?.display || null,
-      authScreenCurrentDisplay: authScreen?.style?.display || null,
-      mainAppCurrentDisplay: mainApp?.style?.display || null,
-    });
-
-    if (loadingScreen) loadingScreen.style.display = target === "loading" ? "flex" : "none";
-    if (authScreen) authScreen.style.display = target === "auth" ? "flex" : "none";
-    if (mainApp) mainApp.style.display = target === "main" ? "block" : "none";
-
-    popupLog("toggleScreens:done", {
-      target,
-      loadingScreenDisplay: loadingScreen?.style?.display || null,
-      authScreenDisplay: authScreen?.style?.display || null,
-      mainAppDisplay: mainApp?.style?.display || null,
+      serviceHealth: this.serviceHealth,
+      organizationName: this.organizationName,
     });
   }
 
-  handleLogin() {
-    popupLog("handleLogin:start");
+  async getAuthContext() {
+    const storage = await this.extension.storage.local.get([
+      "denetron_auth",
+      "userId",
+      "orgId",
+      "organizationName",
+    ]);
 
-    const loginUrl = this.authHandler.getLoginUrl();
+    const auth = storage.denetron_auth || null;
+    const user = auth?.user || auth?.session?.user || null;
 
-    popupLog("handleLogin:create-tab", {
-      loginUrl,
-    });
+    const accessToken =
+      auth?.accessToken ||
+      auth?.session?.access_token ||
+      auth?.access_token ||
+      null;
 
-    this.extension.tabs.create({ url: loginUrl });
-    window.close();
+    const userId =
+      storage.userId ||
+      this.userId ||
+      user?.id ||
+      null;
+
+    const orgId =
+      storage.orgId ||
+      this.orgId ||
+      user?.organization_id ||
+      user?.user_metadata?.organization_id ||
+      user?.app_metadata?.organization_id ||
+      null;
+
+    this.userId = userId;
+    this.orgId = orgId;
+    this.organizationName = storage.organizationName || this.organizationName || null;
+
+    return {
+      storage,
+      auth,
+      user,
+      accessToken,
+      userId,
+      orgId,
+    };
   }
 
-  async handleLogout() {
-    popupLog("handleLogout:start");
-
-    await this.authHandler.clearAuth();
-
-    popupLog("handleLogout:auth-cleared:reload");
-    window.location.reload();
-  }
-
-  setupEventListeners() {
-    popupLog("setupEventListeners:start");
-
-    const btnLogout = document.getElementById("btnLogout");
-    const btnSync = document.getElementById("btnSync");
-    const btnOpenDashboard = document.getElementById("btnOpenDashboard");
-    const btnSyncISGKatip = document.getElementById("btnSyncISGKatip");
-
-    popupLog("setupEventListeners:dom-check", {
-      hasBtnLogout: Boolean(btnLogout),
-      hasBtnSync: Boolean(btnSync),
-      hasBtnOpenDashboard: Boolean(btnOpenDashboard),
-      hasBtnSyncISGKatip: Boolean(btnSyncISGKatip),
-    });
-
-    btnLogout?.addEventListener("click", () => this.handleLogout());
-    btnSync?.addEventListener("click", () => this.handleSync());
-
-    btnOpenDashboard?.addEventListener("click", () => {
-      popupLog("btnOpenDashboard:click");
-      this.extension.tabs.create({ url: "https://www.isgvizyon.com/isg-bot" });
-    });
-
-    btnSyncISGKatip?.addEventListener("click", async () => {
-      popupLog("btnSyncISGKatip:click");
-      await this.handleISGKatipSync();
-    });
-
-    popupLog("setupEventListeners:done");
+  getSupabaseHeaders(accessToken) {
+    return {
+      apikey: this.supabaseKey,
+      Authorization: accessToken ? `Bearer ${accessToken}` : `Bearer ${this.supabaseKey}`,
+      "Content-Type": "application/json",
+    };
   }
 
   async fetchOrganizationId(userId, accessToken) {
-    popupLog("fetchOrganizationId:start", {
-      userId,
-      hasAccessToken: Boolean(accessToken),
-      accessTokenMasked: maskValue(accessToken),
-    });
-
-    if (!userId || !accessToken) {
-      popupWarn("fetchOrganizationId:return:null:missing-user-or-token", {
-        userId,
-        hasAccessToken: Boolean(accessToken),
-      });
-      return null;
-    }
+    if (!userId || !accessToken) return null;
 
     try {
       const url = `${this.supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=organization_id&limit=1`;
 
-      popupLog("fetchOrganizationId:request:start", {
-        url,
-        hasSupabaseKey: Boolean(this.supabaseKey),
-        supabaseKeyMasked: maskValue(this.supabaseKey),
-      });
-
       const response = await fetch(url, {
-        headers: {
-          apikey: this.supabaseKey,
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      popupLog("fetchOrganizationId:response", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
+        headers: this.getSupabaseHeaders(accessToken),
       });
 
       if (!response.ok) return null;
 
       const rows = await response.json();
-
-      popupLog("fetchOrganizationId:rows", {
-        rowCount: Array.isArray(rows) ? rows.length : null,
-        organizationId: rows?.[0]?.organization_id || null,
-      });
-
       return rows?.[0]?.organization_id || null;
     } catch (error) {
-      popupError("fetchOrganizationId:error", error);
-      console.warn("Organization bilgisi alinamadi:", error?.message || error);
+      popupWarn("fetchOrganizationId:error", {
+        message: error?.message || String(error),
+      });
+
+      return null;
+    }
+  }
+
+  async fetchOrganizationName(orgId, accessToken) {
+    if (!orgId) return null;
+
+    try {
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/organizations?id=eq.${orgId}&select=name,slug,industry,city&limit=1`,
+        {
+          headers: this.getSupabaseHeaders(accessToken),
+        }
+      );
+
+      if (!response.ok) return null;
+
+      const rows = await response.json();
+      return rows?.[0]?.name || null;
+    } catch (error) {
+      popupWarn("fetchOrganizationName:error", {
+        message: error?.message || String(error),
+      });
+
       return null;
     }
   }
@@ -759,20 +507,7 @@ class PopupController {
     popupLog("syncOrgIdWithUser:start");
 
     try {
-      const storage = await this.extension.storage.local.get("denetron_auth");
-      const auth = storage.denetron_auth || null;
-      const user = auth?.user || null;
-      const accessToken = auth?.accessToken || auth?.session?.access_token || null;
-
-      popupLog("syncOrgIdWithUser:storage-result", {
-        hasAuth: Boolean(auth),
-        hasUser: Boolean(user),
-        userId: user?.id || null,
-        userEmail: user?.email || null,
-        hasAccessToken: Boolean(accessToken),
-        accessTokenMasked: maskValue(accessToken),
-        currentOrgId: this.orgId,
-      });
+      const { accessToken, user, orgId } = await this.getAuthContext();
 
       if (!user?.id) {
         popupWarn("syncOrgIdWithUser:return:no-user-id");
@@ -787,325 +522,99 @@ class PopupController {
         user.app_metadata?.organization_id ||
         null;
 
-      popupLog("syncOrgIdWithUser:metadata-org", {
-        metadataOrgId,
-        rootOrgId: user.organization_id || null,
-        userMetadataOrgId: user.user_metadata?.organization_id || null,
-        appMetadataOrgId: user.app_metadata?.organization_id || null,
-      });
-
       this.orgId =
         metadataOrgId ||
+        orgId ||
         (await this.fetchOrganizationId(user.id, accessToken)) ||
-        this.orgId ||
-        user.id;
+        null;
 
-      popupLog("syncOrgIdWithUser:resolved", {
-        userId: this.userId,
-        orgId: this.orgId,
-      });
+      if (this.orgId && !this.organizationName) {
+        this.organizationName = await this.fetchOrganizationName(this.orgId, accessToken);
+      }
 
       await this.extension.storage.local.set({
         orgId: this.orgId,
         userId: this.userId,
+        organizationName: this.organizationName,
       });
 
-      popupLog("syncOrgIdWithUser:storage-set:done");
+      popupLog("syncOrgIdWithUser:done", {
+        userId: this.userId,
+        orgId: this.orgId,
+        organizationName: this.organizationName,
+      });
     } catch (error) {
-      popupError("syncOrgIdWithUser:error", error);
-      console.error("Org scope eslenemedi:", error);
+      popupWarn("syncOrgIdWithUser:error", {
+        message: error?.message || String(error),
+      });
     }
   }
 
-  async handleISGKatipSync() {
-    const targetUrl = "https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim";
+  async fetchCompanies(orgId, accessToken) {
+    if (!orgId) return [];
 
-    popupLog("handleISGKatipSync:start", {
-      targetUrl,
+    const select = [
+      "id",
+      "org_id",
+      "sgk_no",
+      "company_name",
+      "employee_count",
+      "hazard_class",
+      "assigned_minutes",
+      "required_minutes",
+      "compliance_status",
+      "risk_score",
+      "last_synced_at",
+      "contract_start",
+      "contract_end",
+      "contract_status",
+      "assigned_person_name",
+      "service_provider_name",
+      "is_deleted",
+    ].join(",");
+
+    const url =
+      `${this.supabaseUrl}/rest/v1/isgkatip_companies` +
+      `?org_id=eq.${orgId}` +
+      `&or=(is_deleted.is.null,is_deleted.eq.false)` +
+      `&select=${select}` +
+      `&order=last_synced_at.desc`;
+
+    popupLog("fetchCompanies:request", {
+      url,
+      orgId,
     });
 
+    const response = await fetch(url, {
+      headers: this.getSupabaseHeaders(accessToken),
+    });
+
+    const responseText = await response.text();
+
+    popupLog("fetchCompanies:response", {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      responseTextPreview: responseText ? responseText.slice(0, 500) : null,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Firma listesi alınamadı. HTTP ${response.status}: ${responseText}`);
+    }
+
+    const rows = responseText ? JSON.parse(responseText) : [];
+    return Array.isArray(rows) ? rows : [];
+  }
+
+  async checkServiceHealth(accessToken) {
     try {
-      const tabs = await this.extension.tabs.query({
-        url: "https://isgkatip.csgb.gov.tr/*",
-      });
-
-      popupLog("handleISGKatipSync:tabs-result", {
-        tabCount: tabs.length,
-        tabs: tabs.map((tab) => ({
-          id: tab.id,
-          url: tab.url,
-          windowId: tab.windowId,
-          active: tab.active,
-        })),
-      });
-
-      if (tabs.length > 0) {
-        const tab = tabs[0];
-        const currentUrl = tab.url || "";
-
-        popupLog("handleISGKatipSync:existing-tab", {
-          tabId: tab.id,
-          windowId: tab.windowId,
-          currentUrl,
-        });
-
-        await this.extension.tabs.update(tab.id, { active: true });
-        await this.extension.windows.update(tab.windowId, { focused: true });
-
-        if (!currentUrl.includes("/kisi-kurum/kisi-karti/kisi-kartim")) {
-          popupLog("handleISGKatipSync:update-tab-url");
-          await this.extension.tabs.update(tab.id, { url: targetUrl });
-        } else {
-          popupLog("handleISGKatipSync:create-notification");
-          this.extension.notifications.create({
-            type: "basic",
-            iconUrl: "/assets/icon-128.png",
-            title: "ISGVizyon ISG Bot",
-            message: 'Sag alttaki "Verileri ISGVizyon\'a Aktar" butonuna tiklayin.',
-            priority: 1,
-          });
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/isgkatip_companies?select=id&limit=1`,
+        {
+          method: "GET",
+          headers: this.getSupabaseHeaders(accessToken),
         }
-      } else {
-        popupLog("handleISGKatipSync:create-new-tab");
-        await this.extension.tabs.create({ url: targetUrl });
-      }
-
-      popupLog("handleISGKatipSync:window-close");
-      window.close();
-    } catch (error) {
-      popupError("handleISGKatipSync:error", error);
-      console.error("ISG-KATIP acma hatasi:", error);
-      this.extension.tabs.create({ url: targetUrl });
-      window.close();
-    }
-  }
-
-  async loadStats() {
-    popupLog("loadStats:start", {
-      orgId: this.orgId,
-    });
-
-    const storage = await this.extension.storage.local.get(["denetron_auth", "userId"]);
-    const auth = storage.denetron_auth || null;
-    const userId = storage.userId || auth?.user?.id || null;
-    const accessToken = auth?.accessToken || auth?.session?.access_token || null;
-
-    popupLog("loadStats:storage-result", {
-      hasAuth: Boolean(auth),
-      userId,
-      hasAccessToken: Boolean(accessToken),
-      accessTokenMasked: maskValue(accessToken),
-      orgId: this.orgId,
-    });
-
-    if (!this.orgId) {
-      this.systemStatus = "Bagli organizasyon bekleniyor";
-
-      popupWarn("loadStats:return:no-org-id", {
-        systemStatus: this.systemStatus,
-      });
-
-      return;
-    }
-
-    try {
-      const headers = {
-        apikey: this.supabaseKey,
-        Authorization: accessToken ? `Bearer ${accessToken}` : `Bearer ${this.supabaseKey}`,
-        "Content-Type": "application/json",
-      };
-
-      const scopeFilter = userId
-        ? `or=(org_id.eq.${this.orgId},user_id.eq.${userId})`
-        : `org_id=eq.${this.orgId}`;
-
-      const url = `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status,last_synced_at&order=last_synced_at.desc`;
-
-      popupLog("loadStats:request:start", {
-        url,
-        scopeFilter,
-        hasSupabaseKey: Boolean(this.supabaseKey),
-        supabaseKeyMasked: maskValue(this.supabaseKey),
-        authorizationMode: accessToken ? "user-access-token" : "anon-key",
-      });
-
-      const response = await fetch(url, { headers });
-
-      popupLog("loadStats:response", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => null);
-
-        popupWarn("loadStats:response:not-ok", {
-          status: response.status,
-          statusText: response.statusText,
-          responseTextPreview: responseText ? responseText.slice(0, 500) : null,
-        });
-
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const companies = await response.json();
-
-      popupLog("loadStats:companies", {
-        count: companies.length,
-        firstRow: companies[0] || null,
-      });
-
-      this.lastSyncedAt = companies.find((row) => row.last_synced_at)?.last_synced_at || null;
-      this.stats = {
-        totalCompanies: companies.length,
-        warningCount: companies.filter((row) => row.compliance_status === "WARNING").length,
-        criticalCount: companies.filter((row) => row.compliance_status === "CRITICAL").length,
-      };
-      this.systemStatus = "Veri servisi hazir";
-
-      popupLog("loadStats:computed", {
-        stats: this.stats,
-        lastSyncedAt: this.lastSyncedAt,
-        systemStatus: this.systemStatus,
-      });
-
-      await this.extension.storage.local.set({
-        stats: this.stats,
-        extensionLastSyncedAt: this.lastSyncedAt,
-      });
-
-      popupLog("loadStats:storage-cache-set:done");
-    } catch (error) {
-      this.systemStatus = "Veri servisi kontrol edilmeli";
-
-      popupError("loadStats:error", error, {
-        systemStatus: this.systemStatus,
-      });
-
-      console.error("Stats yuklenemedi:", error?.message || error);
-
-      const cached = await this.extension.storage.local.get(["stats", "extensionLastSyncedAt"]);
-
-      popupLog("loadStats:cached-result", {
-        hasCachedStats: Boolean(cached.stats),
-        cachedStats: cached.stats || null,
-        cachedLastSyncedAt: cached.extensionLastSyncedAt || null,
-      });
-
-      if (cached.stats) this.stats = cached.stats;
-      if (cached.extensionLastSyncedAt) this.lastSyncedAt = cached.extensionLastSyncedAt;
-    }
-  }
-
-  updateStatsUI() {
-    popupLog("updateStatsUI:start", {
-      stats: this.stats,
-    });
-
-    const totalEl = document.getElementById("totalCompanies");
-    const warningEl = document.getElementById("warningCount");
-    const criticalEl = document.getElementById("criticalCount");
-
-    popupLog("updateStatsUI:dom-check", {
-      hasTotalEl: Boolean(totalEl),
-      hasWarningEl: Boolean(warningEl),
-      hasCriticalEl: Boolean(criticalEl),
-    });
-
-    if (totalEl) totalEl.textContent = String(this.stats.totalCompanies ?? 0);
-    if (warningEl) warningEl.textContent = String(this.stats.warningCount ?? 0);
-    if (criticalEl) criticalEl.textContent = String(this.stats.criticalCount ?? 0);
-
-    popupLog("updateStatsUI:done");
-  }
-
-  async renderUserProfile() {
-    popupLog("renderUserProfile:start");
-
-    const storage = await this.extension.storage.local.get("denetron_auth");
-    const user = storage.denetron_auth?.user || null;
-
-    popupLog("renderUserProfile:storage-result", {
-      hasUser: Boolean(user),
-      userId: user?.id || null,
-      userEmail: user?.email || null,
-    });
-
-    const fullName =
-      user?.user_metadata?.full_name ||
-      user?.user_metadata?.name ||
-      user?.full_name ||
-      user?.email ||
-      "ISGVizyon Kullanicisi";
-
-    const email = user?.email || user?.user_metadata?.email || "Hesap bilgisi alinamadi";
-    const avatarLetter = String(fullName).trim().charAt(0).toUpperCase() || "I";
-
-    const nameEl = document.getElementById("userName");
-    const emailEl = document.getElementById("userEmail");
-    const avatarEl = document.getElementById("userAvatar");
-
-    popupLog("renderUserProfile:dom-check", {
-      hasNameEl: Boolean(nameEl),
-      hasEmailEl: Boolean(emailEl),
-      hasAvatarEl: Boolean(avatarEl),
-      fullName,
-      email,
-      avatarLetter,
-    });
-
-    if (nameEl) nameEl.textContent = fullName;
-    if (emailEl) emailEl.textContent = email;
-    if (avatarEl) avatarEl.textContent = avatarLetter;
-
-    popupLog("renderUserProfile:done");
-  }
-
-  formatDateLabel(value) {
-    popupLog("formatDateLabel:start", {
-      value,
-    });
-
-    if (!value) {
-      popupLog("formatDateLabel:return:no-value");
-      return "Henüz senkron yok";
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-      popupWarn("formatDateLabel:return:invalid-date", {
-        value,
-      });
-      return "Tarih alinamadi";
-    }
-
-    const result = date.toLocaleString("tr-TR", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-
-    popupLog("formatDateLabel:return", {
-      result,
-    });
-
-    return result;
-  }
-
-  async checkServiceHealth() {
-    popupLog("checkServiceHealth:start", {
-      supabaseUrl: this.supabaseUrl,
-    });
-
-    try {
-      const response = await fetch(`${this.supabaseUrl}/rest/v1/`, {
-        method: "GET",
-        headers: {
-          apikey: this.supabaseKey,
-          Authorization: `Bearer ${this.supabaseKey}`,
-        },
-      });
+      );
 
       popupLog("checkServiceHealth:response", {
         ok: response.ok,
@@ -1113,132 +622,558 @@ class PopupController {
         statusText: response.statusText,
       });
 
-      if (response.ok || response.status === 401 || response.status === 404) {
-        popupLog("checkServiceHealth:return:Hazir");
-        return "Hazir";
-      }
-
-      const result = `Kontrol gerekli (${response.status})`;
-
-      popupWarn("checkServiceHealth:return:kontrol-gerekli", {
-        result,
-      });
-
-      return result;
-    } catch (error) {
-      popupError("checkServiceHealth:error", error);
-      return "Yanit vermiyor";
+      if (response.ok) return "Hazır";
+      return `Kontrol gerekli (${response.status})`;
+    } catch (_error) {
+      return "Yanıt vermiyor";
     }
   }
 
-  async renderStatusPanel() {
-    popupLog("renderStatusPanel:start");
+  buildDashboardStats(companies) {
+    const rows = Array.isArray(companies) ? companies : [];
+    const totalCompanies = rows.length;
 
-    const lastSyncEl = document.getElementById("lastSyncValue");
-    const orgEl = document.getElementById("organizationValue");
-    const serviceEl = document.getElementById("serviceStatusValue");
+    const compliantCount = rows.filter((row) => row.compliance_status === "COMPLIANT").length;
+    const warningCount = rows.filter((row) => row.compliance_status === "WARNING").length;
+    const criticalCount = rows.filter((row) => row.compliance_status === "CRITICAL").length;
+    const excessCount = rows.filter((row) => row.compliance_status === "EXCESS").length;
+    const unknownCount = rows.filter((row) => !row.compliance_status || row.compliance_status === "UNKNOWN").length;
 
-    popupLog("renderStatusPanel:dom-check", {
-      hasLastSyncEl: Boolean(lastSyncEl),
-      hasOrgEl: Boolean(orgEl),
-      hasServiceEl: Boolean(serviceEl),
-      lastSyncedAt: this.lastSyncedAt,
-      orgId: this.orgId,
-    });
+    const totalEmployees = rows.reduce((sum, row) => sum + Number(row.employee_count || 0), 0);
+    const totalAssignedMinutes = rows.reduce((sum, row) => sum + Number(row.assigned_minutes || 0), 0);
+    const totalRequiredMinutes = rows.reduce((sum, row) => sum + Number(row.required_minutes || 0), 0);
 
-    if (lastSyncEl) lastSyncEl.textContent = this.formatDateLabel(this.lastSyncedAt);
-    if (orgEl) orgEl.textContent = this.orgId || "Organizasyon bekleniyor";
+    const riskScores = rows
+      .map((row) => Number(row.risk_score || 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
 
-    if (serviceEl) {
-      popupLog("renderStatusPanel:checkServiceHealth:start");
-      serviceEl.textContent = await this.checkServiceHealth();
-      popupLog("renderStatusPanel:checkServiceHealth:done", {
-        text: serviceEl.textContent,
-      });
-    }
+    const averageRiskScore =
+      riskScores.length > 0
+        ? Math.round(riskScores.reduce((sum, value) => sum + value, 0) / riskScores.length)
+        : 0;
 
-    popupLog("renderStatusPanel:done");
+    const now = Date.now();
+    const nextThirtyDays = now + 30 * 24 * 60 * 60 * 1000;
+
+    const expiringContractsCount = rows.filter((row) => {
+      if (!row.contract_end) return false;
+      const time = new Date(row.contract_end).getTime();
+      return Number.isFinite(time) && time >= now && time <= nextThirtyDays;
+    }).length;
+
+    const highRiskCount = rows.filter((row) => Number(row.risk_score || 0) >= 70).length;
+
+    const minuteCoverage =
+      totalRequiredMinutes > 0
+        ? Math.round((totalAssignedMinutes / totalRequiredMinutes) * 100)
+        : 0;
+
+    return {
+      totalCompanies,
+      compliantCount,
+      warningCount,
+      criticalCount,
+      excessCount,
+      unknownCount,
+      totalEmployees,
+      totalAssignedMinutes,
+      totalRequiredMinutes,
+      averageRiskScore,
+      expiringContractsCount,
+      highRiskCount,
+      minuteCoverage,
+    };
   }
 
-  async loadActivities() {
-    popupLog("loadActivities:start");
+  async loadDashboardData() {
+    popupLog("loadDashboardData:start");
 
-    const list = document.getElementById("activityList");
+    const { accessToken, orgId, user } = await this.getAuthContext();
 
-    popupLog("loadActivities:dom-check", {
-      hasList: Boolean(list),
-    });
+    this.userProfile = {
+      id: user?.id || null,
+      email: user?.email || user?.user_metadata?.email || null,
+      fullName:
+        user?.user_metadata?.full_name ||
+        user?.user_metadata?.name ||
+        user?.email ||
+        "ISGVizyon Kullanıcısı",
+    };
 
-    if (!list) return;
-
-    const items = [];
-
-    if (this.lastSyncedAt) items.push(`Son senkron ${this.formatDateLabel(this.lastSyncedAt)}`);
-    if (this.stats.totalCompanies > 0) items.push(`${this.stats.totalCompanies} firma goruntuleniyor`);
-    if (this.stats.criticalCount > 0) items.push(`${this.stats.criticalCount} kritik kayit takip bekliyor`);
-
-    popupLog("loadActivities:items", {
-      count: items.length,
-      items,
-    });
-
-    if (items.length === 0) {
-      list.innerHTML = '<div class="empty-state">Henüz işlem yok</div>';
-      popupLog("loadActivities:render-empty");
+    if (!orgId) {
+      this.systemStatus = "Organizasyon bekleniyor";
+      this.serviceHealth = "Beklemede";
+      this.companies = [];
+      this.stats = this.buildDashboardStats([]);
       return;
     }
 
-    list.innerHTML = items
+    try {
+      if (!this.organizationName) {
+        this.organizationName = await this.fetchOrganizationName(orgId, accessToken);
+      }
+
+      const [companies, serviceHealth] = await Promise.all([
+        this.fetchCompanies(orgId, accessToken),
+        this.checkServiceHealth(accessToken),
+      ]);
+
+      this.companies = companies;
+      this.stats = this.buildDashboardStats(companies);
+      this.lastSyncedAt = companies.find((row) => row.last_synced_at)?.last_synced_at || null;
+      this.serviceHealth = serviceHealth;
+      this.systemStatus = companies.length > 0 ? "Veri servisi hazır" : "Firma verisi bekleniyor";
+
+      await this.extension.storage.local.set({
+        orgId: this.orgId,
+        userId: this.userId,
+        organizationName: this.organizationName,
+        stats: this.stats,
+        companiesPreview: companies.slice(0, 50),
+        extensionLastSyncedAt: this.lastSyncedAt,
+      });
+
+      popupLog("loadDashboardData:done", {
+        organizationName: this.organizationName,
+        stats: this.stats,
+        companyCount: companies.length,
+        serviceHealth,
+      });
+    } catch (error) {
+      popupWarn("loadDashboardData:error", {
+        message: error?.message || String(error),
+      });
+
+      this.systemStatus = "Veri servisi kontrol edilmeli";
+      this.serviceHealth = "Kontrol gerekli";
+
+      const cached = await this.extension.storage.local.get([
+        "companiesPreview",
+        "extensionLastSyncedAt",
+        "organizationName",
+      ]);
+
+      this.companies = Array.isArray(cached.companiesPreview) ? cached.companiesPreview : [];
+      this.stats = this.buildDashboardStats(this.companies);
+      this.lastSyncedAt = cached.extensionLastSyncedAt || null;
+      this.organizationName = cached.organizationName || this.organizationName || null;
+    }
+  }
+
+  getComplianceLabel(status) {
+    switch (status) {
+      case "COMPLIANT":
+        return "Uyumlu";
+      case "WARNING":
+        return "Uyarı";
+      case "CRITICAL":
+        return "Kritik";
+      case "EXCESS":
+        return "Fazla Süre";
+      default:
+        return "Bilinmiyor";
+    }
+  }
+
+  getComplianceClass(status) {
+    switch (status) {
+      case "COMPLIANT":
+        return "is-success";
+      case "WARNING":
+        return "is-warning";
+      case "CRITICAL":
+        return "is-danger";
+      case "EXCESS":
+        return "is-info";
+      default:
+        return "is-muted";
+    }
+  }
+
+  getRiskLabel(score) {
+    const value = Number(score || 0);
+
+    if (value >= 80) return "Çok Yüksek";
+    if (value >= 60) return "Yüksek";
+    if (value >= 35) return "Orta";
+    if (value > 0) return "Düşük";
+    return "Belirsiz";
+  }
+
+  formatDateLabel(value) {
+    if (!value) return "Henüz senkron yok";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "Tarih alınamadı";
+    }
+
+    return date.toLocaleString("tr-TR", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  }
+
+  formatShortDate(value) {
+    if (!value) return "Yok";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) return "Yok";
+
+    return date.toLocaleDateString("tr-TR", {
+      day: "2-digit",
+      month: "short",
+    });
+  }
+
+  renderProfessionalDashboard() {
+    const stats = this.stats || this.buildDashboardStats([]);
+    const companies = Array.isArray(this.companies) ? this.companies : [];
+
+    const organizationLabel = this.organizationName || "ISGVizyon Organizasyonu";
+    const userName = this.userProfile?.fullName || "ISGVizyon Kullanıcısı";
+    const userEmail = this.userProfile?.email || "Oturum aktif";
+    const avatarLetter = String(userName || "I").trim().charAt(0).toUpperCase() || "I";
+    const lastSyncLabel = this.formatDateLabel(this.lastSyncedAt);
+
+    const topCompanies = companies.slice(0, 12);
+
+    const companyRows =
+      topCompanies.length > 0
+        ? topCompanies
+            .map((company) => {
+              const statusClass = this.getComplianceClass(company.compliance_status);
+              const statusLabel = this.getComplianceLabel(company.compliance_status);
+              const riskScore = Number(company.risk_score || 0);
+              const employeeCount = Number(company.employee_count || 0);
+              const required = Number(company.required_minutes || 0);
+              const assigned = Number(company.assigned_minutes || 0);
+              const companyName = company.company_name || "İsimsiz firma";
+
+              return `
+                <div class="company-row" title="${escapeHtml(companyName)}">
+                  <div class="company-main">
+                    <div class="company-title">${escapeHtml(companyName)}</div>
+                    <div class="company-meta">
+                      <span>${escapeHtml(company.hazard_class || "Tehlike sınıfı yok")}</span>
+                      <span>•</span>
+                      <span>${employeeCount} çalışan</span>
+                      <span>•</span>
+                      <span>${assigned}/${required} dk</span>
+                    </div>
+                    <div class="company-submeta">
+                      <span>SGK: ${escapeHtml(company.sgk_no || "-")}</span>
+                      <span>Bitiş: ${escapeHtml(this.formatShortDate(company.contract_end))}</span>
+                    </div>
+                  </div>
+
+                  <div class="company-side">
+                    <span class="status-pill ${statusClass}">${statusLabel}</span>
+                    <span class="risk-mini">Risk ${riskScore} · ${escapeHtml(this.getRiskLabel(riskScore))}</span>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")
+        : `
+          <div class="empty-premium">
+            <strong>Henüz firma listesi görüntülenemedi.</strong>
+            <span>İSG-KATİP üzerinden senkron başlatın veya verileri yenileyin.</span>
+          </div>
+        `;
+
+    const activities = this.buildActivityItems(stats, companies, userName, lastSyncLabel)
       .map(
-        (item) =>
-          `<div class="activity-item"><span class="activity-bullet"></span><span>${item}</span></div>`
+        (item) => `
+          <div class="activity-premium ${escapeHtml(item.type)}">
+            <span class="activity-dot"></span>
+            <div>
+              <div class="activity-title">${escapeHtml(item.title)}</div>
+              <div class="activity-text">${escapeHtml(item.text)}</div>
+            </div>
+          </div>
+        `
       )
       .join("");
 
-    popupLog("loadActivities:done");
+    document.body.innerHTML = `
+      <main class="premium-popup">
+        <section class="premium-hero">
+          <div class="hero-brand">
+            <div class="brand-orb">İ</div>
+            <div>
+              <div class="brand-title">ISGVizyon</div>
+              <div class="brand-subtitle">İSG Bot Uzantısı</div>
+            </div>
+          </div>
+
+          <button id="btnLogout" class="ghost-icon-button" title="Çıkış yap">Çıkış</button>
+        </section>
+
+        <section class="session-card">
+          <div class="session-avatar">${escapeHtml(avatarLetter)}</div>
+          <div class="session-content">
+            <div class="session-kicker">Oturum Kartı</div>
+            <div class="session-name">${escapeHtml(userName)}</div>
+            <div class="session-email">${escapeHtml(userEmail)}</div>
+          </div>
+          <div class="session-status">
+            <span></span>
+            Aktif
+          </div>
+        </section>
+
+        <section class="system-grid">
+          <div class="system-card wide">
+            <div class="system-label">Bağlı organizasyon</div>
+            <div class="system-value">${escapeHtml(organizationLabel)}</div>
+          </div>
+
+          <div class="system-card">
+            <div class="system-label">Son senkron zamanı</div>
+            <div class="system-value">${escapeHtml(lastSyncLabel)}</div>
+          </div>
+
+          <div class="system-card">
+            <div class="system-label">Sistem durumu</div>
+            <div class="system-value status-ready">${escapeHtml(this.serviceHealth || this.systemStatus || "Hazır")}</div>
+          </div>
+        </section>
+
+        <section class="premium-stats">
+          <div class="premium-stat primary">
+            <div class="stat-topline">Toplam Firma</div>
+            <div class="stat-number">${stats.totalCompanies ?? 0}</div>
+            <div class="stat-caption">${stats.totalEmployees ?? 0} çalışan</div>
+          </div>
+
+          <div class="premium-stat success">
+            <div class="stat-topline">Uyumlu</div>
+            <div class="stat-number">${stats.compliantCount ?? 0}</div>
+            <div class="stat-caption">Kontrol altında</div>
+          </div>
+
+          <div class="premium-stat warning">
+            <div class="stat-topline">Uyarı</div>
+            <div class="stat-number">${stats.warningCount ?? 0}</div>
+            <div class="stat-caption">Takip önerilir</div>
+          </div>
+
+          <div class="premium-stat danger">
+            <div class="stat-topline">Kritik</div>
+            <div class="stat-number">${stats.criticalCount ?? 0}</div>
+            <div class="stat-caption">Aksiyon gerekli</div>
+          </div>
+        </section>
+
+        <section class="insight-row">
+          <div class="insight-card">
+            <div class="insight-label">Ortalama risk</div>
+            <div class="insight-value">${stats.averageRiskScore ?? 0}</div>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-label">Dakika karşılama</div>
+            <div class="insight-value">${stats.minuteCoverage ?? 0}%</div>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-label">Yaklaşan bitiş</div>
+            <div class="insight-value">${stats.expiringContractsCount ?? 0}</div>
+          </div>
+        </section>
+
+        <section class="coverage-card">
+          <div class="coverage-head">
+            <span>Dakika karşılama oranı</span>
+            <strong>${stats.totalAssignedMinutes ?? 0}/${stats.totalRequiredMinutes ?? 0} dk</strong>
+          </div>
+          <div class="coverage-track">
+            <div class="coverage-fill" style="width:${Math.max(0, Math.min(100, stats.minuteCoverage || 0))}%"></div>
+          </div>
+        </section>
+
+        <section class="actions-premium">
+          <button id="btnSync" class="primary-action">Verileri Yenile</button>
+
+          <div class="secondary-actions">
+            <button id="btnOpenDashboard" class="secondary-action">Paneli Aç</button>
+            <button id="btnSyncISGKatip" class="secondary-action">İSG-KATİP</button>
+          </div>
+        </section>
+
+        <section class="companies-card">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Çekilen Firmalar</div>
+              <div class="section-subtitle">İSG-KATİP entegrasyonundan gelen son kayıtlar</div>
+            </div>
+            <span class="section-count">${companies.length}</span>
+          </div>
+
+          <div class="company-list">
+            ${companyRows}
+          </div>
+        </section>
+
+        <section class="activity-card">
+          <div class="section-head compact">
+            <div>
+              <div class="section-title">Aktivite ve Aksiyonlar</div>
+              <div class="section-subtitle">Kısa durum özeti ve öncelikler</div>
+            </div>
+          </div>
+
+          <div class="activity-list-premium">
+            ${activities}
+          </div>
+        </section>
+      </main>
+    `;
+
+    this.bindDashboardEvents();
+
+    popupLog("renderProfessionalDashboard:done", {
+      companyCount: companies.length,
+      stats,
+    });
   }
 
-  async handleSync() {
-    popupLog("handleSync:start");
+  buildActivityItems(stats, companies, userName, lastSyncLabel) {
+    const items = [
+      {
+        type: "success",
+        title: "Oturum aktif",
+        text: `${userName} hesabı uzantıya bağlı.`,
+      },
+    ];
 
-    const btn = document.getElementById("btnSync");
+    if (this.lastSyncedAt) {
+      items.push({
+        type: "info",
+        title: "Son senkron",
+        text: `${lastSyncLabel} tarihinde ${stats.totalCompanies || 0} firma görüntülendi.`,
+      });
+    } else {
+      items.push({
+        type: "warning",
+        title: "Senkron bekleniyor",
+        text: "Henüz başarılı firma senkronu görünmüyor.",
+      });
+    }
 
-    popupLog("handleSync:dom-check", {
-      hasBtn: Boolean(btn),
+    if ((stats.criticalCount || 0) > 0) {
+      items.push({
+        type: "danger",
+        title: "Kritik takip",
+        text: `${stats.criticalCount} firma kritik uyum durumunda.`,
+      });
+    }
+
+    if ((stats.warningCount || 0) > 0) {
+      items.push({
+        type: "warning",
+        title: "Uyarıdaki firmalar",
+        text: `${stats.warningCount} firma uyarı seviyesinde izleniyor.`,
+      });
+    }
+
+    if ((stats.expiringContractsCount || 0) > 0) {
+      items.push({
+        type: "warning",
+        title: "Yaklaşan sözleşme bitişi",
+        text: `${stats.expiringContractsCount} sözleşme 30 gün içinde bitiyor.`,
+      });
+    }
+
+    if ((stats.totalCompanies || 0) > 0 && companies.length > 0) {
+      items.push({
+        type: "info",
+        title: "Firma listesi hazır",
+        text: `${companies.length} firma kayıt olarak listeleniyor.`,
+      });
+    }
+
+    return items.slice(0, 7);
+  }
+
+  bindDashboardEvents() {
+    document.getElementById("btnLogout")?.addEventListener("click", () => this.handleLogout());
+
+    document.getElementById("btnSync")?.addEventListener("click", async () => {
+      const button = document.getElementById("btnSync");
+      const originalText = button?.textContent || "Verileri Yenile";
+
+      try {
+        if (button) {
+          button.disabled = true;
+          button.textContent = "Yenileniyor...";
+        }
+
+        await this.loadDashboardData();
+        this.renderProfessionalDashboard();
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalText;
+        }
+      }
     });
 
-    if (!btn) return;
+    document.getElementById("btnOpenDashboard")?.addEventListener("click", () => {
+      this.extension.tabs.create({ url: `${WEB_APP_URL}/isg-bot` });
+    });
 
-    const original = btn.innerHTML;
+    document.getElementById("btnSyncISGKatip")?.addEventListener("click", async () => {
+      await this.handleISGKatipSync();
+    });
+  }
+
+  async handleLogout() {
+    popupLog("handleLogout:start");
+    await this.authHandler.clearAuth();
+    window.location.reload();
+  }
+
+  async handleISGKatipSync() {
+    popupLog("handleISGKatipSync:start", {
+      targetUrl: ISGKATIP_URL,
+    });
 
     try {
-      btn.disabled = true;
-      btn.innerHTML = "Senkronize ediliyor...";
+      const tabs = await this.extension.tabs.query({
+        url: "https://isgkatip.csgb.gov.tr/*",
+      });
 
-      popupLog("handleSync:sendMessage:SYNC_NOW:start");
-      await this.extension.runtime.sendMessage({ type: "SYNC_NOW" });
-      popupLog("handleSync:sendMessage:SYNC_NOW:done");
+      if (tabs.length > 0) {
+        const tab = tabs[0];
+        const currentUrl = tab.url || "";
 
-      await this.loadStats();
-      await this.renderStatusPanel();
-      await this.loadActivities();
+        await this.extension.tabs.update(tab.id, { active: true });
+        await this.extension.windows.update(tab.windowId, { focused: true });
 
-      this.updateStatsUI();
+        if (!currentUrl.includes("/kisi-kurum/kisi-karti/kisi-kartim")) {
+          await this.extension.tabs.update(tab.id, { url: ISGKATIP_URL });
+        } else {
+          this.extension.notifications.create({
+            type: "basic",
+            iconUrl: "/assets/icon-128.png",
+            title: "ISGVizyon İSG Bot",
+            message: 'Sağ alttaki "Verileri ISGVizyon\'a Aktar" butonuna tıklayın.',
+            priority: 1,
+          });
+        }
+      } else {
+        await this.extension.tabs.create({ url: ISGKATIP_URL });
+      }
 
-      btn.innerHTML = "Tamamlandi";
-
-      popupLog("handleSync:done");
+      window.close();
     } catch (error) {
-      popupError("handleSync:error", error);
-      console.error("Senkron hatasi:", error);
-      btn.innerHTML = "Hata";
-    } finally {
-      setTimeout(() => {
-        btn.innerHTML = original;
-        btn.disabled = false;
-
-        popupLog("handleSync:button-restored");
-      }, 1800);
+      popupError("handleISGKatipSync:error", error);
+      this.extension.tabs.create({ url: ISGKATIP_URL });
+      window.close();
     }
   }
 }
@@ -1248,22 +1183,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const controller = new PopupController();
 
-  popupLog("controller:init:start");
-
   controller.init().catch((error) => {
     popupError("controller:init:catch", error);
-
-    console.error("Popup init hatasi:", error);
 
     const loadingScreen = document.getElementById("loadingScreen");
     const authScreen = document.getElementById("authScreen");
     const subtitle = document.querySelector(".subtitle");
-
-    popupLog("controller:init:catch:dom-check", {
-      hasLoadingScreen: Boolean(loadingScreen),
-      hasAuthScreen: Boolean(authScreen),
-      hasSubtitle: Boolean(subtitle),
-    });
 
     if (loadingScreen) loadingScreen.style.display = "none";
     if (authScreen) authScreen.style.display = "flex";
@@ -1271,7 +1196,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (subtitle) {
       subtitle.textContent =
         error?.message ||
-        "Eklenti baslatilamadi. Eklentiyi yeniden yukleyip tekrar deneyin.";
+        "Eklenti başlatılamadı. Eklentiyi yeniden yükleyip tekrar deneyin.";
     }
 
     if (!authScreen) {

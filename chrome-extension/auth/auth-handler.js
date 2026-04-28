@@ -139,82 +139,151 @@ export class AuthHandler {
   }
 
   normalizeAuthPayload(authData) {
-    authLog("normalizeAuthPayload:start", {
-      hasAuthData: Boolean(authData),
-      hasDirectAccessToken: Boolean(authData?.accessToken),
-      hasDirectRefreshToken: Boolean(authData?.refreshToken),
-      hasSession: Boolean(authData?.session),
-      session: safeSessionSummary(authData?.session),
-      hasUser: Boolean(authData?.user),
-      userId: authData?.user?.id || authData?.session?.user?.id || null,
-      userEmail: authData?.user?.email || authData?.session?.user?.email || null,
+  authLog("normalizeAuthPayload:start", {
+    hasAuthData: Boolean(authData),
+    hasDirectCamelAccessToken: Boolean(authData?.accessToken),
+    hasDirectCamelRefreshToken: Boolean(authData?.refreshToken),
+    hasDirectSnakeAccessToken: Boolean(authData?.access_token),
+    hasDirectSnakeRefreshToken: Boolean(authData?.refresh_token),
+    hasSession: Boolean(authData?.session),
+    sessionHasAccessToken: Boolean(authData?.session?.access_token),
+    hasUser: Boolean(authData?.user || authData?.session?.user),
+    userId: authData?.user?.id || authData?.session?.user?.id || null,
+  });
+
+  if (!authData) return null;
+
+  if (authData.accessToken && authData.refreshToken) {
+    const normalized = {
+      ...authData,
+      expiresAt:
+        authData.expiresAt ||
+        (authData.expires_at ? authData.expires_at * 1000 : null) ||
+        (authData.expiresIn ? Date.now() + authData.expiresIn * 1000 : null) ||
+        Date.now() + 60 * 60 * 1000,
+    };
+
+    authLog("normalizeAuthPayload:return:camel-direct", {
+      userId: normalized.user?.id || null,
+      hasAccessToken: Boolean(normalized.accessToken),
+      hasRefreshToken: Boolean(normalized.refreshToken),
+      expiresAt: normalized.expiresAt,
     });
 
-    if (!authData) {
-      authLog("normalizeAuthPayload:return:null:no-auth-data");
-      return null;
-    }
+    return normalized;
+  }
 
-    if (authData.accessToken && authData.refreshToken) {
-      authLog("normalizeAuthPayload:return:direct-token-payload", {
-        normalized: safeAuthSummary(authData),
+  if (authData.access_token && authData.refresh_token) {
+    const expiresAt =
+      authData.expiresAt ||
+      (authData.expires_at ? authData.expires_at * 1000 : null) ||
+      (authData.expires_in ? Date.now() + authData.expires_in * 1000 : null) ||
+      Date.now() + 60 * 60 * 1000;
+
+    const normalized = {
+      accessToken: authData.access_token,
+      refreshToken: authData.refresh_token,
+      expiresAt,
+      user: authData.user || null,
+      session: authData,
+    };
+
+    authLog("normalizeAuthPayload:return:snake-direct", {
+      userId: normalized.user?.id || null,
+      hasAccessToken: Boolean(normalized.accessToken),
+      hasRefreshToken: Boolean(normalized.refreshToken),
+      expiresAt: normalized.expiresAt,
+    });
+
+    return normalized;
+  }
+
+  if (authData.session?.access_token) {
+    const expiresAt =
+      authData.expiresAt ||
+      (authData.session.expires_at ? authData.session.expires_at * 1000 : null) ||
+      (authData.session.expires_in ? Date.now() + authData.session.expires_in * 1000 : null) ||
+      Date.now() + 60 * 60 * 1000;
+
+    const normalized = {
+      accessToken: authData.session.access_token,
+      refreshToken: authData.session.refresh_token,
+      expiresAt,
+      user: authData.user || authData.session.user || null,
+      session: authData.session,
+    };
+
+    authLog("normalizeAuthPayload:return:session-payload", {
+      userId: normalized.user?.id || null,
+      hasAccessToken: Boolean(normalized.accessToken),
+      hasRefreshToken: Boolean(normalized.refreshToken),
+      expiresAt: normalized.expiresAt,
+    });
+
+    return normalized;
+  }
+
+  authLog("normalizeAuthPayload:return:raw-auth-data");
+
+  return authData;
+}
+
+  async getAuth() {
+  authLog("getAuth:start", {
+    storageKey: this.storageKey,
+  });
+
+  try {
+    const result = await this.extension.storage.local.get([this.storageKey]);
+    const auth = result[this.storageKey] || null;
+
+    authLog("getAuth:storage-result", {
+      storageKeys: Object.keys(result || {}),
+      exists: Boolean(auth),
+      hasAccessToken: Boolean(auth?.accessToken || auth?.access_token || auth?.session?.access_token),
+      hasRefreshToken: Boolean(auth?.refreshToken || auth?.refresh_token || auth?.session?.refresh_token),
+      hasUser: Boolean(auth?.user || auth?.session?.user),
+      userId: auth?.user?.id || auth?.session?.user?.id || null,
+      expiresAt: auth?.expiresAt || auth?.expires_at || null,
+    });
+
+    if (!auth) return null;
+
+    const normalized = this.normalizeAuthPayload(auth);
+
+    if (
+      normalized &&
+      (
+        !auth.accessToken ||
+        !auth.refreshToken ||
+        !auth.expiresAt
+      )
+    ) {
+      authLog("getAuth:migrating-stored-auth-to-normalized-format", {
+        userId: normalized.user?.id || null,
+        hasAccessToken: Boolean(normalized.accessToken),
+        hasRefreshToken: Boolean(normalized.refreshToken),
+        expiresAt: normalized.expiresAt,
       });
 
-      return authData;
-    }
-
-    if (authData.session?.access_token) {
-      const expiresAt =
-        authData.expiresAt ||
-        (authData.session.expires_at ? authData.session.expires_at * 1000 : null) ||
-        Date.now() + 60 * 60 * 1000;
-
-      const normalized = {
-        accessToken: authData.session.access_token,
-        refreshToken: authData.session.refresh_token,
-        expiresAt,
-        user: authData.user || authData.session.user || null,
-        session: authData.session,
-      };
-
-      authLog("normalizeAuthPayload:return:session-payload", {
-        normalized: safeAuthSummary(normalized),
+      await this.extension.storage.local.set({
+        [this.storageKey]: normalized,
+        userId: normalized.user?.id || null,
       });
 
       return normalized;
     }
 
-    authLog("normalizeAuthPayload:return:raw-auth-data", {
-      normalized: safeAuthSummary(authData),
+    return normalized;
+  } catch (error) {
+    authLog("getAuth:error", {
+      error: safeError(error),
     });
 
-    return authData;
+    console.error("Get auth error:", error);
+    return null;
   }
-
-  async getAuth() {
-    authLog("getAuth:start", {
-      storageKey: this.storageKey,
-    });
-
-    try {
-      const result = await this.extension.storage.local.get([this.storageKey]);
-      const auth = result[this.storageKey] || null;
-
-      authLog("getAuth:storage-result", {
-        storageKeys: Object.keys(result || {}),
-        auth: safeAuthSummary(auth),
-      });
-
-      return auth;
-    } catch (error) {
-      authLog("getAuth:error", {
-        error: safeError(error),
-      });
-
-      console.error("Get auth error:", error);
-      return null;
-    }
-  }
+}
 
   async saveAuth(authData) {
     authLog("saveAuth:start", {
@@ -357,39 +426,52 @@ export class AuthHandler {
     try {
       const auth = await this.getAuth();
 
-      authLog("isAuthenticated:auth-result", {
-        auth: safeAuthSummary(auth),
-      });
-
       if (!auth) {
         authLog("isAuthenticated:return:false:no-auth");
         return false;
       }
 
-      if (!auth.expiresAt) {
-        authLog("isAuthenticated:return:false:no-expiresAt", {
-          auth: safeAuthSummary(auth),
-        });
+      const accessToken = auth.accessToken || auth.session?.access_token || auth.access_token || null;
+      const refreshToken = auth.refreshToken || auth.session?.refresh_token || auth.refresh_token || null;
+      const user = auth.user || auth.session?.user || null;
+      const expiresAt =
+        auth.expiresAt ||
+        (auth.expires_at ? auth.expires_at * 1000 : null) ||
+        null;
 
+      authLog("isAuthenticated:normalized-check", {
+        hasAccessToken: Boolean(accessToken),
+        hasRefreshToken: Boolean(refreshToken),
+        hasUser: Boolean(user),
+        userId: user?.id || null,
+        expiresAt,
+        expired: expiresAt ? Date.now() >= expiresAt : null,
+      });
+
+      if (!accessToken || !user?.id) {
+        authLog("isAuthenticated:return:false:missing-token-or-user");
         return false;
       }
 
-      if (Date.now() >= auth.expiresAt) {
-        authLog("isAuthenticated:token-expired:refreshToken:start", {
-          auth: safeAuthSummary(auth),
+      if (expiresAt && Date.now() >= expiresAt) {
+        if (!refreshToken) {
+          authLog("isAuthenticated:return:false:expired-no-refresh-token");
+          return false;
+        }
+
+        authLog("isAuthenticated:expired-refreshing");
+
+        const refreshed = await this.refreshToken();
+
+        authLog("isAuthenticated:refresh-result", {
+          refreshed,
         });
 
-        const refreshResult = await this.refreshToken();
-
-        authLog("isAuthenticated:token-expired:refreshToken:done", {
-          refreshResult,
-        });
-
-        return refreshResult;
+        return refreshed;
       }
 
       authLog("isAuthenticated:return:true", {
-        expiresInMs: auth.expiresAt - Date.now(),
+        userId: user.id,
       });
 
       return true;
@@ -531,79 +613,59 @@ export class AuthHandler {
   }
 
   async getAccessToken() {
-    authLog("getAccessToken:start");
+  authLog("getAccessToken:start");
 
-    try {
-      const auth = await this.getAuth();
+  try {
+    const auth = await this.getAuth();
 
-      authLog("getAccessToken:auth-result", {
-        auth: safeAuthSummary(auth),
-      });
-
-      if (!auth) {
-        authLog("getAccessToken:return:null:no-auth");
-        return null;
-      }
-
-      if (!auth.expiresAt) {
-        authLog("getAccessToken:return:null:no-expiresAt", {
-          auth: safeAuthSummary(auth),
-        });
-
-        return null;
-      }
-
-      const shouldRefresh = Date.now() >= auth.expiresAt - 5 * 60 * 1000;
-
-      authLog("getAccessToken:refresh-check", {
-        shouldRefresh,
-        refreshThresholdMs: 5 * 60 * 1000,
-        expiresAt: auth.expiresAt,
-        expiresAtIso: new Date(auth.expiresAt).toISOString(),
-        now: Date.now(),
-        nowIso: new Date().toISOString(),
-        msUntilExpiry: auth.expiresAt - Date.now(),
-      });
-
-      if (shouldRefresh) {
-        authLog("getAccessToken:refreshToken:start");
-
-        const refreshResult = await this.refreshToken();
-
-        authLog("getAccessToken:refreshToken:done", {
-          refreshResult,
-        });
-
-        const nextAuth = await this.getAuth();
-
-        authLog("getAccessToken:next-auth-after-refresh", {
-          auth: safeAuthSummary(nextAuth),
-        });
-
-        const nextAccessToken = nextAuth?.accessToken || null;
-
-        authLog("getAccessToken:return:after-refresh", {
-          hasAccessToken: Boolean(nextAccessToken),
-          accessTokenMasked: maskValue(nextAccessToken),
-        });
-
-        return nextAccessToken;
-      }
-
-      authLog("getAccessToken:return:current-token", {
-        hasAccessToken: Boolean(auth.accessToken),
-        accessTokenMasked: maskValue(auth.accessToken),
-      });
-
-      return auth.accessToken;
-    } catch (error) {
-      authLog("getAccessToken:error", {
-        error: safeError(error),
-      });
-
+    if (!auth) {
+      authLog("getAccessToken:return:null:no-auth");
       return null;
     }
+
+    const accessToken = auth.accessToken || auth.session?.access_token || auth.access_token || null;
+    const expiresAt =
+      auth.expiresAt ||
+      (auth.expires_at ? auth.expires_at * 1000 : null) ||
+      null;
+
+    if (!accessToken) {
+      authLog("getAccessToken:return:null:no-access-token");
+      return null;
+    }
+
+    if (expiresAt && Date.now() >= expiresAt - 5 * 60 * 1000) {
+      authLog("getAccessToken:refreshToken:start");
+
+      await this.refreshToken();
+
+      const nextAuth = await this.getAuth();
+      const nextAccessToken =
+        nextAuth?.accessToken ||
+        nextAuth?.session?.access_token ||
+        nextAuth?.access_token ||
+        null;
+
+      authLog("getAccessToken:return:after-refresh", {
+        hasAccessToken: Boolean(nextAccessToken),
+      });
+
+      return nextAccessToken;
+    }
+
+    authLog("getAccessToken:return:current-token", {
+      hasAccessToken: Boolean(accessToken),
+    });
+
+    return accessToken;
+  } catch (error) {
+    authLog("getAccessToken:error", {
+      error: safeError(error),
+    });
+
+    return null;
   }
+}
 
   async getUser() {
     authLog("getUser:start");

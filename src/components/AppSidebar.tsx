@@ -336,6 +336,8 @@ export function AppSidebar() {
           { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
           { title: "Mevzuat Belge Analizi", url: "/document-analysis", icon: Gavel, badge: "AI" },
           { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
+          { title: "Tahliye Kroki Editörü", url: "/evacuation-editor", icon: MapPinned, badge: "NEW" },
+          { title: "AI Kroki Analizi", url: "/blueprint-analyzer", icon: Search, badge: "AI" },
         ],
       },
       {

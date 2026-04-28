@@ -810,7 +810,7 @@ export default function EvacuationEditor() {
     if (!canvas) return;
     const safeName = projectName.replace(/\s+/g, "-").toLowerCase();
 
-    const ExportService = await loadEvacuationExportService();
+    const { ExportService } = await loadEvacuationExportService();
 
     if (formatName === "png") return ExportService.exportPNG(canvas, safeName);
     if (formatName === "svg") return ExportService.exportSVG(canvas, safeName);
