@@ -501,6 +501,173 @@ class PopupController {
       }, 2000);
     }
   }
+
+  async fetchOrganizationId(userId, accessToken) {
+    if (!this.supabaseUrl || !this.supabaseKey || !accessToken || !userId) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=organization_id&limit=1`,
+        {
+          headers: {
+            apikey: this.supabaseKey,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.warn("Profile organization sorgusu basarisiz:", response.status);
+        return null;
+      }
+
+      const rows = await response.json();
+      return rows?.[0]?.organization_id || null;
+    } catch (error) {
+      console.warn("Profile organization sorgusu hatasi:", error?.message || error);
+      return null;
+    }
+  }
+
+  async syncOrgIdWithUser() {
+    try {
+      const auth = await chrome.storage.local.get("denetron_auth");
+
+      if (!auth.denetron_auth?.user?.id) {
+        console.warn("Auth user bulunamadi");
+        return;
+      }
+
+      const userId = auth.denetron_auth.user.id;
+      const accessToken = auth.denetron_auth?.session?.access_token;
+      const nextOrgId =
+        auth.denetron_auth?.user?.organization_id ||
+        auth.denetron_auth?.user?.user_metadata?.organization_id ||
+        auth.denetron_auth?.user?.app_metadata?.organization_id ||
+        (await this.fetchOrganizationId(userId, accessToken)) ||
+        userId;
+
+      this.orgId = nextOrgId;
+
+      await chrome.storage.local.set({
+        orgId: nextOrgId,
+        userId,
+      });
+    } catch (error) {
+      console.error("Sync org ID hatasi:", error);
+    }
+  }
+
+  async loadStats() {
+    const storage = await chrome.storage.local.get(["denetron_auth", "userId"]);
+    const userId = storage.userId || storage.denetron_auth?.user?.id || null;
+    const accessToken = storage.denetron_auth?.session?.access_token;
+
+    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
+      console.warn("Stats icin config eksik:", {
+        hasUrl: !!this.supabaseUrl,
+        hasKey: !!this.supabaseKey,
+        hasOrgId: !!this.orgId,
+        hasUserId: !!userId,
+      });
+      return;
+    }
+
+    try {
+      const headers = {
+        apikey: this.supabaseKey,
+        Authorization: accessToken
+          ? `Bearer ${accessToken}`
+          : `Bearer ${this.supabaseKey}`,
+        "Content-Type": "application/json",
+      };
+
+      const scopeFilter = userId
+        ? `or=(org_id.eq.${this.orgId},user_id.eq.${userId})`
+        : `org_id=eq.${this.orgId}`;
+
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status`,
+        { headers }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const companies = await response.json();
+
+      this.stats = {
+        totalCompanies: companies.length,
+        warningCount: companies.filter((c) => c.compliance_status === "WARNING")
+          .length,
+        criticalCount: companies.filter(
+          (c) => c.compliance_status === "CRITICAL"
+        ).length,
+      };
+
+      await chrome.storage.local.set({ stats: this.stats });
+    } catch (error) {
+      console.error("Stats load hatasi:", error?.message || error);
+
+      const cached = await chrome.storage.local.get("stats");
+      if (cached.stats) {
+        this.stats = cached.stats;
+      }
+    }
+  }
+
+  async renderUserProfile() {
+    try {
+      const storage = await chrome.storage.local.get("denetron_auth");
+      const user = storage.denetron_auth?.user || null;
+
+      const fullName =
+        user?.user_metadata?.full_name ||
+        user?.user_metadata?.name ||
+        user?.full_name ||
+        user?.email ||
+        "İSGVizyon Kullanıcısı";
+
+      const email =
+        user?.email ||
+        user?.user_metadata?.email ||
+        "Hesap bilgisi alınamadı";
+
+      const avatarLetter = String(fullName).trim().charAt(0).toUpperCase() || "İ";
+
+      const nameEl = document.getElementById("userName");
+      const emailEl = document.getElementById("userEmail");
+      const avatarEl = document.getElementById("userAvatar");
+
+      if (nameEl) nameEl.textContent = fullName;
+      if (emailEl) emailEl.textContent = email;
+      if (avatarEl) avatarEl.textContent = avatarLetter;
+    } catch (error) {
+      console.error("Kullanici bilgisi gosterilemedi:", error);
+    }
+  }
+
+  async showMainApp() {
+    const loadingScreen = document.getElementById("loadingScreen");
+    const authScreen = document.getElementById("authScreen");
+    const mainApp = document.getElementById("mainApp");
+
+    if (loadingScreen) loadingScreen.style.display = "none";
+    if (authScreen) authScreen.style.display = "none";
+    if (mainApp) mainApp.style.display = "block";
+
+    this.setupEventListeners();
+
+    await this.renderUserProfile();
+    await this.loadStats();
+    await this.loadActivities();
+
+    this.updateStatsUI();
+  }
 }
 
 // ====================================================

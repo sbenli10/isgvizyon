@@ -554,6 +554,119 @@ class BackgroundService {
       chrome.action.setBadgeBackgroundColor({ color: "#2196F3" });
     }
   }
+  async fetchOrganizationId(userId, accessToken) {
+    if (!this.supabaseUrl || !this.supabaseKey || !userId || !accessToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=organization_id&limit=1`,
+        {
+          headers: {
+            apikey: this.supabaseKey,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.warn("Profile organization sorgusu basarisiz:", response.status);
+        return null;
+      }
+
+      const rows = await response.json();
+      return rows?.[0]?.organization_id || null;
+    } catch (error) {
+      console.warn("Profile organization sorgusu hatasi:", error?.message || error);
+      return null;
+    }
+  }
+
+  async loadConfig() {
+    try {
+      const config = await chrome.storage.local.get([
+        "supabaseUrl",
+        "supabaseKey",
+        "orgId",
+        "userId",
+        "denetron_auth",
+      ]);
+
+      this.supabaseUrl = config.supabaseUrl;
+      this.supabaseKey = config.supabaseKey;
+      this.userId = config.userId || config.denetron_auth?.user?.id || null;
+
+      const accessToken = config.denetron_auth?.session?.access_token;
+      const fetchedOrgId = await this.fetchOrganizationId(this.userId, accessToken);
+      this.orgId =
+        config.denetron_auth?.user?.organization_id ||
+        config.denetron_auth?.user?.user_metadata?.organization_id ||
+        config.denetron_auth?.user?.app_metadata?.organization_id ||
+        fetchedOrgId ||
+        config.orgId ||
+        this.userId ||
+        null;
+
+      await chrome.storage.local.set({
+        orgId: this.orgId,
+        userId: this.userId,
+      });
+
+      if (!this.supabaseUrl || !this.supabaseKey) {
+        console.warn("Config eksik");
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Config load hatasi:", error);
+      return false;
+    }
+  }
+
+  async loadStats() {
+    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
+      console.warn("Stats icin config eksik");
+      return;
+    }
+
+    try {
+      const scopeFilter = this.userId
+        ? `or=(org_id.eq.${this.orgId},user_id.eq.${this.userId})`
+        : `org_id=eq.${this.orgId}`;
+
+      const response = await fetch(
+        `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status`,
+        {
+          headers: {
+            apikey: this.supabaseKey,
+            Authorization: `Bearer ${this.supabaseKey}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const companies = await response.json();
+
+      const stats = {
+        totalCompanies: companies.length,
+        warningCount: companies.filter((c) => c.compliance_status === "WARNING")
+          .length,
+        criticalCount: companies.filter(
+          (c) => c.compliance_status === "CRITICAL"
+        ).length,
+      };
+
+      await chrome.storage.local.set({ stats });
+    } catch (error) {
+      console.error("Stats load hatasi:", error);
+    }
+  }
 }
 
 const service = new BackgroundService();

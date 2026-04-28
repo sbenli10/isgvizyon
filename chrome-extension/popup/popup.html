@@ -1,263 +1,162 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-
-<title>İSGVizyon İSG Bot</title>
-
-<link rel="stylesheet" href="popup.css">
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>İSGVizyon İSG Bot</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
-
 <body>
-
-<div class="app" id="app">
-
-<!-- =====================================================
-AUTH SCREEN
-===================================================== -->
-
-<section id="authScreen" class="screen auth-screen hidden">
-
-<header class="auth-header">
-
-<img src="../assets/icon-128.png" class="auth-logo" alt="İSGVizyon">
-
-<h1>İSGVizyon İSG Bot</h1>
-
-<p class="subtitle">
-Devam etmek için İSGVizyon hesabınızla giriş yapın
-</p>
-
-</header>
-
-<div class="auth-actions">
-
-<button class="btn btn-primary btn-large" id="btnLogin">
-
-<svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
-
-<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
-<polyline points="10 17 15 12 10 7"/>
-<line x1="15" y1="12" x2="3" y2="12"/>
-
-</svg>
-
-İSGVizyon'a Giriş Yap
-
-</button>
-
-</div>
-
-<footer class="auth-footer">
-
-<p>
-
-İSG-KATİP verilerinizi otomatik analiz eder ve
-uyumluluk risklerini tespit eder.
-
-</p>
-
-</footer>
-
-</section>
-
-
-<!-- =====================================================
-MAIN APP
-===================================================== -->
-
-<section id="mainApp" class="screen hidden">
-
-<!-- HEADER -->
-
-<header class="header">
-
-<div class="brand">
-
-<img src="../assets/icon-48.png" class="logo" alt="İSGVizyon">
-
-<div class="brand-info">
-
-<h1>İSGVizyon</h1>
-<span class="brand-sub">İSG Bot</span>
-
-</div>
-
-</div>
-
-<div class="header-actions">
-
-<button class="btn-icon" id="btnLogout" aria-label="Çıkış Yap">
-
-<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
-
-<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-<polyline points="16 17 21 12 16 7"/>
-<line x1="21" y1="12" x2="9" y2="12"/>
-
-</svg>
-
-</button>
-
-</div>
-
-</header>
-
-
-<!-- =====================================================
-STATS
-===================================================== -->
-
-<section class="stats" id="stats">
-
-<article class="stat-card">
-
-<span class="stat-label">
-Toplam Firma
-</span>
-
-<span class="stat-value" id="totalCompanies">
-–
-</span>
-
-</article>
-
-
-<article class="stat-card warning">
-
-<span class="stat-label">
-Uyarı
-</span>
-
-<span class="stat-value" id="warningCount">
-–
-</span>
-
-</article>
-
-
-<article class="stat-card critical">
-
-<span class="stat-label">
-Kritik
-</span>
-
-<span class="stat-value" id="criticalCount">
-–
-</span>
-
-</article>
-
-</section>
-
-
-<!-- =====================================================
-ACTIONS
-===================================================== -->
-
-<section class="actions-section">
-
-<h2 class="section-title">
-
-İşlemler
-
-</h2>
-
-<div class="actions">
-
-<button id="btnSyncISGKatip" class="btn btn-secondary">
-
-<svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
-
-<path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-<path d="M9 12l2 2 4-4"/>
-
-</svg>
-
-İSG-KATİP'ten Veri Al
-
-</button>
-
-
-<button id="btnSync" class="btn btn-primary">
-
-<svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
-
-<path d="M21.5 2v6h-6"/>
-<path d="M2.5 22v-6h6"/>
-<path d="M2 11.5a10 10 0 0118.8-4.3"/>
-<path d="M22 12.5a10 10 0 01-18.8 4.2"/>
-
-</svg>
-
-Hemen Senkronize Et
-
-</button>
-
-
-<button id="btnOpenDashboard" class="btn btn-ghost">
-
-<svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
-
-<path d="M3 9l9-7 9 7"/>
-<path d="M9 22V12h6v10"/>
-
-</svg>
-
-Dashboard Aç
-
-</button>
-
-</div>
-
-</section>
-
-
-<!-- =====================================================
-ACTIVITY
-===================================================== -->
-
-<section class="activity-section">
-
-<h2 class="section-title">
-
-Son İşlemler
-
-</h2>
-
-<div id="activityList" class="activity-list">
-
-<div class="empty-state">
-
-Henüz işlem bulunmuyor
-
-</div>
-
-</div>
-
-</section>
-
-</section>
-
-
-<!-- =====================================================
-LOADING
-===================================================== -->
-
-<section id="loadingScreen" class="loading-screen">
-
-<div class="loader"></div>
-
-<p>Yükleniyor...</p>
-
-</section>
-
-</div>
-
-<script type="module" src="popup.js"></script>
-
+  <div class="app-shell" id="app">
+    <section id="authScreen" class="screen auth-screen hidden">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="../assets/icon-128.png" class="auth-logo" alt="İSGVizyon">
+          <div>
+            <p class="eyebrow">İSGVizyon Eklentisi</p>
+            <h1>İSG Bot ile devam edin</h1>
+            <p class="subtitle">
+              İSG-KATİP verilerinizi güvenli şekilde senkronize edin, eksikleri tek merkezden görün.
+            </p>
+          </div>
+        </div>
+
+        <div class="auth-highlight">
+          <div class="highlight-item">
+            <span class="highlight-kicker">1</span>
+            <span>İSGVizyon hesabınızla giriş yapın</span>
+          </div>
+          <div class="highlight-item">
+            <span class="highlight-kicker">2</span>
+            <span>İSG-KATİP ekranını açın</span>
+          </div>
+          <div class="highlight-item">
+            <span class="highlight-kicker">3</span>
+            <span>Firmaları ve aksiyonları senkronize edin</span>
+          </div>
+        </div>
+
+        <div class="auth-actions">
+          <button class="btn btn-primary btn-large" id="btnLogin">
+            <svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/>
+              <line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            İSGVizyon'a Giriş Yap
+          </button>
+        </div>
+
+        <footer class="auth-footer">
+          <p>Giriş sonrası kullanıcı bilgisi ve senkron durumu eklenti üzerinde görünür.</p>
+        </footer>
+      </div>
+    </section>
+
+    <section id="mainApp" class="screen hidden">
+      <header class="header">
+        <div class="brand">
+          <div class="brand-mark">
+            <img src="../assets/icon-48.png" class="logo" alt="İSGVizyon">
+          </div>
+          <div class="brand-info">
+            <h1>İSGVizyon</h1>
+            <span class="brand-sub">İSG Bot</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button class="btn-icon" id="btnLogout" aria-label="Çıkış Yap">
+            <svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/>
+              <line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="user-panel">
+        <div class="user-panel__avatar" id="userAvatar">İ</div>
+        <div class="user-panel__content">
+          <div class="user-panel__topline">
+            <span class="status-dot"></span>
+            <span class="status-label">Giriş yapıldı</span>
+          </div>
+          <h2 id="userName">İSGVizyon Kullanıcısı</h2>
+          <p id="userEmail">Hesap bilgisi yükleniyor...</p>
+        </div>
+      </section>
+
+      <section class="stats" id="stats">
+        <article class="stat-card">
+          <span class="stat-label">Toplam Firma</span>
+          <span class="stat-value" id="totalCompanies">0</span>
+        </article>
+
+        <article class="stat-card warning">
+          <span class="stat-label">Uyarı</span>
+          <span class="stat-value" id="warningCount">0</span>
+        </article>
+
+        <article class="stat-card critical">
+          <span class="stat-label">Kritik</span>
+          <span class="stat-value" id="criticalCount">0</span>
+        </article>
+      </section>
+
+      <section class="actions-section">
+        <div class="section-heading">
+          <h2 class="section-title">Hızlı İşlemler</h2>
+          <p>Önce veri alın, sonra senkron ve panel kontrolü yapın.</p>
+        </div>
+
+        <div class="actions">
+          <button id="btnSyncISGKatip" class="btn btn-secondary">
+            <svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
+              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              <path d="M9 12l2 2 4-4"/>
+            </svg>
+            İSG-KATİP'ten Veri Al
+          </button>
+
+          <button id="btnSync" class="btn btn-primary">
+            <svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
+              <path d="M21.5 2v6h-6"/>
+              <path d="M2.5 22v-6h6"/>
+              <path d="M2 11.5a10 10 0 0118.8-4.3"/>
+              <path d="M22 12.5a10 10 0 01-18.8 4.2"/>
+            </svg>
+            Hemen Senkronize Et
+          </button>
+
+          <button id="btnOpenDashboard" class="btn btn-ghost">
+            <svg class="icon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2">
+              <path d="M3 9l9-7 9 7"/>
+              <path d="M9 22V12h6v10"/>
+            </svg>
+            Dashboard Aç
+          </button>
+        </div>
+      </section>
+
+      <section class="activity-section">
+        <div class="section-heading">
+          <h2 class="section-title">Son İşlemler</h2>
+          <p>Yakın zamanda gerçekleşen senkron ve veri akışları burada görünür.</p>
+        </div>
+        <div id="activityList" class="activity-list">
+          <div class="empty-state">Henüz işlem yok</div>
+        </div>
+      </section>
+    </section>
+
+    <section id="loadingScreen" class="loading-screen">
+      <div class="loader"></div>
+      <p>İSG Bot hazırlanıyor...</p>
+    </section>
+  </div>
+
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

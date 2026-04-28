@@ -32,12 +32,17 @@ export class AuthHandler {
 
   async saveAuth(authData) {
     const config = await chrome.storage.local.get(['supabaseUrl', 'supabaseKey']);
+    const resolvedOrganizationId =
+      authData?.user?.organization_id ||
+      authData?.user?.user_metadata?.organization_id ||
+      authData?.user?.app_metadata?.organization_id ||
+      null;
 
     const data = {
       denetron_auth: authData,
       supabaseUrl: config.supabaseUrl,
       supabaseKey: config.supabaseKey,
-      orgId: authData.user.id,
+      orgId: resolvedOrganizationId,
       userId: authData.user.id
     };
 
@@ -155,6 +160,6 @@ export class AuthHandler {
   // ====================================================
 
   getLoginUrl() {
-    return `${this.webAppUrl}/auth/login?ext=true`;
+    return `${this.webAppUrl}/auth?ext=true`;
   }
 }
