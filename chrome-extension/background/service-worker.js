@@ -1,563 +1,43 @@
 // chrome-extension/background/service-worker.js
-
-// ====================================================
-// BACKGROUND SERVICE WORKER - TAM DÜZELTİLMİŞ
-// ====================================================
-
 import { AuthHandler } from "../auth/auth-handler.js";
+import {
+  DEFAULT_SUPABASE_ANON_KEY,
+  DEFAULT_SUPABASE_URL,
+} from "../config/defaults.js";
+import { assertExtensionApi } from "../shared/extension-api.js";
 
 class BackgroundService {
   constructor() {
+    this.extension = assertExtensionApi("BackgroundService");
     this.authHandler = new AuthHandler();
-    this.supabaseUrl = null;
-    this.supabaseKey = null;
+    this.supabaseUrl = DEFAULT_SUPABASE_URL;
+    this.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
     this.orgId = null;
+    this.userId = null;
   }
-
-  // ====================================================
-  // INIT
-  // ====================================================
 
   async init() {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("🔧 BACKGROUND SERVICE BAŞLATILDI");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-    await this.autoConfigureIfNeeded();
+    await this.ensureDefaults();
+    await this.authHandler.init();
     await this.loadConfig();
-    await this.setupListeners();
-
-    console.log("✅ Background service hazır");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    this.setupListeners();
+    console.log("ISGVizyon background service hazir");
   }
 
-  // ====================================================
-  // AUTO CONFIGURE
-  // ====================================================
+  async ensureDefaults() {
+    const config = await this.extension.storage.local.get(["supabaseUrl", "supabaseKey"]);
+    const payload = {};
 
-  async autoConfigureIfNeeded() {
-    try {
-      const config = await chrome.storage.local.get([
-        "supabaseUrl",
-        "supabaseKey",
-        "autoConfigured",
-      ]);
+    if (!config.supabaseUrl) payload.supabaseUrl = DEFAULT_SUPABASE_URL;
+    if (!config.supabaseKey) payload.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
 
-      if (!config.supabaseUrl || !config.supabaseKey) {
-        console.log("⚠️ Supabase ayarlari eksik. Lutfen Options sayfasindan yapilandirin.");
-      }
-    } catch (error) {
-      console.error("❌ Auto-configure hatası:", error);
+    if (Object.keys(payload).length > 0) {
+      await this.extension.storage.local.set(payload);
     }
   }
 
-  // ====================================================
-  // CONFIG LOAD
-  // ====================================================
-
-  async loadConfig() {
-    try {
-      const config = await chrome.storage.local.get([
-        "supabaseUrl",
-        "supabaseKey",
-        "orgId",
-        "denetron_auth",
-      ]);
-
-      this.supabaseUrl = config.supabaseUrl;
-      this.supabaseKey = config.supabaseKey;
-
-      if (config.denetron_auth?.user?.id) {
-        this.orgId = config.denetron_auth.user.id;
-        console.log("✅ Org ID (user ID):", this.orgId);
-      } else if (config.orgId) {
-        this.orgId = config.orgId;
-        console.log("✅ Org ID (storage):", this.orgId);
-      }
-
-      console.log("✅ Config yüklendi:", {
-        url: this.supabaseUrl ? "✓" : "✗",
-        key: this.supabaseKey ? "✓" : "✗",
-        orgId: this.orgId || "✗",
-      });
-
-      if (!this.supabaseUrl || !this.supabaseKey) {
-        console.warn("⚠️ Config eksik");
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error("❌ Config load hatası:", error);
-      return false;
-    }
-  }
-
-  // ====================================================
-  // LISTENERS
-  // ====================================================
-
-  async setupListeners() {
-    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      this.handleMessage(message, sender, sendResponse);
-      return true;
-    });
-
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (changeInfo.status === "complete") {
-        this.handleTabUpdate(tabId, tab);
-      }
-    });
-  }
-
-  // ====================================================
-  // MESSAGE HANDLER
-  // ====================================================
-
-  async handleMessage(message, sender, sendResponse) {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("📨 MESAJ ALINDI:", message.type);
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-    try {
-      switch (message.type) {
-        case "SYNC_NOW":
-          await this.handleManualSync();
-          sendResponse({ success: true });
-          break;
-
-        case "ISGKATIP_COMPANIES_SCRAPED":
-          await this.handleISGKatipSync(message.data, message.metadata);
-          sendResponse({ success: true });
-          break;
-
-        case "GET_CONFIG":
-          sendResponse({
-            supabaseUrl: this.supabaseUrl,
-            supabaseKey: this.supabaseKey,
-            orgId: this.orgId,
-          });
-          break;
-
-        default:
-          console.warn("⚠️ Bilinmeyen mesaj tipi:", message.type);
-          sendResponse({ success: false, error: "Unknown message type" });
-      }
-    } catch (error) {
-      console.error("❌ Message handler hatası:", error);
-      sendResponse({ success: false, error: error.message });
-    }
-  }
-
-  // ====================================================
-  // İSG-KATİP SYNC HANDLER
-  // ====================================================
-
-  async handleISGKatipSync(companies, metadata) {
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("📦 İSG-KATİP SYNC BAŞLATILDI");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("📊 Toplam işyeri:", companies.length);
-    console.log("📅 Tarih:", metadata.scrapedAt);
-    console.log("🔗 Kaynak:", metadata.sourceUrl);
-
-    try {
-      // Config kontrol
-      if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
-        console.error("❌ CONFIG EKSİK:");
-        console.error("  Supabase URL:", this.supabaseUrl ? "✓" : "✗");
-        console.error("  Supabase Key:", this.supabaseKey ? "✓" : "✗");
-        console.error("  Org ID:", this.orgId || "✗");
-        throw new Error("Supabase configuration eksik");
-      }
-
-      console.log("✅ Config doğrulandı");
-
-      // Headers
-      const headers = {
-        apikey: this.supabaseKey,
-        Authorization: `Bearer ${this.supabaseKey}`,
-        "Content-Type": "application/json",
-        Prefer: "resolution=merge-duplicates",
-      };
-
-      console.log("📡 Headers hazırlandı");
-
-      // Veri kaydetme
-      let successCount = 0;
-      let errorCount = 0;
-      const errors = [];
-      const successfulCompanies = [];
-
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("🔄 VERİ KAYDETME BAŞLADI");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-      for (let i = 0; i < companies.length; i++) {
-        const company = companies[i];
-
-        try {
-          const cleanData = {
-            org_id: this.orgId,
-            sgk_no: this.cleanString(company.sgk_no),
-            company_name: this.cleanString(company.company_name),
-            employee_count: this.cleanNumber(company.employee_count),
-            hazard_class:
-              this.cleanString(company.hazard_class) || "Az Tehlikeli",
-            nace_code: this.cleanString(company.nace_code) || null,
-            assigned_minutes: this.cleanNumber(company.assigned_minutes),
-            required_minutes: this.cleanNumber(company.required_minutes),
-            compliance_status: this.calculateComplianceStatus(
-              this.cleanNumber(company.assigned_minutes),
-              this.cleanNumber(company.required_minutes)
-            ),
-            risk_score: this.calculateRiskScore(company),
-            contract_start: this.validateDate(company.contract_start),
-            contract_end: this.validateDate(company.contract_end),
-            last_synced_at: new Date().toISOString(),
-          };
-
-          if (!cleanData.sgk_no || !cleanData.company_name) {
-            console.warn(
-              `⚠️ [${i + 1}/${companies.length}] Geçersiz veri (SGK/Firma adı eksik)`
-            );
-            errorCount++;
-            errors.push({
-              index: i + 1,
-              company: company.company_name || "İsimsiz",
-              error: "SGK No veya Firma Adı eksik",
-            });
-            continue;
-          }
-
-          const response = await fetch(
-            `${this.supabaseUrl}/rest/v1/isgkatip_companies`,
-            {
-              method: "POST",
-              headers,
-              body: JSON.stringify(cleanData),
-            }
-          );
-
-          if (response.ok) {
-            successCount++;
-            successfulCompanies.push(cleanData.company_name);
-            console.log(
-              `✅ [${successCount}/${companies.length}] ${cleanData.company_name}`
-            );
-          } else {
-            const errorText = await response.text();
-            let errorJson;
-
-            try {
-              errorJson = JSON.parse(errorText);
-            } catch {
-              errorJson = { message: errorText };
-            }
-
-            errorCount++;
-            errors.push({
-              index: i + 1,
-              company: cleanData.company_name,
-              status: response.status,
-              error: errorJson.message || errorJson.code || "Unknown error",
-              details: errorJson,
-            });
-
-            console.error(
-              `❌ [${i + 1}/${companies.length}] ${cleanData.company_name}`
-            );
-            console.error(
-              `   → HTTP ${response.status}: ${errorJson.message || errorText}`
-            );
-          }
-        } catch (error) {
-          errorCount++;
-          errors.push({
-            index: i + 1,
-            company: company.company_name || "İsimsiz",
-            error: error.message,
-          });
-          console.error(
-            `❌ [${i + 1}/${companies.length}] Fetch hatası:`,
-            error.message
-          );
-        }
-      }
-
-      // Sonuçlar
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("📊 SYNC SONUÇLARI");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log(`✅ Başarılı: ${successCount}/${companies.length}`);
-      console.log(`❌ Hatalı: ${errorCount}/${companies.length}`);
-      console.log(
-        `📈 Başarı Oranı: ${((successCount / companies.length) * 100).toFixed(1)}%`
-      );
-
-      if (successCount > 0) {
-        console.log("✅ BAŞARILI FİRMALAR (İlk 10):");
-        successfulCompanies.slice(0, 10).forEach((name, idx) => {
-          console.log(`   ${idx + 1}. ${name}`);
-        });
-        if (successfulCompanies.length > 10) {
-          console.log(
-            `   ... ve ${successfulCompanies.length - 10} firma daha`
-          );
-        }
-      }
-
-      if (errors.length > 0) {
-        console.log("❌ HATALAR (İlk 5):");
-        errors.slice(0, 5).forEach((err) => {
-          console.error(`   [${err.index}] ${err.company}`);
-          console.error(`       → ${err.error}`);
-        });
-        if (errors.length > 5) {
-          console.log(`   ... ve ${errors.length - 5} hata daha`);
-        }
-      }
-
-      // Sync log kaydet
-      try {
-        await this.saveSyncLog({
-          source: "ISGKATIP_SCRAPER",
-          total_companies: companies.length,
-          success_count: successCount,
-          error_count: errorCount,
-          metadata: {
-            ...metadata,
-            errors: errors.slice(0, 10),
-            successful_companies: successfulCompanies.slice(0, 10),
-          },
-        });
-        console.log("✅ Sync log kaydedildi");
-      } catch (logError) {
-        console.warn("⚠️ Sync log kaydedilemedi:", logError.message);
-      }
-
-      // UI güncellemeleri
-      chrome.action.setBadgeText({ text: successCount.toString() });
-      chrome.action.setBadgeBackgroundColor({
-        color: successCount > 0 ? "#4CAF50" : "#F44336",
-      });
-
-      const notificationTitle =
-        successCount > 0
-          ? "✅ İSG-KATİP Senkronizasyonu Tamamlandı"
-          : "❌ İSG-KATİP Senkronizasyon Hatası";
-
-      const notificationMessage =
-        successCount > 0
-          ? `${successCount} işyeri başarıyla senkronize edildi!${errorCount > 0 ? ` (${errorCount} hata)` : ""}`
-          : `${errorCount} işyeri kaydedilemedi`;
-
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "/icons/icon128.png",
-        title: notificationTitle,
-        message: notificationMessage,
-        priority: 2,
-      });
-
-      await this.loadStats();
-
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.log("✅ İSG-KATİP SYNC TAMAMLANDI");
-      console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    } catch (error) {
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.error("❌ KRİTİK HATA - SYNC DURDU");
-      console.error("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-      console.error("Hata:", error.message);
-      console.error("Stack:", error.stack);
-
-      chrome.notifications.create({
-        type: "basic",
-        iconUrl: "/icons/icon128.png",
-        title: "❌ Senkronizasyon Hatası",
-        message: error.message || "Bilinmeyen hata",
-        priority: 2,
-      });
-    }
-  }
-
-  // ====================================================
-  // HELPER FUNCTIONS
-  // ====================================================
-
-  cleanString(value) {
-    if (!value) return "";
-    return String(value).trim();
-  }
-
-  cleanNumber(value) {
-    const num = parseInt(value);
-    return isNaN(num) ? 0 : num;
-  }
-
-  validateDate(dateStr) {
-    if (!dateStr) return null;
-
-    try {
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateStr)) {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          return date.toISOString();
-        }
-      }
-
-      const match = dateStr.match(
-        /(\d{2})\.(\d{2})\.(\d{4})\s+(\d{2}):(\d{2}):(\d{2})/
-      );
-
-      if (match) {
-        const [, day, month, year, hour, minute, second] = match;
-        const isoDate = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-        const date = new Date(isoDate);
-
-        if (!isNaN(date.getTime())) {
-          return date.toISOString();
-        }
-      }
-
-      console.warn("⚠️ Tarih parse edilemedi:", dateStr);
-      return null;
-    } catch (error) {
-      console.error("❌ Tarih validate hatası:", dateStr, error);
-      return null;
-    }
-  }
-
-  calculateComplianceStatus(assigned, required) {
-    if (!required || required === 0) return "UNKNOWN";
-    if (assigned >= required) return "COMPLIANT";
-    if (assigned >= required * 0.8) return "WARNING";
-    return "CRITICAL";
-  }
-
-  calculateRiskScore(company) {
-    let score = 50;
-
-    const hazardClass = String(company.hazard_class || "");
-    if (hazardClass.includes("Çok Tehlikeli")) {
-      score += 30;
-    } else if (hazardClass.includes("Tehlikeli")) {
-      score += 15;
-    }
-
-    const employeeCount = this.cleanNumber(company.employee_count);
-    if (employeeCount > 100) {
-      score += 10;
-    } else if (employeeCount > 50) {
-      score += 5;
-    }
-
-    const complianceStatus = this.calculateComplianceStatus(
-      this.cleanNumber(company.assigned_minutes),
-      this.cleanNumber(company.required_minutes)
-    );
-
-    if (complianceStatus === "CRITICAL") {
-      score += 20;
-    } else if (complianceStatus === "WARNING") {
-      score += 10;
-    }
-
-    return Math.min(score, 100);
-  }
-
-  async saveSyncLog(logData) {
-    try {
-      console.log("📝 Sync log kaydediliyor...");
-
-      const response = await fetch(
-        `${this.supabaseUrl}/rest/v1/isgkatip_sync_logs`,
-        {
-          method: "POST",
-          headers: {
-            apikey: this.supabaseKey,
-            Authorization: `Bearer ${this.supabaseKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            org_id: this.orgId,
-            source: logData.source,
-            total_companies: logData.total_companies,
-            success_count: logData.success_count,
-            error_count: logData.error_count,
-            metadata: logData.metadata,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.warn("⚠️ Sync log kaydedilemedi:", response.status, errorText);
-      } else {
-        console.log("✅ Sync log başarıyla kaydedildi");
-      }
-    } catch (error) {
-      console.warn("⚠️ Sync log kayıt hatası:", error.message);
-    }
-  }
-
-  async loadStats() {
-    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
-      console.warn("⚠️ Stats için config eksik");
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${this.supabaseUrl}/rest/v1/isgkatip_companies?org_id=eq.${this.orgId}&select=compliance_status`,
-        {
-          headers: {
-            apikey: this.supabaseKey,
-            Authorization: `Bearer ${this.supabaseKey}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const companies = await response.json();
-
-      const stats = {
-        totalCompanies: companies.length,
-        warningCount: companies.filter((c) => c.compliance_status === "WARNING")
-          .length,
-        criticalCount: companies.filter(
-          (c) => c.compliance_status === "CRITICAL"
-        ).length,
-      };
-
-      await chrome.storage.local.set({ stats });
-
-      console.log("📊 Stats güncellendi:", stats);
-    } catch (error) {
-      console.error("❌ Stats load hatası:", error);
-    }
-  }
-
-  async handleManualSync() {
-    console.log("🔄 Manuel sync tetiklendi");
-    await this.loadStats();
-  }
-
-  async handleTabUpdate(tabId, tab) {
-    if (tab.url?.includes("isgkatip.csgb.gov.tr")) {
-      console.log("📍 İSG-KATİP sitesi tespit edildi");
-      chrome.action.setBadgeText({ tabId, text: "🔍" });
-      chrome.action.setBadgeBackgroundColor({ color: "#2196F3" });
-    }
-  }
   async fetchOrganizationId(userId, accessToken) {
-    if (!this.supabaseUrl || !this.supabaseKey || !userId || !accessToken) {
-      return null;
-    }
+    if (!userId || !accessToken) return null;
 
     try {
       const response = await fetch(
@@ -571,105 +51,468 @@ class BackgroundService {
         }
       );
 
-      if (!response.ok) {
-        console.warn("Profile organization sorgusu basarisiz:", response.status);
-        return null;
-      }
+      if (!response.ok) return null;
 
       const rows = await response.json();
       return rows?.[0]?.organization_id || null;
     } catch (error) {
-      console.warn("Profile organization sorgusu hatasi:", error?.message || error);
+      console.warn("Organization bilgisi alinamadi:", error?.message || error);
       return null;
     }
   }
 
   async loadConfig() {
+    const config = await this.extension.storage.local.get([
+      "supabaseUrl",
+      "supabaseKey",
+      "orgId",
+      "userId",
+      "denetron_auth",
+    ]);
+
+    this.supabaseUrl = config.supabaseUrl || DEFAULT_SUPABASE_URL;
+    this.supabaseKey = config.supabaseKey || DEFAULT_SUPABASE_ANON_KEY;
+    this.userId = config.userId || config.denetron_auth?.user?.id || null;
+
+    const user = config.denetron_auth?.user || null;
+    const accessToken =
+      config.denetron_auth?.accessToken || config.denetron_auth?.session?.access_token || null;
+
+    const fetchedOrgId = await this.fetchOrganizationId(this.userId, accessToken);
+
+    this.orgId =
+      user?.organization_id ||
+      user?.user_metadata?.organization_id ||
+      user?.app_metadata?.organization_id ||
+      fetchedOrgId ||
+      config.orgId ||
+      this.userId ||
+      null;
+
+    await this.extension.storage.local.set({
+      supabaseUrl: this.supabaseUrl,
+      supabaseKey: this.supabaseKey,
+      orgId: this.orgId,
+      userId: this.userId,
+    });
+
+    return Boolean(this.supabaseUrl && this.supabaseKey);
+  }
+
+  setupListeners() {
+    this.extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      this.handleMessage(message, sender, sendResponse);
+      return true;
+    });
+
+    this.setupExternalAuthListener();
+
+    this.extension.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === "complete") {
+        this.handleTabUpdate(tabId, tab);
+      }
+    });
+  }
+
+  setupExternalAuthListener() {
+    if (!this.extension.runtime.onMessageExternal) {
+      console.warn("[Denetron Background] onMessageExternal kullanilamiyor");
+      return;
+    }
+
+    this.extension.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+      this.handleExternalAuthMessage(message, sender, sendResponse);
+      return true;
+    });
+
+    console.log("[Denetron Background] external auth listener hazir");
+  }
+
+  isAllowedExternalSender(sender) {
+    const senderUrl = sender?.url || "";
+    const senderOrigin = sender?.origin || "";
+
+    return (
+      senderUrl.startsWith("https://www.isgvizyon.com/") ||
+      senderUrl.startsWith("https://isgvizyon.com/") ||
+      senderOrigin === "https://www.isgvizyon.com" ||
+      senderOrigin === "https://isgvizyon.com"
+    );
+  }
+
+  summarizeExternalAuthData(authData) {
+    const session = authData?.session || null;
+    const user = authData?.user || session?.user || null;
+
+    return {
+      hasAuthData: Boolean(authData),
+      hasSession: Boolean(session),
+      hasAccessToken: Boolean(authData?.accessToken || session?.access_token),
+      hasRefreshToken: Boolean(authData?.refreshToken || session?.refresh_token),
+      hasUser: Boolean(user),
+      userId: user?.id || null,
+      userEmail: user?.email || null,
+      expiresAt: authData?.expiresAt || session?.expires_at || null,
+    };
+  }
+
+  async handleExternalAuthMessage(message, sender, sendResponse) {
+    console.log("[Denetron Background] external message received", {
+      messageType: message?.type,
+      senderUrl: sender?.url || null,
+      senderOrigin: sender?.origin || null,
+      authSummary: this.summarizeExternalAuthData(message?.authData),
+    });
+
     try {
-      const config = await chrome.storage.local.get([
-        "supabaseUrl",
-        "supabaseKey",
-        "orgId",
-        "userId",
-        "denetron_auth",
-      ]);
+      if (!this.isAllowedExternalSender(sender)) {
+        console.warn("[Denetron Background] external message rejected: invalid sender", {
+          senderUrl: sender?.url || null,
+          senderOrigin: sender?.origin || null,
+        });
 
-      this.supabaseUrl = config.supabaseUrl;
-      this.supabaseKey = config.supabaseKey;
-      this.userId = config.userId || config.denetron_auth?.user?.id || null;
+        sendResponse({
+          ok: false,
+          success: false,
+          error: "INVALID_SENDER",
+        });
 
-      const accessToken = config.denetron_auth?.session?.access_token;
-      const fetchedOrgId = await this.fetchOrganizationId(this.userId, accessToken);
-      this.orgId =
-        config.denetron_auth?.user?.organization_id ||
-        config.denetron_auth?.user?.user_metadata?.organization_id ||
-        config.denetron_auth?.user?.app_metadata?.organization_id ||
-        fetchedOrgId ||
-        config.orgId ||
-        this.userId ||
-        null;
-
-      await chrome.storage.local.set({
-        orgId: this.orgId,
-        userId: this.userId,
-      });
-
-      if (!this.supabaseUrl || !this.supabaseKey) {
-        console.warn("Config eksik");
-        return false;
+        return;
       }
 
-      return true;
+      if (message?.type === "DENETRON_AUTH_PING") {
+        console.log("[Denetron Background] external ping received", {
+          senderUrl: sender?.url || null,
+          senderOrigin: sender?.origin || null,
+        });
+
+        sendResponse({
+          ok: true,
+          success: true,
+          pong: true,
+        });
+
+        return;
+      }
+
+      if (message?.type !== "DENETRON_AUTH_SUCCESS") {
+        console.warn("[Denetron Background] external message ignored: invalid type", {
+          type: message?.type,
+        });
+
+        sendResponse({
+          ok: false,
+          success: false,
+          error: "INVALID_MESSAGE_TYPE",
+        });
+
+        return;
+      }
+
+      if (!message?.authData) {
+        console.warn("[Denetron Background] external message missing authData");
+
+        sendResponse({
+          ok: false,
+          success: false,
+          error: "MISSING_AUTH_DATA",
+        });
+
+        return;
+      }
+
+      console.log("[Denetron Background] auth save start", {
+        authSummary: this.summarizeExternalAuthData(message.authData),
+      });
+
+     await this.authHandler.init();
+      await this.authHandler.saveAuth(message.authData);
+
+      const verify = await this.extension.storage.local.get([
+        "denetron_auth",
+        "orgId",
+        "userId",
+      ]);
+
+      this.userId = verify.userId || verify.denetron_auth?.user?.id || null;
+      this.orgId = verify.orgId || this.userId || null;
+
+      console.log("[Denetron Background] auth saved successfully", {
+        hasStoredAuth: Boolean(verify.denetron_auth),
+        userId: verify.userId || null,
+        orgId: verify.orgId || null,
+      });
+
+      sendResponse({
+        ok: true,
+        success: true,
+        saved: true,
+        userId: verify.userId || null,
+        orgId: verify.orgId || null,
+      });
+
+      console.log("[Denetron Background] auth saved successfully", {
+        hasStoredAuth: Boolean(verify.denetron_auth),
+        userId: verify.userId || null,
+        orgId: verify.orgId || null,
+      });
+
+      sendResponse({
+        ok: true,
+        success: true,
+        saved: true,
+        userId: verify.userId || null,
+        orgId: verify.orgId || null,
+      });
     } catch (error) {
-      console.error("Config load hatasi:", error);
-      return false;
+      console.error("[Denetron Background] auth save failed", {
+        message: error?.message || String(error),
+        stack: error?.stack || null,
+      });
+
+      sendResponse({
+        ok: false,
+        success: false,
+        error: error?.message || "AUTH_SAVE_FAILED",
+      });
+    }
+  }
+
+  async handleMessage(message, _sender, sendResponse) {
+    try {
+      switch (message?.type) {
+        case "SYNC_NOW":
+          await this.handleManualSync();
+          sendResponse({ success: true });
+          break;
+
+        case "ISGKATIP_COMPANIES_SCRAPED":
+          await this.handleISGKatipSync(message.data || [], message.metadata || {});
+          sendResponse({ success: true });
+          break;
+
+        case "GET_CONFIG":
+          sendResponse({
+            success: true,
+            supabaseUrl: this.supabaseUrl,
+            supabaseKey: this.supabaseKey,
+            orgId: this.orgId,
+            userId: this.userId,
+          });
+          break;
+
+        default:
+          sendResponse({ success: false, error: "Unknown message type" });
+      }
+    } catch (error) {
+      console.error("Background message handling error:", error);
+      sendResponse({ success: false, error: error?.message || "Unknown error" });
+    }
+  }
+
+  cleanString(value) {
+    return value ? String(value).trim() : "";
+  }
+
+  cleanNumber(value) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  validateDate(dateValue) {
+    if (!dateValue) return null;
+    const parsed = new Date(dateValue);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+  }
+
+  calculateComplianceStatus(assigned, required) {
+    if (!required || required <= 0) return "UNKNOWN";
+    if (assigned >= required) return "COMPLIANT";
+    if (assigned >= required * 0.8) return "WARNING";
+    return "CRITICAL";
+  }
+
+  calculateRiskScore(company) {
+    let score = 50;
+    const hazardClass = String(company?.hazard_class || "");
+    const employeeCount = this.cleanNumber(company?.employee_count);
+    const complianceStatus = this.calculateComplianceStatus(
+      this.cleanNumber(company?.assigned_minutes),
+      this.cleanNumber(company?.required_minutes)
+    );
+
+    if (hazardClass.includes("Cok Tehlikeli") || hazardClass.includes("Çok Tehlikeli")) {
+      score += 30;
+    } else if (hazardClass.includes("Tehlikeli")) {
+      score += 15;
+    }
+
+    if (employeeCount > 100) score += 10;
+    else if (employeeCount > 50) score += 5;
+
+    if (complianceStatus === "CRITICAL") score += 20;
+    else if (complianceStatus === "WARNING") score += 10;
+
+    return Math.min(score, 100);
+  }
+
+  async saveSyncLog(logData) {
+    try {
+      await fetch(`${this.supabaseUrl}/rest/v1/isgkatip_sync_logs`, {
+        method: "POST",
+        headers: {
+          apikey: this.supabaseKey,
+          Authorization: `Bearer ${this.supabaseKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          org_id: this.orgId,
+          source: logData.source,
+          total_companies: logData.total_companies,
+          success_count: logData.success_count,
+          error_count: logData.error_count,
+          metadata: logData.metadata,
+        }),
+      });
+    } catch (error) {
+      console.warn("Sync log kaydedilemedi:", error?.message || error);
     }
   }
 
   async loadStats() {
-    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
-      console.warn("Stats icin config eksik");
-      return;
+    if (!this.orgId) return;
+
+    const scopeFilter = this.userId
+      ? `or=(org_id.eq.${this.orgId},user_id.eq.${this.userId})`
+      : `org_id=eq.${this.orgId}`;
+
+    const response = await fetch(
+      `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status,last_synced_at&order=last_synced_at.desc`,
+      {
+        headers: {
+          apikey: this.supabaseKey,
+          Authorization: `Bearer ${this.supabaseKey}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Stats request failed with HTTP ${response.status}`);
     }
 
-    try {
-      const scopeFilter = this.userId
-        ? `or=(org_id.eq.${this.orgId},user_id.eq.${this.userId})`
-        : `org_id=eq.${this.orgId}`;
+    const companies = await response.json();
+    const lastSyncedAt = companies.find((item) => item.last_synced_at)?.last_synced_at || null;
 
-      const response = await fetch(
-        `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status`,
-        {
-          headers: {
-            apikey: this.supabaseKey,
-            Authorization: `Bearer ${this.supabaseKey}`,
-          },
-        }
-      );
+    const stats = {
+      totalCompanies: companies.length,
+      warningCount: companies.filter((item) => item.compliance_status === "WARNING").length,
+      criticalCount: companies.filter((item) => item.compliance_status === "CRITICAL").length,
+    };
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+    await this.extension.storage.local.set({
+      stats,
+      extensionLastSyncedAt: lastSyncedAt,
+    });
+  }
 
-      const companies = await response.json();
+  async handleManualSync() {
+    await this.loadConfig();
+    await this.loadStats();
+  }
 
-      const stats = {
-        totalCompanies: companies.length,
-        warningCount: companies.filter((c) => c.compliance_status === "WARNING")
-          .length,
-        criticalCount: companies.filter(
-          (c) => c.compliance_status === "CRITICAL"
-        ).length,
+  async handleISGKatipSync(companies, metadata) {
+    await this.loadConfig();
+
+    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
+      throw new Error("Supabase configuration eksik");
+    }
+
+    const headers = {
+      apikey: this.supabaseKey,
+      Authorization: `Bearer ${this.supabaseKey}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    };
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const company of companies) {
+      const payload = {
+        org_id: this.orgId,
+        user_id: this.userId,
+        sgk_no: this.cleanString(company.sgk_no),
+        company_name: this.cleanString(company.company_name),
+        employee_count: this.cleanNumber(company.employee_count),
+        hazard_class: this.cleanString(company.hazard_class) || "Az Tehlikeli",
+        nace_code: this.cleanString(company.nace_code) || null,
+        assigned_minutes: this.cleanNumber(company.assigned_minutes),
+        required_minutes: this.cleanNumber(company.required_minutes),
+        compliance_status: this.calculateComplianceStatus(
+          this.cleanNumber(company.assigned_minutes),
+          this.cleanNumber(company.required_minutes)
+        ),
+        risk_score: this.calculateRiskScore(company),
+        contract_start: this.validateDate(company.contract_start),
+        contract_end: this.validateDate(company.contract_end),
+        last_synced_at: new Date().toISOString(),
       };
 
-      await chrome.storage.local.set({ stats });
-    } catch (error) {
-      console.error("Stats load hatasi:", error);
+      if (!payload.sgk_no || !payload.company_name) {
+        errorCount += 1;
+        continue;
+      }
+
+      const response = await fetch(`${this.supabaseUrl}/rest/v1/isgkatip_companies`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) successCount += 1;
+      else errorCount += 1;
+    }
+
+    await this.saveSyncLog({
+      source: "ISGKATIP_SCRAPER",
+      total_companies: companies.length,
+      success_count: successCount,
+      error_count: errorCount,
+      metadata,
+    });
+
+    await this.extension.action.setBadgeText({ text: successCount ? String(successCount) : "" });
+
+    await this.extension.action.setBadgeBackgroundColor({
+      color: successCount > 0 ? "#22c55e" : "#ef4444",
+    });
+
+    this.extension.notifications.create({
+      type: "basic",
+      iconUrl: "/assets/icon-128.png",
+      title: successCount > 0 ? "ISG-KATIP senkronu tamamlandi" : "ISG-KATIP senkronu basarisiz",
+      message:
+        successCount > 0
+          ? `${successCount} firma senkronize edildi${
+              errorCount > 0 ? `, ${errorCount} kayit kontrol edilmeli.` : "."
+            }`
+          : "Kayitlar senkronize edilemedi.",
+      priority: 1,
+    });
+
+    await this.loadStats();
+  }
+
+  handleTabUpdate(tabId, tab) {
+    if (tab?.url?.includes("isgkatip.csgb.gov.tr")) {
+      this.extension.action.setBadgeText({ tabId, text: "ISG" });
+      this.extension.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" });
     }
   }
 }
 
 const service = new BackgroundService();
-service.init();
 
-console.log("🟢 Service worker yüklendi");
+service.init().catch((error) => {
+  console.error("Background service baslatilamadi:", error);
+});

@@ -20,6 +20,48 @@
   --radius-sm: 10px;
 }
 
+html,
+body {
+  width: 360px;
+  min-height: 520px;
+  margin: 0;
+  background: #07111f;
+}
+
+#authScreen {
+  display: flex;
+  visibility: visible;
+  opacity: 1;
+  min-height: 520px;
+  width: 100%;
+  box-sizing: border-box;
+  background: #07111f;
+  color: #ffffff;
+  z-index: 999999;
+}
+
+#authScreen * {
+  visibility: visible;
+}
+
+#authScreen .subtitle,
+#authScreen h1,
+#authScreen h2,
+#authScreen p,
+#authScreen span,
+#authScreen div {
+  color: #ffffff;
+  opacity: 1;
+}
+
+#btnLogin {
+  display: inline-flex;
+  visibility: visible;
+  opacity: 1;
+  color: #07111f;
+  background: #ffffff;
+}
+
 *,
 *::before,
 *::after {
@@ -270,6 +312,7 @@ body {
 }
 
 .user-panel,
+.system-panel,
 .stats,
 .actions-section,
 .activity-section {
@@ -298,6 +341,36 @@ body {
   font-size: 18px;
   font-weight: 800;
   box-shadow: 0 16px 28px rgba(59, 130, 246, 0.22);
+}
+
+.system-panel {
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.system-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.system-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.system-value {
+  max-width: 170px;
+  text-align: right;
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .user-panel__content h2 {
@@ -425,6 +498,31 @@ body {
   color: var(--muted);
   text-align: center;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.activity-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #dbe7fb;
+  font-size: 12px;
+}
+
+.activity-item + .activity-item {
+  margin-top: 8px;
+}
+
+.activity-bullet {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 5px rgba(79, 140, 255, 0.12);
 }
 
 .loading-screen {

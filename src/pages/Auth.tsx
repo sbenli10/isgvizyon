@@ -144,7 +144,7 @@ function StrengthBar({ password }: { password: string }) {
   const { score, level } = useMemo(() => scorePassword(password), [password]);
   const pct = (score / 5) * 100;
   const color =
-    level === "zay��f"
+    level === "zayıf"
       ? "from-rose-500 to-orange-500"
       : level === "orta"
         ? "from-amber-500 to-yellow-500"

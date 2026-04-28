@@ -3,27 +3,36 @@
   "name": "İSGVizyon İSG Bot",
   "version": "1.0.0",
   "description": "İSG-KATİP entegrasyonu ve compliance takibi",
-  
+
   "permissions": [
     "storage",
     "tabs",
     "notifications",
     "scripting"
   ],
-  
+
   "host_permissions": [
     "https://isgkatip.csgb.gov.tr/*",
     "https://elmdzekyyoepdrpnfppn.supabase.co/*",
     "https://www.isgvizyon.com/*",
     "https://isgvizyon.com/*"
   ],
-  
+
+  "externally_connectable": {
+    "matches": [
+      "https://www.isgvizyon.com/*",
+      "https://isgvizyon.com/*"
+    ]
+  },
+
   "content_scripts": [
     {
       "matches": [
         "https://isgkatip.csgb.gov.tr/*"
       ],
-      "js": ["content-scripts/isgkatip-scraper.js"],
+      "js": [
+        "content-scripts/isgkatip-scraper.js"
+      ],
       "run_at": "document_end",
       "all_frames": false
     },
@@ -32,16 +41,19 @@
         "https://www.isgvizyon.com/*",
         "https://isgvizyon.com/*"
       ],
-      "js": ["content-scripts/auth-listener.js"],
-      "run_at": "document_start"
+      "js": [
+        "content-scripts/auth-listener.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": false
     }
   ],
-  
+
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  
+
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
