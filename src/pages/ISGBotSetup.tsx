@@ -1,5 +1,3 @@
-// src/app/(app)/isg-bot/setup/page.tsx
-
 import {
   Card,
   CardContent,
@@ -9,445 +7,311 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  Chrome,
-  CheckCircle2,
   ArrowRight,
+  CheckCircle2,
+  Chrome,
   ExternalLink,
-  Zap,
-  Shield,
   Play,
+  Shield,
+  Sparkles,
+  Zap,
 } from "lucide-react";
+
+const extensionDownloadUrl = "/chrome-extension.zip";
+const isgKatipUrl = "https://isgkatip.csgb.gov.tr";
+
+const nextSteps = [
+  "Eksik sözleşmeleri kontrol et",
+  "Denetime hazır olmayan firmaları aç",
+  "Kurul gereken firmalara git",
+  "Öncelikli görevleri ilgili modüllere taşı",
+];
 
 export default function ISGBotSetup() {
   return (
-    <div className="container max-w-5xl mx-auto py-8 space-y-8">
-      {/* Header */}
-      <div className="text-center space-y-3">
+    <div className="container mx-auto max-w-6xl space-y-8 py-8">
+      <div className="space-y-4 text-center">
         <div className="flex justify-center">
-          <div className="bg-primary/10 p-4 rounded-full">
+          <div className="rounded-full bg-primary/10 p-4">
             <Chrome className="h-12 w-12 text-primary" />
           </div>
         </div>
-        <h1 className="text-4xl font-bold">İSG Bot Kurulumu</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          İSG-KATİP verilerinizi otomatik olarak İSGVizyon'a aktarın.
-          <br />
-          <strong>3 adımda</strong> kurulum tamamlanır.
-        </p>
+        <div className="space-y-2">
+          <Badge className="border-primary/30 bg-primary/10 text-primary hover:bg-primary/10">
+            ISG-Bot Kurulum Rehberi
+          </Badge>
+          <h1 className="text-4xl font-bold tracking-tight">3 adımda bağlantıyı kur, veriyi aksiyona çevir</h1>
+          <p className="mx-auto max-w-3xl text-lg leading-8 text-muted-foreground">
+            ISG-Bot, İSG-KATİP verinizi okuyup size yapılacak işleri, eksikleri ve öncelikli
+            aksiyonları gösterir. Bu sayfa kurulum içindir; veri girişi eklentiden, yorumlama ve iş
+            akışı ise ISGVizyon içinden yürür.
+          </p>
+        </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardContent className="pt-6 text-center">
-            <Zap className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+            <Zap className="mx-auto mb-2 h-8 w-8 text-amber-500" />
             <p className="text-2xl font-bold">3 Adım</p>
-            <p className="text-sm text-muted-foreground">Hızlı Kurulum</p>
+            <p className="text-sm text-muted-foreground">Kurulum kısa ve nettir</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <Shield className="h-8 w-8 text-green-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold">%100 Güvenli</p>
-            <p className="text-sm text-muted-foreground">Verileriniz Korunur</p>
+            <Shield className="mx-auto mb-2 h-8 w-8 text-emerald-500" />
+            <p className="text-2xl font-bold">Salt Okuma</p>
+            <p className="text-sm text-muted-foreground">Eklenti veriyi okur, kayıtları değiştirmez</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6 text-center">
-            <Play className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold">Otomatik</p>
-            <p className="text-sm text-muted-foreground">Tek Tıkla Sync</p>
+            <Sparkles className="mx-auto mb-2 h-8 w-8 text-cyan-500" />
+            <p className="text-2xl font-bold">Aksiyon Odaklı</p>
+            <p className="text-sm text-muted-foreground">Sözleşme, kurul ve denetim işlerine dönüşür</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Step 1: Install Extension */}
-      <Card className="border-2 border-primary">
+      <Alert>
+        <Shield className="h-4 w-4" />
+        <AlertTitle>Önce bunu netleştirelim</AlertTitle>
+        <AlertDescription className="mt-2 space-y-2">
+          <p>ISG-Bot bir veri giriş ekranı değildir. İSG-KATİP verisini okur, ISGVizyon içinde iş diline çevirir.</p>
+          <p>Bireysel uzman için günlük yönlendirme sağlar. Ekipli portföy ve çok kullanıcılı operasyon için OSGB modülü kullanılır.</p>
+        </AlertDescription>
+      </Alert>
+
+      <Card className="border-2 border-primary/40">
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <Badge variant="default" className="text-lg px-4 py-2">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <Badge variant="default" className="w-fit px-4 py-2 text-base">
               Adım 1
             </Badge>
-            <div className="flex-1">
-              <CardTitle className="text-2xl">Chrome Extension'ı Yükle</CardTitle>
+            <div>
+              <CardTitle className="text-2xl">Chrome eklentisini yükleyin</CardTitle>
               <CardDescription className="text-base">
-                Tek tıkla yükle, hiçbir ayar gerekmez
+                İlk bağlantı için eklentiyi indirip tarayıcınıza ekleyin.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Big Install Button */}
           <div className="flex justify-center">
-            <Button
-              size="lg"
-              className="h-16 px-12 text-lg"
-              onClick={() => {
-                // Chrome Web Store link (gerçek publish edilince)
-                window.open(
-                  "https://chrome.google.com/webstore/detail/denetron-isg-bot/xxxxx",
-                  "_blank"
-                );
-              }}
-            >
-              <Chrome className="h-6 w-6 mr-3" />
-              Chrome'a Ekle (Ücretsiz)
+            <Button size="lg" className="h-14 px-10 text-base" asChild>
+              <a href={extensionDownloadUrl} target="_blank" rel="noopener noreferrer">
+                <Chrome className="mr-3 h-5 w-5" />
+                Eklentiyi İndir
+              </a>
             </Button>
           </div>
 
-          <Alert>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <AlertDescription>
-              Extension yüklendikten sonra <strong>otomatik olarak</strong> İSGVizyon
-              hesabınıza bağlanır. Hiçbir ayar yapmanıza gerek yok.
-            </AlertDescription>
-          </Alert>
-
-          {/* What happens */}
-          <div className="bg-muted p-6 rounded-lg space-y-3">
-            <p className="font-semibold flex items-center gap-2">
-              <Zap className="h-5 w-5 text-yellow-500" />
-              Extension yüklenince ne olur?
-            </p>
-            <ul className="space-y-2 text-sm text-muted-foreground">
+          <div className="rounded-2xl border bg-muted/50 p-5">
+            <p className="font-semibold">Eklenti yüklendikten sonra ne olur?</p>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                <span>
-                  Chrome toolbar'a <strong>İSGVizyon İSG Bot</strong> ikonu eklenir
-                </span>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                Tarayıcınızda ISGVizyon ISG-Bot kısayolu görünür.
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                <span>
-                  Otomatik olarak İSGVizyon hesabınıza <strong>bağlanır</strong>
-                </span>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                İSG-KATİP işyeri listesi ekranında veri alımı için hazır hale gelir.
               </li>
               <li className="flex items-start gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                <span>
-                  İSG-KATİP sitesinde <strong>otomatik çalışmaya</strong> başlar
-                </span>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                Verileriniz ISGVizyon içinde durum, uyum ve aksiyon ekranlarına taşınır.
               </li>
             </ul>
           </div>
 
-          {/* Alternative: Manual Install */}
-          <details className="border rounded-lg p-4">
-            <summary className="font-semibold cursor-pointer text-sm">
-              👨‍💻 Gelişmiş: Manuel Kurulum (Developer Mode)
-            </summary>
+          <details className="rounded-xl border p-4">
+            <summary className="cursor-pointer font-semibold text-sm">Manuel kurulum gerekiyorsa</summary>
             <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <p>
-                Eğer extension henüz Chrome Web Store'da yayınlanmadıysa manuel
-                yükleyebilirsiniz:
-              </p>
-              <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>
-                  <code className="bg-muted px-1 rounded">chrome://extensions/</code>{" "}
-                  adresine gidin
-                </li>
-                <li>Sağ üstte "Developer mode" düğmesini aktif edin</li>
-                <li>"Load unpacked" butonuna tıklayın</li>
-                <li>
-                  <code className="bg-muted px-1 rounded">chrome-extension</code>{" "}
-                  klasörünü seçin
-                </li>
+              <p>Eğer eklentiyi paket dosyasıyla yüklüyorsanız şu adımları izleyin:</p>
+              <ol className="ml-2 list-inside list-decimal space-y-1">
+                <li><code className="rounded bg-muted px-1">chrome://extensions/</code> adresini açın.</li>
+                <li>Sağ üstten geliştirici modunu etkinleştirin.</li>
+                <li><strong>Paketlenmemiş öğe yükle</strong> seçeneğini kullanın.</li>
+                <li><code className="rounded bg-muted px-1">chrome-extension</code> klasörünü seçin.</li>
               </ol>
             </div>
           </details>
         </CardContent>
       </Card>
 
-      {/* Step 2: Login to İSG-KATİP */}
-      <Card className="border-2">
+      <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <Badge variant="secondary" className="text-lg px-4 py-2">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <Badge variant="secondary" className="w-fit px-4 py-2 text-base">
               Adım 2
             </Badge>
-            <div className="flex-1">
-              <CardTitle className="text-2xl">İSG-KATİP'e Giriş Yap</CardTitle>
+            <div>
+              <CardTitle className="text-2xl">İSG-KATİP’e giriş yapın</CardTitle>
               <CardDescription className="text-base">
-                E-Devlet ile giriş yapın
+                E-Devlet ile giriş yapıp işyeri listesi ekranına geçin.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">1</div>
+              <div>
+                <p className="font-semibold">İSG-KATİP sitesini açın</p>
+                <a
+                  href={isgKatipUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  isgkatip.csgb.gov.tr
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">2</div>
+              <div>
+                <p className="font-semibold">E-Devlet ile giriş yapın</p>
+                <p className="text-sm text-muted-foreground">Mevcut uzman hesabınızla giriş yapmanız yeterlidir.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground font-bold">3</div>
+              <div>
+                <p className="font-semibold">İşyeri listesi ekranını açın</p>
+                <p className="text-sm text-muted-foreground">Eklenti veri alımını işyeri listesi görünümünde başlatır.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center rounded-2xl border bg-muted/50 p-6">
+            <div className="space-y-3 text-center">
+              <div className="inline-flex rounded-xl bg-red-100 px-6 py-3 font-semibold text-red-700">
+                E-Devlet Girişi
+              </div>
+              <p className="text-sm text-muted-foreground">Bu adımda tarayıcı tarafında giriş yapılır, veri aktarımı ISGVizyon içinde görünür.</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-2 border-emerald-500/40">
+        <CardHeader>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center">
+            <Badge className="w-fit bg-emerald-500 px-4 py-2 text-base text-white hover:bg-emerald-500">
+              Adım 3
+            </Badge>
+            <div>
+              <CardTitle className="text-2xl">İlk senkronu tamamlayın</CardTitle>
+              <CardDescription className="text-base">
+                İşyeri listesi açıldığında eklenti veriyi okur ve ISGVizyon’a taşır.
               </CardDescription>
             </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Left: Instructions */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold">
-                  1
-                </div>
-                <div>
-                  <p className="font-semibold">İSG-KATİP Sitesine Git</p>
-                  <a
-                    href="https://isgkatip.csgb.gov.tr"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline inline-flex items-center gap-1"
-                  >
-                    isgkatip.csgb.gov.tr
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold">
-                  2
-                </div>
-                <div>
-                  <p className="font-semibold">E-Devlet ile Giriş Yap</p>
-                  <p className="text-sm text-muted-foreground">
-                    Sağ üstteki <strong>"E-Devlet Girişi"</strong> butonuna tıklayın
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="bg-primary text-primary-foreground rounded-full w-8 h-8 flex items-center justify-center shrink-0 font-bold">
-                  3
-                </div>
-                <div>
-                  <p className="font-semibold">T.C. Kimlik No ve Şifre Girin</p>
-                  <p className="text-sm text-muted-foreground">
-                    E-Devlet bilgilerinizle giriş yapın
-                  </p>
-                </div>
-              </div>
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="rounded-2xl border bg-muted/40 p-4">
+              <p className="font-semibold">1. Listeyi açın</p>
+              <p className="mt-2 text-sm text-muted-foreground">İşyeri listesi ekranında kalın.</p>
             </div>
-
-            {/* Right: Visual */}
-            <div className="bg-muted rounded-lg p-6 flex items-center justify-center">
-              <div className="text-center space-y-3">
-                <div className="bg-red-100 text-red-600 rounded-lg py-3 px-6 inline-block font-bold">
-                  E-Devlet Girişi
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  İSG-KATİP giriş ekranı
-                </p>
-              </div>
+            <div className="rounded-2xl border bg-muted/40 p-4">
+              <p className="font-semibold">2. Veri okunsun</p>
+              <p className="mt-2 text-sm text-muted-foreground">Firma, çalışan, süre ve sözleşme bilgileri alınır.</p>
+            </div>
+            <div className="rounded-2xl border bg-muted/40 p-4">
+              <p className="font-semibold">3. Bildirim görün</p>
+              <p className="mt-2 text-sm text-muted-foreground">Senkron tamamlandığında kısa bir bildirim görürsünüz.</p>
+            </div>
+            <div className="rounded-2xl border bg-muted/40 p-4">
+              <p className="font-semibold">4. Durum merkezine dönün</p>
+              <p className="mt-2 text-sm text-muted-foreground">Öneri kartları ve sonraki işler otomatik belirir.</p>
             </div>
           </div>
 
           <Alert>
-            <Shield className="h-4 w-4 text-green-500" />
-            <AlertDescription>
-              <strong>Güvenlik:</strong> Extension sadece <strong>okuma</strong>{" "}
-              yetkisine sahiptir. Hiçbir bilginiz değiştirilmez veya paylaşılmaz.
+            <Sparkles className="h-4 w-4" />
+            <AlertTitle>İlk senkron sonrası burada ne göreceksiniz?</AlertTitle>
+            <AlertDescription className="mt-2">
+              Hazır firmalar, eksik sözleşmeler, kurul ihtiyacı olan işyerleri ve denetime hazır olmayan
+              firmalar öneri kartları halinde önünüze gelir.
             </AlertDescription>
           </Alert>
-        </CardContent>
-      </Card>
 
-      {/* Step 3: Sync Data */}
-      <Card className="border-2 border-green-500">
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <Badge variant="default" className="text-lg px-4 py-2 bg-green-500">
-              Adım 3
-            </Badge>
-            <div className="flex-1">
-              <CardTitle className="text-2xl">Verileri Senkronize Et</CardTitle>
-              <CardDescription className="text-base">
-                İşyeri listesine gidin, extension otomatik çalışır
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            {/* Step 3.1 */}
-            <div className="flex items-start gap-4">
-              <div className="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center shrink-0 font-bold text-lg">
-                1
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-lg">İşyeri Listesine Git</p>
-                <p className="text-muted-foreground">
-                  İSG-KATİP'te: <strong>Menü → İşyerleri → İşyeri Listesi</strong>
-                </p>
-                <div className="mt-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <a
-                      href="https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Direkt Git
-                      <ExternalLink className="h-4 w-4 ml-2" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3.2 */}
-            <div className="flex items-start gap-4">
-              <div className="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center shrink-0 font-bold text-lg">
-                2
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-lg">Extension Otomatik Çalışır</p>
-                <p className="text-muted-foreground">
-                  Sayfa yüklendiğinde extension <strong>otomatik olarak</strong> firma
-                  verilerinizi toplar
-                </p>
-                <div className="mt-3 bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-sm font-semibold text-green-700 flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Ne olacak?
-                  </p>
-                  <ul className="mt-2 space-y-1 text-sm text-green-700">
-                    <li>✅ Firma adları</li>
-                    <li>✅ SGK numaraları</li>
-                    <li>✅ Çalışan sayıları</li>
-                    <li>✅ Tehlike sınıfları</li>
-                    <li>✅ Sözleşme bilgileri</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            {/* Step 3.3 */}
-            <div className="flex items-start gap-4">
-              <div className="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center shrink-0 font-bold text-lg">
-                3
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-lg">Bildirim Gelir</p>
-                <p className="text-muted-foreground">
-                  Extension senkronizasyon tamamlandığında bildirim gösterir
-                </p>
-                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-                  <CheckCircle2 className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-semibold text-blue-900">
-                      12 işyeri başarıyla senkronize edildi!
-                    </p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      İSGVizyon Dashboard'da görüntüleyebilirsiniz.
-                    </p>
+          <div className="rounded-2xl border bg-muted/50 p-5">
+            <p className="font-semibold">Sonraki adımlar</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {nextSteps.map((step) => (
+                <div key={step} className="rounded-xl border bg-background p-4 text-sm">
+                  <div className="flex items-start gap-2">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>{step}</span>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Step 3.4 */}
-            <div className="flex items-start gap-4">
-              <div className="bg-green-500 text-white rounded-full w-10 h-10 flex items-center justify-center shrink-0 font-bold text-lg">
-                4
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-lg">İSGVizyon'da Görüntüle</p>
-                <p className="text-muted-foreground mb-3">
-                  Firmalarınız İSGVizyon Dashboard'da hazır!
-                </p>
-                <Button size="lg" asChild>
-                  <a href="/isg-bot">
-                    <CheckCircle2 className="h-5 w-5 mr-2" />
-                    Dashboard'a Git
-                  </a>
-                </Button>
-              </div>
-            </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button size="lg" asChild>
+              <a href="/isg-bot">
+                Durum Merkezine Git
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </a>
+            </Button>
+            <Button size="lg" variant="outline" asChild>
+              <a href={isgKatipUrl} target="_blank" rel="noopener noreferrer">
+                İSG-KATİP’i Aç
+                <ExternalLink className="ml-2 h-5 w-5" />
+              </a>
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Video Tutorial */}
       <Card>
         <CardHeader>
-          <CardTitle>📹 Video Anlatım</CardTitle>
+          <CardTitle>ISG-Bot ile OSGB modülü aynı şey mi?</CardTitle>
           <CardDescription>
-            Kurulumun tüm adımlarını videoda izleyin (2 dakika)
+            Hayır. Aynı veri kaynağını kullanırlar ama kullanıcı tipi ve amaçları farklıdır.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-            <div className="text-center space-y-3">
-              <Play className="h-16 w-16 text-muted-foreground mx-auto" />
-              <p className="text-muted-foreground">Video yakında eklenecek</p>
-            </div>
+        <CardContent className="grid gap-4 lg:grid-cols-2">
+          <div className="rounded-2xl border bg-card/60 p-5">
+            <p className="font-semibold">ISG-Bot: bireysel uzman akışı</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Kendi firmanızda veya sorumlu olduğunuz işyerlerinde önce ne yapmanız gerektiğini gösterir.
+              Günlük iş listesi, denetime hazırlık ve uyum yönlendirmesi için idealdir.
+            </p>
+          </div>
+          <div className="rounded-2xl border bg-card/60 p-5">
+            <p className="font-semibold">OSGB modülü: ekipli portföy yönetimi</p>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Birden fazla uzman, çok sayıda firma, görev paylaşımı ve kurumsal portföy görünümü için
+              kullanılır. Yönetim ve ekip operasyonu burada güçlenir.
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* FAQ */}
       <Card>
         <CardHeader>
-          <CardTitle>Sık Sorulan Sorular</CardTitle>
+          <CardTitle>
+            <Play className="mr-2 inline-flex h-5 w-5" />
+            Kısa kullanım mantığı
+          </CardTitle>
+          <CardDescription>
+            Teknik detay yerine iş diliyle düşünün.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <details className="border rounded-lg p-4">
-            <summary className="font-semibold cursor-pointer">
-              Extension ücretsiz mi?
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Evet, extension tamamen <strong>ücretsizdir</strong>. İSGVizyon
-              aboneliğinize dahildir.
-            </p>
-          </details>
-
-          <details className="border rounded-lg p-4">
-            <summary className="font-semibold cursor-pointer">
-              Verilerim güvende mi?
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Evet, tüm veriler <strong>şifrelenmiş</strong> olarak Supabase'de
-              saklanır. Row Level Security (RLS) ile sadece siz erişebilirsiniz.
-            </p>
-          </details>
-
-          <details className="border rounded-lg p-4">
-            <summary className="font-semibold cursor-pointer">
-              Her seferinde manuel sync yapmam gerekiyor mu?
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Hayır, İSG-KATİP işyeri listesi sayfasını her açtığınızda extension{" "}
-              <strong>otomatik</strong> olarak çalışır.
-            </p>
-          </details>
-
-          <details className="border rounded-lg p-4">
-            <summary className="font-semibold cursor-pointer">
-              Edge veya Firefox'ta çalışır mı?
-            </summary>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Edge tarayıcısında çalışır (Chromium tabanlı). Firefox için ayrı bir
-              versiyon yayınlanacak.
-            </p>
-          </details>
-        </CardContent>
-      </Card>
-
-      {/* CTA */}
-      <Card className="bg-primary text-primary-foreground">
-        <CardContent className="py-8 text-center space-y-4">
-          <h2 className="text-2xl font-bold">Kuruluma Başlayın! 🚀</h2>
-          <p className="text-primary-foreground/90 max-w-2xl mx-auto">
-            Extension'ı yükleyin, İSG-KATİP'e giriş yapın ve firmalarınız otomatik
-            olarak İSGVizyon'a aktarılsın.
-          </p>
-          <div className="flex justify-center gap-3 pt-4">
-            <Button size="lg" variant="secondary" asChild>
-              <a href="https://chrome.google.com/webstore/detail/xxxxx" target="_blank">
-                <Chrome className="h-5 w-5 mr-2" />
-                Extension'ı Yükle
-              </a>
-            </Button>
-            <Button size="lg" variant="outline" className="bg-transparent" asChild>
-              <a href="/isg-bot">
-                Dashboard'a Git
-                <ArrowRight className="h-5 w-5 ml-2" />
-              </a>
-            </Button>
-          </div>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p><strong>ISG-Bot ne yapar?</strong> Veriyi okur, eksikleri ve yaklaşan işleri sıralar.</p>
+          <p><strong>ISG-Bot ne yapmaz?</strong> İSG-KATİP tarafında veri değiştirmez, resmi kayıtları sizin yerinize yönetmez.</p>
+          <p><strong>Doğru kullanım nedir?</strong> Veriyi alın, öneri kartlarına bakın, gerekli işlere ilgili modüllerden devam edin.</p>
         </CardContent>
       </Card>
     </div>

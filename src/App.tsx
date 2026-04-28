@@ -34,6 +34,7 @@ import CookieConsent from "@/components/CookieConsent";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { SentryRuntimeContext } from "@/components/SentryRuntimeContext";
 import { OverlayPortalProvider } from "@/components/overlay/OverlayPortalProvider";
+import { SupabaseServiceStatusOverlay } from "@/components/SupabaseServiceStatusOverlay";
 
 // ============================================
 // CORE PAGES
@@ -378,6 +379,7 @@ const App = () => (
           >
             <AuthProvider>
               <SentryRuntimeContext />
+              <SupabaseServiceStatusOverlay />
               <RouteTimingObserver />
               <CookieConsent />
               <Routes>

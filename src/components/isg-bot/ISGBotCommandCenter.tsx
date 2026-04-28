@@ -200,7 +200,7 @@ const ruleCatalog: Record<string, RuleMeta> = {
     title: "Sözleşme süresi dolmuş veya bitişe yaklaşmış",
     legalReference: "Görevlendirme sürekliliği yükümlülüğü",
     category: "Sözleşme",
-    defaultRoute: "/isg-bot?tab=audit",
+    defaultRoute: "/isg-bot?tab=readiness",
     template: "Sözleşme yenileme sürecini başlatın ve onay tarihlerini doğrulayın.",
   },
   BOARD_REQUIRED: {
@@ -225,7 +225,7 @@ const expertTemplates: TemplateDefinition[] = [
     title: "Sözleşme yenileme akışı",
     detail: "Süresi dolan veya 30 gün içinde bitecek firmalar için yenileme görevi oluşturur.",
     legalReference: "Görevlendirme sürekliliği yükümlülüğü",
-    defaultRoute: "/isg-bot?tab=audit",
+    defaultRoute: "/isg-bot?tab=readiness",
     priority: "Yüksek",
   },
   {
@@ -659,7 +659,7 @@ export default function ISGBotCommandCenter() {
         status: contractDays < 0 ? "Gecikmiş" : "Bu ay",
         sourceType: "contract",
         legalReference: ruleCatalog.CONTRACT_EXPIRED.legalReference,
-        route: "/isg-bot?tab=audit",
+        route: "/isg-bot?tab=readiness",
         notes: "Sözleşme yenileme sürecini başlatın, taraf onaylarını tamamlayın ve bitiş tarihini güncelleyin.",
         severity: contractDays < 0 ? "critical" : "high",
         priorityScore: calculatePriorityScore({
@@ -878,6 +878,55 @@ export default function ISGBotCommandCenter() {
         .sort((a, b) => b.riskScore - a.riskScore),
     };
   }, [filteredOsgbCompanies, flags, selectedOsgbExpert]);
+
+  const prioritySuggestions = useMemo(
+    () => [
+      {
+        id: "priority-action",
+        title: "Bugün önce bunu yap",
+        description:
+          expertActions[0]?.title ?? "İlk senkron sonrası öncelikli iş burada görünecek.",
+        actionLabel: expertActions[0] ? "Aksiyonu aç" : "Kurulum rehberine dön",
+        onClick: () => {
+          if (expertActions[0]) {
+            openTaskDialog(expertActions[0]);
+            return;
+          }
+          navigate("/docs/isg-bot-setup");
+        },
+      },
+      {
+        id: "contracts",
+        title: "Eksik sözleşmeleri kontrol et",
+        description:
+          upcomingContractCount > 0
+            ? `${upcomingContractCount} firma için sözleşme takibi bekliyor.`
+            : "Şu an yaklaşan sözleşme baskısı görünmüyor.",
+        actionLabel: "Sözleşme görünümüne git",
+        onClick: () => navigate("/isg-bot?tab=readiness"),
+      },
+      {
+        id: "readiness",
+        title: "Denetime hazır olmayan firmaları aç",
+        description:
+          criticalFlagCount > 0
+            ? `${criticalFlagCount} kritik açık denetim hazırlığını etkiliyor.`
+            : "Denetim hazırlığı tarafında kritik açık görünmüyor.",
+        actionLabel: "Denetim hazırlığını aç",
+        onClick: () => navigate("/isg-bot?tab=readiness"),
+      },
+      {
+        id: "boards",
+        title: "Kurul gereken firmalara git",
+        description: expertActions.some((action) => action.sourceType === "board")
+          ? "Kurul toplantısı gerektiren firmalar bulundu."
+          : "Şu an kurul açısından yeni bir baskı görünmüyor.",
+        actionLabel: "Kurul işlemlerine git",
+        onClick: () => navigate("/board-meetings"),
+      },
+    ],
+    [criticalFlagCount, expertActions, navigate, upcomingContractCount]
+  );
 
   const openCompanyPlanTaskDialog = (item: CompanyPlanItem) => {
     if (!selectedCompany) return;
@@ -1174,11 +1223,11 @@ export default function ISGBotCommandCenter() {
             <div className="space-y-2">
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <Sparkles className="h-6 w-6 text-cyan-400" />
-                Operasyon Komuta Merkezi
+                Öneri ve Aksiyon Merkezi
               </CardTitle>
               <CardDescription className="max-w-3xl text-slate-400">
-                Uzman, firma ve OSGB katmanlarında aynı veri setini farklı karar seviyelerine çevirir.
-                Uzman için aksiyon, firma için özet, OSGB için portföy görünümü üretir.
+                Aynı veriyi önce yapılacak işlere, sonra firma özetine ve ardından portföy görünümüne
+                çevirir. Teknik komutlardan önce iş diliyle yönlendirme üretir.
               </CardDescription>
             </div>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1192,13 +1241,40 @@ export default function ISGBotCommandCenter() {
 
         <CardContent>
           <Tabs value={layer} onValueChange={(value) => setLayer(value as LayerMode)} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 bg-slate-900 lg:w-[520px]">
-              <TabsTrigger value="expert">Uzman Katmanı</TabsTrigger>
-              <TabsTrigger value="company">Firma Katmanı</TabsTrigger>
-              <TabsTrigger value="osgb">OSGB Katmanı</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-1 gap-2 bg-transparent p-0 md:grid-cols-3 lg:w-[620px]">
+              <TabsTrigger value="expert" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
+                Uzman Akışı
+              </TabsTrigger>
+              <TabsTrigger value="company" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
+                Firma Özeti
+              </TabsTrigger>
+              <TabsTrigger value="osgb" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
+                OSGB Görünümü
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="expert" className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {prioritySuggestions.map((suggestion) => (
+                  <Card key={suggestion.id} className="border-slate-800 bg-slate-900/70">
+                    <CardContent className="p-5">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+                        <Sparkles className="h-4 w-4 text-cyan-400" />
+                        {suggestion.title}
+                      </div>
+                      <p className="min-h-[60px] text-sm leading-6 text-slate-300">{suggestion.description}</p>
+                      <Button
+                        variant="outline"
+                        className="mt-4 w-full border-slate-700 text-slate-200 hover:bg-slate-800"
+                        onClick={suggestion.onClick}
+                      >
+                        {suggestion.actionLabel}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+
               <div className="grid gap-4 lg:grid-cols-4">
                 <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-400">Kritik mevzuat açığı</p><p className="mt-2 text-3xl font-semibold text-white">{criticalFlagCount}</p></div><ShieldAlert className="h-8 w-8 text-rose-400" /></div></CardContent></Card>
                 <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-400">Üretilecek aksiyon</p><p className="mt-2 text-3xl font-semibold text-white">{expertActions.length}</p></div><ClipboardCheck className="h-8 w-8 text-cyan-400" /></div></CardContent></Card>
@@ -1209,8 +1285,8 @@ export default function ISGBotCommandCenter() {
               <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
                 <Card className="border-slate-800 bg-slate-900/70">
                   <CardHeader>
-                    <CardTitle>Öncelik motoru</CardTitle>
-                    <CardDescription>Severity, sözleşme günü, çalışan hacmi ve açık sayısına göre sıralama yapılır.</CardDescription>
+                    <CardTitle>Öncelikli işler</CardTitle>
+                    <CardDescription>Bugün hangi işi öne almanız gerektiği burada sıralanır.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {expertActions.map((action) => (
@@ -1241,8 +1317,8 @@ export default function ISGBotCommandCenter() {
                 <div className="space-y-6">
                   <Card className="border-slate-800 bg-slate-900/70">
                     <CardHeader>
-                      <CardTitle>Mevzuat kartları</CardTitle>
-                      <CardDescription>En çok tetiklenen yükümlülük alanları ve yoğunlukları.</CardDescription>
+                      <CardTitle>En çok tekrar eden yükümlülükler</CardTitle>
+                      <CardDescription>Hangi başlıkların sık tekrar ettiğini sade şekilde görün.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {legislationCards.map((item) => (
@@ -1260,8 +1336,8 @@ export default function ISGBotCommandCenter() {
 
                   <Card className="border-slate-800 bg-slate-900/70">
                     <CardHeader>
-                      <CardTitle>Aksiyon şablonları</CardTitle>
-                      <CardDescription>Tekrarlanan operasyon akışları için hazır görev şablonları.</CardDescription>
+                      <CardTitle>Hazır iş akışları</CardTitle>
+                      <CardDescription>Tekrarlanan işler için önceden hazırlanmış görev taslakları.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
                       {expertTemplates.map((template) => (
@@ -1319,7 +1395,7 @@ export default function ISGBotCommandCenter() {
                     <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Yaklaşan işler ve yönetim aksiyonu</CardTitle><CardDescription>Yönetim tarafında gecikmeden alınması gereken kararlar.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-300">
                       <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><CalendarClock className="h-4 w-4 text-cyan-400" />Yaklaşan iş</div><p>Sözleşme bitiş tarihi: <strong>{formatDateLabel(selectedCompany.contract_end)}</strong></p><p className="mt-1">Son kurul kaydı: <strong>{selectedCompanyMeetings[0] ? formatDateLabel(selectedCompanyMeetings[0].meeting_date) : "Kayıt bulunmuyor"}</strong></p></div>
                       <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><Building2 className="h-4 w-4 text-amber-400" />Yönetim aksiyonu</div><p>Öncelik, süre eksiği ve açık kritik uyumsuzlukları kapatmak. Karar mekanizması olarak kurul gündemi veya ek uzman süresi planlaması önerilir.</p></div>
-                      <div className="flex gap-2"><Button className="flex-1" onClick={() => navigate("/isg-bot?tab=audit")}>Denetim özetine git</Button><Button variant="outline" className="flex-1 border-slate-700 text-slate-200" onClick={() => navigate("/board-meetings")}>Kurul işlemleri</Button></div>
+                      <div className="flex gap-2"><Button className="flex-1" onClick={() => navigate("/isg-bot?tab=readiness")}>Denetim özetine git</Button><Button variant="outline" className="flex-1 border-slate-700 text-slate-200" onClick={() => navigate("/board-meetings")}>Kurul işlemleri</Button></div>
                     </CardContent></Card>
                   </div>
                 </div>
