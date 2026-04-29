@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useMemo } from "react";
 import { FixedSizeList as List } from "react-window";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { useRef, useCallback } from "react";
 import { 
   Building2, Users, FileSpreadsheet, Plus, Save, 
@@ -62,19 +62,50 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseEmployeeExcel, downloadEmployeeTemplate, type ParsedEmployee } from "@/utils/excelParser";
-import { NACE_DATABASE, searchNACE, type NACECode } from "@/utils/naceDatabase";
+import type { NACECode } from "@/utils/naceDatabase";
 import type { Company, Employee, RiskTemplate } from "@/types/companies";
 import { cn } from "@/lib/utils";
 import { useSafeMode } from "@/hooks/useSafeMode";
 import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { getBulkCompanyPreviewKey, getParsedEmployeePreviewKey } from "@/lib/companyManagerKeys";
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 
 interface NACEVirtualListProps {
   items: NACECode[];
   selectedCode: string | undefined;
   onSelect: (nace: NACECode) => void;
 }
+
+type NaceModule = typeof import("@/utils/naceDatabase");
+
+let naceModuleLoader: Promise<NaceModule> | null = null;
+
+const loadNaceModule = async () => {
+  if (!naceModuleLoader) {
+    naceModuleLoader = import("@/utils/naceDatabase");
+  }
+
+  return naceModuleLoader;
+};
+
+const searchNaceCodes = (items: NACECode[], query: string) => {
+  const normalized = query.trim().toLocaleLowerCase("tr-TR");
+  if (!normalized) return items;
+
+  return items.filter((item) =>
+    [
+      item.code,
+      item.name,
+      item.industry_sector,
+      item.hazard_class,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("tr-TR")
+      .includes(normalized),
+  );
+};
 
 const NACEVirtualList: React.FC<NACEVirtualListProps> = ({ 
   items, 
@@ -313,15 +344,25 @@ function createBulkCompanyClientId(
 export default function CompanyManager() {
   const { user } = useAuth();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const runtimeMode = useSafeMode();
   const overlayContainerRef = useRef<HTMLDivElement | null>(null);
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [hazardFilter, setHazardFilter] = useState<string | null>(null);
-  const [companyViewMode, setCompanyViewMode] = useState<"table" | "cards">("table");
-  const [workspaceMode, setWorkspaceMode] = useState<"list" | "wizard" | "import">("list");
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("search") || "");
+  const [hazardFilter, setHazardFilter] = useState<string | null>(() => {
+    const value = searchParams.get("hazard");
+    return value === "Az Tehlikeli" || value === "Tehlikeli" || value === "Çok Tehlikeli" ? value : null;
+  });
+  const [companyViewMode, setCompanyViewMode] = useState<"table" | "cards">(() => {
+    const value = searchParams.get("view");
+    return value === "cards" ? "cards" : "table";
+  });
+  const [workspaceMode, setWorkspaceMode] = useState<"list" | "wizard" | "import">(() => {
+    const value = searchParams.get("workspace");
+    return value === "wizard" || value === "import" ? value : "list";
+  });
   const [showAllCompanies, setShowAllCompanies] = useState(false);
   
   // Wizard State
@@ -377,6 +418,7 @@ export default function CompanyManager() {
   const [naceOpen, setNaceOpen] = useState(false);
   const [naceSearchQuery, setNaceSearchQuery] = useState("");
   const [selectedNACE, setSelectedNACE] = useState<NACECode | null>(null);
+  const [naceCatalog, setNaceCatalog] = useState<NACECode[]>([]);
 
   // Step 2: Sektörel Şablon
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
@@ -396,6 +438,53 @@ export default function CompanyManager() {
   const [savingEmployeeId, setSavingEmployeeId] = useState<string | null>(null);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+  const [restoredWizardDraftLabel, setRestoredWizardDraftLabel] = useState<string | null>(null);
+
+  const companyWizardDraftKey = useMemo(
+    () => `company-manager:${user?.id || "guest"}:${editingCompanyId || "new"}`,
+    [editingCompanyId, user?.id],
+  );
+
+  const ensureNaceCatalogLoaded = useCallback(async () => {
+    if (naceCatalog.length > 0) return naceCatalog;
+
+    const naceModule = await loadNaceModule();
+    setNaceCatalog(naceModule.NACE_DATABASE);
+    return naceModule.NACE_DATABASE;
+  }, [naceCatalog]);
+
+  const restoreSelectedNace = useCallback(
+    async (naceCode?: string | null) => {
+      if (!naceCode) {
+        setSelectedNACE(null);
+        return;
+      }
+
+      const items = await ensureNaceCatalogLoaded();
+      const matched = items.find((item) => item.code === naceCode) || searchNaceCodes(items, naceCode)[0] || null;
+      setSelectedNACE(matched);
+    },
+    [ensureNaceCatalogLoaded],
+  );
+
+  const { clearDraft: clearCompanyWizardDraft } = usePersistentDraft({
+    key: companyWizardDraftKey,
+    enabled: Boolean(user?.id) && workspaceMode === "wizard" && wizardOpen,
+    version: 1,
+    value: {
+      currentStep,
+      formData,
+      selectedTemplate,
+    },
+    onRestore: (draft) => {
+      setCurrentStep(typeof draft.currentStep === "number" ? draft.currentStep : 1);
+      setFormData((prev) => ({ ...prev, ...(draft.formData || {}) }));
+      setSelectedTemplate(draft.selectedTemplate || "");
+      void restoreSelectedNace(draft.formData?.nace_code);
+      setRestoredWizardDraftLabel(editingCompanyId ? "Firma düzenleme taslağı" : "Yeni firma taslağı");
+      toast.info("Kaydedilmemiş firma taslağı geri yüklendi.");
+    },
+  });
 
   const closeTransientUi = useCallback(() => {
     setNaceOpen(false);
@@ -412,7 +501,40 @@ export default function CompanyManager() {
       loadCompanies();
       loadRiskTemplates();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+
+    if (searchQuery.trim()) {
+      next.set("search", searchQuery.trim());
+    } else {
+      next.delete("search");
+    }
+
+    if (hazardFilter) {
+      next.set("hazard", hazardFilter);
+    } else {
+      next.delete("hazard");
+    }
+
+    if (companyViewMode !== "table") {
+      next.set("view", companyViewMode);
+    } else {
+      next.delete("view");
+    }
+
+    if (workspaceMode !== "list") {
+      next.set("workspace", workspaceMode);
+    } else {
+      next.delete("workspace");
+    }
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [companyViewMode, hazardFilter, searchParams, searchQuery, setSearchParams, workspaceMode]);
 
   useEffect(() => {
     if (runtimeMode.safeMode) {
@@ -435,6 +557,11 @@ export default function CompanyManager() {
       closeTransientUi();
     }
   }, [closeTransientUi, location.pathname]);
+
+  useEffect(() => {
+    if (!naceOpen && !(workspaceMode === "wizard" && formData.nace_code)) return;
+    void ensureNaceCatalogLoaded();
+  }, [ensureNaceCatalogLoaded, formData.nace_code, naceOpen, workspaceMode]);
 
   const loadCompanies = async () => {
     try {
@@ -589,6 +716,16 @@ export default function CompanyManager() {
       return haystack.includes(normalizedSearch);
     });
   }, [detailEmployeeDepartmentFilter, detailEmployeeSearchQuery, existingEmployees]);
+
+  const filteredNaceOptions = useMemo(() => {
+    if (naceSearchQuery.length > 0 && naceSearchQuery.length < 2) {
+      return [];
+    }
+
+    return naceSearchQuery.length >= 2
+      ? searchNaceCodes(naceCatalog, naceSearchQuery)
+      : naceCatalog;
+  }, [naceCatalog, naceSearchQuery]);
 
   const startEmployeeEdit = (employee: Employee) => {
     setEditingEmployeeId(employee.id);
@@ -788,10 +925,7 @@ export default function CompanyManager() {
 
     void syncCompanyLogoPreview(company.logo_url || "");
 
-    const nace = NACE_DATABASE.find(n => n.code === company.nace_code);
-    if (nace) {
-      setSelectedNACE(nace);
-    }
+    void restoreSelectedNace(company.nace_code);
 
     if (company.industry_sector) {
       setSelectedTemplate(resolveSectorTemplateValue(company.industry_sector));
@@ -801,6 +935,7 @@ export default function CompanyManager() {
     setWorkspaceMode("wizard");
     setWizardOpen(true);
     setCurrentStep(1);
+    setRestoredWizardDraftLabel(null);
     void loadExistingEmployees(company.id);
   };
 
@@ -864,6 +999,7 @@ export default function CompanyManager() {
 
   const parseBulkCompanyFile = async (file: File) => {
     const XLSX = await loadXlsx();
+    const naceItems = await ensureNaceCatalogLoaded();
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: "array" });
     const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -881,7 +1017,7 @@ export default function CompanyManager() {
 
         const naceCode = String(getValue("nacekodu", "nacecode", "nace", "faaliyetkodu") || "").trim();
         const naceMatch = naceCode
-          ? NACE_DATABASE.find((item) => item.code === naceCode) || searchNACE(naceCode)[0]
+          ? naceItems.find((item) => item.code === naceCode) || searchNaceCodes(naceItems, naceCode)[0]
           : undefined;
 
         const hazardClass = String(getValue("tehlikesinifi", "hazardclass", "sinif") || "").trim();
@@ -1164,6 +1300,7 @@ export default function CompanyManager() {
             : "Firma bilgileri güncellendi"
         });
 
+        clearCompanyWizardDraft();
         setWizardOpen(false);
         setWorkspaceMode("list");
         setEditingCompanyId(null);
@@ -1257,6 +1394,7 @@ export default function CompanyManager() {
         description: `${result.inserted_risks || 0} risk, ${insertedEmployeesCount} çalışan eklendi`,
       });
 
+      clearCompanyWizardDraft();
       setWizardOpen(false);
       setWorkspaceMode("list");
       resetWizard();
@@ -1308,6 +1446,7 @@ export default function CompanyManager() {
     setEditingEmployeeId(null);
     setEmployeeDraft({});
     setEditingCompanyId(null);
+    setRestoredWizardDraftLabel(null);
   };
 
   const goToStep = (step: number) => {
@@ -1506,8 +1645,8 @@ export default function CompanyManager() {
                           <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
                             <span>
                               {naceSearchQuery.length >= 2
-                                ? `${searchNACE(naceSearchQuery).length} sonuç`
-                                : `${NACE_DATABASE.length} toplam kod`}
+                                ? `${filteredNaceOptions.length} sonuç`
+                                : `${naceCatalog.length.toLocaleString()} toplam kod`}
                             </span>
                             {naceSearchQuery && (
                               <Button
@@ -1529,7 +1668,7 @@ export default function CompanyManager() {
                           </div>
                         ) : (
                           <NACEVirtualList
-                            items={naceSearchQuery.length >= 2 ? searchNACE(naceSearchQuery) : NACE_DATABASE}
+                            items={filteredNaceOptions}
                             selectedCode={selectedNACE?.code}
                             onSelect={handleNACESelect}
                           />
@@ -1591,7 +1730,7 @@ export default function CompanyManager() {
                   {/* ✅ Bilgi Notu */}
                   <p className="text-xs text-muted-foreground mt-2">
                     💡 İpucu: En az 2 karakter girerek arama yapabilirsiniz. 
-                    Boş bırakırsanız tüm {NACE_DATABASE.length.toLocaleString()} kod gösterilir.
+                    Boş bırakırsanız tüm {naceCatalog.length.toLocaleString()} kod gösterilir.
                   </p>
                 </div>
 
@@ -2180,7 +2319,10 @@ export default function CompanyManager() {
             size="lg"
             className="gap-2 rounded-2xl"
             onClick={() => {
-              if (!editingCompanyId) resetWizard();
+              if (!editingCompanyId) {
+                resetWizard();
+                setRestoredWizardDraftLabel(null);
+              }
               setWorkspaceMode("wizard");
             }}
           >
@@ -2206,6 +2348,25 @@ export default function CompanyManager() {
 
       {workspaceMode === "wizard" && (
         <RouteErrorBoundary routeKey="companies:wizard" componentName="CompanyManagerWizard">
+        {restoredWizardDraftLabel ? (
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-cyan-50 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold">{restoredWizardDraftLabel} geri yüklendi</p>
+              <p className="mt-1 text-sm text-cyan-100/80">Firma sihirbazındaki kaydedilmemiş alanlar otomatik olarak geri taşındı.</p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                clearCompanyWizardDraft();
+                resetWizard();
+              }}
+              className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
+            >
+              Taslağı temizle
+            </Button>
+          </div>
+        ) : null}
         <Card className="border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
           <CardHeader>
             <CardTitle className="text-xl font-black text-white">

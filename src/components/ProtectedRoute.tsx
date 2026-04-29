@@ -1,8 +1,19 @@
-import { Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { saveIntendedRoute } from "@/lib/navigationPersistence";
+
+function AuthRedirect({ intendedPath }: { intendedPath: string }) {
+  useEffect(() => {
+    saveIntendedRoute(intendedPath);
+  }, [intendedPath]);
+
+  return <Navigate to="/landing" replace />;
+}
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -38,7 +49,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!session) {
-    return <Navigate to="/landing" replace />;
+    return <AuthRedirect intendedPath={`${location.pathname}${location.search}${location.hash}`} />;
   }
 
   return <>{children}</>;

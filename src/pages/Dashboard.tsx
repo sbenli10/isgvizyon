@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { useSafeMode } from "@/hooks/useSafeMode";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import NotificationWidget from "@/components/NotificationWidget";
 import { toast } from "sonner";
 import {
@@ -51,15 +53,22 @@ function RevealBlock({
   children,
   delay = 0,
   className = "",
+  disabled = false,
 }: {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    if (disabled) {
+      setVisible(true);
+      return;
+    }
+
     const node = ref.current;
     if (!node) return;
 
@@ -75,7 +84,7 @@ function RevealBlock({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [disabled]);
 
   return (
     <div
@@ -95,13 +104,16 @@ function RevealBlock({
 function StorySurface({
   children,
   className = "",
+  disabled = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (disabled) return;
     const node = ref.current;
     if (!node) return;
 
@@ -124,16 +136,21 @@ function StorySurface({
         } as React.CSSProperties
       }
     >
-      <div className="pointer-events-none absolute inset-0 opacity-70 transition-opacity duration-300 [background:radial-gradient(circle_at_var(--glow-x)_var(--glow-y),rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_calc(var(--glow-x)_-_14%)_calc(var(--glow-y)_+_18%),rgba(99,102,241,0.10),transparent_26%)]" />
+      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-300 [background:radial-gradient(circle_at_var(--glow-x)_var(--glow-y),rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_calc(var(--glow-x)_-_14%)_calc(var(--glow-y)_+_18%),rgba(99,102,241,0.10),transparent_26%)] ${disabled ? "opacity-0" : "opacity-70"}`} />
       <div className="relative">{children}</div>
     </div>
   );
 }
 
-function AnimatedNumber({ value }: { value: number }) {
+function AnimatedNumber({ value, disabled = false }: { value: number; disabled?: boolean }) {
   const [displayValue, setDisplayValue] = useState(0);
 
   useEffect(() => {
+    if (disabled) {
+      setDisplayValue(value);
+      return;
+    }
+
     const duration = 700;
     const steps = 24;
     const increment = value / steps;
@@ -158,6 +175,9 @@ function AnimatedNumber({ value }: { value: number }) {
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const { safeMode } = useSafeMode();
+  const prefersReducedMotion = useReducedMotion();
+  const reduceMotion = safeMode || prefersReducedMotion;
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
   const [refreshing, setRefreshing] = useState(false);
@@ -419,7 +439,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 notranslate" translate="no">
-      <RevealBlock>
+      <RevealBlock disabled={reduceMotion}>
         <section className="relative overflow-hidden rounded-[24px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),radial-gradient(circle_at_80%_20%,_rgba(59,130,246,0.16),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-4 shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:rounded-[28px] md:p-8">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.04)_45%,transparent_100%)]" />
         <div className="relative grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
@@ -449,7 +469,7 @@ export default function Dashboard() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5">
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Kritik Sonuçlar</p>
-                <p className="mt-3 text-3xl font-semibold text-white"><AnimatedNumber value={criticalRecentCount} /></p>
+                <p className="mt-3 text-3xl font-semibold text-white"><AnimatedNumber value={criticalRecentCount} disabled={reduceMotion} /></p>
                 <p className="mt-1 text-sm text-slate-300">Son denetimlerde kritik risk etiketi alan kayıtlar</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5">
@@ -471,7 +491,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Canlı Durum</p>
                   <p className="mt-2 text-3xl font-semibold text-white md:text-4xl">
-                    <AnimatedNumber value={operationalScore} />
+                    <AnimatedNumber value={operationalScore} disabled={reduceMotion} />
                   </p>
                 </div>
                 <Button
@@ -499,12 +519,12 @@ export default function Dashboard() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
               <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/5 p-4 transition-transform duration-300 hover:-translate-y-0.5">
                 <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">Saha Akışı</p>
-                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={activeInspections} /></p>
+                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={activeInspections} disabled={reduceMotion} /></p>
                 <p className="mt-1 text-sm text-slate-300">Aktif yürüyen denetim</p>
               </div>
               <div className="rounded-2xl border border-amber-400/10 bg-amber-400/5 p-4 transition-transform duration-300 hover:-translate-y-0.5">
                 <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Kapanış Baskısı</p>
-                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={openFindings + overdueActions} /></p>
+                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={openFindings + overdueActions} disabled={reduceMotion} /></p>
                 <p className="mt-1 text-sm text-slate-300">Açık bulgu + geciken işlem toplamı</p>
               </div>
             </div>
@@ -514,7 +534,7 @@ export default function Dashboard() {
       </RevealBlock>
 
       <Tabs defaultValue="executive" className="space-y-6">
-        <RevealBlock delay={80}>
+        <RevealBlock delay={80} disabled={reduceMotion}>
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Dashboard Akışı</p>
@@ -538,7 +558,7 @@ export default function Dashboard() {
         </RevealBlock>
 
         <TabsContent value="executive" className="space-y-6">
-          <RevealBlock delay={100}>
+          <RevealBlock delay={100} disabled={reduceMotion}>
             <section className="grid gap-3 md:grid-cols-3">
               {priorityActions.map((action, index) => (
                 <div
@@ -556,7 +576,7 @@ export default function Dashboard() {
             </section>
           </RevealBlock>
 
-          <RevealBlock delay={140}>
+          <RevealBlock delay={140} disabled={reduceMotion}>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {loading ? (
                 Array.from({ length: 4 }).map((_, idx) => (
@@ -589,7 +609,7 @@ export default function Dashboard() {
                     </div>
                     <div className="mt-6 space-y-2">
                       <p className="text-4xl font-semibold tracking-tight text-white">
-                        <AnimatedNumber value={metric.value} />
+                        <AnimatedNumber value={metric.value} disabled={reduceMotion} />
                       </p>
                       <p className="text-sm text-slate-300">{metric.insight}</p>
                     </div>
@@ -599,13 +619,13 @@ export default function Dashboard() {
             </div>
           </RevealBlock>
 
-          <RevealBlock delay={180}>
+          <RevealBlock delay={180} disabled={reduceMotion}>
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.08fr_0.92fr]">
               <section className="grid gap-4 sm:grid-cols-3">
                 <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-5">
                   <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Risk Hacmi</p>
                   <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    <AnimatedNumber value={totalRiskVolume} />
+                    <AnimatedNumber value={totalRiskVolume} disabled={reduceMotion} />
                   </p>
                   <p className="mt-2 text-sm text-slate-300">Toplam sınıflandırılmış risk kaydı</p>
                 </div>
@@ -622,7 +642,7 @@ export default function Dashboard() {
                   <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Ritim Farkı</p>
                   <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
                     {momentumDelta > 0 ? "+" : ""}
-                    <AnimatedNumber value={Math.abs(momentumDelta)} />
+                    <AnimatedNumber value={Math.abs(momentumDelta)} disabled={reduceMotion} />
                   </p>
                   <p className="mt-2 text-sm text-slate-300">
                     {momentumDelta === 0 ? "Son iki ay aynı ritimde" : momentumDelta > 0 ? "Son ay yukarı yönlü" : "Son ay aşağı yönlü"}
@@ -630,7 +650,7 @@ export default function Dashboard() {
                 </div>
               </section>
 
-              <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(18,24,41,0.92))] p-6 md:p-7">
+              <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(18,24,41,0.92))] p-6 md:p-7">
                 <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
                 <div className="relative grid gap-6 lg:grid-cols-[0.44fr_0.56fr]">
                   <div className="space-y-5">
@@ -703,9 +723,9 @@ export default function Dashboard() {
         </TabsContent>
 
         <TabsContent value="operations" className="space-y-6">
-          <RevealBlock delay={140}>
+          <RevealBlock delay={140} disabled={reduceMotion}>
             <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.02fr_0.98fr]">
-              <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(20,26,44,0.92))] p-6 md:p-7">
+              <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(20,26,44,0.92))] p-6 md:p-7">
                 <div className="relative">
                   <div className="mb-5 flex items-start justify-between gap-4">
                     <div>
@@ -818,7 +838,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <StorySurface className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
+                <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
                   <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Bildirim Merkezi</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { generateAgendaWithAI } from "@/utils/aiAgendaGenerator";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import type {
   MeetingAttendee,
   MeetingAgenda,
@@ -67,7 +68,7 @@ type EditableAgendaItem = Omit<MeetingAgenda, "id" | "meeting_id" | "created_at"
 export default function BoardMeetingForm() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const isEditMode = !!id;
   const requestedCompanyId = searchParams.get("companyId") || "";
@@ -99,6 +100,33 @@ export default function BoardMeetingForm() {
 
   // Selected company for employee filtering
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+
+  const draftKey = useMemo(
+    () =>
+      `board-meeting:${user?.id || "guest"}:${id || "new"}:${requestedCompanyId || formData.company_id || "no-company"}`,
+    [formData.company_id, id, requestedCompanyId, user?.id],
+  );
+
+  const { clearDraft } = usePersistentDraft({
+    key: draftKey,
+    enabled: Boolean(user?.id),
+    version: 1,
+    value: {
+      formData,
+      attendees,
+      agendaItems,
+    },
+    onRestore: (draft) => {
+      setFormData(draft.formData || formData);
+      setAttendees(Array.isArray(draft.attendees) ? draft.attendees : []);
+      setAgendaItems(Array.isArray(draft.agendaItems) ? draft.agendaItems : []);
+      setHasRestoredDraft(true);
+      setRestoredDraftLabel(isEditMode ? "Toplantı düzenleme taslağı" : "Toplantı taslağı");
+      toast.info("Kaydedilmemiş toplantı taslağı geri yüklendi.");
+    },
+  });
 
   useEffect(() => {
     if (user) {
@@ -107,7 +135,20 @@ export default function BoardMeetingForm() {
         fetchMeetingData();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, id]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (formData.company_id) {
+      next.set("companyId", formData.company_id);
+    } else {
+      next.delete("companyId");
+    }
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [formData.company_id, searchParams, setSearchParams]);
 
   // ✅ Firma değiştiğinde çalışanları yükle VE otomatik katılımcı olarak ekle
   useEffect(() => {
@@ -121,6 +162,7 @@ export default function BoardMeetingForm() {
       setEmployees([]);
       setAttendees([]); // ✅ Firma yoksa katılımcıları da temizle
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.company_id, companies]);
 
   useEffect(() => {
@@ -219,15 +261,17 @@ export default function BoardMeetingForm() {
 
       if (meetingError) throw meetingError;
 
-      setFormData({
-        company_id: meeting.company_id,
-        meeting_date: meeting.meeting_date,
-        meeting_time: meeting.meeting_time || "",
-        location: meeting.location || "",
-        president_name: meeting.president_name,
-        secretary_name: meeting.secretary_name || "",
-        notes: meeting.notes || "",
-      });
+      if (!hasRestoredDraft) {
+        setFormData({
+          company_id: meeting.company_id,
+          meeting_date: meeting.meeting_date,
+          meeting_time: meeting.meeting_time || "",
+          location: meeting.location || "",
+          president_name: meeting.president_name,
+          secretary_name: meeting.secretary_name || "",
+          notes: meeting.notes || "",
+        });
+      }
 
       // Fetch attendees
       const { data: attendeesData, error: attendeesError } = await supabase
@@ -249,7 +293,9 @@ export default function BoardMeetingForm() {
           notes: attendee.notes,
         }));
 
-      setAttendees(typedAttendees);
+      if (!hasRestoredDraft) {
+        setAttendees(typedAttendees);
+      }
 
       // Fetch agenda
       const { data: agendaData, error: agendaError } = await supabase
@@ -274,7 +320,9 @@ export default function BoardMeetingForm() {
           risk_item_id: item.risk_item_id,
         }));
 
-      setAgendaItems(typedAgenda);
+      if (!hasRestoredDraft) {
+        setAgendaItems(typedAgenda);
+      }
     } catch (error: any) {
       console.error("Fetch meeting error:", error);
       toast.error("Toplantı yüklenemedi");
@@ -477,6 +525,9 @@ export default function BoardMeetingForm() {
       }
 
       toast.success(`✅ Toplantı ${isEditMode ? "güncellendi" : "oluşturuldu"}!`);
+      clearDraft();
+      setHasRestoredDraft(false);
+      setRestoredDraftLabel(null);
       navigate(`/board-meetings/${meetingId}`);
     } catch (error: any) {
       console.error("Save meeting error:", error);
@@ -550,6 +601,31 @@ export default function BoardMeetingForm() {
           </Button>
         </div>
       </div>
+
+      {restoredDraftLabel ? (
+        <Card className="border-cyan-400/20 bg-cyan-400/10 text-cyan-50">
+          <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold">{restoredDraftLabel} geri yüklendi</p>
+              <p className="mt-1 text-sm text-cyan-100/80">
+                Kaydedilmemiş alanlar otomatik olarak geri getirildi.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                clearDraft();
+                setHasRestoredDraft(false);
+                setRestoredDraftLabel(null);
+              }}
+              className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
+            >
+              Taslağı temizle
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Form */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

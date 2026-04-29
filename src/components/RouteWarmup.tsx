@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useSafeMode } from "@/hooks/useSafeMode";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 
 type RouteWarmupTask = {
   key: string;
@@ -16,12 +18,17 @@ export function RouteWarmup({
   tasks: RouteWarmupTask[];
   enabled: boolean;
 }) {
+  const { safeMode } = useSafeMode();
+  const prefersReducedMotion = useReducedMotion();
+
   useEffect(() => {
-    if (!enabled || typeof window === "undefined") return;
+    if (!enabled || typeof window === "undefined" || safeMode || prefersReducedMotion) return;
 
     let cancelled = false;
 
     const runWarmup = async () => {
+      if (document.visibilityState === "hidden") return;
+
       for (const task of tasks) {
         if (cancelled || warmedRoutes.has(task.key)) continue;
 
@@ -35,6 +42,7 @@ export function RouteWarmup({
         }
 
         await wait(120);
+        if (document.visibilityState === "hidden") return;
       }
     };
 
@@ -58,7 +66,7 @@ export function RouteWarmup({
         cancelIdle(idleHandle);
       }
     };
-  }, [enabled, tasks]);
+  }, [enabled, prefersReducedMotion, safeMode, tasks]);
 
   return null;
 }

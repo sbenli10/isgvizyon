@@ -7,6 +7,7 @@ import {
   writeDashboardSnapshot,
 } from "@/lib/dashboardCache";
 import { completeNamedFlow } from "@/lib/perfTiming";
+import { resolvePostAuthRoute } from "@/lib/navigationPersistence";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
@@ -125,11 +126,13 @@ export default function AuthCallback() {
           }
 
           setStatus("Oturum hazır. Yönlendiriliyorsunuz...");
+          const restoredRoute = resolvePostAuthRoute("/");
+          const targetRoute = oauthProfileState.shouldRedirectToProfile ? "/profile" : restoredRoute;
           completeNamedFlow("login", {
             method: code ? "oauth-or-callback" : "password",
-            target: oauthProfileState.shouldRedirectToProfile ? "/profile" : "/",
+            target: targetRoute,
           });
-          navigate(oauthProfileState.shouldRedirectToProfile ? "/profile" : "/", { replace: true });
+          navigate(targetRoute, { replace: true });
           return;
         }
 

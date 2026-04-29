@@ -50,6 +50,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { differenceInCalendarDays, format, isPast, parseISO } from "date-fns";
 import { withTemporaryBodyChild } from "@/lib/safeDom";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 
 type CAPAStatus = "Açık" | "Devam Ediyor" | "Tamamlandı";
 type CAPAPriority = "Düşük" | "Orta" | "Yüksek" | "Kritik";
@@ -254,6 +255,10 @@ const MAX_MEDIA_FILES = 4;
 const MAX_DOCUMENT_FILES = 4;
 const MAX_ATTACHMENT_FILES = 4;
 const CAPA_EVIDENCE_BUCKET = "capa-evidence";
+const CAPA_STATUSES: CAPAStatus[] = ["Açık", "Devam Ediyor", "Tamamlandı"];
+
+const parseStatusFilter = (value: string | null): "all" | CAPAStatus =>
+  value && CAPA_STATUSES.includes(value as CAPAStatus) ? (value as CAPAStatus) : "all";
 
 const formatTimeLabel = (date: string) => {
   if (!date) return "--:--";
@@ -549,8 +554,8 @@ export default function CAPA() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<"all" | CAPAStatus>("all");
-  const [searchText, setSearchText] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | CAPAStatus>(() => parseStatusFilter(searchParams.get("status")));
+  const [searchText, setSearchText] = useState(() => searchParams.get("search") || "");
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailRecord, setDetailRecord] = useState<CAPARecord | null>(null);
   const [detailActivityLogs, setDetailActivityLogs] = useState<CAPAActivityLogRow[]>([]);
@@ -574,6 +579,42 @@ export default function CAPA() {
   const [mediaFiles, setMediaFiles] = useState<File[]>([]);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
+
+  const draftScopeKey = useMemo(
+    () =>
+      `capa:${user?.id || "guest"}:${activeCompanyId || "no-company"}:${editingId || "new"}`,
+    [activeCompanyId, editingId, user?.id],
+  );
+
+  const { clearDraft } = usePersistentDraft({
+    key: draftScopeKey,
+    enabled: Boolean(user?.id) && dialogOpen,
+    version: 1,
+    value: {
+      nonConformity,
+      rootCause,
+      correctiveAction,
+      assignedPerson,
+      deadline,
+      priority,
+      notes,
+      editingId,
+    },
+    onRestore: (draft) => {
+      setNonConformity(draft.nonConformity || emptyForm.nonConformity);
+      setRootCause(draft.rootCause || emptyForm.rootCause);
+      setCorrectiveAction(draft.correctiveAction || emptyForm.correctiveAction);
+      setAssignedPerson(draft.assignedPerson || emptyForm.assignedPerson);
+      setDeadline(draft.deadline || emptyForm.deadline);
+      setPriority((draft.priority as CAPAPriority) || emptyForm.priority);
+      setNotes(draft.notes || emptyForm.notes);
+      setEditingId(draft.editingId || null);
+      setDialogOpen(true);
+      setRestoredDraftLabel(draft.editingId ? "Düzenleme taslağı" : "Yeni kayıt taslağı");
+      toast.info("Kaydedilmemiş CAPA taslağı geri yüklendi.");
+    },
+  });
 
   const resetForm = () => {
     setNonConformity(emptyForm.nonConformity);
@@ -588,6 +629,7 @@ export default function CAPA() {
     setAttachmentFiles([]);
     setUploadProgress({ media: 0, document: 0, attachment: 0 });
     setEditingId(null);
+    setRestoredDraftLabel(null);
   };
 
   useEffect(() => {
@@ -598,10 +640,34 @@ export default function CAPA() {
       setLoading(false);
     }
     void fetchRecords(Boolean(cached));
+    // fetchRecords intentionally stays out of deps to avoid reloading on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCompanyId, user]);
 
   useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+
+    if (filterStatus !== "all") {
+      next.set("status", filterStatus);
+    } else {
+      next.delete("status");
+    }
+
+    if (searchText.trim()) {
+      next.set("search", searchText.trim());
+    } else {
+      next.delete("search");
+    }
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [filterStatus, searchParams, searchText, setSearchParams]);
+
+  useEffect(() => {
     if (!location.state?.aiData) return;
+    clearDraft();
+    setRestoredDraftLabel(null);
     const { description, plan, justification, risk } = location.state.aiData;
     setNonConformity(description || "");
     setCorrectiveAction(plan || "");
@@ -611,7 +677,7 @@ export default function CAPA() {
     else setPriority("Orta");
     setDialogOpen(true);
     toast.success("AI verisi DÖF formuna dolduruldu.");
-  }, [location.state]);
+  }, [clearDraft, location.state]);
 
   useEffect(() => {
     const loadDetailActivity = async () => {
@@ -1276,6 +1342,7 @@ export default function CAPA() {
         toast.success("Yeni DÖF kaydı oluşturuldu.");
       }
 
+      clearDraft();
       resetForm();
       setDialogOpen(false);
       void fetchRecords();
@@ -1286,6 +1353,8 @@ export default function CAPA() {
   };
 
   const handleEdit = (record: CAPARecord) => {
+    clearDraft();
+    setRestoredDraftLabel(null);
     setMediaFiles([]);
     setDocumentFiles([]);
     setAttachmentFiles([]);
@@ -1523,6 +1592,25 @@ export default function CAPA() {
                     <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Termin</Label><Input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} className="border-white/10 bg-slate-900/80 text-slate-100" /></div>
                     <div className="space-y-2"><Label className="text-sm font-semibold text-slate-100">Öncelik</Label><Select value={priority} onValueChange={(value: CAPAPriority) => setPriority(value)}><SelectTrigger className="border-white/10 bg-slate-900/80 text-slate-100"><SelectValue /></SelectTrigger><SelectContent className="border-slate-700 bg-slate-950 text-slate-100"><SelectItem value="Düşük">🟢 Düşük</SelectItem><SelectItem value="Orta">🟡 Orta</SelectItem><SelectItem value="Yüksek">🟠 Yüksek</SelectItem><SelectItem value="Kritik">🔴 Kritik</SelectItem></SelectContent></Select></div>
                   </div>
+                  {restoredDraftLabel ? (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-50 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-semibold">{restoredDraftLabel} geri yüklendi</p>
+                        <p className="mt-1 text-cyan-100/80">Kaydedilmemiş alanlar otomatik olarak formunuza geri taşındı.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          clearDraft();
+                          resetForm();
+                        }}
+                        className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
+                      >
+                        Taslağı temizle
+                      </Button>
+                    </div>
+                  ) : null}
                   <div className="space-y-2 rounded-2xl border border-white/10 bg-white/5 p-5"><Label className="text-sm font-semibold text-slate-100">Operasyon notu</Label><Textarea placeholder="Kapanış kanıtı, yönetici notu veya ekip içi açıklamalar..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} className="border-white/10 bg-slate-900/80 text-slate-100" /></div>
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">

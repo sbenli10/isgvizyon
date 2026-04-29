@@ -1,5 +1,5 @@
 ﻿//src\pages\Reports.tsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Brain, FileText, CheckCircle, Clock, AlertTriangle, 
   Download, Loader2, ShieldCheck, PlusCircle, Trash2,
@@ -17,15 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { addInterFontsToJsPDF } from "@/utils/fonts";
-import { generateHazardAnalysisPdf } from "@/lib/reportsPdfExport";
-import { generateHazardAnalysisWord } from "@/lib/reportsWordExport";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
-import jsPDF from "jspdf";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 
 // ✅ PDF.js worker setup
 
@@ -59,6 +56,8 @@ const MAX_DOCUMENTS = 3;
 const MAX_PDF_OCR_PAGES = 5;
 
 let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
+let hazardPdfExportLoader: Promise<typeof import("@/lib/reportsPdfExport")> | null = null;
+let hazardWordExportLoader: Promise<typeof import("@/lib/reportsWordExport")> | null = null;
 
 const loadPdfJs = async () => {
   if (!pdfJsLoader) {
@@ -69,6 +68,22 @@ const loadPdfJs = async () => {
   }
 
   return pdfJsLoader;
+};
+
+const loadHazardPdfExport = async () => {
+  if (!hazardPdfExportLoader) {
+    hazardPdfExportLoader = import("@/lib/reportsPdfExport");
+  }
+
+  return hazardPdfExportLoader;
+};
+
+const loadHazardWordExport = async () => {
+  if (!hazardWordExportLoader) {
+    hazardWordExportLoader = import("@/lib/reportsWordExport");
+  }
+
+  return hazardWordExportLoader;
 };
 
 function calculateRiskScore(probability: number, frequency: number, severity: number) {
@@ -117,8 +132,8 @@ const RiskHeatmap = ({ history }: { history: AnalysisHistory[] }) => {
   history.forEach(h => {
     const ai = h.ai_result;
     if (ai && ai.probability && ai.severity) {
-      let pIdx = ai.probability <= 0.5 ? 0 : ai.probability <= 1 ? 1 : ai.probability <= 3 ? 2 : ai.probability <= 6 ? 3 : 4;
-      let sIdx = ai.severity <= 3 ? 0 : ai.severity <= 7 ? 1 : ai.severity <= 15 ? 2 : ai.severity <= 40 ? 3 : 4;
+      const pIdx = ai.probability <= 0.5 ? 0 : ai.probability <= 1 ? 1 : ai.probability <= 3 ? 2 : ai.probability <= 6 ? 3 : 4;
+      const sIdx = ai.severity <= 3 ? 0 : ai.severity <= 7 ? 1 : ai.severity <= 15 ? 2 : ai.severity <= 40 ? 3 : 4;
       matrix[4 - pIdx][sIdx]++;
     }
   });
@@ -180,10 +195,30 @@ export default function Reports() {
   const [extracting, setExtracting] = useState(false);
   const [history, setHistory] = useState<AnalysisHistory[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
-  const [filterRisk, setFilterRisk] = useState("all");
-  const [searchText, setSearchText] = useState("");
+  const [filterRisk, setFilterRisk] = useState(searchParams.get("risk") || "all");
+  const [searchText, setSearchText] = useState(searchParams.get("search") || "");
   const [selectedHistory, setSelectedHistory] = useState<AnalysisHistory | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
+
+  const draftScopeKey = useMemo(
+    () => `reports:${user?.id || "guest"}:${activeCompanyId || "no-company"}`,
+    [activeCompanyId, user?.id],
+  );
+
+  const { clearDraft } = usePersistentDraft({
+    key: draftScopeKey,
+    enabled: Boolean(user?.id),
+    version: 1,
+    value: { hazardInput },
+    onRestore: (draft) => {
+      if (draft.hazardInput) {
+        setHazardInput(draft.hazardInput);
+        setRestoredDraftLabel("Saha gözlemi taslağı");
+        toast.info("Kaydedilmemiş taslak geri yüklendi.");
+      }
+    },
+  });
 
     
   useEffect(() => {
@@ -192,6 +227,25 @@ export default function Reports() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]); // user.id ile kontrol et
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (filterRisk !== "all") {
+      next.set("risk", filterRisk);
+    } else {
+      next.delete("risk");
+    }
+
+    if (searchText.trim()) {
+      next.set("search", searchText.trim());
+    } else {
+      next.delete("search");
+    }
+
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [filterRisk, searchParams, searchText, setSearchParams]);
 
   const fetchHistory = async () => {
     if (!user) return;
@@ -547,6 +601,8 @@ export default function Reports() {
           });
         }
 
+        clearDraft();
+        setRestoredDraftLabel(null);
         toast.success(`✅ ${normalizedAnalyses.length} fotoğraf işlendi!`, {
           action: {
             label: "Formu Temizle",
@@ -572,6 +628,8 @@ export default function Reports() {
         
         await fetchHistory();
         
+        clearDraft();
+        setRestoredDraftLabel(null);
         toast.success("✅ Analiz tamamlandı!", {
           action: {
             label: "Formu Temizle",
@@ -626,233 +684,12 @@ Yasal Atıf: ${analysis.legalReference}`,
     toast.info("Veriler DÖF formuna aktarılıyor...");
   };
 
-  const generatePDF = (analysis: FineKinneyAiResult, originalDescription: string) => {
-  const doc = new jsPDF();
-  
-  // ✅ Inter fontlarını yükle
-  const fontsLoaded = addInterFontsToJsPDF(doc);
-  
-  if (fontsLoaded) {
-    doc.setFont("Inter", "normal");
-  }
-  
-  const now = new Date().toLocaleDateString("tr-TR");
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - (margin * 2);
-
-  // ========================
-  // BAŞLIK BÖLÜMÜ
-  // ========================
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(30, 41, 59); // Slate-800
-  doc.text("İSGVizyon İSG Yönetim Sistemi", margin, 25);
-  
-  doc.setFontSize(14);
-  doc.setTextColor(71, 85, 105); // Slate-600
-  doc.setFont("Inter", "normal");
-  doc.text("A Sınıfı Uzman Analiz Raporu (Fine-Kinney)", margin, 35);
-  
-  // Tarih
-  doc.setFontSize(10);
-  doc.setTextColor(148, 163, 184); // Slate-400
-  doc.text(`Tarih: ${now}`, margin, 43);
-  
-  // Çizgi
-  doc.setDrawColor(226, 232, 240); // Slate-200
-  doc.setLineWidth(0.5);
-  doc.line(margin, 47, pageWidth - margin, 47);
-
-  let y = 57;
-
-  // ========================
-  // TESPİT EDİLEN UYGUNSUZLUK
-  // ========================
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(30, 41, 59);
-  doc.text("Tespit Edilen Uygunsuzluk", margin, y);
-  y += 8;
-  
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(51, 65, 85); // Slate-700
-  const hazardLines = doc.splitTextToSize(
-    analysis.hazardDescription || originalDescription, 
-    contentWidth
-  );
-  doc.text(hazardLines, margin, y);
-  y += hazardLines.length * 5 + 10;
-
-  // ========================
-  // RİSK DEĞERLENDİRMESİ KUTUSU
-  // ========================
-  doc.setFillColor(241, 245, 249); // Slate-100
-  doc.roundedRect(margin, y, contentWidth, 35, 3, 3, 'F');
-  
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text("Risk Değerlendirmesi (Fine-Kinney)", margin + 5, y + 8);
-  y += 15;
-  
-  // İhtimal, Frekans, Şiddet
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(51, 65, 85);
-  
-  const col1 = margin + 5;
-  const col2 = margin + contentWidth / 3;
-  const col3 = margin + (contentWidth * 2) / 3;
-  
-  doc.text(`İhtimal: ${analysis.probability}`, col1, y);
-  doc.text(`Frekans: ${analysis.frequency}`, col2, y);
-  doc.text(`Şiddet: ${analysis.severity}`, col3, y);
-  y += 10;
-
-  // Risk Skoru (Renkli)
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(12);
-  
-  const riskColor = analysis.riskScore >= 400 ?
-    [220, 38, 38] :  // Red-600
-    analysis.riskScore >= 200 ?
-    [234, 88, 12] :  // Orange-600
-    analysis.riskScore >= 70 ?
-    [234, 179, 8] :  // Yellow-600
-    [22, 163, 74];  // Green-600
-  
-  doc.setTextColor(riskColor[0], riskColor[1], riskColor[2]);
-  doc.text(
-    `Risk Skoru: ${analysis.riskScore} - ${analysis.riskLevel}`, 
-    col1, 
-    y
-  );
-  doc.setTextColor(51, 65, 85);
-  y += 20;
-
-  // ========================
-  // YASAL ATIF
-  // ========================
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(30, 41, 59);
-  doc.text("Yasal Atıf (Mevzuat)", margin, y);
-  y += 7;
-  
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(29, 78, 216); // Blue-700
-  const refLines = doc.splitTextToSize(
-    analysis.legalReference || "Belirtilmedi", 
-    contentWidth
-  );
-  doc.text(refLines, margin, y);
-  doc.setTextColor(51, 65, 85);
-  y += refLines.length * 5 + 10;
-
-  // Sayfa sonu kontrolü
-  if (y > 250) {
-    doc.addPage();
-    y = 20;
-  }
-
-  // ========================
-  // ANLIK DÜZELTİCİ AKSİYON
-  // ========================
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(220, 38, 38); // Red-600
-  doc.text("Anlık Düzeltici Aksiyon", margin, y);
-  y += 7;
-  
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(51, 65, 85);
-  const immLines = doc.splitTextToSize(
-    analysis.immediateAction || "-", 
-    contentWidth
-  );
-  doc.text(immLines, margin, y);
-  y += immLines.length * 5 + 10;
-
-  // Sayfa sonu kontrolü
-  if (y > 250) {
-    doc.addPage();
-    y = 20;
-  }
-
-  // ========================
-  // KALICI ÖNLEYİCİ AKSİYON
-  // ========================
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(22, 163, 74); // Green-600
-  doc.text("Kalıcı Önleyici Aksiyon", margin, y);
-  y += 7;
-  
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(51, 65, 85);
-  const prevLines = doc.splitTextToSize(
-    analysis.preventiveAction || "-", 
-    contentWidth
-  );
-  doc.text(prevLines, margin, y);
-  y += prevLines.length * 5 + 10;
-
-  // ========================
-  // GEREKÇE
-  // ========================
-  if (analysis.justification) {
-    if (y > 240) {
-      doc.addPage();
-      y = 20;
-    }
-    
-    doc.setFont("Inter", "bold");
-    doc.setFontSize(11);
-    doc.setTextColor(30, 41, 59);
-    doc.text("Gerekçe", margin, y);
-    y += 7;
-    
-    doc.setFont("Inter", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139); // Slate-500
-    const justLines = doc.splitTextToSize(
-      analysis.justification, 
-      contentWidth
-    );
-    doc.text(justLines, margin, y);
-  }
-
-  // ========================
-  // FOOTER
-  // ========================
-  const pageCount = doc.internal.pages.length - 1;
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFont("Inter", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(148, 163, 184);
-    doc.text(
-      `Sayfa ${i} / ${pageCount} | İSGVizyon İSG © ${new Date().getFullYear()}`, 
-      pageWidth / 2, 
-      285, 
-      { align: 'center' }
-    );
-  }
-
-  doc.save(`denetron-isg-rapor-${Date.now()}.pdf`);
-  toast.success("✅ Rapor PDF olarak indirildi!");
-};
-
   const generateRichPDF = async (
     analysis: FineKinneyAiResult,
     originalDescription: string,
     imageUrl?: string,
   ) => {
+    const { generateHazardAnalysisPdf } = await loadHazardPdfExport();
     await generateHazardAnalysisPdf({
       analyses: [
         {
@@ -872,6 +709,7 @@ Yasal Atıf: ${analysis.legalReference}`,
   const generateCombinedPDF = async () => {
     if (!aiResults.length) return;
 
+    const { generateHazardAnalysisPdf } = await loadHazardPdfExport();
     await generateHazardAnalysisPdf({
       analyses: aiResults.map((result, idx) => ({
         ...result,
@@ -890,6 +728,7 @@ Yasal Atıf: ${analysis.legalReference}`,
     originalDescription: string,
     imageUrl?: string,
   ) => {
+    const { generateHazardAnalysisWord } = await loadHazardWordExport();
     await generateHazardAnalysisWord({
       analyses: [
         {
@@ -910,6 +749,7 @@ Yasal Atıf: ${analysis.legalReference}`,
   const generateCombinedWord = async () => {
     if (!aiResults.length) return;
 
+    const { generateHazardAnalysisWord } = await loadHazardWordExport();
     await generateHazardAnalysisWord({
       analyses: aiResults.map((result, idx) => ({
         ...result,
@@ -1042,6 +882,26 @@ Yasal Atıf: ${analysis.legalReference}`,
         </div>
 
         <div className="space-y-5">
+          {restoredDraftLabel ? (
+            <div className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-cyan-50 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-semibold">{restoredDraftLabel} geri yüklendi</p>
+                <p className="mt-1 text-sm text-cyan-100/80">Kaydedilmemiş saha notu tekrar forma taşındı.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  clearDraft();
+                  setRestoredDraftLabel(null);
+                  setHazardInput("");
+                }}
+                className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
+              >
+                Taslağı temizle
+              </Button>
+            </div>
+          ) : null}
           <div>
             <Label className="text-sm font-semibold mb-2 flex items-center gap-2">
               📝 Saha Gözlemi / Uygunsuzluk Açıklaması

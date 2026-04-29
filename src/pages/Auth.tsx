@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchDashboardSnapshot, writeDashboardSnapshot } from "@/lib/dashboardCache";
+import { resolvePostAuthRoute } from "@/lib/navigationPersistence";
 import { startNamedFlow } from "@/lib/perfTiming";
 import { getUserFacingError, getUserFacingErrorDescription, getUserFacingErrorMessage } from "@/lib/userFacingError";
 import { toast } from "sonner";
@@ -344,7 +345,10 @@ export default function Auth() {
   useEffect(() => {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
-      if (data?.session?.user) navigate(callbackUrl, { replace: true });
+      if (data?.session?.user) {
+        const targetRoute = resolvePostAuthRoute(callbackUrl);
+        navigate(targetRoute, { replace: true });
+      }
     };
     void checkUser();
   }, [navigate, callbackUrl]);

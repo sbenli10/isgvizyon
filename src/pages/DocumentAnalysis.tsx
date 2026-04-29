@@ -44,8 +44,7 @@ import {
   type DocumentAnalysisActionItem,
   urgencyLabelMap,
 } from "@/lib/documentAnalysisTypes";
-import { generateDocumentAnalysisPdf } from "@/lib/documentAnalysisPdfExport";
-import { generateDocumentAnalysisWord } from "@/lib/documentAnalysisWordExport";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 
 interface CompanyOption {
   id: string;
@@ -58,6 +57,8 @@ const MAX_PDF_OCR_PAGES = 5;
 const DOCUMENT_BUCKET = "document-analysis-files";
 
 let pdfJsLoader: Promise<typeof import("pdfjs-dist")> | null = null;
+let documentAnalysisPdfLoader: Promise<typeof import("@/lib/documentAnalysisPdfExport")> | null = null;
+let documentAnalysisWordLoader: Promise<typeof import("@/lib/documentAnalysisWordExport")> | null = null;
 
 const loadPdfJs = async () => {
   if (!pdfJsLoader) {
@@ -68,6 +69,22 @@ const loadPdfJs = async () => {
   }
 
   return pdfJsLoader;
+};
+
+const loadDocumentAnalysisPdf = async () => {
+  if (!documentAnalysisPdfLoader) {
+    documentAnalysisPdfLoader = import("@/lib/documentAnalysisPdfExport");
+  }
+
+  return documentAnalysisPdfLoader;
+};
+
+const loadDocumentAnalysisWord = async () => {
+  if (!documentAnalysisWordLoader) {
+    documentAnalysisWordLoader = import("@/lib/documentAnalysisWordExport");
+  }
+
+  return documentAnalysisWordLoader;
 };
 
 const db = supabase as any;
@@ -106,13 +123,14 @@ const safeFileName = (value: string) =>
 export default function DocumentAnalysis() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeCompanyId = searchParams.get("companyId") || "";
+  const activeDocumentType = (searchParams.get("docType") as DocumentAnalysisType | null) || "legislation";
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(activeCompanyId);
-  const [documentType, setDocumentType] = useState<DocumentAnalysisType>("legislation");
+  const [documentType, setDocumentType] = useState<DocumentAnalysisType>(activeDocumentType);
   const [contextNote, setContextNote] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -121,6 +139,27 @@ export default function DocumentAnalysis() {
   const [currentRecord, setCurrentRecord] = useState<DocumentAnalysisRecord | null>(null);
   const [savingArchive, setSavingArchive] = useState(false);
   const [creatingAction, setCreatingAction] = useState<null | "capa" | "inspection" | "report-pdf" | "report-word">(null);
+  const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
+
+  const { clearDraft } = usePersistentDraft({
+    key: `document-analysis:${profile?.organization_id || "no-org"}:${user?.id || "guest"}:${activeCompanyId || "no-company"}`,
+    enabled: Boolean(user?.id),
+    version: 1,
+    value: {
+      selectedCompanyId,
+      documentType,
+      contextNote,
+    },
+    onRestore: (draft) => {
+      setSelectedCompanyId(draft.selectedCompanyId || activeCompanyId);
+      setDocumentType((draft.documentType as DocumentAnalysisType) || "legislation");
+      setContextNote(draft.contextNote || "");
+      setRestoredDraftLabel("Belge analiz taslağı");
+      toast.info("Kaydedilmemiş taslak geri yüklendi.", {
+        description: "Belge tekrar seçilmelidir; dosyalar tarayıcıda taslak olarak saklanmaz.",
+      });
+    },
+  });
 
   const selectedCompany = useMemo(
     () => companies.find((company) => company.id === selectedCompanyId) || null,
@@ -132,6 +171,19 @@ export default function DocumentAnalysis() {
     void Promise.all([loadCompanies(), loadHistory()]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (selectedCompanyId) {
+      next.set("companyId", selectedCompanyId);
+    } else {
+      next.delete("companyId");
+    }
+    next.set("docType", documentType);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [documentType, searchParams, selectedCompanyId, setSearchParams]);
 
   const loadCompanies = async () => {
     if (!user?.id) return;
@@ -355,6 +407,8 @@ export default function DocumentAnalysis() {
         filePath: upload.filePath,
       });
 
+      clearDraft();
+      setRestoredDraftLabel(null);
       setCurrentRecord(savedRecord);
       setAnalysisHistory((prev) => [savedRecord, ...prev.filter((item) => item.id !== savedRecord.id)].slice(0, 12));
       toast.success("Mevzuat belge analizi hazır.");
@@ -532,6 +586,7 @@ export default function DocumentAnalysis() {
     if (!currentRecord) return;
     setCreatingAction("report-pdf");
     try {
+      const { generateDocumentAnalysisPdf } = await loadDocumentAnalysisPdf();
       await generateDocumentAnalysisPdf(currentRecord);
       await createActionLog(currentRecord.id, "report", currentRecord.id, "PDF raporu indirildi", { format: "pdf" });
       toast.success("PDF raporu hazırlandı.");
@@ -546,6 +601,7 @@ export default function DocumentAnalysis() {
     if (!currentRecord) return;
     setCreatingAction("report-word");
     try {
+      const { generateDocumentAnalysisWord } = await loadDocumentAnalysisWord();
       await generateDocumentAnalysisWord(currentRecord);
       await createActionLog(currentRecord.id, "report", currentRecord.id, "Word raporu indirildi", { format: "word" });
       toast.success("Word raporu hazırlandı.");
@@ -586,6 +642,26 @@ export default function DocumentAnalysis() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
+            {restoredDraftLabel ? (
+              <div className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-cyan-50 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="font-semibold">{restoredDraftLabel} geri yüklendi</p>
+                  <p className="mt-1 text-sm text-cyan-100/80">Belge hariç kaydedilmemiş alanlar otomatik olarak geri getirildi.</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    clearDraft();
+                    setRestoredDraftLabel(null);
+                    setContextNote("");
+                  }}
+                  className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
+                >
+                  Taslağı temizle
+                </Button>
+              </div>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Firma</Label>
