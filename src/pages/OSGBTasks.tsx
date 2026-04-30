@@ -4,6 +4,7 @@ import { ClipboardList, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createOsgbTaskWorkspace,
   deleteOsgbTaskWorkspace,
-  listOsgbManagedCompanyOptions,
   listOsgbTasksWorkspace,
-  type OsgbManagedCompanyOption,
   type OsgbWorkspaceTaskRecord,
   updateOsgbTaskWorkspaceStatus,
 } from "@/lib/osgbPlatform";
@@ -39,7 +38,7 @@ export default function OSGBTasks() {
   const [searchParams, setSearchParams] = useSearchParams();
   const organizationId = profile?.organization_id || null;
   const [records, setRecords] = useState<OsgbWorkspaceTaskRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbManagedCompanyOption[]>([]);
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -53,12 +52,8 @@ export default function OSGBTasks() {
 
     setLoading(true);
     try {
-      const [taskRows, companyRows] = await Promise.all([
-        listOsgbTasksWorkspace(organizationId),
-        listOsgbManagedCompanyOptions(organizationId),
-      ]);
+      const taskRows = await listOsgbTasksWorkspace(organizationId);
       setRecords(taskRows);
-      setCompanies(companyRows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gorevler yuklenemedi.");

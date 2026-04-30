@@ -48,16 +48,15 @@ import {
 } from "@/lib/osgbOperations";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useAccessRole } from "@/hooks/useAccessRole";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { downloadCsv } from "@/lib/csvExport";
 import {
   getOsgbWorkspaceAssignmentRecommendation,
   getOsgbWorkspaceCompanyAssignedMinutesTotal,
   getOsgbWorkspacePersonnelAssignedMinutesTotal,
   listOsgbWorkspaceAssignmentsPage,
-  listOsgbWorkspaceCompanies,
   listOsgbWorkspacePersonnel,
   type OsgbWorkspaceAssignmentRecord,
-  type OsgbWorkspaceCompanyOption,
   type OsgbWorkspacePersonnelRecord,
   upsertOsgbAssignmentWorkspace,
 } from "@/lib/osgbPlatform";
@@ -120,8 +119,8 @@ export default function OSGBAssignments() {
   const organizationId = profile?.organization_id || null;
   const { canManage } = useAccessRole();
   const [records, setRecords] = useState<OsgbWorkspaceAssignmentRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
   const [personnel, setPersonnel] = useState<OsgbWorkspacePersonnelRecord[]>([]);
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
   const [personnelLoading, setPersonnelLoading] = useState(false);
@@ -145,21 +144,16 @@ export default function OSGBAssignments() {
     if (!silent) setLoading(true);
     try {
       const cacheKey = `${getCacheKey(organizationId)}:${statusFilter}:${search}:${page}`;
-      const [assignmentResult, companyRows] = await Promise.all([
-        listOsgbWorkspaceAssignmentsPage(organizationId, {
-          page,
-          pageSize: ASSIGNMENT_PAGE_SIZE,
-          status: statusFilter,
-          search,
-        }),
-        companies.length > 0 ? Promise.resolve(companies) : listOsgbWorkspaceCompanies(organizationId),
-      ]);
+      const assignmentResult = await listOsgbWorkspaceAssignmentsPage(organizationId, {
+        page,
+        pageSize: ASSIGNMENT_PAGE_SIZE,
+        status: statusFilter,
+        search,
+      });
       setRecords(assignmentResult.rows);
       setTotalCount(assignmentResult.count);
-      setCompanies(companyRows);
       writeOsgbPageCache(cacheKey, {
         records: assignmentResult.rows,
-        companies: companyRows,
         totalCount: assignmentResult.count,
       });
       setError(null);
@@ -177,12 +171,10 @@ export default function OSGBAssignments() {
     }
     const cached = readOsgbPageCache<{
       records: OsgbWorkspaceAssignmentRecord[];
-      companies: OsgbWorkspaceCompanyOption[];
       totalCount: number;
     }>(`${getCacheKey(organizationId)}:${statusFilter}:${search}:${page}`, CACHE_TTL_MS);
     if (cached) {
       setRecords(cached.records);
-      setCompanies(cached.companies);
       setTotalCount(cached.totalCount);
       setLoading(false);
       void loadData(true);

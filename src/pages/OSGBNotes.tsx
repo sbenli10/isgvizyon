@@ -3,6 +3,7 @@ import { NotebookPen, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { deleteOsgbNoteWorkspace, listOsgbManagedCompanyOptions, listOsgbNotesWorkspace, type OsgbManagedCompanyOption, type OsgbWorkspaceNoteRecord, upsertOsgbNoteWorkspace } from "@/lib/osgbPlatform";
+import { deleteOsgbNoteWorkspace, listOsgbNotesWorkspace, type OsgbWorkspaceNoteRecord, upsertOsgbNoteWorkspace } from "@/lib/osgbPlatform";
 
 const emptyForm = { companyId: "", title: "", note: "", noteType: "general" as OsgbWorkspaceNoteRecord["noteType"] };
 
@@ -21,7 +22,7 @@ export default function OSGBNotes() {
   const { canManageOperations } = useOsgbAccess();
   const organizationId = profile?.organization_id || null;
   const [records, setRecords] = useState<OsgbWorkspaceNoteRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbManagedCompanyOption[]>([]);
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,9 +33,8 @@ export default function OSGBNotes() {
     if (!organizationId) return setLoading(false);
     setLoading(true);
     try {
-      const [noteRows, companyRows] = await Promise.all([listOsgbNotesWorkspace(organizationId), listOsgbManagedCompanyOptions(organizationId)]);
+      const noteRows = await listOsgbNotesWorkspace(organizationId);
       setRecords(noteRows);
-      setCompanies(companyRows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Notlar yüklenemedi.");

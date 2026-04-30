@@ -463,7 +463,15 @@ export const listOsgbWorkspaceCompanies = async (
     return [];
   }
 
-  const [complianceResponse, contractsResponse] = await Promise.all([
+  const [companiesResponse, complianceResponse, contractsResponse] = await Promise.all([
+    (supabase as any)
+      .from("isgkatip_companies")
+      .select("id, company_name, hazard_class, employee_count")
+      .eq("org_id", organizationId)
+      .eq("is_deleted", false)
+      .eq("is_osgb_managed", true)
+      .in("id", managedCompanyIds)
+      .order("company_name", { ascending: true }),
     (supabase as any)
       .from("osgb_monthly_company_compliance")
       .select(`
@@ -494,6 +502,7 @@ export const listOsgbWorkspaceCompanies = async (
       .order("updated_at", { ascending: false }),
   ]);
 
+  if (companiesResponse.error) throw companiesResponse.error;
   if (complianceResponse.error) throw complianceResponse.error;
   if (contractsResponse.error) throw contractsResponse.error;
 
@@ -504,28 +513,42 @@ export const listOsgbWorkspaceCompanies = async (
     }
   }
 
-  return (complianceResponse.data ?? []).map((row: any) => ({
-    id: row.company_id,
-    companyName: row.company?.company_name || "Firma",
-    hazardClass: row.hazard_class || "Bilinmiyor",
-    employeeCount: row.employee_count || 0,
-    complianceStatus: normalizeComplianceStatus(row.compliance_status),
-    contractEnd: contractsByCompany.get(row.company_id)?.ends_on || null,
-    totalRequiredMinutes: (row.igu_required_minutes || 0) + (row.hekim_required_minutes || 0) + (row.dsp_required_minutes || 0),
-    totalAssignedMinutes: (row.igu_assigned_minutes || 0) + (row.hekim_assigned_minutes || 0) + (row.dsp_assigned_minutes || 0),
-    deficitMinutes: row.deficit_minutes || 0,
-    overtimeMinutes: row.overtime_minutes || 0,
-    requiredMinutesByRole: {
-      igu: row.igu_required_minutes || 0,
-      hekim: row.hekim_required_minutes || 0,
-      dsp: row.dsp_required_minutes || 0,
-    },
-    assignedMinutesByRole: {
-      igu: row.igu_assigned_minutes || 0,
-      hekim: row.hekim_assigned_minutes || 0,
-      dsp: row.dsp_assigned_minutes || 0,
-    },
-  }));
+  const complianceByCompany = new Map<string, any>();
+  for (const row of complianceResponse.data ?? []) {
+    complianceByCompany.set(row.company_id, row);
+  }
+
+  return (companiesResponse.data ?? []).map((company: any) => {
+    const compliance = complianceByCompany.get(company.id);
+    return {
+      id: company.id,
+      companyName: company.company_name || "Firma",
+      hazardClass: compliance?.hazard_class || company.hazard_class || "Bilinmiyor",
+      employeeCount: compliance?.employee_count || company.employee_count || 0,
+      complianceStatus: normalizeComplianceStatus(compliance?.compliance_status),
+      contractEnd: contractsByCompany.get(company.id)?.ends_on || null,
+      totalRequiredMinutes:
+        (compliance?.igu_required_minutes || 0) +
+        (compliance?.hekim_required_minutes || 0) +
+        (compliance?.dsp_required_minutes || 0),
+      totalAssignedMinutes:
+        (compliance?.igu_assigned_minutes || 0) +
+        (compliance?.hekim_assigned_minutes || 0) +
+        (compliance?.dsp_assigned_minutes || 0),
+      deficitMinutes: compliance?.deficit_minutes || 0,
+      overtimeMinutes: compliance?.overtime_minutes || 0,
+      requiredMinutesByRole: {
+        igu: compliance?.igu_required_minutes || 0,
+        hekim: compliance?.hekim_required_minutes || 0,
+        dsp: compliance?.dsp_required_minutes || 0,
+      },
+      assignedMinutesByRole: {
+        igu: compliance?.igu_assigned_minutes || 0,
+        hekim: compliance?.hekim_assigned_minutes || 0,
+        dsp: compliance?.dsp_assigned_minutes || 0,
+      },
+    };
+  });
 };
 
 export const listOsgbWorkspacePersonnel = async (

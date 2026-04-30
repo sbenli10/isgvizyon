@@ -46,11 +46,9 @@ import { cn } from "@/lib/utils";
 import {
   createUpcomingDocumentTasks,
   deleteOsgbDocument,
-  getOsgbCompanyOptions,
   getOsgbDocumentsOverview,
   listActionableOsgbDocuments,
   listOsgbDocumentsPage,
-  type OsgbCompanyOption,
   type OsgbDocumentInput,
   type OsgbDocumentsOverview,
   type OsgbDocumentRecord,
@@ -58,6 +56,7 @@ import {
 } from "@/lib/osgbOperations";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useAccessRole } from "@/hooks/useAccessRole";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { downloadCsv } from "@/lib/csvExport";
 
 type DocumentFormState = {
@@ -108,11 +107,12 @@ const getCacheKey = (userId: string) => `documents:${userId}`;
 const DOCUMENT_PAGE_SIZE = 20;
 
 export default function OSGBDocuments() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { canManage } = useAccessRole();
+  const organizationId = profile?.organization_id || null;
   const [searchParams] = useSearchParams();
   const [records, setRecords] = useState<OsgbDocumentRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbCompanyOption[]>([]);
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [overview, setOverview] = useState<OsgbDocumentsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
@@ -141,7 +141,7 @@ export default function OSGBDocuments() {
     if (!silent) setLoading(true);
     try {
       const cacheKey = `${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`;
-      const [documentResult, companyRows, documentOverview] = await Promise.all([
+      const [documentResult, documentOverview] = await Promise.all([
         listOsgbDocumentsPage(user.id, {
           page,
           pageSize: DOCUMENT_PAGE_SIZE,
@@ -149,16 +149,13 @@ export default function OSGBDocuments() {
           companyId: companyFilter,
           search,
         }),
-        companies.length > 0 ? Promise.resolve(companies) : getOsgbCompanyOptions(user.id),
         getOsgbDocumentsOverview(user.id),
       ]);
       setRecords(documentResult.rows);
-      setCompanies(companyRows);
       setOverview(documentOverview);
       setTotalCount(documentResult.count);
       writeOsgbPageCache(cacheKey, {
         records: documentResult.rows,
-        companies: companyRows,
         overview: documentOverview,
         totalCount: documentResult.count,
       });
@@ -174,13 +171,11 @@ export default function OSGBDocuments() {
     if (!user?.id) return;
     const cached = readOsgbPageCache<{
       records: OsgbDocumentRecord[];
-      companies: OsgbCompanyOption[];
       overview: OsgbDocumentsOverview;
       totalCount: number;
     }>(`${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`, CACHE_TTL_MS);
     if (cached) {
       setRecords(cached.records);
-      setCompanies(cached.companies);
       setOverview(cached.overview);
       setTotalCount(cached.totalCount);
       setLoading(false);

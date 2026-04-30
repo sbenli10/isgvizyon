@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAccessRole } from "@/hooks/useAccessRole";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -158,6 +159,7 @@ export default function FieldVisits() {
   const { user, profile } = useAuth();
   const { canManage } = useAccessRole();
   const organizationId = profile?.organization_id || null;
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [data, setData] = useState<OsgbFieldVisitWorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -586,7 +588,7 @@ export default function FieldVisits() {
               <Select value={form.companyId} onValueChange={(value) => setForm((current) => ({ ...current, companyId: value }))}>
                 <SelectTrigger><SelectValue placeholder="Firma seçin" /></SelectTrigger>
                 <SelectContent>
-                  {data?.companies.map((company) => (
+                  {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>
                   ))}
                 </SelectContent>

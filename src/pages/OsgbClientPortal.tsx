@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Copy, Download, ExternalLink, Globe2, Plus
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import {
   createOsgbClientPortalLink,
   getOsgbClientPortalUploadSignedUrl,
   issueOsgbClientPortalLinkAccess,
-  listOsgbClientPortalCompanyOptions,
   listOsgbClientPortalUploads,
   listOsgbClientPortalWorkspace,
   reviewOsgbClientPortalUpload,
@@ -56,9 +56,9 @@ const formatBytes = (value: number) => {
 export default function OsgbClientPortal() {
   const { user, profile } = useAuth();
   const organizationId = profile?.organization_id || null;
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [workspace, setWorkspace] = useState<OsgbClientPortalWorkspace | null>(null);
   const [uploads, setUploads] = useState<OsgbClientPortalUploadRecord[]>([]);
-  const [companyOptions, setCompanyOptions] = useState<Array<{ companyId: string; companyName: string; hazardClass: string; deficitMinutes: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,13 +77,11 @@ export default function OsgbClientPortal() {
 
     setLoading(true);
     try {
-      const [portalWorkspace, companies, uploadRows] = await Promise.all([
+      const [portalWorkspace, uploadRows] = await Promise.all([
         listOsgbClientPortalWorkspace(organizationId),
-        listOsgbClientPortalCompanyOptions(organizationId),
         listOsgbClientPortalUploads(organizationId),
       ]);
       setWorkspace(portalWorkspace);
-      setCompanyOptions(companies);
       setUploads(uploadRows);
       setError(null);
     } catch (err) {
@@ -374,8 +372,8 @@ export default function OsgbClientPortal() {
               <Select value={form.companyId} onValueChange={(value) => setForm((current) => ({ ...current, companyId: value }))}>
                 <SelectTrigger><SelectValue placeholder="Firma secin" /></SelectTrigger>
                 <SelectContent>
-                  {companyOptions.map((company) => (
-                    <SelectItem key={company.companyId} value={company.companyId}>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
                       {company.companyName}
                     </SelectItem>
                   ))}

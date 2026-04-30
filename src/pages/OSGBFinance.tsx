@@ -45,14 +45,13 @@ import {
 import { cn } from "@/lib/utils";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useAccessRole } from "@/hooks/useAccessRole";
+import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { downloadCsv } from "@/lib/csvExport";
 import {
   deleteOsgbFinance,
-  getOsgbCompanyOptions,
   getOsgbFinanceOverview,
   listOsgbFinancePage,
   type OsgbFinanceCalendarItem,
-  type OsgbCompanyOption,
   type OsgbFinanceInput,
   type OsgbFinanceOverview,
   type OsgbFinanceRecord,
@@ -114,11 +113,12 @@ const getCacheKey = (userId: string) => `finance:${userId}`;
 const FINANCE_PAGE_SIZE = 20;
 
 export default function OSGBFinance() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { canManage } = useAccessRole();
+  const organizationId = profile?.organization_id || null;
   const [searchParams] = useSearchParams();
   const [records, setRecords] = useState<OsgbFinanceRecord[]>([]);
-  const [companies, setCompanies] = useState<OsgbCompanyOption[]>([]);
+  const { companies } = useOsgbManagedCompanies(organizationId);
   const [calendarItems, setCalendarItems] = useState<OsgbFinanceCalendarItem[]>([]);
   const [overview, setOverview] = useState<OsgbFinanceOverview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,7 +147,7 @@ export default function OSGBFinance() {
     if (!silent) setLoading(true);
     try {
       const cacheKey = `${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`;
-      const [financeResult, companyRows, financeOverview] = await Promise.all([
+      const [financeResult, financeOverview] = await Promise.all([
         listOsgbFinancePage(user.id, {
           page,
           pageSize: FINANCE_PAGE_SIZE,
@@ -155,17 +155,14 @@ export default function OSGBFinance() {
           companyId: companyFilter,
           search,
         }),
-        companies.length > 0 ? Promise.resolve(companies) : getOsgbCompanyOptions(user.id),
         getOsgbFinanceOverview(user.id),
       ]);
       setRecords(financeResult.rows);
-      setCompanies(companyRows);
       setCalendarItems(financeOverview.calendarItems);
       setOverview(financeOverview);
       setTotalCount(financeResult.count);
       writeOsgbPageCache(cacheKey, {
         records: financeResult.rows,
-        companies: companyRows,
         calendarItems: financeOverview.calendarItems,
         overview: financeOverview,
         totalCount: financeResult.count,
@@ -182,14 +179,12 @@ export default function OSGBFinance() {
     if (!user?.id) return;
     const cached = readOsgbPageCache<{
       records: OsgbFinanceRecord[];
-      companies: OsgbCompanyOption[];
       calendarItems: OsgbFinanceCalendarItem[];
       overview: OsgbFinanceOverview;
       totalCount: number;
     }>(`${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`, CACHE_TTL_MS);
     if (cached) {
       setRecords(cached.records);
-      setCompanies(cached.companies);
       setCalendarItems(cached.calendarItems);
       setOverview(cached.overview);
       setTotalCount(cached.totalCount);

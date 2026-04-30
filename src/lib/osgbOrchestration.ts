@@ -6,7 +6,7 @@ import {
   listIsgkatipSyncLogs,
 } from "@/domain/isgkatip/isgkatipQueries";
 import {
-  getOsgbPlatformDashboard,
+  listOsgbWorkspaceCompanies,
   listOsgbFieldVisitsWorkspace,
   listOsgbFinanceWorkspace,
   listOsgbRequiredDocumentsWorkspace,
@@ -865,12 +865,12 @@ export const getOsgbClientPortalUploadSignedUrl = async (filePath: string) => {
 };
 
 export const listOsgbClientPortalCompanyOptions = async (organizationId: string) => {
-  const dashboard = await getOsgbPlatformDashboard(organizationId, { refreshCompliance: false });
-  return dashboard.complianceRows.map((row) => ({
-    companyId: row.companyId,
-    companyName: row.companyName,
-    hazardClass: row.hazardClass,
-    deficitMinutes: row.deficitMinutes,
+  const companies = await listOsgbWorkspaceCompanies(organizationId);
+  return companies.map((company) => ({
+    companyId: company.id,
+    companyName: company.companyName,
+    hazardClass: company.hazardClass,
+    deficitMinutes: company.deficitMinutes,
   }));
 };
 
