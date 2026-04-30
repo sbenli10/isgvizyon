@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { addDays, differenceInDays, format } from "date-fns";
+import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
 import jsPDF from "jspdf";
 import {
   AlertTriangle,
@@ -31,6 +32,7 @@ import {
   listIsgkatipComplianceFlags,
   listIsgkatipPredictiveAlerts,
 } from "@/domain/isgkatip/isgkatipQueries";
+import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
 import { createOsgbTask } from "@/lib/osgbOperations";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { Badge } from "@/components/ui/badge";
@@ -357,7 +359,7 @@ export default function ISGBotCommandCenter() {
           supabase
             .from("osgb_tasks")
             .select("id, status, priority, due_date")
-            .eq("user_id", user.id),
+            .eq("organization_id", (await getIsgkatipOrgScope({ userId: user.id })).organizationId),
         ]);
 
       if (meetingsResponse.error) throw meetingsResponse.error;
