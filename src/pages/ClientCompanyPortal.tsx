@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CalendarClock, CreditCard, FileText, ShieldCheck, UploadCloud } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { AlertTriangle, CalendarClock, CircleHelp, CreditCard, FileText, ShieldCheck, UploadCloud } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,7 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { getOsgbClientPortalSnapshot, submitOsgbClientPortalUpload, type OsgbPublicClientPortalSnapshot } from "@/lib/osgbOrchestration";
+
+type UploadDraft = {
+  requiredDocumentId: string;
+  submittedByName: string;
+  submittedByEmail: string;
+  note: string;
+};
 
 const formatDate = (value: string | null) => {
   if (!value) return "-";
@@ -20,6 +28,7 @@ const formatDate = (value: string | null) => {
 };
 
 export default function ClientCompanyPortal() {
+  const navigate = useNavigate();
   const { token } = useParams();
   const [data, setData] = useState<OsgbPublicClientPortalSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,6 +39,24 @@ export default function ClientCompanyPortal() {
   const [submittedByEmail, setSubmittedByEmail] = useState("");
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const {
+    clearDraft: clearUploadDraft,
+    restoreDraft: restoreUploadDraft,
+  } = usePersistentDraft<UploadDraft>({
+    key: `client-company-portal:upload:${token || "unknown"}`,
+    enabled: Boolean(token),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 7 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    value: {
+      requiredDocumentId,
+      submittedByName,
+      submittedByEmail,
+      note,
+    },
+  });
 
   const load = useCallback(async () => {
     if (!token) {
@@ -59,6 +86,26 @@ export default function ClientCompanyPortal() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!token) return;
+
+    const draft = restoreUploadDraft();
+    if (!draft) return;
+    const hasContent = Boolean(
+      draft.requiredDocumentId !== "none" ||
+        draft.submittedByName.trim() ||
+        draft.submittedByEmail.trim() ||
+        draft.note.trim(),
+    );
+    if (!hasContent) return;
+
+    setRequiredDocumentId(draft.requiredDocumentId || "none");
+    setSubmittedByName(draft.submittedByName || "");
+    setSubmittedByEmail(draft.submittedByEmail || "");
+    setNote(draft.note || "");
+    toast.info("Belge yukleme taslagi geri yuklendi. Dosyayi guvenlik nedeniyle yeniden secmeniz gerekir.");
+  }, [restoreUploadDraft, token]);
+
   const missingDocuments = useMemo(
     () => (data?.documents || []).filter((item) => item.status !== "approved"),
     [data],
@@ -85,6 +132,7 @@ export default function ClientCompanyPortal() {
       setSubmittedByEmail("");
       setNote("");
       setRequiredDocumentId("none");
+      clearUploadDraft();
       await load();
       toast.success("Dosyaniz OSGB incelemesine gonderildi.");
     } catch (err) {
@@ -135,10 +183,19 @@ export default function ClientCompanyPortal() {
                 Son hizmetleri, bekleyen belgeleri ve cari ozetinizi buradan takip edebilir; istenen dosyalari dogrudan yukleyebilirsiniz.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
-              <div>Yetkili: {data.meta.contactName || "-"}</div>
-              <div className="mt-1">E-posta: {data.meta.contactEmail || "-"}</div>
-              <div className="mt-1">Link gecerlilik: {formatDate(data.meta.expiresAt)}</div>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/portal/company/${token}/how-to`)}
+              >
+                <CircleHelp className="mr-2 h-4 w-4" />
+                Nasil kullanilir?
+              </Button>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
+                <div>Yetkili: {data.meta.contactName || "-"}</div>
+                <div className="mt-1">E-posta: {data.meta.contactEmail || "-"}</div>
+                <div className="mt-1">Link gecerlilik: {formatDate(data.meta.expiresAt)}</div>
+              </div>
             </div>
           </div>
         </section>

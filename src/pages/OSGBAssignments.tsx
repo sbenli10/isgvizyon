@@ -13,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +71,12 @@ type AssignmentFormState = {
   endDate: string;
   status: OsgbWorkspaceAssignmentRecord["status"];
   notes: string;
+};
+
+type AssignmentDraft = {
+  mode: "create" | "edit";
+  editingId: string | null;
+  form: AssignmentFormState;
 };
 
 const emptyForm: AssignmentFormState = {
@@ -135,6 +142,32 @@ export default function OSGBAssignments() {
   const [form, setForm] = useState<AssignmentFormState>(emptyForm);
   const [personnelAssignedMinutes, setPersonnelAssignedMinutes] = useState(0);
   const [companyAssignedMinutes, setCompanyAssignedMinutes] = useState(0);
+  const [pendingRestoredEditingId, setPendingRestoredEditingId] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearAssignmentDraft,
+    restoreDraft: restoreAssignmentDraft,
+  } = usePersistentDraft<AssignmentDraft>({
+    key: "osgb-assignments:dialog",
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      mode: editing?.id ? "edit" : "create",
+      editingId: editing?.id ?? null,
+      form,
+    },
+  });
 
   const loadData = async (silent = false) => {
     if (!organizationId) {
@@ -194,6 +227,42 @@ export default function OSGBAssignments() {
       setPage(totalPages);
     }
   }, [page, totalPages]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreAssignmentDraft();
+    if (!draft?.form) return;
+    const hasContent = Boolean(
+      draft.editingId ||
+        draft.form.companyId ||
+        draft.form.personnelId ||
+        draft.form.assignedMinutes ||
+        draft.form.startDate ||
+        draft.form.endDate ||
+        draft.form.notes.trim(),
+    );
+    if (!hasContent) return;
+
+    void ensurePersonnelOptions().then(() => {
+      setForm(draft.form);
+      setPendingRestoredEditingId(draft.mode === "edit" ? draft.editingId || null : null);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş görevlendirme taslağı geri yüklendi.");
+    });
+  }, [restoreAssignmentDraft, user?.id]);
+
+  useEffect(() => {
+    if (!pendingRestoredEditingId || records.length === 0) return;
+
+    const restoredRecord =
+      records.find((record) => record.id === pendingRestoredEditingId) || null;
+    setEditing(restoredRecord);
+    if (!restoredRecord) {
+      clearAssignmentDraft();
+    }
+    setPendingRestoredEditingId(null);
+  }, [clearAssignmentDraft, pendingRestoredEditingId, records]);
 
   const ensurePersonnelOptions = async () => {
     if (!organizationId || personnel.length > 0) return;
@@ -330,6 +399,25 @@ export default function OSGBAssignments() {
       return;
     }
     await ensurePersonnelOptions();
+    const draft = restoreAssignmentDraft();
+    if (draft?.form && draft.mode === "create") {
+      const hasContent = Boolean(
+        draft.editingId ||
+          draft.form.companyId ||
+          draft.form.personnelId ||
+          draft.form.assignedMinutes ||
+          draft.form.startDate ||
+          draft.form.endDate ||
+          draft.form.notes.trim(),
+      );
+      if (hasContent) {
+        setForm(draft.form);
+        setPendingRestoredEditingId(null);
+        setDialogOpen(true);
+        toast.info("Kaydedilmemiş görevlendirme taslağı geri yüklendi.");
+        return;
+      }
+    }
     setEditing(null);
     setForm(emptyForm);
     setCompanyAssignedMinutes(0);
@@ -343,6 +431,18 @@ export default function OSGBAssignments() {
       return;
     }
     await ensurePersonnelOptions();
+    const restoredDraft = restoreAssignmentDraft();
+    if (
+      restoredDraft?.form &&
+      restoredDraft.mode === "edit" &&
+      restoredDraft.editingId === record.id
+    ) {
+      setEditing(record);
+      setForm(restoredDraft.form);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş düzenleme taslağı geri yüklendi.");
+      return;
+    }
     setEditing(record);
     setForm({
       companyId: record.company_id,
@@ -396,6 +496,7 @@ export default function OSGBAssignments() {
       setDialogOpen(false);
       setEditing(null);
       setForm(emptyForm);
+      clearAssignmentDraft();
       toast.success(editing ? "Görevlendirme güncellendi." : "Personel firmaya atandı.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Görevlendirme kaydı kaydedilemedi.");
@@ -733,7 +834,17 @@ export default function OSGBAssignments() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Vazgeç</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setEditing(null);
+                setForm(emptyForm);
+                clearAssignmentDraft();
+              }}
+            >
+              Vazgeç
+            </Button>
             <Button onClick={() => void handleSave()} disabled={saving || livePersonnelCapacity?.exceeded}>
               {saving ? "Kaydediliyor..." : editing ? "Güncelle" : "Kaydet"}
             </Button>

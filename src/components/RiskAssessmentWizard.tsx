@@ -1,10 +1,11 @@
 ﻿import { ChangeEvent, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, Download, FilePenLine, FileSearch, FileSignature, FileText, Loader2, ShieldCheck, Upload, Users, X } from "lucide-react";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStorageObjectRef } from "@/lib/storageObject";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,11 @@ interface FormData {
   hazardSources: string; identifiedRisks: string;
   controlMeasures: string; responsiblePersons: string; legislationNotes: string; renewalTriggersNote: string;
 }
+
+type RiskAssessmentWizardDraft = {
+  currentStep: number;
+  formData: FormData;
+};
 
 const today = new Date().toISOString().split("T")[0];
 const steps: WizardStep[] = [
@@ -140,8 +146,9 @@ const createInitialFormData = (): FormData => ({
 });
 
 export default function RiskAssessmentWizard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRefs = useRef<Record<SignatureFieldKey, HTMLInputElement | null>>({
     employerRepresentativeSignatureUrl: null,
@@ -154,6 +161,55 @@ export default function RiskAssessmentWizard() {
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [signaturePreview, setSignaturePreview] = useState<{ title: string; imageUrl: string; field: SignatureFieldKey } | null>(null);
+  const locationState = location.state as { companyId?: string | null } | null;
+  const draftContextKey = useMemo(
+    () => `${location.pathname}:${locationState?.companyId || "general"}`,
+    [location.pathname, locationState?.companyId],
+  );
+  const draftFormData = useMemo<FormData>(() => ({
+    ...formData,
+    logo: formData.logo?.startsWith("data:") ? null : formData.logo,
+    employerRepresentativeSignatureUrl: formData.employerRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employerRepresentativeSignatureUrl,
+    occupationalSafetySpecialistSignatureUrl: formData.occupationalSafetySpecialistSignatureUrl?.startsWith("data:") ? null : formData.occupationalSafetySpecialistSignatureUrl,
+    workplaceDoctorSignatureUrl: formData.workplaceDoctorSignatureUrl?.startsWith("data:") ? null : formData.workplaceDoctorSignatureUrl,
+    employeeRepresentativeSignatureUrl: formData.employeeRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employeeRepresentativeSignatureUrl,
+    supportPersonnelSignatureUrl: formData.supportPersonnelSignatureUrl?.startsWith("data:") ? null : formData.supportPersonnelSignatureUrl,
+  }), [formData]);
+  const { clearDraft } = usePersistentDraft<RiskAssessmentWizardDraft>({
+    key: `risk-assessment-wizard:${draftContextKey}`,
+    enabled: Boolean(user?.id),
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 500,
+    scope: {
+      userId: user?.id,
+      orgId: profile?.organization_id ?? null,
+    },
+    value: {
+      currentStep,
+      formData: draftFormData,
+    },
+    onRestore: (draft) => {
+      setCurrentStep(
+        typeof draft.currentStep === "number"
+          ? Math.min(Math.max(draft.currentStep, 0), steps.length - 1)
+          : 0,
+      );
+      setFormData({
+        ...createInitialFormData(),
+        ...(draft.formData || {}),
+      });
+      toast.info("Kaydedilmemiş risk değerlendirme taslağı geri yüklendi.");
+    },
+  });
+  const resetWizardDraft = () => {
+    clearDraft();
+    setCurrentStep(0);
+    setFormData(createInitialFormData());
+    setSignaturePreview(null);
+    toast.success("Risk değerlendirme taslağı temizlendi.");
+  };
 
   const hazardCfg = hazardConfig[formData.hazardLevel];
   const currentStepConfig = steps[currentStep];
@@ -374,6 +430,7 @@ export default function RiskAssessmentWizard() {
       }
       sessionStorage.setItem("risk-editor-bridge", JSON.stringify({ assessmentId: insertedAssessment.id, companyId: insertedAssessment.company_id, createdFromWizard: true, createdAt: Date.now() }));
       toast.success("Risk değerlendirme taslağı oluşturuldu.", { description: "Şimdi detaylı madde yönetimi için editör ekranına geçiyoruz." });
+      clearDraft();
       setFormData(createInitialFormData()); setCurrentStep(0);
       navigate("/risk-editor", { state: { assessmentId: insertedAssessment.id, companyId: insertedAssessment.company_id, createdFromWizard: true } });
     } catch (error: any) { toast.error(error.message || "Kayıt oluşturulamadı."); }
@@ -525,9 +582,15 @@ export default function RiskAssessmentWizard() {
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Geri
               </Button>
-              <Button type="button" onClick={currentStep === steps.length - 1 ? handleSubmit : () => setCurrentStep(currentStep + 1)} disabled={submitting} className="rounded-2xl bg-slate-100 text-slate-950 hover:bg-white">
-                {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Editör hazırlanıyor...</> : currentStep === steps.length - 1 ? <><FilePenLine className="mr-2 h-4 w-4" />Kaydet ve Editöre Geç</> : <>İleri<ChevronRight className="ml-2 h-4 w-4" /></>}
-              </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button type="button" variant="outline" onClick={resetWizardDraft} disabled={submitting} className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15">
+                  <X className="mr-2 h-4 w-4" />
+                  Taslağı Temizle
+                </Button>
+                <Button type="button" onClick={currentStep === steps.length - 1 ? handleSubmit : () => setCurrentStep(currentStep + 1)} disabled={submitting} className="rounded-2xl bg-slate-100 text-slate-950 hover:bg-white">
+                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Editör hazırlanıyor...</> : currentStep === steps.length - 1 ? <><FilePenLine className="mr-2 h-4 w-4" />Kaydet ve Editöre Geç</> : <>İleri<ChevronRight className="ml-2 h-4 w-4" /></>}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

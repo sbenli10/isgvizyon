@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { ClipboardList, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,6 +33,8 @@ const emptyForm = {
   dueDate: "",
 };
 
+type TaskFormState = typeof emptyForm;
+
 export default function OSGBTasks() {
   const { user, profile } = useAuth();
   const { canManageOperations } = useOsgbAccess();
@@ -43,6 +46,27 @@ export default function OSGBTasks() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearTaskDraft,
+    restoreDraft: restoreTaskDraft,
+  } = usePersistentDraft<TaskFormState>({
+    key: `osgb-tasks:dialog:${searchParams.get("taskId") || "general"}`,
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: form,
+  });
 
   const loadData = useCallback(async () => {
     if (!organizationId) {
@@ -96,6 +120,25 @@ export default function OSGBTasks() {
 
   const selectedTaskId = searchParams.get("taskId");
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreTaskDraft();
+    if (!draft) return;
+    const hasContent = Boolean(
+      draft.companyId ||
+        draft.title.trim() ||
+        draft.description.trim() ||
+        draft.assignedTo.trim() ||
+        draft.dueDate,
+    );
+    if (!hasContent) return;
+
+    setForm(draft);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemiş görev taslağı geri yüklendi.");
+  }, [restoreTaskDraft, user?.id]);
+
   const handleCreate = async () => {
     if (!organizationId || !user?.id || !form.title.trim()) {
       toast.error("Gorev basligi zorunlu.");
@@ -116,6 +159,7 @@ export default function OSGBTasks() {
       setRecords((prev) => [created, ...prev]);
       setDialogOpen(false);
       setForm(emptyForm);
+      clearTaskDraft();
       toast.success("Gorev olusturuldu.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gorev olusturulamadi.");
@@ -175,7 +219,28 @@ export default function OSGBTasks() {
             <RefreshCcw className="mr-2 h-4 w-4" />
             Yenile
           </Button>
-          <Button onClick={() => setDialogOpen(true)} disabled={!canManageOperations}>
+          <Button
+            onClick={() => {
+              const draft = restoreTaskDraft();
+              if (draft) {
+                const hasContent = Boolean(
+                  draft.companyId ||
+                    draft.title.trim() ||
+                    draft.description.trim() ||
+                    draft.assignedTo.trim() ||
+                    draft.dueDate,
+                );
+                if (hasContent) {
+                  setForm(draft);
+                  setDialogOpen(true);
+                  toast.info("Kaydedilmemiş görev taslağı geri yüklendi.");
+                  return;
+                }
+              }
+              setDialogOpen(true);
+            }}
+            disabled={!canManageOperations}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Gorev Ekle
           </Button>
@@ -361,7 +426,14 @@ export default function OSGBTasks() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setForm(emptyForm);
+                clearTaskDraft();
+              }}
+            >
               Iptal
             </Button>
             <Button onClick={handleCreate} disabled={!canManageOperations}>

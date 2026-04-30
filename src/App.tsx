@@ -85,6 +85,7 @@ const OsgbAutomationCenter = lazyWithRetry("osgb-automation-center", () => impor
 const OsgbClientPortal = lazyWithRetry("osgb-client-portal", () => import("./pages/OsgbClientPortal"));
 const OsgbHowTo = lazyWithRetry("osgb-how-to", () => import("./pages/OsgbHowTo"));
 const ClientCompanyPortal = lazyWithRetry("client-company-portal", () => import("./pages/ClientCompanyPortal"));
+const ClientCompanyPortalHowTo = lazyWithRetry("client-company-portal-how-to", () => import("./pages/ClientCompanyPortalHowTo"));
 const CertificatesDashboard = lazyWithRetry("certificates-dashboard", () => import("./pages/CertificatesDashboard"));
 const CertificatesHistory = lazyWithRetry("certificates-history", () => import("./pages/CertificatesHistory"));
 const CertificateJobDetail = lazyWithRetry("certificate-job-detail", () => import("./pages/CertificateJobDetail"));
@@ -397,6 +398,14 @@ const App = () => (
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <ClientCompanyPortal />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/portal/company/:token/how-to"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <ClientCompanyPortalHowTo />
                   </Suspense>
                 }
               />

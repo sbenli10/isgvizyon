@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Copy, Download, ExternalLink, Globe2, Plus
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,27 @@ export default function OsgbClientPortal() {
   usePageDataTiming(loading);
 
   const origin = useMemo(() => window.location.origin, []);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearPortalLinkDraft,
+    restoreDraft: restorePortalLinkDraft,
+  } = usePersistentDraft<FormState>({
+    key: "osgb-client-portal:create-link-dialog",
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: form,
+  });
 
   const loadData = useCallback(async () => {
     if (!organizationId) {
@@ -94,6 +116,24 @@ export default function OsgbClientPortal() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restorePortalLinkDraft();
+    if (!draft) return;
+    const hasContent = Boolean(
+      draft.companyId ||
+        draft.contactName.trim() ||
+        draft.contactEmail.trim() ||
+        draft.expiresAt,
+    );
+    if (!hasContent) return;
+
+    setForm(draft);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemis portal linki taslagi geri yuklendi.");
+  }, [restorePortalLinkDraft, user?.id]);
 
   const copyLink = async (portalPath: string) => {
     try {
@@ -125,6 +165,7 @@ export default function OsgbClientPortal() {
       });
       setDialogOpen(false);
       setForm(emptyForm);
+      clearPortalLinkDraft();
       await loadData();
       await copyLink(`/portal/company/${created.access_token}`);
     } catch (err) {
@@ -202,7 +243,26 @@ export default function OsgbClientPortal() {
             <RefreshCcw className="mr-2 h-4 w-4" />
             Yenile
           </Button>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button
+            onClick={() => {
+              const draft = restorePortalLinkDraft();
+              if (draft) {
+                const hasContent = Boolean(
+                  draft.companyId ||
+                    draft.contactName.trim() ||
+                    draft.contactEmail.trim() ||
+                    draft.expiresAt,
+                );
+                if (hasContent) {
+                  setForm(draft);
+                  setDialogOpen(true);
+                  toast.info("Kaydedilmemis portal linki taslagi geri yuklendi.");
+                  return;
+                }
+              }
+              setDialogOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Portal linki olustur
           </Button>
@@ -394,7 +454,16 @@ export default function OsgbClientPortal() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Vazgec</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setForm(emptyForm);
+                clearPortalLinkDraft();
+              }}
+            >
+              Vazgec
+            </Button>
             <Button onClick={() => void handleCreate()} disabled={saving}>{saving ? "Olusturuluyor" : "Link olustur"}</Button>
           </DialogFooter>
         </DialogContent>

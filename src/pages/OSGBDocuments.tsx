@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +69,12 @@ type DocumentFormState = {
   status: OsgbDocumentRecord["status"];
   fileUrl: string;
   notes: string;
+};
+
+type DocumentDraft = {
+  mode: "create" | "edit";
+  editingId: string | null;
+  form: DocumentFormState;
 };
 
 const emptyForm: DocumentFormState = {
@@ -128,6 +135,32 @@ export default function OSGBDocuments() {
   const [batchInfo, setBatchInfo] = useState<{ created: number; skipped: number } | null>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [pendingRestoredEditingId, setPendingRestoredEditingId] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearDocumentDraft,
+    restoreDraft: restoreDocumentDraft,
+  } = usePersistentDraft<DocumentDraft>({
+    key: `osgb-documents:dialog:${companyFilter}:${statusFilter}`,
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      mode: editing?.id ? "edit" : "create",
+      editingId: editing?.id ?? null,
+      form,
+    },
+  });
 
   useEffect(() => {
     const status = searchParams.get("status");
@@ -204,10 +237,63 @@ export default function OSGBDocuments() {
     }
   }, [page, totalPages]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreDocumentDraft();
+    if (!draft?.form) return;
+    const hasContent = Boolean(
+      draft.editingId ||
+        draft.form.companyId ||
+        draft.form.documentName.trim() ||
+        draft.form.issueDate ||
+        draft.form.expiryDate ||
+        draft.form.fileUrl.trim() ||
+        draft.form.notes.trim(),
+    );
+    if (!hasContent) return;
+
+    setForm(draft.form);
+    setPendingRestoredEditingId(draft.mode === "edit" ? draft.editingId || null : null);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemiş evrak taslağı geri yüklendi.");
+  }, [restoreDocumentDraft, user?.id]);
+
+  useEffect(() => {
+    if (!pendingRestoredEditingId || records.length === 0) return;
+
+    const restoredRecord =
+      records.find((record) => record.id === pendingRestoredEditingId) || null;
+    setEditing(restoredRecord);
+    if (!restoredRecord) {
+      clearDocumentDraft();
+    }
+    setPendingRestoredEditingId(null);
+  }, [clearDocumentDraft, pendingRestoredEditingId, records]);
+
   const openCreate = () => {
     if (!canManage) {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
       return;
+    }
+    const draft = restoreDocumentDraft();
+    if (draft?.form && draft.mode === "create") {
+      const hasContent = Boolean(
+        draft.editingId ||
+          draft.form.companyId ||
+          draft.form.documentName.trim() ||
+          draft.form.issueDate ||
+          draft.form.expiryDate ||
+          draft.form.fileUrl.trim() ||
+          draft.form.notes.trim(),
+      );
+      if (hasContent) {
+        setForm(draft.form);
+        setPendingRestoredEditingId(null);
+        setDialogOpen(true);
+        toast.info("Kaydedilmemiş evrak taslağı geri yüklendi.");
+        return;
+      }
     }
     setEditing(null);
     setForm(emptyForm);
@@ -215,6 +301,19 @@ export default function OSGBDocuments() {
   };
 
   const openEdit = (record: OsgbDocumentRecord) => {
+    const restoredDraft = restoreDocumentDraft();
+    if (
+      restoredDraft?.form &&
+      restoredDraft.mode === "edit" &&
+      restoredDraft.editingId === record.id
+    ) {
+      setEditing(record);
+      setForm(restoredDraft.form);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş düzenleme taslağı geri yüklendi.");
+      return;
+    }
+
     setEditing(record);
     setForm({
       companyId: record.company_id,
@@ -264,6 +363,7 @@ export default function OSGBDocuments() {
       setDialogOpen(false);
       setEditing(null);
       setForm(emptyForm);
+      clearDocumentDraft();
       toast.success(editing ? "Evrak kaydı güncellendi." : "Evrak kaydı oluşturuldu.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Evrak kaydı kaydedilemedi.");
@@ -510,7 +610,17 @@ export default function OSGBDocuments() {
             <div className="space-y-2 md:col-span-2"><Label>Not</Label><Textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Vazgeç</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setEditing(null);
+                setForm(emptyForm);
+                clearDocumentDraft();
+              }}
+            >
+              Vazgeç
+            </Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? "Kaydediliyor..." : "Kaydet"}</Button>
           </DialogFooter>
         </DialogContent>

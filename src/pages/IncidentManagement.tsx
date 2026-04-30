@@ -16,6 +16,7 @@ import {
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useAccessRole } from "@/hooks/useAccessRole";
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
@@ -121,6 +122,20 @@ type IncidentCloseFormState = {
   createCapa: boolean;
 };
 
+type IncidentDialogDraft = {
+  mode: "create" | "edit";
+  editingId: string | null;
+  form: IncidentFormState;
+};
+
+type IncidentWorkflowDraft = {
+  detailOpen: boolean;
+  closeDialogOpen: boolean;
+  selectedId: string | null;
+  actionForm: IncidentActionFormState;
+  closeForm: IncidentCloseFormState;
+};
+
 const emptyIncidentForm: IncidentFormState = {
   companyId: "",
   incidentType: "near_miss",
@@ -215,8 +230,39 @@ const getCacheKey = (userId: string) => `incident-management:${userId}`;
 const formatDate = (value: string | null) =>
   value ? new Date(value).toLocaleString("tr-TR") : "-";
 
+const hasIncidentDialogDraftContent = (form: IncidentFormState) =>
+  Boolean(
+    form.companyId ||
+      form.title.trim() ||
+      form.description.trim() ||
+      form.location.trim() ||
+      form.affectedPerson.trim() ||
+      form.rootCause.trim() ||
+      form.immediateAction.trim() ||
+      form.correctiveAction.trim() ||
+      form.reportedBy.trim() ||
+      form.witnessInfo.trim() ||
+      form.accidentCategory.trim() ||
+      form.lostTimeDays !== "0" ||
+      form.requiresNotification,
+  );
+
+const hasIncidentWorkflowDraftContent = (draft: IncidentWorkflowDraft) =>
+  Boolean(
+    draft.selectedId &&
+      (draft.detailOpen ||
+        draft.closeDialogOpen ||
+        draft.actionForm.actionTitle.trim() ||
+        draft.actionForm.ownerName.trim() ||
+        draft.actionForm.dueDate.trim() ||
+        draft.actionForm.notes.trim() ||
+        draft.closeForm.closureSummary.trim() ||
+        draft.closeForm.closureNotes.trim() ||
+        draft.closeForm.createCapa),
+  );
+
 export default function IncidentManagement() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { role, canManage, isViewer } = useAccessRole();
   const activeCompanyId = searchParams.get("companyId") || "";
@@ -246,6 +292,7 @@ export default function IncidentManagement() {
   const [actionForm, setActionForm] =
     useState<IncidentActionFormState>(emptyActionForm);
   const [closeForm, setCloseForm] = useState<IncidentCloseFormState>(emptyCloseForm);
+  const [pendingEditingDraftId, setPendingEditingDraftId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<IncidentType | "ALL">("ALL");
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | "ALL">(
@@ -256,6 +303,54 @@ export default function IncidentManagement() {
   const canDelete = role === "admin" || role === "inspector";
   const canClose = role === "admin" || role === "inspector";
   const canCreateCapa = role === "admin" || role === "inspector";
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: profile?.organization_id ?? null,
+    }),
+    [profile?.organization_id, user?.id],
+  );
+
+  const {
+    clearDraft: clearIncidentDialogDraft,
+    restoreDraft: restoreIncidentDialogDraft,
+  } = usePersistentDraft<IncidentDialogDraft>({
+    key: "incident-management:dialog",
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      mode: editing?.id ? "edit" : "create",
+      editingId: editing?.id ?? null,
+      form,
+    },
+  });
+
+  const {
+    clearDraft: clearIncidentWorkflowDraft,
+    patchDraft: patchIncidentWorkflowDraft,
+    restoreDraft: restoreIncidentWorkflowDraft,
+  } = usePersistentDraft<IncidentWorkflowDraft>({
+    key: "incident-management:workflow",
+    enabled: Boolean(user?.id && (detailOpen || closeDialogOpen)),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      detailOpen,
+      closeDialogOpen,
+      selectedId: selected?.id ?? null,
+      actionForm,
+      closeForm,
+    },
+  });
 
   useRouteOverlayCleanup(() => {
     setDialogOpen(false);
@@ -374,6 +469,30 @@ export default function IncidentManagement() {
     }
   }, [page, totalPages]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreIncidentDialogDraft();
+    if (!draft || !hasIncidentDialogDraftContent(draft.form)) return;
+
+    setForm(draft.form);
+    setPendingEditingDraftId(draft.mode === "edit" ? draft.editingId || null : null);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemiş olay formu geri yüklendi.");
+  }, [restoreIncidentDialogDraft, user?.id]);
+
+  useEffect(() => {
+    if (!pendingEditingDraftId || records.length === 0) return;
+
+    const restoredRecord =
+      records.find((record) => record.id === pendingEditingDraftId) || null;
+    setEditing(restoredRecord);
+    if (!restoredRecord) {
+      clearIncidentDialogDraft();
+    }
+    setPendingEditingDraftId(null);
+  }, [clearIncidentDialogDraft, pendingEditingDraftId, records]);
+
   const operationalInsights = useMemo(
     () => ({
       requiresNotification: records.filter((item) => item.requires_notification)
@@ -458,6 +577,7 @@ export default function IncidentManagement() {
   const resetIncidentForm = () => {
     setForm(emptyIncidentForm);
     setEditing(null);
+    setPendingEditingDraftId(null);
   };
 
   const resetActionForm = () => {
@@ -474,6 +594,19 @@ export default function IncidentManagement() {
       return;
     }
 
+    const restoredDraft = restoreIncidentDialogDraft();
+    if (
+      restoredDraft &&
+      restoredDraft.mode === "create" &&
+      hasIncidentDialogDraftContent(restoredDraft.form)
+    ) {
+      setForm(restoredDraft.form);
+      setPendingEditingDraftId(null);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş olay formu geri yüklendi.");
+      return;
+    }
+
     resetIncidentForm();
     if (activeCompanyId) {
       setForm((prev) => ({ ...prev, companyId: activeCompanyId }));
@@ -484,6 +617,20 @@ export default function IncidentManagement() {
   const openEdit = (record: IncidentReportRecord) => {
     if (!canManage) {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
+      return;
+    }
+
+    const restoredDraft = restoreIncidentDialogDraft();
+    if (
+      restoredDraft &&
+      restoredDraft.mode === "edit" &&
+      restoredDraft.editingId === record.id &&
+      hasIncidentDialogDraftContent(restoredDraft.form)
+    ) {
+      setEditing(record);
+      setForm(restoredDraft.form);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş düzenleme taslağı geri yüklendi.");
       return;
     }
 
@@ -511,7 +658,10 @@ export default function IncidentManagement() {
     setDialogOpen(true);
   };
 
-  const openDetail = async (record: IncidentReportRecord) => {
+  const openDetail = async (
+    record: IncidentReportRecord,
+    restoredDraft?: IncidentWorkflowDraft | null,
+  ) => {
     setSelected(record);
     setDetailOpen(true);
     setDetailLoading(true);
@@ -531,6 +681,22 @@ export default function IncidentManagement() {
 
       setAttachments(attachmentRows);
       setActions(actionRows);
+
+      const persistedDraft =
+        restoredDraft ??
+        (() => {
+          const draft = restoreIncidentWorkflowDraft();
+          if (!draft || draft.selectedId !== record.id) return null;
+          return draft;
+        })();
+
+      if (persistedDraft) {
+        setActionForm(persistedDraft.actionForm || emptyActionForm);
+        setCloseForm(persistedDraft.closeForm || emptyCloseForm);
+        if (persistedDraft.closeDialogOpen) {
+          setCloseDialogOpen(true);
+        }
+      }
     } catch (detailError) {
       toast.error(
         detailError instanceof Error
@@ -541,6 +707,19 @@ export default function IncidentManagement() {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!user?.id || records.length === 0) return;
+
+    const draft = restoreIncidentWorkflowDraft();
+    if (!draft || !draft.selectedId) return;
+    if (!draft.detailOpen && !draft.closeDialogOpen) return;
+
+    const targetRecord = records.find((record) => record.id === draft.selectedId);
+    if (!targetRecord) return;
+
+    void openDetail(targetRecord, draft);
+  }, [records, restoreIncidentWorkflowDraft, user?.id]);
 
   const handleSave = async () => {
     if (!canManage) {
@@ -588,6 +767,7 @@ export default function IncidentManagement() {
 
       setDialogOpen(false);
       resetIncidentForm();
+      clearIncidentDialogDraft();
       toast.success(
         editing ? "Olay kaydı güncellendi." : "Olay kaydı oluşturuldu.",
       );
@@ -616,6 +796,7 @@ export default function IncidentManagement() {
       if (selected?.id === record.id) {
         setSelected(null);
         setDetailOpen(false);
+        clearIncidentWorkflowDraft();
       }
       toast.success("Olay kaydı silindi.");
     } catch (deleteError) {
@@ -784,6 +965,9 @@ export default function IncidentManagement() {
       const saved = await upsertIncidentAction(user.id, selected.id, payload);
       setActions((prev) => [saved, ...prev]);
       resetActionForm();
+      patchIncidentWorkflowDraft({
+        actionForm: emptyActionForm,
+      });
       toast.success("Aksiyon eklendi.");
     } catch (actionError) {
       toast.error(
@@ -890,6 +1074,7 @@ export default function IncidentManagement() {
       setSelected(saved);
       await loadData(true);
       setCloseDialogOpen(false);
+      clearIncidentWorkflowDraft();
       toast.success("Olay kapatıldı.");
     } catch (closeError) {
       toast.error(
@@ -1732,6 +1917,10 @@ export default function IncidentManagement() {
         onOpenChange={(open) => {
           setDetailOpen(open);
           if (!open) {
+            patchIncidentWorkflowDraft({
+              detailOpen: false,
+              closeDialogOpen: false,
+            });
             setSelected(null);
             setAttachments([]);
             setActions([]);
@@ -2141,7 +2330,17 @@ export default function IncidentManagement() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={closeDialogOpen} onOpenChange={setCloseDialogOpen}>
+      <Dialog
+        open={closeDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            patchIncidentWorkflowDraft({
+              closeDialogOpen: false,
+            });
+          }
+          setCloseDialogOpen(open);
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Olay Kapatma Workflow'u</DialogTitle>

@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,6 +70,12 @@ type FinanceFormState = {
   status: OsgbFinanceRecord["status"];
   paidAt: string;
   paymentNote: string;
+};
+
+type FinanceDraft = {
+  mode: "create" | "edit";
+  editingId: string | null;
+  form: FinanceFormState;
 };
 
 const emptyForm: FinanceFormState = {
@@ -134,6 +141,32 @@ export default function OSGBFinance() {
   const [calendarView, setCalendarView] = useState<"weekly" | "monthly">("monthly");
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [pendingRestoredEditingId, setPendingRestoredEditingId] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearFinanceDraft,
+    restoreDraft: restoreFinanceDraft,
+  } = usePersistentDraft<FinanceDraft>({
+    key: `osgb-finance:dialog:${companyFilter}`,
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      mode: editing?.id ? "edit" : "create",
+      editingId: editing?.id ?? null,
+      form,
+    },
+  });
 
   useEffect(() => {
     const status = searchParams.get("status");
@@ -219,6 +252,42 @@ export default function OSGBFinance() {
     }
   }, [page, totalPages]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreFinanceDraft();
+    if (!draft?.form) return;
+    const hasContent = Boolean(
+      draft.editingId ||
+        draft.form.companyId ||
+        draft.form.invoiceNo.trim() ||
+        draft.form.servicePeriod.trim() ||
+        draft.form.invoiceDate ||
+        draft.form.dueDate ||
+        draft.form.amount ||
+        draft.form.paidAt ||
+        draft.form.paymentNote.trim(),
+    );
+    if (!hasContent) return;
+
+    setForm(draft.form);
+    setPendingRestoredEditingId(draft.mode === "edit" ? draft.editingId || null : null);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemiş finans taslağı geri yüklendi.");
+  }, [restoreFinanceDraft, user?.id]);
+
+  useEffect(() => {
+    if (!pendingRestoredEditingId || records.length === 0) return;
+
+    const restoredRecord =
+      records.find((record) => record.id === pendingRestoredEditingId) || null;
+    setEditing(restoredRecord);
+    if (!restoredRecord) {
+      clearFinanceDraft();
+    }
+    setPendingRestoredEditingId(null);
+  }, [clearFinanceDraft, pendingRestoredEditingId, records]);
+
   const groupedCalendar = useMemo(() => {
     const getWeekLabel = (value: string) => {
       const date = new Date(value);
@@ -275,12 +344,46 @@ export default function OSGBFinance() {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
       return;
     }
+    const draft = restoreFinanceDraft();
+    if (draft?.form && draft.mode === "create") {
+      const hasContent = Boolean(
+        draft.editingId ||
+          draft.form.companyId ||
+          draft.form.invoiceNo.trim() ||
+          draft.form.servicePeriod.trim() ||
+          draft.form.invoiceDate ||
+          draft.form.dueDate ||
+          draft.form.amount ||
+          draft.form.paidAt ||
+          draft.form.paymentNote.trim(),
+      );
+      if (hasContent) {
+        setForm(draft.form);
+        setPendingRestoredEditingId(null);
+        setDialogOpen(true);
+        toast.info("Kaydedilmemiş finans taslağı geri yüklendi.");
+        return;
+      }
+    }
     setEditing(null);
     setForm(emptyForm);
     setDialogOpen(true);
   };
 
   const openEdit = (record: OsgbFinanceRecord) => {
+    const restoredDraft = restoreFinanceDraft();
+    if (
+      restoredDraft?.form &&
+      restoredDraft.mode === "edit" &&
+      restoredDraft.editingId === record.id
+    ) {
+      setEditing(record);
+      setForm(restoredDraft.form);
+      setDialogOpen(true);
+      toast.info("Kaydedilmemiş düzenleme taslağı geri yüklendi.");
+      return;
+    }
+
     setEditing(record);
     setForm({
       companyId: record.company_id,
@@ -348,6 +451,7 @@ export default function OSGBFinance() {
       setDialogOpen(false);
       setEditing(null);
       setForm(emptyForm);
+      clearFinanceDraft();
       toast.success(editing ? "Finans kaydı güncellendi." : "Finans kaydı oluşturuldu.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Finans kaydı kaydedilemedi.");
@@ -651,7 +755,17 @@ export default function OSGBFinance() {
             <div className="space-y-2 md:col-span-2"><Label>Not</Label><Textarea value={form.paymentNote} onChange={(e) => setForm((prev) => ({ ...prev, paymentNote: e.target.value }))} /></div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Vazgeç</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setEditing(null);
+                setForm(emptyForm);
+                clearFinanceDraft();
+              }}
+            >
+              Vazgeç
+            </Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? "Kaydediliyor..." : "Kaydet"}</Button>
           </DialogFooter>
         </DialogContent>

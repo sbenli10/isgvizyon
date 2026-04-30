@@ -10,6 +10,7 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Sentry } from "@/lib/sentry";
+import { clearUserDrafts } from "@/hooks/usePersistentDraft";
 
 type AuthProfile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -324,12 +325,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile]);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    const activeUserId = session?.user?.id ?? null;
+    let signOutError: unknown = null;
+
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      signOutError = error;
+    } finally {
 
     try {
       localStorage.removeItem("denetron_extension_auth");
     } catch (error) {
       console.warn("Extension auth fallback temizlenemedi:", error);
+    }
+
+    if (activeUserId) {
+      try {
+        clearUserDrafts(activeUserId);
+      } catch (error) {
+        console.warn("Kullanıcı draftları temizlenemedi:", error);
+      }
+    }
+    }
+
+    if (signOutError) {
+      throw signOutError;
     }
   };
 

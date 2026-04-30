@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAccessRole } from "@/hooks/useAccessRole";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
+import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -103,6 +104,15 @@ type EvidenceFormState = {
   metadata: string;
 };
 
+type FieldVisitDraft = {
+  form: VisitFormState;
+};
+
+type FieldVisitEvidenceDraft = {
+  selectedVisitId: string | null;
+  evidenceForm: EvidenceFormState;
+};
+
 const emptyVisitForm: VisitFormState = {
   companyId: "",
   visitType: "onsite_visit",
@@ -169,6 +179,47 @@ export default function FieldVisits() {
   const [evidenceForm, setEvidenceForm] = useState<EvidenceFormState>(emptyEvidenceForm);
   const [saving, setSaving] = useState(false);
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
+  const [pendingEvidenceRestoreVisitId, setPendingEvidenceRestoreVisitId] = useState<string | null>(null);
+  const draftScope = useMemo(
+    () => ({
+      userId: user?.id,
+      orgId: organizationId,
+    }),
+    [organizationId, user?.id],
+  );
+  const {
+    clearDraft: clearVisitDraft,
+    restoreDraft: restoreVisitDraft,
+  } = usePersistentDraft<FieldVisitDraft>({
+    key: "field-visits:create-dialog",
+    enabled: Boolean(user?.id && dialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      form,
+    },
+  });
+  const {
+    clearDraft: clearEvidenceDraft,
+    restoreDraft: restoreEvidenceDraft,
+  } = usePersistentDraft<FieldVisitEvidenceDraft>({
+    key: "field-visits:evidence-dialog",
+    enabled: Boolean(user?.id && evidenceDialogOpen),
+    autoRestore: false,
+    version: 1,
+    storage: "localStorage",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 400,
+    scope: draftScope,
+    value: {
+      selectedVisitId,
+      evidenceForm,
+    },
+  });
   usePageDataTiming(loading);
 
   const loadData = useCallback(async () => {
@@ -194,6 +245,28 @@ export default function FieldVisits() {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const draft = restoreVisitDraft();
+    if (!draft?.form) return;
+    const hasContent = Boolean(
+      draft.form.companyId ||
+        draft.form.plannedAt ||
+        draft.form.plannedEndAt ||
+        draft.form.visitAddress.trim() ||
+        draft.form.notes.trim() ||
+        draft.form.nextActionSummary.trim() ||
+        draft.form.complianceImpactMinutes ||
+        draft.form.assignedPersonnelIds.length > 0,
+    );
+    if (!hasContent) return;
+
+    setForm(draft.form);
+    setDialogOpen(true);
+    toast.info("Kaydedilmemiş saha ziyareti taslağı geri yüklendi.");
+  }, [restoreVisitDraft, user?.id]);
+
   const selectedVisit = useMemo(
     () => data?.visits.find((visit) => visit.id === selectedVisitId) || data?.visits[0] || null,
     [data?.visits, selectedVisitId],
@@ -204,6 +277,36 @@ export default function FieldVisits() {
     [data?.visits],
   );
 
+  useEffect(() => {
+    if (!user?.id || !data?.visits.length) return;
+
+    const draft = restoreEvidenceDraft();
+    if (!draft?.evidenceForm) return;
+    const hasContent = Boolean(
+      draft.evidenceForm.visitId ||
+        draft.evidenceForm.title.trim() ||
+        draft.evidenceForm.fileUrl.trim() ||
+        draft.evidenceForm.metadata.trim(),
+    );
+    if (!hasContent) return;
+
+    const targetVisitId = draft.selectedVisitId || draft.evidenceForm.visitId;
+    if (!targetVisitId) return;
+    if (!data.visits.some((visit) => visit.id === targetVisitId)) return;
+
+    setSelectedVisitId(targetVisitId);
+    setEvidenceForm(draft.evidenceForm);
+    setPendingEvidenceRestoreVisitId(targetVisitId);
+  }, [data?.visits, restoreEvidenceDraft, user?.id]);
+
+  useEffect(() => {
+    if (!pendingEvidenceRestoreVisitId) return;
+
+    setEvidenceDialogOpen(true);
+    setPendingEvidenceRestoreVisitId(null);
+    toast.info("Kaydedilmemiş ziyaret kanıtı taslağı geri yüklendi.");
+  }, [pendingEvidenceRestoreVisitId]);
+
   const togglePersonnel = (personnelId: string) => {
     setForm((current) => ({
       ...current,
@@ -211,6 +314,44 @@ export default function FieldVisits() {
         ? current.assignedPersonnelIds.filter((id) => id !== personnelId)
         : [...current.assignedPersonnelIds, personnelId],
     }));
+  };
+
+  const openVisitDialog = () => {
+    const draft = restoreVisitDraft();
+    if (draft?.form) {
+      const hasContent = Boolean(
+        draft.form.companyId ||
+          draft.form.plannedAt ||
+          draft.form.plannedEndAt ||
+          draft.form.visitAddress.trim() ||
+          draft.form.notes.trim() ||
+          draft.form.nextActionSummary.trim() ||
+          draft.form.complianceImpactMinutes ||
+          draft.form.assignedPersonnelIds.length > 0,
+      );
+      if (hasContent) {
+        setForm(draft.form);
+        setDialogOpen(true);
+        toast.info("Kaydedilmemiş saha ziyareti taslağı geri yüklendi.");
+        return;
+      }
+    }
+
+    setDialogOpen(true);
+  };
+
+  const openEvidenceDialog = (visitId: string) => {
+    const draft = restoreEvidenceDraft();
+    if (draft?.evidenceForm && (draft.selectedVisitId || draft.evidenceForm.visitId) === visitId) {
+      setSelectedVisitId(visitId);
+      setEvidenceForm(draft.evidenceForm);
+      setEvidenceDialogOpen(true);
+      toast.info("Kaydedilmemiş ziyaret kanıtı taslağı geri yüklendi.");
+      return;
+    }
+
+    setEvidenceForm((current) => ({ ...current, visitId }));
+    setEvidenceDialogOpen(true);
   };
 
   const handleCreateVisit = async () => {
@@ -235,6 +376,7 @@ export default function FieldVisits() {
       });
       setDialogOpen(false);
       setForm(emptyVisitForm);
+      clearVisitDraft();
       await loadData();
       toast.success("Ziyaret oluşturuldu.");
     } catch (err) {
@@ -282,6 +424,7 @@ export default function FieldVisits() {
       });
       setEvidenceDialogOpen(false);
       setEvidenceForm(emptyEvidenceForm);
+      clearEvidenceDraft();
       await loadData();
       toast.success("Kanıt eklendi.");
     } catch (err) {
@@ -326,7 +469,7 @@ export default function FieldVisits() {
             <RefreshCcw className="mr-2 h-4 w-4" />
             Yenile
           </Button>
-          <Button onClick={() => setDialogOpen(true)} disabled={!canManage}>
+          <Button onClick={openVisitDialog} disabled={!canManage}>
             <Plus className="mr-2 h-4 w-4" />
             Ziyaret oluştur
           </Button>
@@ -500,8 +643,7 @@ export default function FieldVisits() {
                   <Button
                     variant="outline"
                     onClick={() => {
-                      setEvidenceForm((current) => ({ ...current, visitId: selectedVisit.id }));
-                      setEvidenceDialogOpen(true);
+                      openEvidenceDialog(selectedVisit.id);
                     }}
                     disabled={!canManage}
                   >
@@ -655,7 +797,16 @@ export default function FieldVisits() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Vazgeç</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDialogOpen(false);
+                setForm(emptyVisitForm);
+                clearVisitDraft();
+              }}
+            >
+              Vazgeç
+            </Button>
             <Button onClick={() => void handleCreateVisit()} disabled={saving}>{saving ? "Kaydediliyor..." : "Ziyareti oluştur"}</Button>
           </DialogFooter>
         </DialogContent>
@@ -693,7 +844,16 @@ export default function FieldVisits() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEvidenceDialogOpen(false)}>Vazgeç</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEvidenceDialogOpen(false);
+                setEvidenceForm(emptyEvidenceForm);
+                clearEvidenceDraft();
+              }}
+            >
+              Vazgeç
+            </Button>
             <Button onClick={() => void handleAddEvidence()} disabled={saving}>{saving ? "Ekleniyor..." : "Kanıtı kaydet"}</Button>
           </DialogFooter>
         </DialogContent>
