@@ -4,6 +4,7 @@ import {
   listIsgkatipComplianceFlags,
   listIsgkatipPredictiveAlerts,
 } from "@/domain/isgkatip/isgkatipQueries";
+import { listOsgbCompanyTrackingWorkspace } from "@/lib/osgbPlatform";
 
 export interface OsgbCompanyRecord {
   id: string;
@@ -128,6 +129,28 @@ const normalizeAlert = (row: any): OsgbAlertRecord => ({
   createdAt: row.created_at || null,
 });
 
+const deriveCompanyComplianceStatus = (item: {
+  assignmentApprovalStatus: string;
+  totalAssignedMinutes: number;
+  totalRequiredMinutes: number;
+}) => {
+  if (item.totalAssignedMinutes <= 0) return "UNKNOWN";
+  if (item.totalAssignedMinutes < item.totalRequiredMinutes) return "WARNING";
+  if (item.assignmentApprovalStatus === "approved") return "COMPLIANT";
+  return "WARNING";
+};
+
+const deriveCompanyRiskScore = (item: {
+  employeeCount: number;
+  totalAssignedMinutes: number;
+  totalRequiredMinutes: number;
+}) => {
+  if (item.totalRequiredMinutes <= 0) return 0;
+  const gapRatio = Math.max(0, item.totalRequiredMinutes - item.totalAssignedMinutes) / item.totalRequiredMinutes;
+  const employeePressure = Math.min(20, Math.round(item.employeeCount / 10));
+  return Math.min(100, Math.round(gapRatio * 80) + employeePressure);
+};
+
 const daysUntil = (dateValue: string | null) => {
   if (!dateValue) return null;
   const today = new Date();
@@ -217,11 +240,8 @@ const calculateExpertLoads = (companies: OsgbCompanyRecord[]): OsgbExpertLoad[] 
 };
 
 export const getOsgbDashboardData = async (orgId: string): Promise<OsgbDashboardData> => {
-  const [companiesResponse, flagsResponse, alertsResponse] = await Promise.all([
-    listIsgkatipCompanies({
-      organizationId: orgId,
-      select: "*",
-    }),
+  const [workspace, flagsResponse, alertsResponse] = await Promise.all([
+    listOsgbCompanyTrackingWorkspace(orgId),
     listIsgkatipComplianceFlags({
       organizationId: orgId,
       select: "*",
@@ -234,9 +254,34 @@ export const getOsgbDashboardData = async (orgId: string): Promise<OsgbDashboard
     }),
   ]);
 
-  const companies = (companiesResponse || []).map(normalizeCompany);
-  const flags = (flagsResponse || []).map(normalizeFlag);
-  const alerts = (alertsResponse || []).map(normalizeAlert);
+  const managedCompanyIds = new Set(workspace.companies.map((item) => item.id));
+
+  const companies = workspace.companies.map((item) =>
+    normalizeCompany({
+      id: item.id,
+      sgk_no: item.sgkNo,
+      company_name: item.companyName,
+      employee_count: item.employeeCount,
+      hazard_class: item.hazardClass,
+      assigned_minutes: item.totalAssignedMinutes,
+      required_minutes: item.totalRequiredMinutes,
+      compliance_status: deriveCompanyComplianceStatus(item),
+      risk_score: deriveCompanyRiskScore(item),
+      contract_start: item.contractStart,
+      contract_end: item.contractEnd,
+      assigned_person_name: item.contactName,
+      service_provider_name: null,
+      nace_code: null,
+      work_period: null,
+      last_synced_at: item.managedAt,
+    }),
+  );
+  const flags = (flagsResponse || [])
+    .filter((row: any) => !row.company_id || managedCompanyIds.has(row.company_id))
+    .map(normalizeFlag);
+  const alerts = (alertsResponse || [])
+    .filter((row: any) => !row.company_id || managedCompanyIds.has(row.company_id))
+    .map(normalizeAlert);
 
   return {
     summary: calculateSummary(companies, flags, alerts),
@@ -248,38 +293,46 @@ export const getOsgbDashboardData = async (orgId: string): Promise<OsgbDashboard
 };
 
 export const getOsgbDashboardCatalogData = async (orgId: string): Promise<OsgbDashboardCatalogData> => {
-  const [companiesResponse, flagsResponse, alertsResponse] = await Promise.all([
-    listIsgkatipCompanies({
-      organizationId: orgId,
-      select:
-        "id, employee_count, assigned_minutes, required_minutes, compliance_status, risk_score, contract_end, assigned_person_name, last_synced_at",
-    }),
+  const [workspace, flagsResponse, alertsResponse] = await Promise.all([
+    listOsgbCompanyTrackingWorkspace(orgId),
     listIsgkatipComplianceFlags({
       organizationId: orgId,
-      select: "created_at",
+      select: "company_id, created_at",
       status: "OPEN",
     }),
     listIsgkatipPredictiveAlerts({
       organizationId: orgId,
-      select: "created_at",
+      select: "company_id, created_at",
       status: "OPEN",
     }),
   ]);
 
-  const companies = (companiesResponse ?? []).map((row: any) =>
+  const managedCompanyIds = new Set(workspace.companies.map((item) => item.id));
+
+  const companies = workspace.companies.map((item) =>
     normalizeCompany({
-      ...row,
+      id: item.id,
+      employee_count: item.employeeCount,
+      assigned_minutes: item.totalAssignedMinutes,
+      required_minutes: item.totalRequiredMinutes,
+      compliance_status: deriveCompanyComplianceStatus(item),
+      risk_score: deriveCompanyRiskScore(item),
+      contract_end: item.contractEnd,
+      assigned_person_name: item.contactName,
+      last_synced_at: item.managedAt,
       sgk_no: null,
-      company_name: null,
-      hazard_class: null,
-      contract_start: null,
+      company_name: item.companyName,
+      hazard_class: item.hazardClass,
+      contract_start: item.contractStart,
       service_provider_name: null,
       nace_code: null,
       work_period: null,
     }),
   );
 
-  const flags = (flagsResponse ?? []).map((row: any) =>
+  const flags = (flagsResponse ?? [])
+    .filter((row: any) => !row.company_id || managedCompanyIds.has(row.company_id))
+    .map((row: any) =>
     normalizeFlag({
       ...row,
       id: "",
@@ -288,10 +341,11 @@ export const getOsgbDashboardCatalogData = async (orgId: string): Promise<OsgbDa
       severity: "",
       message: "",
       status: "OPEN",
-    }),
-  );
+    }));
 
-  const alerts = (alertsResponse ?? []).map((row: any) =>
+  const alerts = (alertsResponse ?? [])
+    .filter((row: any) => !row.company_id || managedCompanyIds.has(row.company_id))
+    .map((row: any) =>
     normalizeAlert({
       ...row,
       id: "",
@@ -302,8 +356,7 @@ export const getOsgbDashboardCatalogData = async (orgId: string): Promise<OsgbDa
       predicted_date: null,
       confidence_score: null,
       status: "OPEN",
-    }),
-  );
+    }));
 
   return {
     summary: calculateSummary(companies, flags, alerts),

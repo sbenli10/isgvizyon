@@ -1,245 +1,377 @@
-# Denetron Safety Suite - Kurulum Rehberi
+# Denetron Safety Suite / ISGVizyon
 
-## Proje Hakkinda
+Bu dosya, uygulamayi bir ogretim uyesine, hakeme veya teknik inceleyiciye gonderirken projenin ne yaptigini hizli ve dogru sekilde anlatmak icin hazirlanmistir.
 
-Denetron Safety Suite, Is Sagligi ve Guvenligi (ISG) yonetim platformudur.
-React + TypeScript + Vite ile gelistirilmistir. Supabase backend, Google Gemini AI entegrasyonu ve Chrome eklentisi icerir.
+## 1. Projenin Amaci
 
----
+İSGVİZYON Safety Suite, Is Sagligi ve Guvenligi sureclerini tek bir dijital platformda toplamak icin gelistirilmis bir web uygulamasidir. Hedefi, sahadaki daginik ISG operasyonlarini yazilim destekli, izlenebilir ve olculebilir hale getirmektir.
 
-## Gereksinimler
+Uygulama su ihtiyaclara cevap verir:
 
-Asagidakilerden birini bilgisayariniza kurun:
+- firma ve calisan kayitlarinin takibi
+- risk degerlendirme sureclerinin yonetimi
+- denetim, bulgu ve duzeltici faaliyet yonetimi
+- acil durum eylem plani ve kurul toplantisi surecleri
+- periyodik kontrol, PPE ve saglik gozetimi takibi
+- OSGB operasyonlarinin merkezi olarak yonetilmesi
+- ISG-KATIP/harici portal verilerinin yardimci entegrasyonlar ile kullanilmasi
+- AI destekli analiz, ozetleme ve aksiyon onerisi uretilmesi
 
-| Arac | Minimum Surum | Indirme Linki |
-|------|---------------|---------------|
-| **Node.js** | 18+ | https://nodejs.org |
-| **npm** (Node.js ile gelir) | 9+ | Node.js ile otomatik kurulur |
+## 2. Uygulamanin Kisa Ozeti
 
-> **Not:** Bun yerine `bun` veya `yarn` da kullanabilirsiniz.
+Teknik olarak bu proje:
 
-### Editir (Opsiyonel)
-- VS Code: https://code.visualstudio.com
-- Onerilen eklentiler: ESLint, Tailwind CSS IntelliSense, TypeScript Importer
+- frontend tarafinda React + TypeScript + Vite
+- backend tarafinda Supabase
+- veritabani tarafinda PostgreSQL
+- kimlik dogrulama tarafinda Supabase Auth
+- dosya yonetimi tarafinda Supabase Storage
+- sunucusuz is akislari icin Supabase Edge Functions
+- AI ozellikleri icin Google Gemini
 
----
+kullanilarak gelistirilmistir.
 
-## Kurulum Adimlari
+Bu yapi sayesinde uygulama hem klasik CRUD ekrani gibi calisabilir, hem de belge analizi, toplu aksiyon yonetimi ve operasyonel karar destek sistemi gibi daha ileri fonksiyonlar sunabilir.
 
-### 1. Zip Dosyasini Cikartin
+## 3. Temel Moduller
 
-Zip dosyasini istediginiz klasore cikartin. Ornegin:
+Uygulama tek bir ekran degil, birden fazla alt urunden olusan bir platformdur.
 
-```
-C:\Projeler\denetron-safety-suite\
-```
+### 3.1 Ana Dashboard
 
-### 2. Terminal Acin
+Giristen sonra kullaniciya genel durumu gosteren merkez ekrandir. Uygulamadaki diger modullere gecis buradan yapilir.
 
-Cikardiginiz klasorde terminal (komut satiri) acin:
+### 3.2 Firma ve Calisan Yonetimi
 
-**Windows icin:**
-- Klasoru Dosya Gezgini'nde acin
-- Adres cubuguna `cmd` yazip Enter'a basin
+- firmalarin temel bilgileri
+- tehlike sinifi, sektor ve iletisim verileri
+- calisan listeleri
+- gorevlendirme mektuplari
 
-**Mac/Linux icin:**
-- Terminal acin, `cd` komutuyla klasore gidin
+bu bolumde yonetilir.
 
-### 3. Bagimliklari Yukleyin
+### 3.3 Risk Degerlendirme Modulu
+
+- risk degerlendirme olusturma
+- risk kalemleri ekleme ve duzenleme
+- risk kutuphanesi kullanma
+- imza akislari
+- rapor/PDF ciktilari
+
+Bu modulde klasik ISG risk degerlendirme sureci dijital ortama tasinmistir.
+
+### 3.4 Denetim ve Bulgular
+
+- saha denetimleri
+- ozel form tabanli denetim akislari
+- bulgu takibi
+- onleyici ve duzeltici aksiyonlar
+
+Bu kisim ozellikle denetim sonrasi takibin kaybolmamasi icin tasarlanmistir.
+
+### 3.5 CAPA ve Bulk CAPA
+
+CAPA modulu, uygunsuzluklar icin duzeltici/onleyici faaliyet takibi sunar.
+
+Bulk CAPA modulu ise:
+
+- sahadan coklu gorsel veya toplu veri alip
+- AI yardimiyla tespitleri yorumlayip
+- seri aksiyon kaydi olusturmayi
+
+hedefler.
+
+### 3.6 ADEP - Acil Durum Eylem Plani
+
+Bu modulde acil durum eylem planlari dijital olarak uretilir ve yonetilir.
+
+Kapsaminda:
+
+- senaryolar
+- ekipler
+- ekipman envanteri
+- hukuki referanslar
+- onleyici tedbirler
+- RACI matrisi
+- tatbikatlar
+- checklist yapilari
+
+yer alir.
+
+### 3.7 Kurul Toplantilari
+
+- kurul toplantisi kaydi
+- gundem yonetimi
+- katilimci takibi
+- toplanti belgeleri
+- karar ve sorumlu atamalari
+
+bu modulle yonetilir.
+
+### 3.8 Yillik Planlar
+
+Yillik calisma plani, egitim plani ve degerlendirme raporu gibi surecler bu bolumde yonetilir.
+
+### 3.9 PPE, Periyodik Kontrol ve Saglik Gozetimi
+
+Bu moduller ile:
+
+- KKD envanteri ve zimmetleri
+- periyodik kontroller
+- saglik gozetimi kayitlari
+- ilgili dosya ve raporlar
+
+tek sistemden takip edilir.
+
+### 3.10 Belge Analizi
+
+Bu modulde kullanici belge yukleyebilir. Sistem belgeyi:
+
+- siniflandirir
+- ozetler
+- kritik noktalar cikarir
+- aksiyon maddeleri onerir
+
+Bu ozellik AI desteklidir.
+
+### 3.11 Blueprint Analyzer ve Tahliye Editoru
+
+Plan/kroki/yerlesim gorselleri uzerinde analiz yapmayi ve tahliye plani uretmeyi hedefleyen moduldur.
+
+### 3.12 OSGB Modulu
+
+Uygulamanin daha kurumsal ve operasyonel tarafidir. Bir OSGB'nin coklu musteri/firma operasyonunu yonetmesini hedefler.
+
+Alt ekranlardan bazilari:
+
+- OSGB Dashboard
+- personel yonetimi
+- atamalar
+- firma takibi
+- kapasite analizi
+- saha ziyaretleri
+- finans
+- belge ve yukumluluk takibi
+- gorev ve not akislari
+- analitik ekranlar
+
+### 3.13 ISG-Bot
+
+ISG-Bot, uygulamanin karar destek ve otomasyon tarafidir.
+
+Amaç:
+
+- uyum risklerini erken gormek
+- kritik sirketleri listelemek
+- toplanti, sure, sozlesme ve gorev aciklarini one cikarmak
+- AI destekli aksiyon onermek
+
+ISG-Bot, klasik bir chatbot degil; daha cok ISG surec verilerini yorumlayan operasyon merkezi gibi dusunulebilir.
+
+### 3.14 Chrome Eklentisi
+
+Projede `chrome-extension/` klasoru altinda bir Chrome eklentisi de bulunur.
+
+Bu eklenti:
+
+- harici portallarla yardimci entegrasyon
+- kimlik baglama
+- veri toplama/aktarma
+
+gibi ihtiyaclar icin kullanilir.
+
+## 4. Mimarinin Ozet Yapisi
+
+### Frontend
+
+Kaynak kod agirlikli olarak `src/` altindadir.
+
+Ana yapilar:
+
+- `src/pages/`: sayfa seviyesindeki ekranlar
+- `src/components/`: tekrar kullanilan bilesenler
+- `src/components/ui/`: shadcn/ui tabanli arayuz bilesenleri
+- `src/contexts/`: oturum ve uygulama seviyesi context yapilari
+- `src/domain/`: is kurali ve alan mantigi
+- `src/lib/`: yardimci fonksiyonlar, export, storage, orchestrasyon
+- `src/integrations/supabase/`: Supabase istemcisi ve tipler
+
+### Routing
+
+Tum ana route yapisi `src/App.tsx` icindedir. Uygulama, tek sayfa uygulamasi olarak React Router ile calisir.
+
+### Backend
+
+`supabase/` klasoru altinda:
+
+- migration dosyalari
+- Edge Function'lar
+- Supabase'a ait backend mantigi
+
+yer alir.
+
+Bu yapi sayesinde backend mantigi proje ile birlikte versiyonlanir.
+
+## 5. Guvenlik Yaklasimi
+
+Projede son donemde ciddi bir Supabase guvenlik sertlestirmesi yapilmistir.
+
+Uygulanan temel yaklasimlar:
+
+- Row Level Security aktif kullanilmistir
+- tablo erisimleri organization ve kullanici kapsaminda sinirlandirilmistir
+- hassas alanlar icin hash/shadow kolonlar eklenmistir
+- kritik storage bucket'lari private yapilmistir
+- public URL bagimliligi signed URL modeline alinmistir
+- security definer function yetkileri daraltilmistir
+- policy ve function execute izinleri gozden gecirilmistir
+
+Bu nedenle sistem sadece ozellik bazli degil, veri erisimi bazli da korunmaktadir.
+
+## 6. Veritabani ve Veri Modeli
+
+Veritabani tarafinda uygulama cok sayida ISG odakli tablo icerir. Baslica veri alanlari:
+
+- profiles
+- organizations
+- companies
+- employees
+- risk_assessments
+- risk_items
+- inspections
+- findings
+- capa_records
+- board_meetings
+- adep_plans
+- osgb_* tablolari
+- isgkatip_* tablolari
+
+Bu model, hem bireysel kullanici senaryolarini hem de organizasyon/OSGB senaryolarini tasimak uzere tasarlanmistir.
+
+## 7. AI Kullanim Alanlari
+
+Projede AI dogrudan "sohbet" amacli degil, gorev odakli kullanilmistir.
+
+Ornek kullanimlar:
+
+- belge analizi
+- hazard/risk yorumlama
+- toplu CAPA onerileri
+- kroki/tahliye destek akislari
+- karar destek ve ozetleme
+
+Bu, projeyi klasik form uygulamasindan ayiran temel farklardan biridir.
+
+## 8. Kullanici Tipleri ve Yetkilendirme
+
+Sistem tek tip kullaniciya gore degil, farkli rol ve senaryolara gore sekillenmistir.
+
+Ornek roller:
+
+- bireysel kullanici
+- firma yetkilisi
+- organizasyon uyeleri
+- admin
+- OSGB operasyon kullanicisi
+
+Uygulamada hem route seviyesinde hem veri seviyesinde yetki kontrolu vardir.
+
+## 9. Degerlendirme Icin Onerilen Demo Akisi
+
+Bir ogretim uyesine uygulamayi gostermek icin asagidaki akis uygundur:
+
+1. Giris ve genel dashboard
+2. Firma olusturma ve calisan yonetimi
+3. Risk degerlendirme sihirbazi
+4. Denetim ve bulgu akisi
+5. CAPA / Bulk CAPA gosteri
+6. ADEP modulu
+7. Kurul toplantisi ve raporlama
+8. Belge analizi veya Blueprint Analyzer
+9. OSGB modulu
+10. ISG-Bot ekranlari
+
+Bu akis, projenin hem klasik kurumsal yazilim kismini hem de yenilikci AI destekli kismini gostermeye yardimci olur.
+
+## 10. Kurulum
+
+### Gereksinimler
+
+- Node.js 18+
+- npm 9+ tavsiye edilir
+
+### Kurulum Adimlari
 
 ```bash
 npm install
-```
-
-> Bu adim `node_modules` klasorunu olusturur ve tum gerekli kutuphaneleri indirir.
-> Internet baglantisi gerektirir. Islem 1-3 dakika surebilir.
-
-### 4. Ortam Degiskenlerini Ayarlayin
-
-Proje klasorundeki `.env.example` dosyasini kopyalayip `.env` olarak yeniden adlandirin:
-
-```bash
-cp .env.example .env
-```
-
-**Windows (CMD):**
-```cmd
-copy .env.example .env
-```
-
-**Windows (PowerShell):**
-```powershell
-Copy-Item .env.example .env
-```
-
-Ardindan `.env` dosyasini acip **gercel API anahtarlarinizi** girin:
-
-```bash
-VITE_SUPABASE_URL=https://xxxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
-GOOGLE_API_KEY=Supabase Edge Function secret
-GOOGLE_MODEL=gemini-2.5-flash
-...vb
-```
-
-#### Gerekli API Anahtarlari
-
-| Anahtar | Nereden Alinir |
-|---------|----------------|
-| Google AI (Gemini) API Key | https://aistudio.google.com/apikey |
-| Supabase URL & Anon Key | https://supabase.com/dashboard → Proje ayarlari |
-| Google Maps API Key | https://console.cloud.google.com/apis/credentials |
-| Resend API Key | https://resend.com/api-keys |
-| Sentry DSN | https://sentry.io |
-
-> **Onemli:** `.env` dosyasini asla baskalariyla paylasmayin!
-
-### 5. Gelistirme Sunucusunu Baslatin
-
-```bash
 npm run dev
 ```
 
-Tarayicinizda otomatik olarak `http://localhost:8080` adresi acilacaktir.
+Varsayilan gelistirme ortaminda uygulama Vite ile calisir.
 
----
+## 11. Ortam Degiskenleri
 
-## Diger Komutlar
+Proje `.env` kullanir. Ornek dosya:
 
-### Uretim Derlemesi (Production Build)
+- `.env.example`
+
+Baslica entegrasyonlar:
+
+- Supabase URL ve anon key
+- Google Gemini API key
+- Google Maps API key
+- Resend
+- Stripe
+- Sentry
+
+Bu bilgilerin gercek degerleri guvenlik nedeniyle repoya dahil edilmemelidir.
+
+## 12. Test ve Kalite
+
+Projede birden fazla kalite katmani vardir:
+
+- TypeScript tip guvenligi
+- ESLint
+- Vitest unit testleri
+- Playwright E2E testleri
+
+Kullanilan temel komutlar:
 
 ```bash
+npm run dev
 npm run build
-```
-
-Derlenen dosyalar `dist/` klasorune olusur. Bu klasoru herhangi bir web sunucusuna (Nginx, Apache, Vercel, Netlify) yukleyebilirsiniz.
-
-### Derleme Onizleme
-
-```bash
-npm run preview
-```
-
-Uretim derlemesini lokalde test etmek icin kullanin.
-
-### Kod Kalite Kontrolu
-
-```bash
 npm run lint
-```
-
-### Test Calistirma
-
-```bash
-# Birim testler
 npm run test
-
-# Testleri izleme modunda calistir
-npm run test:watch
-
-# Uctan uca (E2E) testler
 npm run test:e2e
 ```
 
----
+## 13. Projenin Guclu Yonleri
 
-## Proje Yapisi
+- Tek bir probleme degil, tam bir ISG operasyon alanina cozum sunmasi
+- Klasik CRUD'un otesine gecip surec ve is akisi yonetmesi
+- AI destekli analiz katmanlarina sahip olmasi
+- Supabase tabanli modern web mimarisi kullanmasi
+- Guvenlik sertlestirmesinin ciddi sekilde ele alinmis olmasi
+- OSGB gibi daha zor ve kurumsal bir kullanim senaryosunu desteklemesi
 
-```
-denetron-safety-suite/
-├── chrome-extension/       # ISG-KATIP Chrome eklentisi
-│   ├── background/         # Arka plan servis calistani
-│   ├── content/            # Web sayfasi betikleri
-│   ├── popup/              # Eklenti arayuzu
-│   └── auth/               # Kimlik dogrulama
-├── public/                 # Statik dosyalar
-├── src/
-│   ├── components/         # React bilesenleri
-│   │   ├── ui/             # shadcn/ui arayuz bilesenleri
-│   │   ├── isg-bot/        # AI asistan bilesenleri
-│   │   ├── adep/           # Yillik degerlendirme bilesenleri
-│   │   └── certificates/   # Sertifika bilesenleri
-│   ├── pages/              # Sayfa bilesenleri
-│   ├── services/           # API servis katmani
-│   ├── hooks/              # Ozel React hook'lari
-│   ├── integrations/       # Supabase entegrasyonu
-│   ├── lib/                # Yardimci fonksiyonlar
-│   └── types/              # TypeScript tip tanimlari
-├── supabase/
-│   └── functions/          # Supabase Edge Functions (backend)
-├── .env.example            # Ortam degiskenleri sablonu
-├── package.json            # Proje yapilandirmasi
-├── vite.config.ts          # Vite yapilandirmasi
-├── tailwind.config.ts      # Tailwind CSS yapilandirmasi
-└── tsconfig.json           # TypeScript yapilandirmasi
-```
+## 14. Sinirlar ve Gelisime Acik Alanlar
 
----
+Bu proje aktif gelisim mantiginda tasarlanmistir. Asagidaki alanlar ileride daha da guclendirilebilir:
 
-## Supabase Edge Functions
+- daha genis raporlama ve BI entegrasyonu
+- mobil odakli saha akislari
+- daha derin e-imza ve resmi sistem entegrasyonlari
+- daha ileri yapay zeka destekli tahminleme
+- daha genis otomasyon ve bildirim orkestrasyonu
 
-Backend fonksiyonlari `supabase/functions/` klasorundedir. Bu fonksiyonlari calistirmak icin:
+## 15. Sonuc
 
-1. Supabase CLI yukleyin: https://supabase.com/docs/guides/cli
-2. Supabase'e giris yapin:
-   ```bash
-   supabase login
-   ```
-3. Fonksiyonlari derivative edin:
-   ```bash
-   supabase functions deploy <fonksiyon-adi>
-   ```
+Denetron Safety Suite, yalnizca veri girisi yapilan bir panel degil; ISG sureclerini dijitallestiren, takip eden, yorumlayan ve aksiyon ureten bir platform olarak tasarlanmistir.
 
----
+Akademik veya teknik acidan bakildiginda proje su uc boyutta deger tasir:
 
-## Chrome Eklentisi Kurulumu
+- yazilim mimarisi
+- alan problemi cozumleme
+- uygulamali yenilikcilik
 
-1. Chrome browser'da `chrome://extensions/` adresine gidin
-2. Sag ustte **Gelistirici modu**nu acin
-3. **Paketlenmemis oge yukle** butonuna tiklayin
-4. `chrome-extension/` klasorunu secin
-
-Eklenti ISG-KATIP portali ile entegre calisir.
-
----
-
-## Vercel'e Deploy
-
-Proje Vercel icin yapilandirilmistir:
-
-1. https://vercel.com adresinde hesap acin
-2. Yeni proje olusturup GitHub repo'nuzu baglayin
-3. Vercel otomatik olarak `npm run build` calistirir
-4. Ortam degiskenlerini Vercel dashboard'dan ekleyin
-
----
-
-## Sorun Giderme
-
-| Sorun | Cozum |
-|-------|-------|
-| `npm install` hata veriyor | Node.js surumunu kontrol edin: `node -v` (18+ olmali) |
-| Sayfa bos gorunuyor | `.env` dosyasinin varligini ve API anahtarlarini kontrol edin |
-| Supabase baglantisi basarisiz | `VITE_SUPABASE_URL` ve `VITE_SUPABASE_ANON_KEY` degerlerini kontrol edin |
-| AI ozellikleri calismiyor | Supabase secrets icinde `GOOGLE_API_KEY` ve opsiyonel `GOOGLE_MODEL` tanimlandigindan emin olun |
-| Port 8080 kullanimda | `vite.config.ts` dosyasinda port degerini degistirin |
-
----
-
-## Teknoloji Yigini
-
-- **Frontend:** React 18 + TypeScript + Vite
-- **UI:** shadcn/ui + Tailwind CSS + Radix UI
-- **Backend:** Supabase (PostgreSQL + Edge Functions)
-- **AI:** Google Gemini (Generative AI)
-- **State:** TanStack React Query
-- **Form:** React Hook Form + Zod
-- **Grafik:** Recharts
-- **PDF:** jsPDF + PDF.js
-- **Test:** Vitest + Playwright
-
----
-
-## Lisans
-
-Ozel proje - tum haklari saklidir.
+Kisacasi bu proje, ISG alanina yonelik modern, moduler, guvenlik odakli ve AI destekli bir yazilim platformudur.

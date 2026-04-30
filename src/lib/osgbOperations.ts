@@ -379,13 +379,31 @@ const assignmentLegalReference: Record<OsgbAssignmentRecord["assigned_role"], st
   dsp: "6331 sayılı Kanun ve diğer sağlık personeli görevlendirme süreleri",
 };
 
-export const getOsgbCompanyOptions = async (userId: string): Promise<OsgbCompanyOption[]> => {
+const getManagedCompanyScope = async (userId: string) => {
   const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
+  const { data, error } = await supabase
+    .from("isgkatip_companies")
+    .select("id")
+    .eq("org_id", orgId)
+    .eq("is_deleted", false)
+    .eq("is_osgb_managed", true);
+
+  if (error) throw error;
+
+  return {
+    orgId,
+    managedCompanyIds: (data ?? []).map((item: any) => item.id as string),
+  };
+};
+
+export const getOsgbCompanyOptions = async (userId: string): Promise<OsgbCompanyOption[]> => {
+  const { orgId } = await getManagedCompanyScope(userId);
   const { data, error } = await supabase
     .from("isgkatip_companies")
     .select("id, company_name, hazard_class, contract_end, employee_count, required_minutes, assigned_minutes")
     .eq("org_id", orgId)
     .eq("is_deleted", false)
+    .eq("is_osgb_managed", true)
     .order("company_name", { ascending: true });
 
   if (error) throw error;
@@ -744,10 +762,14 @@ export const deleteOsgbAssignment = async (id: string) => {
 };
 
 export const listOsgbFinance = async (userId: string): Promise<OsgbFinanceRecord[]> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("osgb_finance")
     .select("*, company:isgkatip_companies(company_name)")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -758,7 +780,10 @@ export const listOsgbFinancePage = async (
   userId: string,
   params: OsgbFinancePageParams,
 ): Promise<PagedResult<OsgbFinanceRecord>> => {
-  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) {
+    return { rows: [], count: 0 };
+  }
   const { page, pageSize, status, companyId, search } = params;
   const from = Math.max(0, (page - 1) * pageSize);
   const to = from + pageSize - 1;
@@ -766,7 +791,8 @@ export const listOsgbFinancePage = async (
   let query = (supabase as any)
     .from("osgb_finance")
     .select("*, company:isgkatip_companies(company_name)", { count: "exact" })
-    .eq("user_id", userId);
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds);
 
   if (status && status !== "ALL") {
     query = query.eq("status", status);
@@ -783,6 +809,7 @@ export const listOsgbFinancePage = async (
       .select("id")
       .eq("org_id", orgId)
       .eq("is_deleted", false)
+      .eq("is_osgb_managed", true)
       .ilike("company_name", `%${term}%`)
       .limit(100);
 
@@ -817,10 +844,13 @@ export const listCompanyOsgbFinance = async (
   userId: string,
   companyId: string,
 ): Promise<OsgbFinanceRecord[]> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (!managedCompanyIds.includes(companyId)) return [];
+
   const { data, error } = await supabase
     .from("osgb_finance")
     .select("*, company:isgkatip_companies(company_name)")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
 
@@ -829,12 +859,23 @@ export const listCompanyOsgbFinance = async (
 };
 
 export const getOsgbFinanceOverview = async (userId: string): Promise<OsgbFinanceOverview> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) {
+    return {
+      pendingAmount: 0,
+      paidAmount: 0,
+      overdueAmount: 0,
+      calendarItems: [],
+    };
+  }
+
   const { data, error } = await supabase
     .from("osgb_finance")
     .select(
       "id, due_date, invoice_date, amount, status, currency, invoice_no, service_period, company:isgkatip_companies(company_name)",
     )
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -907,8 +948,14 @@ export const getOsgbFinanceOverview = async (userId: string): Promise<OsgbFinanc
 };
 
 export const upsertOsgbFinance = async (userId: string, input: OsgbFinanceInput, id?: string) => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (!managedCompanyIds.includes(input.companyId)) {
+    throw new Error("OSGB finans kaydi yalnizca firma havuzundaki managed firmalar icin olusturulabilir.");
+  }
+
   const payload = {
     user_id: userId,
+    organization_id: orgId,
     company_id: input.companyId,
     invoice_no: input.invoiceNo || null,
     service_period: input.servicePeriod || null,
@@ -939,10 +986,14 @@ export const deleteOsgbFinance = async (id: string) => {
 };
 
 export const listOsgbDocuments = async (userId: string): Promise<OsgbDocumentRecord[]> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("osgb_document_tracking")
     .select("*, company:isgkatip_companies(company_name)")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -953,7 +1004,10 @@ export const listOsgbDocumentsPage = async (
   userId: string,
   params: OsgbDocumentPageParams,
 ): Promise<PagedResult<OsgbDocumentRecord>> => {
-  const { organizationId: orgId } = await getIsgkatipOrgScope({ userId });
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) {
+    return { rows: [], count: 0 };
+  }
   const { page, pageSize, status, companyId, search } = params;
   const from = Math.max(0, (page - 1) * pageSize);
   const to = from + pageSize - 1;
@@ -961,7 +1015,8 @@ export const listOsgbDocumentsPage = async (
   let query = (supabase as any)
     .from("osgb_document_tracking")
     .select("*, company:isgkatip_companies(company_name)", { count: "exact" })
-    .eq("user_id", userId);
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds);
 
   if (status && status !== "ALL") {
     query = query.eq("status", status);
@@ -978,6 +1033,7 @@ export const listOsgbDocumentsPage = async (
       .select("id")
       .eq("org_id", orgId)
       .eq("is_deleted", false)
+      .eq("is_osgb_managed", true)
       .ilike("company_name", `%${term}%`)
       .limit(100);
 
@@ -1009,10 +1065,20 @@ export const listOsgbDocumentsPage = async (
 };
 
 export const getOsgbDocumentsOverview = async (userId: string): Promise<OsgbDocumentsOverview> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) {
+    return {
+      activeCount: 0,
+      warningCount: 0,
+      expiredCount: 0,
+    };
+  }
+
   const { data, error } = await supabase
     .from("osgb_document_tracking")
     .select("status")
-    .eq("user_id", userId);
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds);
 
   if (error) throw error;
 
@@ -1025,10 +1091,14 @@ export const getOsgbDocumentsOverview = async (userId: string): Promise<OsgbDocu
 };
 
 export const listActionableOsgbDocuments = async (userId: string): Promise<OsgbDocumentRecord[]> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (managedCompanyIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("osgb_document_tracking")
     .select("*, company:isgkatip_companies(company_name)")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
+    .in("company_id", managedCompanyIds)
     .in("status", ["warning", "expired"])
     .order("created_at", { ascending: false });
 
@@ -1040,10 +1110,13 @@ export const listCompanyOsgbDocuments = async (
   userId: string,
   companyId: string,
 ): Promise<OsgbDocumentRecord[]> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (!managedCompanyIds.includes(companyId)) return [];
+
   const { data, error } = await supabase
     .from("osgb_document_tracking")
     .select("*, company:isgkatip_companies(company_name)")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .eq("company_id", companyId)
     .order("created_at", { ascending: false });
 
@@ -1058,10 +1131,15 @@ export const seedOsgbCompanyDocuments = async (
   hazardClass?: string | null,
   employeeCount?: number | null,
 ): Promise<{ seeded: boolean; seededCount: number; records: OsgbDocumentRecord[] }> => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (!managedCompanyIds.includes(companyId)) {
+    throw new Error("Belge seed islemi yalnizca firma havuzundaki managed firmalar icin calisir.");
+  }
+
   const { data: existing, error: existingError } = await supabase
     .from("osgb_document_tracking")
     .select("id")
-    .eq("user_id", userId)
+    .eq("organization_id", orgId)
     .eq("company_id", companyId)
     .limit(1);
 
@@ -1122,6 +1200,7 @@ export const seedOsgbCompanyDocuments = async (
     },
   ].map((item) => ({
     user_id: userId,
+    organization_id: orgId,
     company_id: companyId,
     document_type: item.document_type,
     document_name: item.document_name,
@@ -1145,8 +1224,14 @@ export const seedOsgbCompanyDocuments = async (
 };
 
 export const upsertOsgbDocument = async (userId: string, input: OsgbDocumentInput, id?: string) => {
+  const { orgId, managedCompanyIds } = await getManagedCompanyScope(userId);
+  if (!managedCompanyIds.includes(input.companyId)) {
+    throw new Error("OSGB evrak kaydi yalnizca firma havuzundaki managed firmalar icin olusturulabilir.");
+  }
+
   const payload = {
     user_id: userId,
+    organization_id: orgId,
     company_id: input.companyId,
     document_type: input.documentType,
     document_name: input.documentName,
