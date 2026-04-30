@@ -738,7 +738,7 @@ export default function CompanyManager() {
       department: employee.department || "",
       start_date: employee.start_date || "",
       end_date: employee.end_date || "",
-      gender: employee.gender || "",
+      gender: employee.gender,
       insured_job_code: employee.insured_job_code || "",
       insured_job_name: employee.insured_job_name || "",
       phone: employee.phone || "",
@@ -749,6 +749,13 @@ export default function CompanyManager() {
   const cancelEmployeeEdit = () => {
     setEditingEmployeeId(null);
     setEmployeeDraft({});
+  };
+
+  const normalizeEmployeeGender = (value?: string | null): Employee["gender"] | undefined => {
+    if (value === "Erkek" || value === "Kadın" || value === "Diğer") {
+      return value;
+    }
+    return undefined;
   };
 
   const updateEmployeeDraft = (patch: Partial<Employee>) => {
@@ -767,7 +774,7 @@ export default function CompanyManager() {
         department: (employeeDraft.department || "").trim() || null,
         start_date: (employeeDraft.start_date || "").trim() || null,
         end_date: (employeeDraft.end_date || "").trim() || null,
-        gender: (employeeDraft.gender || "").trim() || null,
+        gender: normalizeEmployeeGender(employeeDraft.gender) ?? null,
         insured_job_code: (employeeDraft.insured_job_code || "").trim() || null,
         insured_job_name: (employeeDraft.insured_job_name || "").trim() || null,
         phone: (employeeDraft.phone || "").trim() || null,
@@ -2056,7 +2063,7 @@ export default function CompanyManager() {
                                 {editingEmployeeId === employee.id ? (
                                   <Input
                                     value={employeeDraft.gender || ""}
-                                    onChange={(e) => updateEmployeeDraft({ gender: e.target.value })}
+                                    onChange={(e) => updateEmployeeDraft({ gender: normalizeEmployeeGender(e.target.value) })}
                                     placeholder="Cinsiyet"
                                   />
                                 ) : (

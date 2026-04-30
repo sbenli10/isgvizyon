@@ -321,7 +321,7 @@ useEffect(() => {
       // Oturum kayıtlarını çek
       const { data: sessionsData, error: sessionsError } = await supabase
         .from("user_sessions")
-        .select("*")
+        .select("id, user_id, device_name, device_type, browser, ip_address, user_agent, last_activity, created_at, is_current")
         .eq("user_id", user.id)
         .order("last_activity", { ascending: false })
         .limit(10);

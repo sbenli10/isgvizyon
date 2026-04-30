@@ -1,5 +1,5 @@
 import type { IBorderOptions } from "docx";
-import { getBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
+import { getBulkCapaLegalBasis as resolveBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
 
 export interface BulkCapaOfficialEntry {
   id: string;
@@ -384,7 +384,7 @@ export async function generateBulkCapaOfficialDocx(input: BulkCapaOfficialDocxIn
           children: [
             entry.description,
             entry.riskDefinition,
-            getBulkCapaLegalBasis(entry),
+            resolveBulkCapaLegalBasis(entry),
             buildActionText(entry),
           ].map((text, index) =>
             new TableCell({

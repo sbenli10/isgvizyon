@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { buildStorageObjectRef, parseStorageObjectRef } from "@/lib/storageObject";
 
 const BUCKET_NAME = "inspection-photos";
 
@@ -16,8 +17,7 @@ export async function uploadInspectionPhoto(file: File, userId: string): Promise
 
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(fileName);
-    return data.publicUrl;
+    return buildStorageObjectRef(BUCKET_NAME, fileName);
   } catch (error) {
     console.error("Upload error:", error);
     return null;
@@ -26,10 +26,10 @@ export async function uploadInspectionPhoto(file: File, userId: string): Promise
 
 export async function deleteInspectionPhoto(photoUrl: string): Promise<boolean> {
   try {
-    const fileName = photoUrl.split(`${BUCKET_NAME}/`)[1];
-    if (!fileName) return false;
+    const storageRef = parseStorageObjectRef(photoUrl, BUCKET_NAME);
+    if (!storageRef || storageRef.bucket !== BUCKET_NAME) return false;
 
-    const { error } = await supabase.storage.from(BUCKET_NAME).remove([fileName]);
+    const { error } = await supabase.storage.from(BUCKET_NAME).remove([storageRef.path]);
     return !error;
   } catch (error) {
     console.error("Delete error:", error);

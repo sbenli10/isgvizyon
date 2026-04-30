@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   createOsgbClientPortalLink,
   getOsgbClientPortalUploadSignedUrl,
+  issueOsgbClientPortalLinkAccess,
   listOsgbClientPortalCompanyOptions,
   listOsgbClientPortalUploads,
   listOsgbClientPortalWorkspace,
@@ -96,16 +97,18 @@ export default function OsgbClientPortal() {
     void loadData();
   }, [loadData]);
 
-  const buildPortalUrl = (link: Pick<OsgbClientPortalLinkRecord, "accessToken"> | { accessToken: string }) =>
-    `${origin}/portal/company/${link.accessToken}`;
-
-  const copyLink = async (link: Pick<OsgbClientPortalLinkRecord, "accessToken"> | { accessToken: string }) => {
+  const copyLink = async (portalPath: string) => {
     try {
-      await navigator.clipboard.writeText(buildPortalUrl(link));
+      await navigator.clipboard.writeText(`${origin}${portalPath}`);
       toast.success("Portal linki panoya kopyalandi.");
     } catch {
       toast.error("Portal linki kopyalanamadi.");
     }
+  };
+
+  const getPortalPath = async (linkId: string) => {
+    const issued = await issueOsgbClientPortalLinkAccess(linkId);
+    return issued.portal_path;
   };
 
   const handleCreate = async () => {
@@ -125,7 +128,7 @@ export default function OsgbClientPortal() {
       setDialogOpen(false);
       setForm(emptyForm);
       await loadData();
-      await copyLink({ accessToken: created.access_token });
+      await copyLink(`/portal/company/${created.access_token}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Portal linki olusturulamadi.");
     } finally {
@@ -249,15 +252,33 @@ export default function OsgbClientPortal() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline">{link.portalStatus}</Badge>
-                      <Button size="sm" variant="outline" onClick={() => void copyLink(link)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          void (async () => {
+                            const portalPath = await getPortalPath(link.id);
+                            await copyLink(portalPath);
+                          })();
+                        }}
+                      >
                         <Copy className="mr-2 h-4 w-4" />
                         Kopyala
                       </Button>
-                      <Button size="sm" variant="outline" asChild>
-                        <a href={buildPortalUrl(link)} target="_blank" rel="noreferrer">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          void (async () => {
+                            const portalPath = await getPortalPath(link.id);
+                            window.open(`${origin}${portalPath}`, "_blank", "noreferrer");
+                          })();
+                        }}
+                      >
+                        <span>
                           <ExternalLink className="mr-2 h-4 w-4" />
                           Ac
-                        </a>
+                        </span>
                       </Button>
                       {link.portalStatus !== "paused" ? (
                         <Button size="sm" variant="outline" onClick={() => void handleStatusChange(link.id, "paused")}>Duraklat</Button>

@@ -60,6 +60,7 @@ import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import { withTemporaryBodyChild } from "@/lib/safeDom";
+import { buildStorageObjectRef, parseStorageObjectRef, resolveStorageObjectUrl, resolveStorageObjectUrls } from "@/lib/storageObject";
 
 interface StatCard {
   title: string;
@@ -77,23 +78,6 @@ interface InspectionReportEvent {
   file_url?: string | null;
   report_kind?: "dof" | "inspection";
 }
-
-const extractStorageReference = (rawUrl?: string | null) => {
-  if (!rawUrl) return null;
-
-  try {
-    const parsedUrl = new URL(rawUrl);
-    const match = parsedUrl.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/i);
-    if (!match) return null;
-
-    return {
-      bucket: decodeURIComponent(match[1]),
-      path: decodeURIComponent(match[2]),
-    };
-  } catch {
-    return null;
-  }
-};
 
 const statusFilters = ["all", "completed", "in_progress", "draft", "cancelled"] as const;
 const PAGE_SIZE = 24;
@@ -140,6 +124,7 @@ export default function Inspections() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<InspectionListItem | null>(null);
   const [inspectionDetail, setInspectionDetail] = useState<InspectionDetail | null>(null);
+  const [resolvedInspectionMediaUrls, setResolvedInspectionMediaUrls] = useState<string[]>([]);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [sharePreparing, setSharePreparing] = useState(false);
@@ -536,18 +521,7 @@ export default function Inspections() {
   };
 
   const resolveLinkedReportUrl = async (rawUrl: string) => {
-    const storageRef = extractStorageReference(rawUrl);
-    if (!storageRef) return rawUrl;
-
-    const { data, error } = await supabase.storage
-      .from(storageRef.bucket)
-      .createSignedUrl(storageRef.path, 60 * 60);
-
-    if (error || !data?.signedUrl) {
-      return rawUrl;
-    }
-
-    return data.signedUrl;
+    return (await resolveStorageObjectUrl(rawUrl)) || rawUrl;
   };
 
   const downloadLinkedReport = async () => {
@@ -580,7 +554,7 @@ export default function Inspections() {
 
     setDeletingLinkedReport(true);
     try {
-      const storageRef = extractStorageReference(linkedReport.url);
+      const storageRef = parseStorageObjectRef(linkedReport.url);
 
       if (storageRef) {
         const { error: storageError } = await supabase.storage
@@ -621,6 +595,23 @@ export default function Inspections() {
       setDeletingLinkedReport(false);
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveMediaUrls = async () => {
+      const urls = await resolveStorageObjectUrls(inspectionDetail?.media_urls || []);
+      if (!cancelled) {
+        setResolvedInspectionMediaUrls(urls.filter((url): url is string => Boolean(url)));
+      }
+    };
+
+    void resolveMediaUrls();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inspectionDetail?.media_urls]);
 
   const handleOpenShareModal = async () => {
     if (!user || !activeInspection) return;
@@ -677,15 +668,7 @@ export default function Inspections() {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from("reports")
-        .getPublicUrl(storagePath);
-
-      if (!publicUrlData?.publicUrl) {
-        throw new Error("Rapor bağlantısı oluşturulamadı");
-      }
-
-      setCurrentReportUrl(publicUrlData.publicUrl);
+      setCurrentReportUrl(buildStorageObjectRef("reports", storagePath));
       setCurrentReportFilename(fileName);
       setSendModalOpen(true);
     } catch (error: any) {
@@ -1473,7 +1456,7 @@ export default function Inspections() {
                         <Eye className="h-4 w-4 text-cyan-200" /> Fotoğraflar
                       </p>
                       <div className="grid grid-cols-2 gap-3">
-                        {inspectionDetail.media_urls.map((url, idx) => (
+                        {resolvedInspectionMediaUrls.map((url, idx) => (
                           <div key={idx} className="overflow-hidden rounded-2xl border border-white/10 aspect-video bg-slate-950/40">
                             <img
                               src={url}

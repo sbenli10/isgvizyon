@@ -255,22 +255,9 @@ export default function BulkCapaPreviewDialog({
 
             {previewEntries.map((entry, idx) => {
               const legalBasis = getBulkCapaLegalBasis({
-                id: entry.id,
                 description: entry.description,
                 riskDefinition: entry.riskDefinition,
-                correctiveAction: entry.correctiveAction,
-                preventiveAction: entry.preventiveAction,
-                importanceLevel: entry.importance_level,
-                terminDate: entry.termin_date,
                 relatedDepartment: entry.related_department,
-                notificationMethod: entry.notification_method,
-                responsibleName: entry.responsible_name,
-                responsibleRole: entry.responsible_role,
-                approverName: entry.approver_name,
-                approverTitle: entry.approver_title,
-                includeStamp: entry.include_stamp,
-                mediaUrls: entry.media_urls,
-                aiAnalyzed: entry.ai_analyzed,
               });
 
               return (

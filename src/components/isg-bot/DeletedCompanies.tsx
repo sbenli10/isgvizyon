@@ -66,6 +66,20 @@ interface DeletedCompany {
   restored_by_name: string | null;
 }
 
+const mapDeletedCompanyRow = (row: Record<string, unknown>): DeletedCompany => ({
+  deleted_record_id: String(row.deleted_record_id ?? ""),
+  original_company_id: String(row.original_company_id ?? ""),
+  company_name: String(row.company_name ?? ""),
+  sgk_no: String(row.sgk_no ?? ""),
+  employee_count: Number(row.employee_count ?? 0),
+  hazard_class: String(row.hazard_class ?? ""),
+  deleted_at: String(row.deleted_at ?? ""),
+  deleted_by_name: typeof row.deleted_by_name === "string" ? row.deleted_by_name : null,
+  deletion_reason: typeof row.deletion_reason === "string" ? row.deletion_reason : null,
+  restored_at: typeof row.restored_at === "string" ? row.restored_at : null,
+  restored_by_name: typeof row.restored_by_name === "string" ? row.restored_by_name : null,
+});
+
 // ====================================================
 // COMPONENT
 // ====================================================
@@ -115,7 +129,7 @@ export default function DeletedCompanies() {
 
       console.log("✅ Deleted companies loaded:", data?.length || 0);
 
-      setDeletedCompanies(data || []);
+      setDeletedCompanies((data || []).map((row) => mapDeletedCompanyRow(row as Record<string, unknown>)));
 
       if (data && data.length > 0) {
         toast.success(`${data.length} silinmiş firma bulundu`);

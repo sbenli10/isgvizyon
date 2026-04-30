@@ -312,8 +312,8 @@ export default function OSGBAlerts() {
                             onClick={() =>
                               void handleQuickTaskCreate({
                                 id: flag.id,
-                                companyId: flag.company_id,
-                                title: `Uyumsuzluk takibi - ${flag.rule_name}`,
+                                companyId: flag.companyId,
+                                title: `Uyumsuzluk takibi - ${flag.ruleName}`,
                                 description: flag.message,
                                 priority: flag.severity.toUpperCase() === "CRITICAL" ? "critical" : "high",
                               })
@@ -359,7 +359,7 @@ export default function OSGBAlerts() {
                             onClick={() =>
                               void handleQuickTaskCreate({
                                 id: alert.id,
-                                companyId: alert.company_id,
+                                companyId: alert.companyId,
                                 title: `Öngörüsel risk takibi - ${alert.alertType}`,
                                 description: alert.message,
                                 dueDate: alert.predictedDate,

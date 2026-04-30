@@ -29,8 +29,16 @@ export function attachDeterministicClientIds<T>(
   scope: string,
   getParts: (item: T, index: number) => Array<string | number | null | undefined>,
 ) {
-  return items.map((item, index) => ({
-    ...item,
-    client_id: buildDeterministicClientId(scope, getParts(item, index), index),
-  }));
+  const occurrenceMap = new Map<string, number>();
+
+  return items.map((item, index) => {
+    const baseId = buildDeterministicClientId(scope, getParts(item, index));
+    const occurrence = occurrenceMap.get(baseId) ?? 0;
+    occurrenceMap.set(baseId, occurrence + 1);
+
+    return {
+      ...item,
+      client_id: occurrence === 0 ? baseId : `${baseId}:dup-${occurrence}`,
+    };
+  });
 }

@@ -85,7 +85,7 @@ export interface OsgbAutomationAction {
   actionUrl: string;
   contactEmail?: string | null;
   contactPhone?: string | null;
-  portalLinkToken?: string | null;
+  portalLinkId?: string | null;
   existingTaskId?: string | null;
   existingTaskStatus?: string | null;
   skipReason?: "existing_task" | null;
@@ -123,7 +123,6 @@ export interface OsgbClientPortalLinkRecord {
   contactName: string | null;
   contactEmail: string | null;
   portalStatus: "active" | "paused" | "revoked";
-  accessToken: string;
   expiresAt: string | null;
   lastViewedAt: string | null;
   overdueDocuments: number;
@@ -463,7 +462,7 @@ export const listOsgbAutomationWorkspace = async (
         .in("id", companyIds),
       (supabase as any)
         .from("osgb_client_portal_links")
-        .select("company_id, access_token, portal_status")
+        .select("id, company_id, portal_status")
         .eq("organization_id", organizationId)
         .eq("portal_status", "active")
         .in("company_id", companyIds),
@@ -480,7 +479,7 @@ export const listOsgbAutomationWorkspace = async (
     const portalByCompany = new Map<string, string>();
     for (const row of portalLinksResponse.data ?? []) {
       if (!portalByCompany.has(row.company_id)) {
-        portalByCompany.set(row.company_id, row.access_token);
+        portalByCompany.set(row.company_id, row.id);
       }
     }
 
@@ -488,7 +487,7 @@ export const listOsgbAutomationWorkspace = async (
       const contact = contactsByCompany.get(action.companyId);
       action.contactEmail = contact?.email || null;
       action.contactPhone = contact?.phone || null;
-      action.portalLinkToken = portalByCompany.get(action.companyId) || null;
+      action.portalLinkId = portalByCompany.get(action.companyId) || null;
     }
   }
 
@@ -592,7 +591,7 @@ export const listOsgbClientPortalWorkspace = async (
   const [linksResponse, documentsResponse, accountsResponse] = await Promise.all([
     (supabase as any)
       .from("osgb_client_portal_links")
-      .select("id, company_id, access_token, contact_name, contact_email, portal_status, expires_at, last_viewed_at, company:isgkatip_companies(company_name)")
+      .select("id, company_id, contact_name, contact_email, portal_status, expires_at, last_viewed_at, company:isgkatip_companies(company_name)")
       .eq("organization_id", organizationId)
       .in("company_id", managedCompanyIds)
       .order("created_at", { ascending: false }),
@@ -630,7 +629,6 @@ export const listOsgbClientPortalWorkspace = async (
     contactName: row.contact_name || null,
     contactEmail: row.contact_email || null,
     portalStatus: row.portal_status,
-    accessToken: row.access_token,
     expiresAt: row.expires_at || null,
     lastViewedAt: row.last_viewed_at || null,
     overdueDocuments: overdueDocsByCompany.get(row.company_id) || 0,
@@ -675,11 +673,29 @@ export const createOsgbClientPortalLink = async (
   const { data, error } = await (supabase as any)
     .from("osgb_client_portal_links")
     .insert(payload)
-    .select("id, access_token")
+    .select("id")
     .single();
 
   if (error) throw error;
-  return data as { id: string; access_token: string };
+  return { id: data.id as string, access_token: payload.access_token };
+};
+
+export const issueOsgbClientPortalLinkAccess = async (
+  linkId: string,
+): Promise<{ access_token: string; portal_path: string }> => {
+  const { data, error } = await (supabase as any).rpc("issue_osgb_client_portal_link_access", {
+    p_link_id: linkId,
+  });
+
+  if (error) throw error;
+  if (!data?.access_token) {
+    throw new Error("Portal erişim linki üretilemedi.");
+  }
+
+  return {
+    access_token: data.access_token,
+    portal_path: `/portal/company/${data.access_token}`,
+  };
 };
 
 export const updateOsgbClientPortalLinkStatus = async (

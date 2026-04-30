@@ -40,6 +40,7 @@ import { toast } from "sonner";
 import {
   generateNaceRiskAnalysis,
   type RiskAnalysisResponse,
+  validateAIConfig,
 } from "@/services/aiRiskService";
 
 interface NaceResult {

@@ -10,7 +10,7 @@ export interface RiskAnalysisResponse {
   risks: RiskHazard[];
 }
 
-export interface NaceRiskAnalysisParams {
+export interface NaceRiskAnalysisParams extends Record<string, unknown> {
   naceCode: string;
   sector: string;
   hazardClass: string;
@@ -42,7 +42,10 @@ export async function generateNaceRiskAnalysis(
   params: NaceRiskAnalysisParams,
 ): Promise<RiskAnalysisResponse> {
   try {
-    const response = await invokeEdgeFunction<NaceRiskAnalyzeResponse>("nace-risk-analyze", params);
+    const response = await invokeEdgeFunction<NaceRiskAnalyzeResponse>(
+      "nace-risk-analyze",
+      params,
+    );
     return {
       risks: Array.isArray(response.risks) ? response.risks : [],
     };

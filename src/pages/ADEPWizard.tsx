@@ -3,6 +3,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { buildStorageObjectRef } from "@/lib/storageObject";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
@@ -1127,15 +1128,7 @@ export default function ADEPWizard() {
 
       if (uploadError) throw uploadError;
 
-      const { data: publicUrlData } = supabase.storage
-        .from("reports")
-        .getPublicUrl(uploadData.path);
-
-      if (!publicUrlData?.publicUrl) {
-        throw new Error("Rapor bağlantısı oluşturulamadı.");
-      }
-
-      setCurrentReportUrl(publicUrlData.publicUrl);
+      setCurrentReportUrl(buildStorageObjectRef("reports", uploadData.path));
       setCurrentReportFilename(fileName);
       setSendModalOpen(true);
       toast.success("Rapor e-posta gönderimi için hazır.");

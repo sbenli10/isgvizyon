@@ -45,6 +45,7 @@ import {
   urgencyLabelMap,
 } from "@/lib/documentAnalysisTypes";
 import { usePersistentDraft } from "@/hooks/usePersistentDraft";
+import { buildStorageObjectRef } from "@/lib/storageObject";
 
 interface CompanyOption {
   id: string;
@@ -310,8 +311,7 @@ export default function DocumentAnalysis() {
     const filePath = `${user.id}/${selectedCompanyId || "no-company"}/${Date.now()}-${safeFileName(file.name)}`;
     const { error } = await supabase.storage.from(DOCUMENT_BUCKET).upload(filePath, file, { upsert: false });
     if (error) throw error;
-    const { data } = supabase.storage.from(DOCUMENT_BUCKET).getPublicUrl(filePath);
-    return { filePath, publicUrl: data.publicUrl };
+    return { filePath, publicUrl: buildStorageObjectRef(DOCUMENT_BUCKET, filePath) };
   };
 
   const persistAnalysis = async (payload: DocumentAnalysisResult & { rawText: string; file: File; fileUrl: string; filePath: string }) => {
@@ -456,7 +456,11 @@ export default function DocumentAnalysis() {
         status: "Açık",
         priority: buildCapaPriority(currentRecord),
         notes: `Belge: ${currentRecord.source_file_name}\nFirma: ${currentRecord.company_name || "-"}\n\nÖne çıkan yükümlülükler:\n${currentRecord.keyObligations.map((item, index) => `${index + 1}. ${item.title}`).join("\n")}`,
-        document_urls: currentRecord.source_file_url ? [currentRecord.source_file_url] : [],
+        document_urls: currentRecord.source_file_path
+          ? [buildStorageObjectRef(DOCUMENT_BUCKET, currentRecord.source_file_path)]
+          : currentRecord.source_file_url
+            ? [currentRecord.source_file_url]
+            : [],
       }).select("id").single();
 
       if (error) throw error;
@@ -544,8 +548,12 @@ export default function DocumentAnalysis() {
         audience: "İSG uzmanı ve operasyon ekibi",
         sector: selectedCompany?.industry || null,
         source_name: "Mevzuat Belge Analizi",
-        source_url: currentRecord.source_file_url,
-        file_url: currentRecord.source_file_url,
+        source_url: currentRecord.source_file_path
+          ? buildStorageObjectRef(DOCUMENT_BUCKET, currentRecord.source_file_path)
+          : currentRecord.source_file_url,
+        file_url: currentRecord.source_file_path
+          ? buildStorageObjectRef(DOCUMENT_BUCKET, currentRecord.source_file_path)
+          : currentRecord.source_file_url,
         tags: ["mevzuat", "uyum", "belge-analizi"],
         metadata: {
           companyId: currentRecord.company_id,

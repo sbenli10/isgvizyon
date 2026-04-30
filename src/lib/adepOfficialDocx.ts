@@ -87,8 +87,10 @@ const parseXml = (xml: string) => new DOMParser().parseFromString(xml, "applicat
 
 const serializeXml = (xml: XMLDocument) => new XMLSerializer().serializeToString(xml);
 
-const getElements = (parent: ParentNode, tagName: string) =>
-  Array.from(parent.getElementsByTagNameNS(WORD_NS, tagName));
+type XmlParent = XMLDocument | Element;
+
+const getElements = (parent: XmlParent, tagName: string): Element[] =>
+  Array.from(parent.getElementsByTagNameNS(WORD_NS, tagName)) as Element[];
 
 const getChildElements = (parent: Element, tagName: string) =>
   Array.from(parent.childNodes).filter(
@@ -98,9 +100,9 @@ const getChildElements = (parent: Element, tagName: string) =>
 const getTables = (xml: XMLDocument) => getElements(xml, "tbl");
 const getRows = (table: Element) => getChildElements(table, "tr");
 const getCells = (row: Element) => getChildElements(row, "tc");
-const getParagraphs = (parent: ParentNode) => getElements(parent, "p");
-const getRuns = (parent: ParentNode) => getElements(parent, "r");
-const getTextNodes = (parent: ParentNode) => getElements(parent, "t");
+const getParagraphs = (parent: XmlParent) => getElements(parent, "p");
+const getRuns = (parent: XmlParent) => getElements(parent, "r");
+const getTextNodes = (parent: XmlParent) => getElements(parent, "t");
 
 const createParagraph = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:p");
 const createRun = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:r");

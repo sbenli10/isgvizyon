@@ -8,7 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { listOsgbAutomationWorkspace, runOsgbAutomationBatch, type OsgbAutomationBatchResult, type OsgbAutomationWorkspace } from "@/lib/osgbOrchestration";
+import { issueOsgbClientPortalLinkAccess, listOsgbAutomationWorkspace, runOsgbAutomationBatch, type OsgbAutomationBatchResult, type OsgbAutomationWorkspace } from "@/lib/osgbOrchestration";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 
 const kindIcon = {
@@ -222,11 +222,16 @@ export default function OsgbAutomationCenter() {
                       <MessageCircle className="mr-2 h-4 w-4" />
                       WhatsApp aç
                     </Button>
-                    {action.portalLinkToken ? (
+                    {action.portalLinkId ? (
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => window.open(`/portal/company/${action.portalLinkToken}`, "_blank", "noopener,noreferrer")}
+                        onClick={() => {
+                          void (async () => {
+                            const issued = await issueOsgbClientPortalLinkAccess(action.portalLinkId!);
+                            window.open(issued.portal_path, "_blank", "noopener,noreferrer");
+                          })();
+                        }}
                       >
                         Portalı aç
                       </Button>

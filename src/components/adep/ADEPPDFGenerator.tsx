@@ -8,14 +8,19 @@ import {
   formatDateOrDash,
 } from "@/lib/adepDocumentBundle";
 
-const colors = {
-  primary: [15, 23, 42] as const,
-  slate: [51, 65, 85] as const,
-  muted: [100, 116, 139] as const,
-  border: [203, 213, 225] as const,
-  soft: [241, 245, 249] as const,
-  accent: [37, 99, 235] as const,
-  white: [255, 255, 255] as const,
+type PdfColor = [number, number, number];
+
+const colors: Record<
+  "primary" | "slate" | "muted" | "border" | "soft" | "accent" | "white",
+  PdfColor
+> = {
+  primary: [15, 23, 42],
+  slate: [51, 65, 85],
+  muted: [100, 116, 139],
+  border: [203, 213, 225],
+  soft: [241, 245, 249],
+  accent: [37, 99, 235],
+  white: [255, 255, 255],
 };
 
 const setupFont = (doc: jsPDF) => {
@@ -55,7 +60,7 @@ const addWrappedText = (
   startY: number,
   options?: {
     fontSize?: number;
-    color?: [number, number, number];
+    color?: PdfColor;
     maxWidth?: number;
     interLoaded?: boolean;
   },

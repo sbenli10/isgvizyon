@@ -76,6 +76,7 @@ import {
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { RISK_SECTOR_CATALOG, buildCatalogKey } from "@/lib/riskSectorCatalog";
+import { buildStorageObjectRef, parseStorageObjectRef, resolveStorageObjectUrl } from "@/lib/storageObject";
 import {
   Dialog,
   DialogContent,
@@ -86,6 +87,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSafeMode } from "@/hooks/useSafeMode";
+import type { Range, WorkBook, WorkSheet } from "xlsx-js-style";
 
 
 let scrollLock = 0;
@@ -497,6 +499,7 @@ export default function RiskAssessmentEditor() {
   const [aiCategoryFilter, setAiCategoryFilter] = useState<string>("all");
   const [photoUploadingItemId, setPhotoUploadingItemId] = useState<string | null>(null);
   const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+  const [resolvedPhotoUrls, setResolvedPhotoUrls] = useState<Record<string, string>>({});
   const [showOrderColumn, setShowOrderColumn] = useState(true);
   const [showTerminColumn, setShowTerminColumn] = useState(true);
   const [showStatusColumns, setShowStatusColumns] = useState(true);
@@ -677,30 +680,6 @@ useEffect(() => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [location.state])
 
-  // Bileşen gövdesine ekle
-useEffect(() => {
-  console.log("RiskAssessmentEditor render oldu!");
-});
-
-useLayoutEffect(() => {
-  const container = tableContainerRef.current;
-  if (!container) return;
-
-  const handleScrollLog = () => {
-    // Sadece scroll 0 olduğunda log bas ki konsol dolmasın
-    if (container.scrollLeft === 0) {
-      console.warn("Scroll sıfırlandı. Tetikleyen olayı kontrol edin.", {
-        activeElement: document.activeElement?.tagName, // O an hangi input/buton seçili?
-        activeElementClass: document.activeElement?.className,
-        reason: "Büyük ihtimalle bir Focus veya Render olayı"
-      });
-    }
-  };
-
-  container.addEventListener('scroll', handleScrollLog);
-  return () => container.removeEventListener('scroll', handleScrollLog);
-}, []);
-
   // 2. Kaydırma olayını yöneten fonksiyon (useCallback ile stabilize edildi)
   const handleScroll = useCallback(() => {
     if (tableContainerRef.current) {
@@ -762,8 +741,6 @@ useLayoutEffect(() => {
 
   const fetchCompanies = async () => {
     try {
-      console.log("Fetching companies...");
-      
       const { data, error } = await supabase
         .from("companies")
         .select("*")
@@ -772,7 +749,6 @@ useLayoutEffect(() => {
 
       if (error) throw error;
 
-      console.log(`Fetched ${data?.length || 0} companies`);
       setCompanies(data || []);
     } catch (error: any) {
       console.error("Fetch companies error:", error);
@@ -784,8 +760,6 @@ useLayoutEffect(() => {
 
   const fetchLibrary = async () => {
     try {
-      console.log("Fetching risk library...");
-      
       const { data, error } = await supabase
         .from("risk_library")
         .select("*")
@@ -794,7 +768,6 @@ useLayoutEffect(() => {
 
       if (error) throw error;
 
-      console.log(`Fetched ${data?.length || 0} library items`);
       setLibrary(data || []);
       
       // Risk Paketlerini Oluştur (katalog + yerleşik fallback)
@@ -1363,8 +1336,6 @@ useLayoutEffect(() => {
   };
   const fetchRiskItems = async (assessmentId: string) => {
     try {
-      console.log("Fetching risk items for assessment:", assessmentId);
-      
       const { data, error } = await supabase
         .from("risk_items")
         .select("*")
@@ -1396,7 +1367,6 @@ useLayoutEffect(() => {
         };
       }) as RiskItem[];
 
-      console.log(`Fetched ${mappedData.length} risk items`);
       setRiskItems(mappedData);
       
     } catch (error: any) {
@@ -2173,9 +2143,8 @@ useLayoutEffect(() => {
 
       if (error) throw error;
 
-      if (data) {
-        console.log("Assessment created:", data.id);
-        setAssessment(data as RiskAssessment);
+        if (data) {
+          setAssessment(data as RiskAssessment);
         setRiskItems([]);
         
         toast.success("Yeni değerlendirme oluşturuldu", {
@@ -2456,7 +2425,8 @@ useLayoutEffect(() => {
   const loadImageAsDataUrl = async (url?: string | null) => {
     if (!url) return null;
     try {
-      const response = await fetch(url);
+      const accessUrl = await resolveStorageObjectUrl(url);
+      const response = await fetch(accessUrl || url);
       const blob = await response.blob();
       return await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -2469,6 +2439,35 @@ useLayoutEffect(() => {
       return null;
     }
   };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolvePhotos = async () => {
+      const entries = await Promise.all(
+        riskItems.map(async (item) => {
+          if (!item.photo_url) return [item.id, ""] as const;
+          const resolved = await resolveStorageObjectUrl(item.photo_url);
+          return [item.id, resolved || item.photo_url] as const;
+        }),
+      );
+
+      if (cancelled) return;
+
+      setResolvedPhotoUrls(
+        entries.reduce<Record<string, string>>((acc, [id, url]) => {
+          if (url) acc[id] = url;
+          return acc;
+        }, {}),
+      );
+    };
+
+    void resolvePhotos();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [riskItems]);
 
   const uploadRiskItemPhoto = async (itemId: string, file: File) => {
     if (!user?.id || !assessment?.id) {
@@ -2496,8 +2495,7 @@ useLayoutEffect(() => {
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from("risk-item-photos").getPublicUrl(storagePath);
-      await updateRiskItem(itemId, "photo_url", data.publicUrl);
+      await updateRiskItem(itemId, "photo_url", buildStorageObjectRef("risk-item-photos", storagePath));
       toast.success("Risk maddesi fotoğrafı yüklendi");
     } catch (error: any) {
       console.error("Risk photo upload error:", error);
@@ -2513,11 +2511,9 @@ useLayoutEffect(() => {
 
   const removeRiskItemPhoto = async (itemId: string, photoUrl?: string | null) => {
     try {
-      if (photoUrl?.includes("/risk-item-photos/")) {
-        const storagePath = photoUrl.split("/risk-item-photos/")[1];
-        if (storagePath) {
-          await supabase.storage.from("risk-item-photos").remove([storagePath]);
-        }
+      const storageRef = parseStorageObjectRef(photoUrl, "risk-item-photos");
+      if (storageRef?.bucket === "risk-item-photos") {
+        await supabase.storage.from("risk-item-photos").remove([storageRef.path]);
       }
 
       await updateRiskItem(itemId, "photo_url", null);
@@ -3316,11 +3312,11 @@ useLayoutEffect(() => {
                     {item.photo_url ? (
                       <button
                         type="button"
-                        onClick={() => setPreviewPhotoUrl(item.photo_url || null)}
+                        onClick={() => setPreviewPhotoUrl(resolvedPhotoUrls[item.id] || item.photo_url || null)}
                         className="group relative h-16 w-16 overflow-hidden rounded-2xl border border-cyan-400/20 bg-slate-950/80 transition hover:border-cyan-300/40"
                       >
                         <img
-                          src={item.photo_url}
+                          src={resolvedPhotoUrls[item.id] || item.photo_url}
                           alt={`Risk ${idx + 1} fotoğrafı`}
                           className="h-full w-full object-cover"
                         />
@@ -4030,12 +4026,7 @@ const exportToPDFAndShare = async () => {
       return;
     }
 
-    // 3. PUBLIC URL AL
-    const { data: publicUrlData } = supabase.storage
-      .from("reports")
-      .getPublicUrl(uploadData.path);
-
-    const reportUrl = publicUrlData.publicUrl;
+    const reportUrl = buildStorageObjectRef("reports", uploadData.path);
 
     // 4. LOCAL İNDİR
     doc.save(fileName);
@@ -4071,7 +4062,7 @@ const exportToPDFAndShare = async () => {
       return format(parsed, "dd.MM.yyyy", { locale: tr });
     };
 
-    const setTemplateCell = (ws: XLSX.WorkSheet, address: string, value: string | number) => {
+    const setTemplateCell = (ws: WorkSheet, address: string, value: string | number) => {
       const existingCell = ws[address] || {};
       ws[address] = {
         ...existingCell,
@@ -4089,7 +4080,7 @@ const exportToPDFAndShare = async () => {
     ];
 
     const setStyledCell = (
-      ws: XLSX.WorkSheet,
+      ws: WorkSheet,
       address: string,
       value: string | number,
       style?: Record<string, any>
@@ -4103,7 +4094,7 @@ const exportToPDFAndShare = async () => {
       };
     };
 
-    const appendMerge = (ws: XLSX.WorkSheet, merge: XLSX.Range) => {
+    const appendMerge = (ws: WorkSheet, merge: Range) => {
       ws["!merges"] = [...(ws["!merges"] || []), merge];
     };
 
@@ -4119,7 +4110,7 @@ const exportToPDFAndShare = async () => {
       },
     } as any);
 
-    const applyRiskScaleLegend = (workbook: XLSX.WorkBook, mainSheet?: XLSX.WorkSheet) => {
+    const applyRiskScaleLegend = (workbook: WorkBook, mainSheet?: WorkSheet) => {
       const legendData = riskScaleRows.flatMap((row) => [[row.range], [row.label]]);
       const legendSheet = XLSX.utils.aoa_to_sheet([
         ["FINE-KINNEY RİSK SINIFLANDIRMA SKALASI"],
@@ -4184,7 +4175,7 @@ const exportToPDFAndShare = async () => {
       });
     };
 
-    const applyRiskTableLayout = (ws: XLSX.WorkSheet, dataRowCount: number, includeLegendColumns = false) => {
+    const applyRiskTableLayout = (ws: WorkSheet, dataRowCount: number, includeLegendColumns = false) => {
       ws["!cols"] = [
         { wch: 6 },   // No
         { wch: 20 },  // Faaliyet/Bölüm

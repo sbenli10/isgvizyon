@@ -27,7 +27,7 @@ export function RouteWarmup({
     let cancelled = false;
 
     const runWarmup = async () => {
-      if (document.visibilityState === "hidden") return;
+      if (document.visibilityState !== "visible") return;
 
       for (const task of tasks) {
         if (cancelled || warmedRoutes.has(task.key)) continue;
@@ -42,7 +42,7 @@ export function RouteWarmup({
         }
 
         await wait(120);
-        if (document.visibilityState === "hidden") return;
+        if (document.visibilityState !== "visible") return;
       }
     };
 

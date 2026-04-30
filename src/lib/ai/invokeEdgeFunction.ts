@@ -9,9 +9,9 @@ interface EdgeFunctionFailure {
   };
 }
 
-export async function invokeEdgeFunction<TResponse>(
+export async function invokeEdgeFunction<TResponse, TBody extends object = Record<string, unknown>>(
   name: string,
-  body: Record<string, unknown>,
+  body: TBody,
 ): Promise<TResponse> {
   const { data, error } = await supabase.functions.invoke(name, { body });
 

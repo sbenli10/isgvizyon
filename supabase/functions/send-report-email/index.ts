@@ -27,6 +27,11 @@ interface SendReportEmailRequest {
   user_id?: string;
 }
 
+type StorageReference = {
+  bucket: string;
+  path: string;
+};
+
 const reportTypeLabels = {
   risk_assessment: "Risk Değerlendirme Raporu",
   dof: "DÖF (Düzeltici/Önleyici Faaliyet) Raporu",
@@ -35,6 +40,49 @@ const reportTypeLabels = {
 } as const;
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+const parseStorageReference = (value?: string | null): StorageReference | null => {
+  if (!value) return null;
+
+  if (value.startsWith("storage://")) {
+    const rawRef = value.slice("storage://".length);
+    const slashIndex = rawRef.indexOf("/");
+    if (slashIndex === -1) return null;
+
+    return {
+      bucket: decodeURIComponent(rawRef.slice(0, slashIndex)),
+      path: decodeURIComponent(rawRef.slice(slashIndex + 1)),
+    };
+  }
+
+  try {
+    const parsedUrl = new URL(value);
+    const match = parsedUrl.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)$/i);
+    if (!match) return null;
+
+    return {
+      bucket: decodeURIComponent(match[1]),
+      path: decodeURIComponent(match[2]),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const resolveReportUrl = async (supabase: ReturnType<typeof createClient>, value: string) => {
+  const storageRef = parseStorageReference(value);
+  if (!storageRef) return value;
+
+  const { data, error } = await supabase.storage
+    .from(storageRef.bucket)
+    .createSignedUrl(storageRef.path, 60 * 60 * 24 * 7);
+
+  if (error || !data?.signedUrl) {
+    throw new Error("report_url signed URL olusturulamadi");
+  }
+
+  return data.signedUrl;
+};
 
 serve(async (req: Request) => {
   const requestId = crypto.randomUUID();
@@ -78,6 +126,7 @@ serve(async (req: Request) => {
       throw new Error("invalid report_type");
     }
 
+    const resolvedReportUrl = await resolveReportUrl(supabase, payload.report_url);
     const emailSubject = `${reportTypeLabels[payload.report_type]} - ${payload.company_name || "Firma"}`;
 
 const reportType = reportTypeLabels?.[payload?.report_type] || "Rapor";
@@ -137,7 +186,7 @@ payload?.custom_message
 }
 
 <div style="text-align:center;margin:36px 0;">
-<a href="${payload?.report_url}"
+<a href="${resolvedReportUrl}"
 style="display:inline-block;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#ffffff;padding:16px 34px;border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;letter-spacing:0.3px;box-shadow:0 10px 30px rgba(37,99,235,0.45),inset 0 -2px 0 rgba(255,255,255,0.15);">
 Raporu Görüntüle
 </a>
@@ -216,7 +265,7 @@ ISO 45001 • KVKK • AES-256
           recipient_email: payload.recipient_email,
           subject: emailSubject,
           report_type: payload.report_type,
-          report_url: payload.report_url,
+          report_url: resolvedReportUrl,
           status: "sent",
           email_id: emailResult?.id ?? null,
         });

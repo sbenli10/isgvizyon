@@ -9,6 +9,7 @@ import {
   PieChart as PieChartIcon,
   RefreshCw,
 } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,13 +20,6 @@ import { useReducedMotion } from "@/hooks/useReducedMotion";
 import NotificationWidget from "@/components/NotificationWidget";
 import { toast } from "sonner";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
   DASHBOARD_CACHE_TTL,
   fetchDashboardSnapshot,
   readDashboardSnapshot,
@@ -35,6 +29,7 @@ import {
   type DashboardRiskLevel,
   type DashboardSnapshot,
 } from "@/lib/dashboardCache";
+const RiskDistributionChart = lazy(() => import("@/components/dashboard/RiskDistributionChart"));
 
 type RiskLevel = DashboardRiskLevel;
 type InspectionStatus = DashboardInspectionStatus;
@@ -684,38 +679,11 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
-                    {loading ? (
-                      <div className="h-[320px] animate-pulse rounded-2xl bg-slate-900/70" />
-                    ) : riskDistribution.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={320}>
-                        <PieChart>
-                          <Pie
-                            data={riskDistribution}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={56}
-                            outerRadius={104}
-                            paddingAngle={3}
-                            dataKey="value"
-                            stroke="rgba(255,255,255,0.05)"
-                            strokeWidth={2}
-                          >
-                            {riskDistribution.map((entry) => (
-                              <Cell key={entry.name} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex h-[320px] flex-col items-center justify-center text-muted-foreground">
-                        <AlertCircle className="mb-3 h-12 w-12 opacity-30" />
-                        <p className="text-sm">Henüz denetim verisi yok</p>
-                        <p className="mt-1 text-xs">İlk denetiminizi oluşturun</p>
-                      </div>
-                    )}
-                  </div>
+                    <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
+                      <Suspense fallback={<div className="h-[320px] animate-pulse rounded-2xl bg-slate-900/70" />}>
+                        <RiskDistributionChart loading={loading} riskDistribution={riskDistribution} />
+                      </Suspense>
+                    </div>
                 </div>
               </StorySurface>
             </div>

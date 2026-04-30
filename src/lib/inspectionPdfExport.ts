@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { resolveStorageObjectUrl } from "@/lib/storageObject";
 
 interface InspectionData {
   id: string;
@@ -14,7 +15,8 @@ interface InspectionData {
 
 async function loadImageAsDataURL(url: string): Promise<string> {
   try {
-    const response = await fetch(url);
+    const accessUrl = await resolveStorageObjectUrl(url);
+    const response = await fetch(accessUrl || url);
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();

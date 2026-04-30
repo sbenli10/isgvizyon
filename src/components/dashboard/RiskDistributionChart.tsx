@@ -1,3 +1,4 @@
+import { AlertCircle } from "lucide-react";
 import {
   ResponsiveContainer,
   PieChart,
@@ -5,7 +6,6 @@ import {
   Cell,
   Tooltip,
 } from "recharts";
-import { AlertCircle } from "lucide-react";
 
 type RiskDistributionItem = {
   name: string;

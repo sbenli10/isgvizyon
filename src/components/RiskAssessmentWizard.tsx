@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { buildStorageObjectRef } from "@/lib/storageObject";
 import { cn } from "@/lib/utils";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { Badge } from "@/components/ui/badge";
@@ -206,8 +207,7 @@ export default function RiskAssessmentWizard() {
     const path = `${user.id}/${assessmentId}/${slot}-${Date.now()}.${extension}`;
     const { error } = await supabase.storage.from("risk-assessment-signatures").upload(path, blob, { contentType: blob.type || "image/png", upsert: true });
     if (error) throw error;
-    const { data } = supabase.storage.from("risk-assessment-signatures").getPublicUrl(path);
-    return data.publicUrl;
+    return buildStorageObjectRef("risk-assessment-signatures", path);
   };
   const generatePDFPreview = () => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
