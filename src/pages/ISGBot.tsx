@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { listIsgkatipCompanies } from "@/domain/isgkatip/isgkatipQueries";
 
 const tabAliases: Record<string, string> = {
   dashboard: "overview",
@@ -90,17 +90,15 @@ export default function ISGBot() {
     const loadSnapshot = async () => {
       setLoadingSnapshot(true);
       try {
-        const { data, error } = await supabase
-          .from("isgkatip_companies")
-          .select("id, last_synced_at")
-          .eq("user_id", user.id)
-          .order("last_synced_at", { ascending: false, nullsFirst: false });
-
-        if (error) throw error;
+        const rows = await listIsgkatipCompanies({
+          userId: user.id,
+          select: "id, last_synced_at",
+          orderBy: "company_name",
+          ascending: true,
+        });
 
         if (cancelled) return;
 
-        const rows = data ?? [];
         const companyCount = rows.length;
         const lastSyncedAt = rows.find((row) => row.last_synced_at)?.last_synced_at ?? null;
 
