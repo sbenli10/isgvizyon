@@ -223,6 +223,69 @@ export interface OsgbPublicClientPortalSnapshot {
   }>;
 }
 
+const normalizeOsgbClientPortalSnapshot = (raw: any): OsgbPublicClientPortalSnapshot => {
+  const legacyCompany = raw?.company;
+  const legacyMeta = raw?.meta;
+  const link = raw?.link;
+
+  return {
+    company: {
+      id: legacyCompany?.id || link?.companyId || link?.company_id || "",
+      companyName: legacyCompany?.companyName || link?.companyName || link?.company_name || "Firma",
+      hazardClass: legacyCompany?.hazardClass || link?.hazardClass || link?.hazard_class || null,
+      employeeCount: Number(legacyCompany?.employeeCount || link?.employeeCount || link?.employee_count || 0),
+    },
+    meta: {
+      organizationName: legacyMeta?.organizationName || link?.organizationName || link?.organization_name || "OSGB",
+      contactName: legacyMeta?.contactName || link?.contactName || link?.contact_name || null,
+      contactEmail: legacyMeta?.contactEmail || link?.contactEmail || link?.contact_email || null,
+      expiresAt: legacyMeta?.expiresAt || link?.expiresAt || link?.expires_at || null,
+    },
+    documents: Array.isArray(raw?.documents)
+      ? raw.documents.map((document: any) => ({
+          id: document?.id || "",
+          documentType: document?.documentType || document?.document_type || "Belge",
+          requiredReason: document?.requiredReason || document?.required_reason || "",
+          riskIfMissing: document?.riskIfMissing || document?.risk_if_missing || null,
+          dueDate: document?.dueDate || document?.due_date || null,
+          status: document?.status || "missing",
+          delayDays: Number(document?.delayDays || document?.delay_days || 0),
+          riskLevel: document?.riskLevel || document?.risk_level || "medium",
+        }))
+      : [],
+    visits: Array.isArray(raw?.visits)
+      ? raw.visits.map((visit: any) => ({
+          id: visit?.id || "",
+          plannedAt: visit?.plannedAt || visit?.plannedStartAt || visit?.planned_start_at || "",
+          completedAt: visit?.completedAt || visit?.completed_at || null,
+          status: visit?.status || visit?.visitStatus || visit?.visit_status || "planned",
+          visitType: visit?.visitType || visit?.visit_type || "onsite_visit",
+          serviceSummary: visit?.serviceSummary || visit?.service_summary || null,
+          nextActionSummary: visit?.nextActionSummary || visit?.next_action_summary || null,
+        }))
+      : [],
+    finance: {
+      currentBalance: Number(raw?.finance?.currentBalance || raw?.finance?.current_balance || 0),
+      overdueBalance: Number(raw?.finance?.overdueBalance || raw?.finance?.overdue_balance || 0),
+      collectionRiskScore: Number(raw?.finance?.collectionRiskScore || raw?.finance?.collection_risk_score || 0),
+      profitabilityScore: Number(raw?.finance?.profitabilityScore || raw?.finance?.profitability_score || 0),
+    },
+    uploads: Array.isArray(raw?.uploads)
+      ? raw.uploads.map((upload: any) => ({
+          id: upload?.id || "",
+          fileName: upload?.fileName || upload?.file_name || "Dosya",
+          note: upload?.note || null,
+          reviewStatus: upload?.reviewStatus || upload?.review_status || "pending",
+          reviewNote: upload?.reviewNote || upload?.review_note || null,
+          submittedByName: upload?.submittedByName || upload?.submitted_by_name || null,
+          submittedByEmail: upload?.submittedByEmail || upload?.submitted_by_email || null,
+          createdAt: upload?.createdAt || upload?.created_at || "",
+          documentType: upload?.documentType || upload?.document_type || null,
+        }))
+      : [],
+  };
+};
+
 const portalUploadFunctionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/osgb-client-portal-upload`;
 
 const normalizePriority = (value: number) => {
@@ -725,7 +788,7 @@ export const getOsgbClientPortalSnapshot = async (
   if (error) throw error;
   if (!data) return null;
 
-  return data as OsgbPublicClientPortalSnapshot;
+  return normalizeOsgbClientPortalSnapshot(data);
 };
 
 export const listOsgbClientPortalUploads = async (
