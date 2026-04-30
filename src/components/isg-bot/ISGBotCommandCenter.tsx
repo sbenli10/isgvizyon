@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { addDays, differenceInDays, format } from "date-fns";
-import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
 import jsPDF from "jspdf";
 import {
   AlertTriangle,
