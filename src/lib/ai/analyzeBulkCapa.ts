@@ -14,6 +14,27 @@ interface BulkCapaAnalyzeResponse {
   analysis: BulkCapaAIAnalysis | null;
 }
 
+export type BulkCapaJobType = "single_analysis" | "bulk_generation" | "overall_analysis";
+
+export interface BulkCapaSessionJobContext {
+  relatedDepartment?: string | null;
+  areaRegion?: string | null;
+  responsiblePerson?: string | null;
+  employerRepresentativeTitle?: string | null;
+  employerRepresentativeName?: string | null;
+  observerName?: string | null;
+  observerTitle?: string | null;
+}
+
+interface BulkCapaSessionJobResponse {
+  success: true;
+  mode: "session-job";
+  sessionId: string;
+  status: "completed";
+  jobType: BulkCapaJobType;
+  result: Record<string, unknown>;
+}
+
 function getMimeTypeFromUrl(url: string) {
   const normalized = url.split("?")[0].toLowerCase();
   if (normalized.endsWith(".png")) return "image/png";
@@ -108,6 +129,38 @@ export async function generateBulkCapaOverallAnalysis(prompt: string) {
     }
 
     return text;
+  } catch (error) {
+    throw new Error(mapBulkCapaError(error));
+  }
+}
+
+export async function startBulkCapaSessionJob({
+  sessionId,
+  jobType,
+  images = [],
+  prompt,
+  context,
+  draftPayload,
+}: {
+  sessionId: string;
+  jobType: BulkCapaJobType;
+  images?: string[];
+  prompt?: string;
+  context?: BulkCapaSessionJobContext;
+  draftPayload?: Record<string, unknown>;
+}) {
+  const normalizedImages = await Promise.all(images.map((url) => imageUrlToDataUrl(url)));
+
+  try {
+    return await invokeEdgeFunction<BulkCapaSessionJobResponse>("bulk-capa-analyze", {
+      mode: "session-job",
+      sessionId,
+      jobType,
+      images: normalizedImages,
+      prompt,
+      context,
+      draftPayload,
+    });
   } catch (error) {
     throw new Error(mapBulkCapaError(error));
   }

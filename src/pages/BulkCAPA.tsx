@@ -165,14 +165,6 @@ interface BulkCAPATemplate {
   created_at?: string | null;
 }
 
-interface AIAnalysisResult {
-  description: string;
-  riskDefinition: string;
-  correctiveAction: string;
-  preventiveAction: string;
-  importance_level: "Düşük" | "Orta" | "Yüksek" | "Kritik";
-}
-
 interface ProfileContext {
   full_name: string | null;
   position: string | null;
@@ -192,12 +184,28 @@ interface BulkCAPADraftSnapshot {
   createMode: "single" | "bulk";
   createStep: "general" | "items";
   createDialogOpen?: boolean;
+  sessionId?: string | null;
+  sessionStatus?: string | null;
+  sessionJobType?: string | null;
 }
 
 interface BulkCAPABootstrapCache {
   companies: CompanyOption[];
   orgData: OrganizationData | null;
   profileContext: ProfileContext | null;
+}
+
+interface BulkCapaProcessingSessionRow {
+  id: string;
+  status: string | null;
+  job_type: string | null;
+  processing_started_at: string | null;
+  processing_completed_at: string | null;
+  processing_error: string | null;
+  draft_payload: Partial<BulkCAPADraftSnapshot> | null;
+  job_result_payload: Record<string, unknown> | null;
+  overall_analysis: string | null;
+  entries_count: number | null;
 }
 
 type ErrorBoundaryProps = {
@@ -396,6 +404,44 @@ const clearBulkCapaDraftFromIndexedDb = async (key: string) => {
       resolve();
     }
   });
+};
+
+const persistBulkCapaDraftSnapshot = async (
+  scopedKey: string | null,
+  snapshot: BulkCAPADraftSnapshot,
+) => {
+  if (typeof window === "undefined") return;
+
+  const localStorageSnapshot = sanitizeBulkCapaDraftForLocalStorage(snapshot);
+  const serializedLocal = JSON.stringify(localStorageSnapshot);
+
+  try {
+    if (scopedKey) {
+      window.localStorage.setItem(scopedKey, serializedLocal);
+      window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, scopedKey);
+      await writeBulkCapaDraftToIndexedDb(scopedKey, snapshot);
+    }
+
+    window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, serializedLocal);
+    await writeBulkCapaDraftToIndexedDb(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, snapshot);
+  } catch (error) {
+    console.warn("Bulk CAPA draft persistence failed:", error);
+  }
+};
+
+const clearPersistedBulkCapaDraft = async (scopedKey: string | null) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (scopedKey) {
+      window.localStorage.removeItem(scopedKey);
+      await clearBulkCapaDraftFromIndexedDb(scopedKey);
+    }
+    window.localStorage.removeItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
+    await clearBulkCapaDraftFromIndexedDb(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
+  } catch (error) {
+    console.warn("Bulk CAPA draft cleanup failed:", error);
+  }
 };
 
 const ModuleCard = ({ eyebrow, title, badge, className, children }: ModuleCardProps) => (
@@ -1880,6 +1926,7 @@ function BulkCAPAContent() {
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const activeAnalysisRef = useRef(0);
   const draftHydratedRef = useRef(false);
+  const isMountedRef = useRef(true);
   const [entries, setEntries] = useState<HazardEntry[]>(() => initialDraftSnapshotRef.current?.entries || []);
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
   const [profileContext, setProfileContext] = useState<ProfileContext | null>(null);
@@ -1925,6 +1972,17 @@ function BulkCAPAContent() {
   const [suggestedTemplateReason, setSuggestedTemplateReason] = useState("");
   const [recentHeaderSuggestion, setRecentHeaderSuggestion] = useState<BulkCAPAGeneralInfo | null>(null);
   const [recentHeaderSuggestionReason, setRecentHeaderSuggestionReason] = useState("");
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(
+    () => initialDraftSnapshotRef.current?.sessionId || null,
+  );
+  const [processingSessionStatus, setProcessingSessionStatus] = useState<string | null>(
+    () => initialDraftSnapshotRef.current?.sessionStatus || null,
+  );
+  const [processingJobType, setProcessingJobType] = useState<string | null>(
+    () => initialDraftSnapshotRef.current?.sessionJobType || null,
+  );
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const lastAppliedSessionResultRef = useRef<string | null>(null);
 
   useRouteOverlayCleanup(() => {
     setCompanyComboboxOpen(false);
@@ -1954,6 +2012,115 @@ function BulkCAPAContent() {
   }));
   const [companySearch, setCompanySearch] = useState("");
   const draftStorageKey = user ? `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:${user.id}` : null;
+
+  const buildDraftSnapshot = (
+    overrides?: Partial<BulkCAPADraftSnapshot>,
+  ): BulkCAPADraftSnapshot => ({
+    companyInputMode,
+    selectedCompanyId,
+    manualCompanyName,
+    generalInfo,
+    newEntry,
+    bulkSourceImages,
+    entries,
+    overallAnalysis,
+    createMode,
+    createStep,
+    createDialogOpen,
+    sessionId: activeSessionId,
+    sessionStatus: processingSessionStatus,
+    sessionJobType: processingJobType,
+    ...overrides,
+  });
+
+  const persistDraftOverride = async (overrides?: Partial<BulkCAPADraftSnapshot>) => {
+    const snapshot = buildDraftSnapshot(overrides);
+    draftSnapshotRef.current = snapshot;
+    await persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
+  };
+
+  const buildSessionDraftPayload = (overrides?: Partial<BulkCAPADraftSnapshot>) => {
+    const snapshot = buildDraftSnapshot(overrides);
+    return sanitizeBulkCapaDraftForLocalStorage(snapshot);
+  };
+
+  const upsertProcessingSession = async (
+    jobType: "single_analysis" | "bulk_generation" | "overall_analysis",
+    overrides?: Partial<BulkCAPADraftSnapshot>,
+  ) => {
+    if (!user?.id || !orgData?.id) {
+      throw new Error("Bulk CAPA işlemi için oturum ve organizasyon bilgisi gerekli.");
+    }
+
+    const draftPayload = buildSessionDraftPayload({
+      ...overrides,
+      sessionId: activeSessionId,
+      sessionStatus: "processing",
+      sessionJobType: jobType,
+    });
+
+    const payload = {
+      org_id: orgData.id,
+      organization_id: orgData.id,
+      user_id: user.id,
+      recipient_email: user.email || "",
+      site_name: effectiveLocation || "",
+      company_name: reportCompanyName || "",
+      department_name: newEntry.related_department || null,
+      overall_analysis: overallAnalysis || null,
+      entries_count: entries.length,
+      status: "processing",
+      job_type: jobType,
+      processing_started_at: new Date().toISOString(),
+      processing_completed_at: null,
+      processing_error: null,
+      area_region: generalInfo.area_region || null,
+      observation_date_range: generalInfo.observation_range || null,
+      report_date: generalInfo.report_date || null,
+      observer_name: generalInfo.observer_name || null,
+      observer_certificate_no: generalInfo.observer_certificate_no || null,
+      responsible_person: generalInfo.responsible_person || null,
+      employer_representative_title: generalInfo.employer_representative_title || null,
+      employer_representative_name: generalInfo.employer_representative_name || null,
+      report_no: generalInfo.report_no || null,
+      service_company_logo_url: generalInfo.company_logo_url || selectedCompany?.logo_url || null,
+      draft_payload: draftPayload,
+      job_result_payload: {},
+    };
+
+    const sessionsClient = supabase as any;
+    let sessionId = activeSessionId;
+
+    if (sessionId) {
+      const { error } = await sessionsClient.from("bulk_capa_sessions").update(payload).eq("id", sessionId);
+      if (error) throw error;
+    } else {
+      const { data, error } = await sessionsClient
+        .from("bulk_capa_sessions")
+        .insert(payload)
+        .select("id")
+        .single();
+
+      if (error) throw error;
+      sessionId = data?.id || null;
+    }
+
+    if (!sessionId) {
+      throw new Error("Bulk CAPA iş oturumu oluşturulamadı.");
+    }
+
+    setActiveSessionId(sessionId);
+    setProcessingSessionStatus("processing");
+    setProcessingJobType(jobType);
+    setProcessingError(null);
+    await persistDraftOverride({
+      ...overrides,
+      sessionId,
+      sessionStatus: "processing",
+      sessionJobType: jobType,
+    });
+    return sessionId;
+  };
   const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
 
   const applyDraftSnapshot = (parsedDraft: Partial<BulkCAPADraftSnapshot>) => {
@@ -2006,6 +2173,15 @@ function BulkCAPAContent() {
     ) {
       setCreateDialogOpen(true);
     }
+    if (typeof parsedDraft.sessionId === "string" || parsedDraft.sessionId === null) {
+      setActiveSessionId(parsedDraft.sessionId || null);
+    }
+    if (typeof parsedDraft.sessionStatus === "string" || parsedDraft.sessionStatus === null) {
+      setProcessingSessionStatus(parsedDraft.sessionStatus || null);
+    }
+    if (typeof parsedDraft.sessionJobType === "string" || parsedDraft.sessionJobType === null) {
+      setProcessingJobType(parsedDraft.sessionJobType || null);
+    }
 
     return true;
   };
@@ -2020,6 +2196,7 @@ function BulkCAPAContent() {
   };
 
   useEffect(() => {
+    isMountedRef.current = true;
     let cancelled = false;
 
     const hydrateDraft = async () => {
@@ -2032,9 +2209,10 @@ function BulkCAPAContent() {
           BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
 
         const indexedDbDraft =
-          preferredKey !== BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY
-            ? await readBulkCapaDraftFromIndexedDb(preferredKey)
-            : null;
+          (preferredKey ? await readBulkCapaDraftFromIndexedDb(preferredKey) : null) ||
+          (preferredKey !== BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY
+            ? await readBulkCapaDraftFromIndexedDb(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY)
+            : null);
 
         if (cancelled) return;
 
@@ -2060,14 +2238,143 @@ function BulkCAPAContent() {
 
     return () => {
       cancelled = true;
+      isMountedRef.current = false;
     };
   }, [draftStorageKey, user]);
 
+  const applySessionJobResult = async (session: BulkCapaProcessingSessionRow) => {
+    const resultPayload = session.job_result_payload || {};
+    const resultKey = JSON.stringify({
+      id: session.id,
+      status: session.status,
+      jobType: session.job_type,
+      completedAt: session.processing_completed_at,
+      result: resultPayload,
+    });
+
+    if (lastAppliedSessionResultRef.current === resultKey) {
+      return;
+    }
+
+    if (session.draft_payload) {
+      applyDraftSnapshot(session.draft_payload);
+    }
+
+    if (session.job_type === "single_analysis") {
+      const nextEntry = (resultPayload.newEntry || null) as Partial<HazardEntry> | null;
+      if (nextEntry) {
+        setNewEntry((prev) => ({
+          ...prev,
+          ...nextEntry,
+        }));
+        setCreateDialogOpen(true);
+      }
+    }
+
+    if (session.job_type === "bulk_generation") {
+      const nextEntries = Array.isArray(resultPayload.entries) ? (resultPayload.entries as HazardEntry[]) : null;
+      if (nextEntries) {
+        setEntries(nextEntries);
+      }
+      if (typeof resultPayload.overallAnalysis === "string") {
+        setOverallAnalysis(resultPayload.overallAnalysis);
+      } else if (session.overall_analysis) {
+        setOverallAnalysis(session.overall_analysis);
+      }
+      setCreateMode("bulk");
+      setCreateStep("items");
+      setCreateDialogOpen(true);
+    }
+
+    if (session.job_type === "overall_analysis") {
+      const nextOverallAnalysis =
+        typeof resultPayload.overallAnalysis === "string"
+          ? resultPayload.overallAnalysis
+          : session.overall_analysis || "";
+      if (nextOverallAnalysis) {
+        setOverallAnalysis(nextOverallAnalysis);
+      }
+    }
+
+    setProcessingSessionStatus(session.status || null);
+    setProcessingJobType(session.job_type || null);
+    setProcessingError(session.processing_error || null);
+    lastAppliedSessionResultRef.current = resultKey;
+    await persistDraftOverride({
+      sessionId: session.id,
+      sessionStatus: session.status || null,
+      sessionJobType: session.job_type || null,
+    });
+  };
+
   useEffect(() => {
-    return () => {
-      activeAnalysisRef.current += 1;
+    if (!activeSessionId || !user?.id) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadSessionState = async () => {
+      try {
+        const { data, error } = await (supabase as any)
+          .from("bulk_capa_sessions")
+          .select(
+            "id, status, job_type, processing_started_at, processing_completed_at, processing_error, draft_payload, job_result_payload, overall_analysis, entries_count",
+          )
+          .eq("id", activeSessionId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (error) throw error;
+        if (!data) {
+          setActiveSessionId(null);
+          setProcessingSessionStatus(null);
+          setProcessingJobType(null);
+          setProcessingError(null);
+          return;
+        }
+
+        const session = data as BulkCapaProcessingSessionRow;
+        setProcessingSessionStatus(session.status || null);
+        setProcessingJobType(session.job_type || null);
+        setProcessingError(session.processing_error || null);
+
+        if (session.status === "completed") {
+          await applySessionJobResult(session);
+        }
+
+        if (session.status === "failed") {
+          await persistDraftOverride({
+            sessionId: session.id,
+            sessionStatus: session.status || null,
+            sessionJobType: session.job_type || null,
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Bulk CAPA session state could not be loaded:", error);
+        }
+      }
     };
-  }, []);
+
+    void loadSessionState();
+
+    if (processingSessionStatus !== "processing") {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadSessionState();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [activeSessionId, processingSessionStatus, user?.id]);
 
   const [newEntry, setNewEntry] = useState<HazardEntry>(() => ({
     id: initialDraftSnapshotRef.current?.newEntry?.id || "",
@@ -2163,26 +2470,16 @@ function BulkCAPAContent() {
   );
 
   useEffect(() => {
-    if (!draftStorageKey || !draftHydratedRef.current) {
+    if (!draftHydratedRef.current) {
       return;
     }
 
-    const snapshot: BulkCAPADraftSnapshot = {
-      companyInputMode,
-      selectedCompanyId,
-      manualCompanyName,
-      generalInfo,
-      newEntry,
-      bulkSourceImages,
-      entries,
-      overallAnalysis,
-      createMode,
-      createStep,
-      createDialogOpen,
-    };
+    const snapshot = buildDraftSnapshot();
     draftSnapshotRef.current = snapshot;
 
     const hasMeaningfulDraft =
+      Boolean(activeSessionId) ||
+      processingSessionStatus === "processing" ||
       entries.length > 0 ||
       manualCompanyName.trim().length > 0 ||
       selectedCompanyId.trim().length > 0 ||
@@ -2202,24 +2499,11 @@ function BulkCAPAContent() {
 
     try {
       if (!hasMeaningfulDraft) {
-        if (draftStorageKey) {
-          window.localStorage.removeItem(draftStorageKey);
-          void clearBulkCapaDraftFromIndexedDb(draftStorageKey);
-        }
-        window.localStorage.removeItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
+        void clearPersistedBulkCapaDraft(draftStorageKey);
         return;
       }
 
-      const localStorageSnapshot = sanitizeBulkCapaDraftForLocalStorage(snapshot);
-      if (draftStorageKey) {
-        window.localStorage.setItem(draftStorageKey, JSON.stringify(localStorageSnapshot));
-        window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
-        void writeBulkCapaDraftToIndexedDb(draftStorageKey, snapshot);
-      }
-      window.localStorage.setItem(
-        BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY,
-        JSON.stringify(localStorageSnapshot),
-      );
+      void persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
     } catch (error) {
       console.warn("Bulk CAPA draft could not be saved:", error);
     }
@@ -2235,6 +2519,9 @@ function BulkCAPAContent() {
     manualCompanyName,
     newEntry,
     overallAnalysis,
+    activeSessionId,
+    processingJobType,
+    processingSessionStatus,
     selectedCompanyId,
   ]);
 
@@ -2242,19 +2529,7 @@ function BulkCAPAContent() {
     const flushDraft = () => {
       if (!draftSnapshotRef.current) return;
 
-      try {
-        const serialized = JSON.stringify(
-          sanitizeBulkCapaDraftForLocalStorage(draftSnapshotRef.current),
-        );
-        if (draftStorageKey) {
-          window.localStorage.setItem(draftStorageKey, serialized);
-          window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
-          void writeBulkCapaDraftToIndexedDb(draftStorageKey, draftSnapshotRef.current);
-        }
-        window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, serialized);
-      } catch (error) {
-        console.warn("Bulk CAPA draft flush failed:", error);
-      }
+      void persistBulkCapaDraftSnapshot(draftStorageKey, draftSnapshotRef.current);
     };
 
     const handleVisibilityChange = () => {
@@ -2987,73 +3262,6 @@ function BulkCAPAContent() {
     : "Firma seçildiğinde geçmiş DÖF kayıtları aynı şirket adı üzerinden taranır.";
   const nextDofNumber = `DOF-${String(entries.length + 1).padStart(3, "0")}`;
 
-  const analyzeImagesWithAI = async (
-    imageUrls: string[]
-  ): Promise<AIAnalysisResult | null> => {
-    try {
-      const { analyzeBulkCapaImages } = await loadBulkCapaAi();
-      const analysis = await analyzeBulkCapaImages(imageUrls);
-      return {
-        ...analysis,
-        description: coerceText(analysis.description).trim(),
-        riskDefinition: coerceText(analysis.riskDefinition).trim(),
-        correctiveAction: coerceText(analysis.correctiveAction).trim(),
-        preventiveAction: coerceText(analysis.preventiveAction).trim(),
-      };
-    } catch (error) {
-      console.error("AI analysis error:", error);
-      return null;
-    }
-  };
-
-  const getSuggestedTerminDate = (importanceLevel: HazardEntry["importance_level"]) => {
-    const days =
-      importanceLevel === "Kritik"
-        ? 1
-        : importanceLevel === "Yüksek"
-        ? 3
-        : importanceLevel === "Orta"
-        ? 7
-        : 14;
-
-    const next = new Date();
-    next.setDate(next.getDate() + days);
-    return next.toISOString().split("T")[0];
-  };
-
-  const buildBulkEntryFromAnalysis = (analysis: AIAnalysisResult, imageUrl: string, index: number): HazardEntry => ({
-    id: `bulk-ai-${Date.now()}-${index}`,
-    description: coerceText(analysis.description).trim(),
-    riskDefinition: coerceText(analysis.riskDefinition).trim(),
-    correctiveAction: coerceText(analysis.correctiveAction).trim(),
-    preventiveAction: coerceText(analysis.preventiveAction).trim(),
-    importance_level: analysis.importance_level,
-    termin_date: getSuggestedTerminDate(analysis.importance_level),
-    related_department:
-      newEntry.related_department?.trim() && newEntry.related_department !== "Diger"
-        ? newEntry.related_department
-        : generalInfo.area_region?.trim() || "Genel Saha",
-    notification_method: "E-mail",
-    responsible_name:
-      generalInfo.employer_representative_name?.trim() ||
-      generalInfo.responsible_person?.trim() ||
-      "İşveren / İşveren Vekili",
-    responsible_role:
-      generalInfo.employer_representative_title?.trim() ||
-      "İşveren / İşveren Vekili",
-    approver_name:
-      generalInfo.observer_name?.trim() ||
-      profileContext?.full_name?.trim() ||
-      user?.email ||
-      "",
-    approver_title:
-      profileContext?.position?.trim() ||
-      "İş Güvenliği Uzmanı",
-    include_stamp: true,
-    media_urls: [imageUrl],
-    ai_analyzed: true,
-  });
-
   const removeBulkSourceImage = (index: number) => {
     setBulkSourceImages((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
   };
@@ -3094,25 +3302,6 @@ function BulkCAPAContent() {
 
     setBulkGenerating(true);
     try {
-      const generatedEntries: HazardEntry[] = [];
-
-      for (let index = 0; index < bulkSourceImages.length; index += 1) {
-        const imageUrl = bulkSourceImages[index];
-        const analysis = await analyzeImagesWithAI([imageUrl]);
-        if (!analysis) {
-          continue;
-        }
-
-        generatedEntries.push(buildBulkEntryFromAnalysis(analysis, imageUrl, index));
-      }
-
-      if (generatedEntries.length === 0) {
-        throw new Error("Yüklenen fotoğraflardan analiz üretilemedi.");
-      }
-
-      setEntries(generatedEntries);
-      setPreviewFocusEntryId(null);
-
       const prompt = `Sen deneyimli bir iş sağlığı ve güvenliği uzmanısın.
 Aşağıdaki toplu DÖF maddeleri için resmi raporda kullanılacak yönetici özetini yaz.
 
@@ -3122,29 +3311,59 @@ Kurallar:
 - Düz metin üret.
 
 Maddeler:
-${generatedEntries
+${bulkSourceImages
   .map(
-    (entry, index) =>
-      `${index + 1}. Bulgu: ${entry.description}\nRisk: ${entry.riskDefinition}\nDüzeltici Faaliyet: ${entry.correctiveAction}\nÖnleyici Faaliyet: ${entry.preventiveAction}\nÖnemlilik: ${entry.importance_level}`,
+    (_entry, index) =>
+      `${index + 1}. Fotoğraf ${index + 1} için saha uygunsuzluklarını, risk tanımlarını ve aksiyonları tekil DÖF maddelerine dönüştür.`,
   )
   .join("\n\n")}`;
+      const sessionId = await upsertProcessingSession("bulk_generation", {
+        createDialogOpen: true,
+        createMode: "bulk",
+        createStep: "items",
+      });
+      const { startBulkCapaSessionJob } = await loadBulkCapaAi();
+      const response = await startBulkCapaSessionJob({
+        sessionId,
+        jobType: "bulk_generation",
+        images: bulkSourceImages,
+        prompt,
+        context: {
+          relatedDepartment: newEntry.related_department,
+          areaRegion: generalInfo.area_region,
+          responsiblePerson: generalInfo.responsible_person,
+          employerRepresentativeTitle: generalInfo.employer_representative_title,
+          employerRepresentativeName: generalInfo.employer_representative_name,
+          observerName: generalInfo.observer_name,
+          observerTitle: profileContext?.position || "İş Güvenliği Uzmanı",
+        },
+        draftPayload: buildSessionDraftPayload({
+          sessionId,
+          sessionStatus: "processing",
+          sessionJobType: "bulk_generation",
+          createDialogOpen: true,
+          createMode: "bulk",
+          createStep: "items",
+        }),
+      });
 
-      try {
-        const { generateBulkCapaOverallAnalysis } = await loadBulkCapaAi();
-        const nextOverallAnalysis = coerceText(await generateBulkCapaOverallAnalysis(prompt)).trim();
-        if (nextOverallAnalysis) {
-          setOverallAnalysis(nextOverallAnalysis);
-        }
-      } catch (overallError) {
-        console.warn("Bulk overall analysis generation skipped:", overallError);
-      }
-
-      toast.success(`${generatedEntries.length} fotoğraf analiz edildi ve toplu DÖF taslağı hazırlandı.`);
+      setProcessingSessionStatus(response.status);
+      await persistDraftOverride({
+        sessionId,
+        sessionStatus: response.status,
+        sessionJobType: "bulk_generation",
+        createDialogOpen: true,
+        createMode: "bulk",
+        createStep: "items",
+      });
+      toast.success("Toplu DÖF işleme alındı. Sayfadan ayrılsanız da tamamlanınca oturuma yazılacak.");
     } catch (error) {
       console.error("Bulk photo-first draft generation failed:", error);
       toast.error(getUserFriendlyErrorMessage(error, "analysis"));
     } finally {
-      setBulkGenerating(false);
+      if (isMountedRef.current) {
+        setBulkGenerating(false);
+      }
     }
   };
 
@@ -3409,91 +3628,49 @@ ${generatedEntries
 
     try {
       const total = newEntry.media_urls.length;
-      toast.info(`${total} fotograf analiz ediliyor`);
+      toast.info(`${total} fotograf analiz için işleme alındı`);
 
-      let finalAnalysis = await analyzeImagesWithAI(newEntry.media_urls);
-
-      if (!finalAnalysis) {
-        const analyses: AIAnalysisResult[] = [];
-
-        for (let i = 0; i < newEntry.media_urls.length; i++) {
-          const analysis = await analyzeImagesWithAI([newEntry.media_urls[i]]);
-          if (analysis) {
-            analyses.push(analysis);
-          }
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-
-        if (analyses.length === 0) {
-          throw new Error("Fotograflar analiz edilemedi");
-        }
-
-        finalAnalysis = mergeAnalyses(analyses);
-      }
+      const sessionId = await upsertProcessingSession("single_analysis", {
+        createDialogOpen: true,
+        createMode: "single",
+      });
+      const { startBulkCapaSessionJob } = await loadBulkCapaAi();
+      const response = await startBulkCapaSessionJob({
+        sessionId,
+        jobType: "single_analysis",
+        images: newEntry.media_urls,
+        draftPayload: buildSessionDraftPayload({
+          sessionId,
+          sessionStatus: "processing",
+          sessionJobType: "single_analysis",
+          createDialogOpen: true,
+          createMode: "single",
+        }),
+      });
 
       if (activeAnalysisRef.current !== runId) {
         return;
       }
 
-      setNewEntry((prev) => ({
-        ...prev,
-        description: finalAnalysis.description,
-        riskDefinition: finalAnalysis.riskDefinition,
-        correctiveAction: finalAnalysis.correctiveAction,
-        preventiveAction: finalAnalysis.preventiveAction,
-        importance_level: finalAnalysis.importance_level,
-        ai_analyzed: true,
-      }));
-
-      toast.success(`${total} fotograf için analiz tamamlandi`);
+      setProcessingSessionStatus(response.status);
+      await persistDraftOverride({
+        sessionId,
+        sessionStatus: response.status,
+        sessionJobType: "single_analysis",
+        createDialogOpen: true,
+        createMode: "single",
+      });
+      toast.success(`${total} fotograf için analiz session işine yazıldı.`);
     } catch (error: any) {
       toast.error(getUserFriendlyErrorMessage(error, "analysis"));
       console.error("Analysis error:", error);
     } finally {
-      if (activeAnalysisRef.current === runId) {
+      if (isMountedRef.current && activeAnalysisRef.current === runId) {
         setAnalyzing(false);
       }
     }
   };
 
-  // ? MERGE ANALYSES
-  const mergeAnalyses = (analyses: AIAnalysisResult[]): AIAnalysisResult => {
-    const importancePriority = { Kritik: 4, Yüksek: 3, Orta: 2, Düşük: 1 };
-    const maxImportance = analyses.reduce((max, curr) => {
-      const currPriority = importancePriority[curr.importance_level] || 0;
-      const maxPriority = importancePriority[max.importance_level] || 0;
-      return currPriority > maxPriority ? curr : max;
-    });
-
-    const descriptions = analyses
-      .map((a) => coerceText(a.description).trim())
-      .filter(Boolean);
-    const riskLines = analyses
-      .map((a) => coerceText(a.riskDefinition).trim())
-      .filter(Boolean);
-    const correctiveActions = analyses
-      .map((a) => coerceText(a.correctiveAction).trim())
-      .filter(Boolean);
-    const preventiveActions = analyses
-      .map((a) => coerceText(a.preventiveAction).trim())
-      .filter(Boolean);
-
-    const shortRiskSummary = riskLines
-      .slice(0, 3)
-      .map((line) => line.split(".")[0].trim())
-      .filter(Boolean)
-      .join(". ");
-
-    return {
-      description: descriptions.slice(0, 2).join(" "),
-      riskDefinition: shortRiskSummary
-        ? `${shortRiskSummary}.`
-        : riskLines[0] || "Genel risk degerlendirmesi tamamlandi.",
-      correctiveAction: correctiveActions.slice(0, 3).join("\n"),
-      preventiveAction: preventiveActions.slice(0, 3).join("\n"),
-      importance_level: maxImportance.importance_level,
-    };
-  };
   const generateOverallAnalysis = async () => {
     if (entries.length === 0) {
       toast.error("Önce en az bir bulgu ekleyin");
@@ -3521,20 +3698,33 @@ ${entries
       `${index + 1}. Bulgu: ${entry.description}\nRisk: ${entry.riskDefinition}\nDüzeltici Faaliyet: ${entry.correctiveAction}\nÖnleyici Faaliyet: ${entry.preventiveAction}\nBölüm: ${entry.related_department}\nÖnemlilik: ${entry.importance_level}`
   )
   .join("\n\n")}`;
+      const sessionId = await upsertProcessingSession("overall_analysis");
+      const { startBulkCapaSessionJob } = await loadBulkCapaAi();
+      const response = await startBulkCapaSessionJob({
+        sessionId,
+        jobType: "overall_analysis",
+        prompt,
+        draftPayload: buildSessionDraftPayload({
+          sessionId,
+          sessionStatus: "processing",
+          sessionJobType: "overall_analysis",
+        }),
+      });
 
-      const { generateBulkCapaOverallAnalysis } = await loadBulkCapaAi();
-      const textContent = coerceText(await generateBulkCapaOverallAnalysis(prompt)).trim();
-      if (!textContent) {
-        throw new Error("Genel analiz metni üretilemedi");
-      }
-
-      setOverallAnalysis(textContent);
-      toast.success("Genel analiz olusturuldu");
+      setProcessingSessionStatus(response.status);
+      await persistDraftOverride({
+        sessionId,
+        sessionStatus: response.status,
+        sessionJobType: "overall_analysis",
+      });
+      toast.success("Genel analiz backend işine yazıldı.");
     } catch (error: any) {
       console.error("Genel analiz hatasi:", error);
       toast.error(getUserFriendlyErrorMessage(error, "overall-analysis"));
     } finally {
-      setOverallAnalyzing(false);
+      if (isMountedRef.current) {
+        setOverallAnalyzing(false);
+      }
     }
   };
 
@@ -3746,6 +3936,7 @@ ${entries
           .single();
 
         if (profile?.organization_id) {
+          const sessionsClient = supabase as any;
           const { data: inspection, error: inspectionError } = await supabase
             .from("inspections")
             .insert({
@@ -3957,36 +4148,70 @@ const handleSaveAndExport = async () => {
 
           if (inspection) {
             createdInspectionId = inspection.id;
-            const { data: sessionRow, error: sessionError } = await (supabase as any)
-              .from("bulk_capa_sessions")
-              .insert({
-                org_id: profile.organization_id,
-                user_id: user.id,
-                recipient_email: user.email || "",
-                site_name: effectiveLocation,
-                company_name: reportCompanyName,
-                department_name: newEntry.related_department || null,
-                organization_id: orgData?.id || null,
-                overall_analysis: overallAnalysis || null,
-                entries_count: entries.length,
-                status: "completed",
-                area_region: generalInfo.area_region || null,
-                observation_date_range: generalInfo.observation_range || null,
-                report_date: generalInfo.report_date || null,
-                observer_name: generalInfo.observer_name || null,
-                observer_certificate_no: generalInfo.observer_certificate_no || null,
-                responsible_person: generalInfo.responsible_person || null,
-                employer_representative_title: generalInfo.employer_representative_title || null,
-                employer_representative_name: generalInfo.employer_representative_name || null,
-                report_no: generalInfo.report_no || null,
-                service_company_logo_url: generalInfo.company_logo_url || selectedCompany?.logo_url || null,
-              })
-              .select("id")
-              .single();
+            const completedSessionPayload = {
+              org_id: profile.organization_id,
+              user_id: user.id,
+              recipient_email: user.email || "",
+              site_name: effectiveLocation,
+              company_name: reportCompanyName,
+              department_name: newEntry.related_department || null,
+              organization_id: orgData?.id || null,
+              overall_analysis: overallAnalysis || null,
+              entries_count: entries.length,
+              status: "completed",
+              job_type: null,
+              processing_started_at: null,
+              processing_completed_at: new Date().toISOString(),
+              processing_error: null,
+              area_region: generalInfo.area_region || null,
+              observation_date_range: generalInfo.observation_range || null,
+              report_date: generalInfo.report_date || null,
+              observer_name: generalInfo.observer_name || null,
+              observer_certificate_no: generalInfo.observer_certificate_no || null,
+              responsible_person: generalInfo.responsible_person || null,
+              employer_representative_title: generalInfo.employer_representative_title || null,
+              employer_representative_name: generalInfo.employer_representative_name || null,
+              report_no: generalInfo.report_no || null,
+              service_company_logo_url: generalInfo.company_logo_url || selectedCompany?.logo_url || null,
+              draft_payload: buildSessionDraftPayload({
+                sessionId: activeSessionId,
+                sessionStatus: "completed",
+                sessionJobType: null,
+              }),
+              job_result_payload: {
+                entries,
+                overallAnalysis,
+              },
+            };
+
+            let sessionRow: { id: string } | null = null;
+            let sessionError: { message?: string } | null = null;
+
+            if (activeSessionId) {
+              const { data, error } = await sessionsClient
+                .from("bulk_capa_sessions")
+                .update(completedSessionPayload)
+                .eq("id", activeSessionId)
+                .select("id")
+                .single();
+
+              sessionRow = data || null;
+              sessionError = error;
+            } else {
+              const { data, error } = await sessionsClient
+                .from("bulk_capa_sessions")
+                .insert(completedSessionPayload)
+                .select("id")
+                .single();
+
+              sessionRow = data || null;
+              sessionError = error;
+            }
 
             if (sessionError) {
               console.warn("bulk_capa_sessions insert failed:", sessionError);
             } else if (sessionRow?.id) {
+              await sessionsClient.from("bulk_capa_entries").delete().eq("session_id", sessionRow.id);
               const bulkEntries = entries.map((entry) => ({
                 session_id: sessionRow.id,
                 description: entry.description,
@@ -4020,6 +4245,10 @@ const handleSaveAndExport = async () => {
               if (bulkEntriesError) {
                 console.warn("bulk_capa_entries insert failed:", bulkEntriesError);
               }
+              setActiveSessionId(sessionRow.id);
+              setProcessingSessionStatus("completed");
+              setProcessingJobType(null);
+              setProcessingError(null);
             }
 
             for (const entry of entries) {
@@ -4186,6 +4415,10 @@ const handleSaveAndExport = async () => {
     setManualCompanyName("");
     setCompanyInputMode("existing");
     setOverallAnalysis("");
+    setActiveSessionId(null);
+    setProcessingSessionStatus(null);
+    setProcessingJobType(null);
+    setProcessingError(null);
     setGeneralInfo({
       company_name: "",
       company_logo_url: null,
@@ -4258,6 +4491,16 @@ const handleSaveAndExport = async () => {
               <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
                 Önce akışı seçin, sonra kaydı doldurun
               </span>
+              {processingSessionStatus === "processing" ? (
+                <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-amber-200">
+                  Arka planda işlem sürüyor
+                </span>
+              ) : null}
+              {processingSessionStatus === "failed" && processingError ? (
+                <span className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-rose-200">
+                  Son işlem hata verdi
+                </span>
+              ) : null}
             </div>
 
             <div className="space-y-4">
