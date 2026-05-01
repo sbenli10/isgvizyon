@@ -262,16 +262,10 @@ function buildServiceClient() {
   return createClient(supabaseUrl, serviceRoleKey);
 }
 
-function buildUserClient(req: Request) {
+function buildAnonClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  return createClient(supabaseUrl, anonKey, {
-    global: {
-      headers: {
-        Authorization: req.headers.get("Authorization") || "",
-      },
-    },
-  });
+  return createClient(supabaseUrl, anonKey);
 }
 
 async function updateSessionStatus(
@@ -337,11 +331,23 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userClient = buildUserClient(req);
+    const authHeader = req.headers.get("Authorization") || "";
+    const accessToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
+    if (!accessToken) {
+      return jsonResponse(401, {
+        success: false,
+        error: {
+          code: "missing_authorization",
+          message: "Authorization bearer token bulunamadi.",
+        },
+      });
+    }
+
+    const userClient = buildAnonClient();
     const {
       data: { user },
       error: authError,
-    } = await userClient.auth.getUser();
+    } = await userClient.auth.getUser(accessToken);
 
     if (authError || !user) {
       return jsonResponse(401, {

@@ -165,6 +165,14 @@ interface BulkCAPATemplate {
   created_at?: string | null;
 }
 
+interface AIAnalysisResult {
+  description: string;
+  riskDefinition: string;
+  correctiveAction: string;
+  preventiveAction: string;
+  importance_level: "Düşük" | "Orta" | "Yüksek" | "Kritik";
+}
+
 interface ProfileContext {
   full_name: string | null;
   position: string | null;
@@ -172,7 +180,7 @@ interface ProfileContext {
   stamp_url: string | null;
 }
 
-interface BulkCAPADraftSnapshot {
+export interface BulkCAPADraftSnapshot {
   companyInputMode: "existing" | "manual";
   selectedCompanyId: string;
   manualCompanyName: string;
@@ -268,7 +276,7 @@ const fetchImageBytes = async (url: string) => {
   }
 };
 
-const readStoredBulkCapaDraft = () => {
+export const readStoredBulkCapaDraft = () => {
   if (typeof window === "undefined") return null;
 
   try {
@@ -286,7 +294,7 @@ const readStoredBulkCapaDraft = () => {
   }
 };
 
-const sanitizeBulkCapaDraftForLocalStorage = (
+export const sanitizeBulkCapaDraftForLocalStorage = (
   snapshot: BulkCAPADraftSnapshot,
 ): BulkCAPADraftSnapshot => ({
   ...snapshot,
@@ -406,7 +414,7 @@ const clearBulkCapaDraftFromIndexedDb = async (key: string) => {
   });
 };
 
-const persistBulkCapaDraftSnapshot = async (
+export const persistBulkCapaDraftSnapshot = async (
   scopedKey: string | null,
   snapshot: BulkCAPADraftSnapshot,
 ) => {
@@ -429,7 +437,7 @@ const persistBulkCapaDraftSnapshot = async (
   }
 };
 
-const clearPersistedBulkCapaDraft = async (scopedKey: string | null) => {
+export const clearPersistedBulkCapaDraft = async (scopedKey: string | null) => {
   if (typeof window === "undefined") return;
 
   try {
@@ -442,6 +450,27 @@ const clearPersistedBulkCapaDraft = async (scopedKey: string | null) => {
   } catch (error) {
     console.warn("Bulk CAPA draft cleanup failed:", error);
   }
+};
+
+export const attachBulkCapaDraftFlushListeners = ({
+  flushDraft,
+}: {
+  flushDraft: () => void;
+}) => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === "hidden") {
+      flushDraft();
+    }
+  };
+
+  window.addEventListener("pagehide", flushDraft);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+
+  return () => {
+    flushDraft();
+    window.removeEventListener("pagehide", flushDraft);
+    document.removeEventListener("visibilitychange", handleVisibilityChange);
+  };
 };
 
 const ModuleCard = ({ eyebrow, title, badge, className, children }: ModuleCardProps) => (
@@ -2532,20 +2561,7 @@ function BulkCAPAContent() {
       void persistBulkCapaDraftSnapshot(draftStorageKey, draftSnapshotRef.current);
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        flushDraft();
-      }
-    };
-
-    window.addEventListener("pagehide", flushDraft);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-
-    return () => {
-      flushDraft();
-      window.removeEventListener("pagehide", flushDraft);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
+    return attachBulkCapaDraftFlushListeners({ flushDraft });
   }, [draftStorageKey]);
 
   const effectiveLocation = useMemo(() =>
@@ -4126,6 +4142,7 @@ const handleSaveAndExport = async () => {
           .single();
 
         if (profile?.organization_id) {
+          const sessionsClient = supabase as any;
           const { data: inspection, error: inspectionError } = await supabase
             .from("inspections")
             .insert({

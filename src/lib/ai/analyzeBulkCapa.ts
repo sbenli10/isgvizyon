@@ -147,7 +147,7 @@ export async function startBulkCapaSessionJob({
   images?: string[];
   prompt?: string;
   context?: BulkCapaSessionJobContext;
-  draftPayload?: Record<string, unknown>;
+  draftPayload?: unknown;
 }) {
   const normalizedImages = await Promise.all(images.map((url) => imageUrlToDataUrl(url)));
 
