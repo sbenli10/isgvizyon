@@ -191,6 +191,7 @@ interface BulkCAPADraftSnapshot {
   overallAnalysis: string;
   createMode: "single" | "bulk";
   createStep: "general" | "items";
+  createDialogOpen?: boolean;
 }
 
 interface BulkCAPABootstrapCache {
@@ -219,6 +220,8 @@ type ModuleCardProps = {
 const BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX = "bulk-capa-draft";
 const BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:fallback`;
 const BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY = `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:last-key`;
+const BULK_CAPA_DRAFT_INDEXED_DB_NAME = "denetron-bulk-capa-drafts";
+const BULK_CAPA_DRAFT_INDEXED_DB_STORE = "drafts";
 const BULK_SOURCE_IMAGE_LIMIT = 12;
 const BULK_CAPA_CACHE_TTL_MS = 5 * 60 * 1000;
 const BulkCapaPreviewDialog = lazy(() => import("@/components/bulk-capa/BulkCapaPreviewDialog"));
@@ -273,6 +276,126 @@ const readStoredBulkCapaDraft = () => {
   } catch {
     return null;
   }
+};
+
+const sanitizeBulkCapaDraftForLocalStorage = (
+  snapshot: BulkCAPADraftSnapshot,
+): BulkCAPADraftSnapshot => ({
+  ...snapshot,
+  generalInfo: {
+    ...snapshot.generalInfo,
+    company_logo_url: snapshot.generalInfo.company_logo_url?.startsWith("data:")
+      ? null
+      : snapshot.generalInfo.company_logo_url,
+    provider_logo_url: snapshot.generalInfo.provider_logo_url?.startsWith("data:")
+      ? null
+      : snapshot.generalInfo.provider_logo_url,
+  },
+  newEntry: {
+    ...snapshot.newEntry,
+    media_urls: [],
+  },
+  bulkSourceImages: [],
+  entries: snapshot.entries.map((entry) => ({
+    ...entry,
+    media_urls: [],
+  })),
+});
+
+const openBulkCapaDraftDb = () =>
+  new Promise<IDBDatabase | null>((resolve) => {
+    if (typeof window === "undefined" || !("indexedDB" in window)) {
+      resolve(null);
+      return;
+    }
+
+    try {
+      const request = window.indexedDB.open(BULK_CAPA_DRAFT_INDEXED_DB_NAME, 1);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(BULK_CAPA_DRAFT_INDEXED_DB_STORE)) {
+          db.createObjectStore(BULK_CAPA_DRAFT_INDEXED_DB_STORE);
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+
+const readBulkCapaDraftFromIndexedDb = async (key: string) => {
+  const db = await openBulkCapaDraftDb();
+  if (!db) return null;
+
+  return new Promise<string | null>((resolve) => {
+    try {
+      const transaction = db.transaction(BULK_CAPA_DRAFT_INDEXED_DB_STORE, "readonly");
+      const store = transaction.objectStore(BULK_CAPA_DRAFT_INDEXED_DB_STORE);
+      const request = store.get(key);
+
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(typeof result === "string" ? result : null);
+      };
+      request.onerror = () => resolve(null);
+      transaction.oncomplete = () => db.close();
+      transaction.onerror = () => db.close();
+    } catch {
+      db.close();
+      resolve(null);
+    }
+  });
+};
+
+const writeBulkCapaDraftToIndexedDb = async (key: string, snapshot: BulkCAPADraftSnapshot) => {
+  const db = await openBulkCapaDraftDb();
+  if (!db) return;
+
+  await new Promise<void>((resolve) => {
+    try {
+      const transaction = db.transaction(BULK_CAPA_DRAFT_INDEXED_DB_STORE, "readwrite");
+      const store = transaction.objectStore(BULK_CAPA_DRAFT_INDEXED_DB_STORE);
+      store.put(JSON.stringify(snapshot), key);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        resolve();
+      };
+    } catch {
+      db.close();
+      resolve();
+    }
+  });
+};
+
+const clearBulkCapaDraftFromIndexedDb = async (key: string) => {
+  const db = await openBulkCapaDraftDb();
+  if (!db) return;
+
+  await new Promise<void>((resolve) => {
+    try {
+      const transaction = db.transaction(BULK_CAPA_DRAFT_INDEXED_DB_STORE, "readwrite");
+      const store = transaction.objectStore(BULK_CAPA_DRAFT_INDEXED_DB_STORE);
+      store.delete(key);
+      transaction.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        db.close();
+        resolve();
+      };
+    } catch {
+      db.close();
+      resolve();
+    }
+  });
 };
 
 const ModuleCard = ({ eyebrow, title, badge, className, children }: ModuleCardProps) => (
@@ -1806,7 +1929,6 @@ function BulkCAPAContent() {
   useRouteOverlayCleanup(() => {
     setCompanyComboboxOpen(false);
     setPreviewOpen(false);
-    setCreateDialogOpen(false);
     setTemplateDialogOpen(false);
   });
 
@@ -1834,12 +1956,10 @@ function BulkCAPAContent() {
   const draftStorageKey = user ? `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:${user.id}` : null;
   const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
 
-  const restoreDraftFromStorage = (rawDraft: string | null) => {
-    if (!rawDraft) {
+  const applyDraftSnapshot = (parsedDraft: Partial<BulkCAPADraftSnapshot>) => {
+    if (!parsedDraft) {
       return false;
     }
-
-    const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
 
     if (parsedDraft.companyInputMode === "existing" || parsedDraft.companyInputMode === "manual") {
       setCompanyInputMode(parsedDraft.companyInputMode);
@@ -1877,34 +1997,70 @@ function BulkCAPAContent() {
     if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
       setCreateStep(parsedDraft.createStep);
     }
+    if (typeof parsedDraft.createDialogOpen === "boolean") {
+      setCreateDialogOpen(parsedDraft.createDialogOpen);
+    } else if (
+      (parsedDraft.newEntry?.description && coerceText(parsedDraft.newEntry.description).trim().length > 0) ||
+      (Array.isArray(parsedDraft.newEntry?.media_urls) && parsedDraft.newEntry!.media_urls.length > 0) ||
+      (Array.isArray(parsedDraft.bulkSourceImages) && parsedDraft.bulkSourceImages.length > 0)
+    ) {
+      setCreateDialogOpen(true);
+    }
 
     return true;
   };
 
-  useEffect(() => {
-    try {
-      if (!user && !draftStorageKey) {
-        draftHydratedRef.current = false;
-      }
-
-      const preferredKey =
-        draftStorageKey ||
-        window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
-        BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
-
-      const restored =
-        restoreDraftFromStorage(window.localStorage.getItem(preferredKey)) ||
-        restoreDraftFromStorage(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY));
-
-      if (!restored) {
-        draftHydratedRef.current = true;
-        return;
-      }
-    } catch (error) {
-      console.warn("Bulk CAPA draft could not be restored:", error);
-    } finally {
-      draftHydratedRef.current = true;
+  const restoreDraftFromStorage = (rawDraft: string | null) => {
+    if (!rawDraft) {
+      return false;
     }
+
+    const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
+    return applyDraftSnapshot(parsedDraft);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydrateDraft = async () => {
+      draftHydratedRef.current = false;
+
+      try {
+        const preferredKey =
+          draftStorageKey ||
+          window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
+          BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
+
+        const indexedDbDraft =
+          preferredKey !== BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY
+            ? await readBulkCapaDraftFromIndexedDb(preferredKey)
+            : null;
+
+        if (cancelled) return;
+
+        const restored =
+          restoreDraftFromStorage(indexedDbDraft) ||
+          restoreDraftFromStorage(window.localStorage.getItem(preferredKey)) ||
+          restoreDraftFromStorage(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY));
+
+        if (!restored) {
+          draftHydratedRef.current = true;
+          return;
+        }
+      } catch (error) {
+        console.warn("Bulk CAPA draft could not be restored:", error);
+      } finally {
+        if (!cancelled) {
+          draftHydratedRef.current = true;
+        }
+      }
+    };
+
+    void hydrateDraft();
+
+    return () => {
+      cancelled = true;
+    };
   }, [draftStorageKey, user]);
 
   useEffect(() => {
@@ -2022,6 +2178,7 @@ function BulkCAPAContent() {
       overallAnalysis,
       createMode,
       createStep,
+      createDialogOpen,
     };
     draftSnapshotRef.current = snapshot;
 
@@ -2047,20 +2204,27 @@ function BulkCAPAContent() {
       if (!hasMeaningfulDraft) {
         if (draftStorageKey) {
           window.localStorage.removeItem(draftStorageKey);
+          void clearBulkCapaDraftFromIndexedDb(draftStorageKey);
         }
         window.localStorage.removeItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY);
         return;
       }
 
+      const localStorageSnapshot = sanitizeBulkCapaDraftForLocalStorage(snapshot);
       if (draftStorageKey) {
-        window.localStorage.setItem(draftStorageKey, JSON.stringify(snapshot));
+        window.localStorage.setItem(draftStorageKey, JSON.stringify(localStorageSnapshot));
         window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
+        void writeBulkCapaDraftToIndexedDb(draftStorageKey, snapshot);
       }
-      window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, JSON.stringify(snapshot));
+      window.localStorage.setItem(
+        BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY,
+        JSON.stringify(localStorageSnapshot),
+      );
     } catch (error) {
       console.warn("Bulk CAPA draft could not be saved:", error);
     }
   }, [
+    createDialogOpen,
     companyInputMode,
     bulkSourceImages,
     createMode,
@@ -2079,10 +2243,13 @@ function BulkCAPAContent() {
       if (!draftSnapshotRef.current) return;
 
       try {
-        const serialized = JSON.stringify(draftSnapshotRef.current);
+        const serialized = JSON.stringify(
+          sanitizeBulkCapaDraftForLocalStorage(draftSnapshotRef.current),
+        );
         if (draftStorageKey) {
           window.localStorage.setItem(draftStorageKey, serialized);
           window.localStorage.setItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY, draftStorageKey);
+          void writeBulkCapaDraftToIndexedDb(draftStorageKey, draftSnapshotRef.current);
         }
         window.localStorage.setItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY, serialized);
       } catch (error) {
