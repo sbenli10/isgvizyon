@@ -1,6 +1,6 @@
 ﻿//src\pages\BulkCAPA.tsx
 import { Component, ReactNode, Suspense, lazy, useMemo, useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Download,
   Plus,
@@ -243,6 +243,39 @@ const BULK_CAPA_CACHE_TTL_MS = 5 * 60 * 1000;
 const BulkCapaPreviewDialog = lazy(() => import("@/components/bulk-capa/BulkCapaPreviewDialog"));
 const loadBulkCapaAi = () => import("@/lib/ai/analyzeBulkCapa");
 const loadBulkCapaDocx = () => import("@/lib/bulkCapaOfficialDocx");
+
+const getSerializedPayloadSize = (value: unknown) => {
+  try {
+    return JSON.stringify(value).length;
+  } catch {
+    return -1;
+  }
+};
+
+const hasMeaningfulBulkCapaDraft = (snapshot: Partial<BulkCAPADraftSnapshot> | null | undefined) => {
+  if (!snapshot) return false;
+
+  return (
+    Boolean(snapshot.sessionId) ||
+    snapshot.sessionStatus === "processing" ||
+    (snapshot.entries?.length || 0) > 0 ||
+    (snapshot.manualCompanyName?.trim().length || 0) > 0 ||
+    (snapshot.selectedCompanyId?.trim().length || 0) > 0 ||
+    (snapshot.overallAnalysis?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.company_name?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.area_region?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.observation_range?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.observer_name?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.employer_representative_name?.trim().length || 0) > 0 ||
+    (snapshot.generalInfo?.report_no?.trim().length || 0) > 0 ||
+    (snapshot.newEntry?.description?.trim().length || 0) > 0 ||
+    (snapshot.newEntry?.riskDefinition?.trim().length || 0) > 0 ||
+    (snapshot.newEntry?.correctiveAction?.trim().length || 0) > 0 ||
+    (snapshot.newEntry?.preventiveAction?.trim().length || 0) > 0 ||
+    (snapshot.newEntry?.media_urls?.length || 0) > 0 ||
+    (snapshot.bulkSourceImages?.length || 0) > 0
+  );
+};
 
 const coerceText = (value: unknown): string => {
   if (typeof value === 'string') return value;
@@ -1944,8 +1977,9 @@ const generateWordDocument = async (
 };
 
 // ? MAIN COMPONENT
-function BulkCAPAContent() {
+export function BulkCAPAContent() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const initialDraftSnapshotRef = useRef<Partial<BulkCAPADraftSnapshot> | null>(readStoredBulkCapaDraft());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1976,7 +2010,11 @@ function BulkCAPAContent() {
   const [lastSingleInspectionId, setLastSingleInspectionId] = useState<string | null>(null);
   const [lastSingleCreatedAt, setLastSingleCreatedAt] = useState<string | null>(null);
   const [editBaselineEntry, setEditBaselineEntry] = useState<HazardEntry | null>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(
+    () =>
+      initialDraftSnapshotRef.current?.createDialogOpen === true ||
+      hasMeaningfulBulkCapaDraft(initialDraftSnapshotRef.current),
+  );
   const [createMode, setCreateMode] = useState<"single" | "bulk">(
     initialDraftSnapshotRef.current?.createMode === "bulk" ? "bulk" : "single",
   );
@@ -2012,6 +2050,11 @@ function BulkCAPAContent() {
   );
   const [processingError, setProcessingError] = useState<string | null>(null);
   const lastAppliedSessionResultRef = useRef<string | null>(null);
+  const hasRestoredDraftRef = useRef(hasMeaningfulBulkCapaDraft(initialDraftSnapshotRef.current));
+  const debugDraftEnabled = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(location.search).get("debugDraft") === "1";
+  }, [location.search]);
 
   useRouteOverlayCleanup(() => {
     setCompanyComboboxOpen(false);
@@ -2062,10 +2105,37 @@ function BulkCAPAContent() {
     ...overrides,
   });
 
+  const getLatestDraftSnapshot = () =>
+    draftSnapshotRef.current ?? buildDraftSnapshot();
+
+  const shouldProtectRestoredDraft = () =>
+    hasRestoredDraftRef.current || hasMeaningfulBulkCapaDraft(getLatestDraftSnapshot());
+
+  const shouldReuseDraftForCreateMode = (mode: "single" | "bulk") => {
+    const snapshot = draftSnapshotRef.current ?? initialDraftSnapshotRef.current;
+
+    if (!snapshot || !hasMeaningfulBulkCapaDraft(snapshot)) {
+      return false;
+    }
+
+    return snapshot.createMode === mode;
+  };
+
   const persistDraftOverride = async (overrides?: Partial<BulkCAPADraftSnapshot>) => {
     const snapshot = buildDraftSnapshot(overrides);
     draftSnapshotRef.current = snapshot;
+    debugDraftLog("draft save started", {
+      reason: "persistDraftOverride",
+      keyUsed: draftStorageKey,
+      payloadSize: getSerializedPayloadSize(snapshot),
+      snapshot,
+    });
     await persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
+    debugDraftLog("draft save completed", {
+      reason: "persistDraftOverride",
+      keyUsed: draftStorageKey,
+      payloadSize: getSerializedPayloadSize(snapshot),
+    });
   };
 
   const buildSessionDraftPayload = (overrides?: Partial<BulkCAPADraftSnapshot>) => {
@@ -2153,8 +2223,19 @@ function BulkCAPAContent() {
   const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
 
   const applyDraftSnapshot = (parsedDraft: Partial<BulkCAPADraftSnapshot>) => {
+    debugDraftLog("API/query result applied to form", {
+      reason: "applyDraftSnapshot",
+      previousFormSnapshot: getDebugFormSnapshot(),
+      nextFormSnapshot: parsedDraft,
+      draftExisted: hasMeaningfulBulkCapaDraft(parsedDraft),
+      dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+    });
     if (!parsedDraft) {
       return false;
+    }
+
+    if (hasMeaningfulBulkCapaDraft(parsedDraft)) {
+      hasRestoredDraftRef.current = true;
     }
 
     if (parsedDraft.companyInputMode === "existing" || parsedDraft.companyInputMode === "manual") {
@@ -2193,14 +2274,15 @@ function BulkCAPAContent() {
     if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
       setCreateStep(parsedDraft.createStep);
     }
-    if (typeof parsedDraft.createDialogOpen === "boolean") {
-      setCreateDialogOpen(parsedDraft.createDialogOpen);
-    } else if (
+    if (
+      parsedDraft.createDialogOpen === true ||
       (parsedDraft.newEntry?.description && coerceText(parsedDraft.newEntry.description).trim().length > 0) ||
       (Array.isArray(parsedDraft.newEntry?.media_urls) && parsedDraft.newEntry!.media_urls.length > 0) ||
       (Array.isArray(parsedDraft.bulkSourceImages) && parsedDraft.bulkSourceImages.length > 0)
     ) {
       setCreateDialogOpen(true);
+    } else if (typeof parsedDraft.createDialogOpen === "boolean") {
+      setCreateDialogOpen(parsedDraft.createDialogOpen);
     }
     if (typeof parsedDraft.sessionId === "string" || parsedDraft.sessionId === null) {
       setActiveSessionId(parsedDraft.sessionId || null);
@@ -2230,6 +2312,13 @@ function BulkCAPAContent() {
 
     const hydrateDraft = async () => {
       draftHydratedRef.current = false;
+      debugDraftLog("draft restore started", {
+        reason: "hydrateDraft",
+        keyUsed:
+          draftStorageKey ||
+          window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
+          BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY,
+      });
 
       try {
         const preferredKey =
@@ -2251,9 +2340,20 @@ function BulkCAPAContent() {
           restoreDraftFromStorage(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY));
 
         if (!restored) {
+          debugDraftLog("draft restore completed", {
+            reason: "hydrateDraft",
+            keyUsed: preferredKey,
+            restored: false,
+          });
           draftHydratedRef.current = true;
           return;
         }
+        debugDraftLog("draft restore completed", {
+          reason: "hydrateDraft",
+          keyUsed: preferredKey,
+          restored: true,
+          formSnapshot: getDebugFormSnapshot(),
+        });
       } catch (error) {
         console.warn("Bulk CAPA draft could not be restored:", error);
       } finally {
@@ -2272,6 +2372,16 @@ function BulkCAPAContent() {
   }, [draftStorageKey, user]);
 
   const applySessionJobResult = async (session: BulkCapaProcessingSessionRow) => {
+    debugDraftLog("API/query result applied to form", {
+      reason: "applySessionJobResult",
+      sessionId: session.id,
+      sessionStatus: session.status,
+      sessionJobType: session.job_type,
+      previousFormSnapshot: getDebugFormSnapshot(),
+      nextFormSnapshot: session.job_result_payload,
+      draftExisted: hasMeaningfulBulkCapaDraft(session.draft_payload),
+      dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+    });
     const resultPayload = session.job_result_payload || {};
     const resultKey = JSON.stringify({
       id: session.id,
@@ -2345,6 +2455,11 @@ function BulkCAPAContent() {
 
     const loadSessionState = async () => {
       try {
+        debugDraftLog("draft restore started", {
+          reason: "loadSessionState",
+          sessionId: activeSessionId,
+          userId: user.id,
+        });
         const { data, error } = await (supabase as any)
           .from("bulk_capa_sessions")
           .select(
@@ -2357,6 +2472,14 @@ function BulkCAPAContent() {
         if (cancelled) return;
         if (error) throw error;
         if (!data) {
+          debugDraftLog("API/query result applied to form", {
+            reason: "session missing",
+            sessionId: activeSessionId,
+            previousFormSnapshot: getDebugFormSnapshot(),
+            nextFormSnapshot: null,
+            draftExisted: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+            dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+          });
           setActiveSessionId(null);
           setProcessingSessionStatus(null);
           setProcessingJobType(null);
@@ -2384,6 +2507,11 @@ function BulkCAPAContent() {
         if (!cancelled) {
           console.warn("Bulk CAPA session state could not be loaded:", error);
         }
+      } finally {
+        debugDraftLog("draft restore completed", {
+          reason: "loadSessionState",
+          sessionId: activeSessionId,
+        });
       }
     };
 
@@ -2423,6 +2551,170 @@ function BulkCAPAContent() {
     media_urls: initialDraftSnapshotRef.current?.newEntry?.media_urls || [],
     ai_analyzed: initialDraftSnapshotRef.current?.newEntry?.ai_analyzed || false,
   }));
+
+  const getDebugFormSnapshot = () => ({
+    companyInputMode,
+    selectedCompanyId,
+    manualCompanyName,
+    generalInfo,
+    newEntry,
+    bulkSourceImages,
+    entries,
+    overallAnalysis,
+    createMode,
+    createStep,
+    createDialogOpen,
+    activeSessionId,
+    processingSessionStatus,
+    processingJobType,
+    processingError,
+  });
+
+  const debugDraftLog = (
+    event: string,
+    details?: Record<string, unknown>,
+  ) => {
+    if (!debugDraftEnabled) return;
+
+    const snapshot = buildDraftSnapshot();
+    console.log("[BulkCAPA debugDraft]", event, {
+      at: new Date().toISOString(),
+      pathname: location.pathname,
+      search: location.search,
+      draftStorageKey,
+      draftExists: hasMeaningfulBulkCapaDraft(snapshot),
+      dirty: hasMeaningfulBulkCapaDraft(snapshot),
+      payloadSize: getSerializedPayloadSize(snapshot),
+      ...details,
+    });
+  };
+
+  const debugDraftReset = (
+    reason: string,
+    nextSnapshot: Partial<BulkCAPADraftSnapshot>,
+    extra?: Record<string, unknown>,
+  ) => {
+    if (!debugDraftEnabled) return;
+    const previousSnapshot = buildDraftSnapshot();
+    console.log("[BulkCAPA debugDraft] form-reset", {
+      at: new Date().toISOString(),
+      reason,
+      pathname: location.pathname,
+      draftStorageKey,
+      draftExisted: hasMeaningfulBulkCapaDraft(previousSnapshot),
+      dirty: hasMeaningfulBulkCapaDraft(previousSnapshot),
+      previousFormSnapshot: previousSnapshot,
+      nextFormSnapshot: nextSnapshot,
+      ...extra,
+    });
+  };
+
+  useEffect(() => {
+    debugDraftLog("component mounted", {
+      initialDraftSnapshot: initialDraftSnapshotRef.current,
+      initialDraftExists: hasMeaningfulBulkCapaDraft(initialDraftSnapshotRef.current),
+    });
+
+    return () => {
+      debugDraftLog("component unmounted", {
+        finalFormSnapshot: getDebugFormSnapshot(),
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    debugDraftLog("route/pathname change", {
+      pathname: location.pathname,
+      search: location.search,
+    });
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
+    debugDraftLog("auth/session user change", {
+      userId: user?.id || null,
+      email: user?.email || null,
+    });
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    debugDraftLog("form dirty state", {
+      dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+      formSnapshot: getDebugFormSnapshot(),
+    });
+  }, [
+    companyInputMode,
+    selectedCompanyId,
+    manualCompanyName,
+    generalInfo,
+    newEntry,
+    bulkSourceImages,
+    entries,
+    overallAnalysis,
+    createMode,
+    createStep,
+    createDialogOpen,
+    activeSessionId,
+    processingSessionStatus,
+    processingJobType,
+    processingError,
+  ]);
+
+  useEffect(() => {
+    if (!debugDraftEnabled) return;
+
+    const handleVisibilityChange = () => {
+      debugDraftLog("visibilitychange", {
+        visibilityState: document.visibilityState,
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    const handlePageHide = () => {
+      debugDraftLog("pagehide", {
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    const handlePageShow = () => {
+      debugDraftLog("pageshow", {
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    const handleBeforeUnload = () => {
+      debugDraftLog("beforeunload", {
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    const handleFocus = () => {
+      debugDraftLog("window focus", {
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    const handleBlur = () => {
+      debugDraftLog("window blur", {
+        formSnapshot: getDebugFormSnapshot(),
+      });
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [debugDraftEnabled, location.pathname, location.search, draftStorageKey]);
 
   const requiredFieldChecks = useMemo(() => [
     { label: "Bulgu açiklamasi", ready: newEntry.description.trim().length > 0 },
@@ -2528,11 +2820,34 @@ function BulkCAPAContent() {
 
     try {
       if (!hasMeaningfulDraft) {
+        hasRestoredDraftRef.current = false;
+        debugDraftLog("draft save started", {
+          reason: "empty-draft-clear",
+          keyUsed: draftStorageKey,
+          payloadSize: 0,
+          snapshot,
+        });
         void clearPersistedBulkCapaDraft(draftStorageKey);
+        debugDraftLog("draft save completed", {
+          reason: "empty-draft-clear",
+          keyUsed: draftStorageKey,
+          cleared: true,
+        });
         return;
       }
 
+      debugDraftLog("draft save started", {
+        reason: "state-sync-effect",
+        keyUsed: draftStorageKey,
+        payloadSize: getSerializedPayloadSize(snapshot),
+        snapshot,
+      });
       void persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
+      debugDraftLog("draft save completed", {
+        reason: "state-sync-effect",
+        keyUsed: draftStorageKey,
+        payloadSize: getSerializedPayloadSize(snapshot),
+      });
     } catch (error) {
       console.warn("Bulk CAPA draft could not be saved:", error);
     }
@@ -2558,7 +2873,18 @@ function BulkCAPAContent() {
     const flushDraft = () => {
       if (!draftSnapshotRef.current) return;
 
+      debugDraftLog("draft save started", {
+        reason: "flushDraft",
+        keyUsed: draftStorageKey,
+        payloadSize: getSerializedPayloadSize(draftSnapshotRef.current),
+        snapshot: draftSnapshotRef.current,
+      });
       void persistBulkCapaDraftSnapshot(draftStorageKey, draftSnapshotRef.current);
+      debugDraftLog("draft save completed", {
+        reason: "flushDraft",
+        keyUsed: draftStorageKey,
+        payloadSize: getSerializedPayloadSize(draftSnapshotRef.current),
+      });
     };
 
     return attachBulkCapaDraftFlushListeners({ flushDraft });
@@ -2665,6 +2991,12 @@ function BulkCAPAContent() {
   };
 
   const handleCompanyModeChange = (mode: "existing" | "manual") => {
+    debugDraftLog("API/query result applied to form", {
+      reason: "handleCompanyModeChange",
+      mode,
+      previousFormSnapshot: getDebugFormSnapshot(),
+      dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+    });
     setCompanyInputMode(mode);
     setCompanyComboboxOpen(false);
     setCompanySearch("");
@@ -2676,6 +3008,16 @@ function BulkCAPAContent() {
     }
 
     if (!selectedCompanyId) {
+      debugDraftReset(
+        "handleCompanyModeChange:clear-company-fields",
+        buildDraftSnapshot({
+          generalInfo: {
+            ...generalInfo,
+            company_name: "",
+            company_logo_url: null,
+          },
+        }),
+      );
       setGeneralInfo((prev) => ({
         ...prev,
         company_name: "",
@@ -2684,7 +3026,33 @@ function BulkCAPAContent() {
     }
   };
 
-  const resetEntryDraft = () => {
+  const resetEntryDraft = (reason = "resetEntryDraft") => {
+    debugDraftReset(
+      reason,
+      buildDraftSnapshot({
+        newEntry: {
+          id: "",
+          description: "",
+          riskDefinition: "",
+          correctiveAction: "",
+          preventiveAction: "",
+          importance_level: "Orta",
+          termin_date: "",
+          related_department: "Diger",
+          notification_method: "E-mail",
+          responsible_name: newEntry.responsible_name,
+          responsible_role: newEntry.responsible_role,
+          approver_name: generalInfo.observer_name || profileContext?.full_name || "",
+          approver_title: profileContext?.position || "İş Güvenliği Uzmanı",
+          include_stamp: true,
+          media_urls: [],
+          ai_analyzed: false,
+        },
+      }),
+      {
+        editingEntryId,
+      },
+    );
     setNewEntry((prev) => ({
       id: "",
       description: "",
@@ -2705,6 +3073,28 @@ function BulkCAPAContent() {
     }));
     setEditingEntryId(null);
     setEditBaselineEntry(null);
+  };
+
+  const handleStartCreateFlow = (mode: "single" | "bulk") => {
+    const shouldReuseDraft = shouldReuseDraftForCreateMode(mode);
+
+    if (!shouldReuseDraft) {
+      resetEntryDraft(mode === "single" ? "start-single-entry" : "start-bulk-entry");
+    }
+
+    if (mode === "bulk") {
+      setPreviewFocusEntryId(null);
+    }
+
+    setCreateMode(mode);
+    setCreateStep(
+      shouldReuseDraft && getLatestDraftSnapshot().createStep === "items"
+        ? "items"
+        : mode === "bulk"
+        ? "general"
+        : "items",
+    );
+    setCreateDialogOpen(true);
   };
 
   const loadSavedTemplates = async (orgId: string) => {
@@ -3404,6 +3794,10 @@ ${bulkSourceImages
       }
 
       try {
+        debugDraftLog("auth/session loading or user change", {
+          reason: "fetchOrgData:start",
+          userId: user.id,
+        });
         const [companyRows, profileResponse] = await Promise.all([
           supabase
             .from("companies")
@@ -3436,6 +3830,10 @@ ${bulkSourceImages
         );
 
         setCompanies(resolvedCompanies);
+        debugDraftLog("API/query result applied to form", {
+          reason: "fetchOrgData:companies-loaded",
+          companyCount: resolvedCompanies.length,
+        });
 
         const nextProfileContext = {
           full_name: profile?.full_name ?? null,
@@ -3445,6 +3843,16 @@ ${bulkSourceImages
         };
         setProfileContext(nextProfileContext);
 
+        debugDraftLog("API/query result applied to form", {
+          reason: "fetchOrgData:profile-defaults",
+          previousFormSnapshot: getDebugFormSnapshot(),
+          nextFormSnapshot: {
+            approver_name: profile?.full_name || "",
+            approver_title: profile?.position || "İş Güvenliği Uzmanı",
+            observer_name: profile?.full_name || "",
+          },
+          dirty: hasMeaningfulBulkCapaDraft(buildDraftSnapshot()),
+        });
         setNewEntry((prev) => ({
           ...prev,
           approver_name: prev.approver_name || profile?.full_name || "",
@@ -3484,6 +3892,10 @@ ${bulkSourceImages
       } catch (error) {
         console.error("Error fetching org data:", error);
       } finally {
+        debugDraftLog("auth/session loading or user change", {
+          reason: "fetchOrgData:complete",
+          userId: user.id,
+        });
         setLoading(false);
       }
     };
@@ -3493,19 +3905,44 @@ ${bulkSourceImages
 
   useEffect(() => {
     if (companyInputMode === "existing" && selectedCompany) {
-      setGeneralInfo((prev) => ({
-        ...prev,
-        company_name: selectedCompany.name,
-        company_logo_url: prev.company_logo_url || selectedCompany.logo_url || null,
-      }));
+      setGeneralInfo((prev) => {
+        const shouldKeepDraftName =
+          shouldProtectRestoredDraft() &&
+          prev.company_name.trim().length > 0 &&
+          prev.company_name !== selectedCompany.name;
+        const nextCompanyName = shouldKeepDraftName ? prev.company_name : prev.company_name || selectedCompany.name;
+        const nextCompanyLogo = prev.company_logo_url || selectedCompany.logo_url || null;
+
+        if (prev.company_name === nextCompanyName && prev.company_logo_url === nextCompanyLogo) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          company_name: nextCompanyName,
+          company_logo_url: nextCompanyLogo,
+        };
+      });
       return;
     }
 
     if (companyInputMode === "manual") {
-      setGeneralInfo((prev) => ({
-        ...prev,
-        company_name: manualCompanyName.trim(),
-      }));
+      setGeneralInfo((prev) => {
+        const nextCompanyName = manualCompanyName.trim();
+
+        if (!nextCompanyName && shouldProtectRestoredDraft() && prev.company_name.trim().length > 0) {
+          return prev;
+        }
+
+        if (prev.company_name === nextCompanyName) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          company_name: nextCompanyName,
+        };
+      });
     }
   }, [companyInputMode, manualCompanyName, selectedCompany]);
 
@@ -4426,6 +4863,24 @@ const handleSaveAndExport = async () => {
     await downloadBlob(wordBlob, reportFileName);
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
 
+    debugDraftReset(
+      "handleSaveAndExport:success-full-reset",
+      {
+        ...buildDraftSnapshot(),
+        entries: [],
+        bulkSourceImages: [],
+        selectedCompanyId: "",
+        manualCompanyName: "",
+        companyInputMode: "existing",
+        overallAnalysis: "",
+        sessionId: null,
+        sessionStatus: null,
+        sessionJobType: null,
+      },
+      {
+        successfulSubmit: true,
+      },
+    );
     setEntries([]);
     setBulkSourceImages([]);
     setSelectedCompanyId("");
@@ -4436,6 +4891,7 @@ const handleSaveAndExport = async () => {
     setProcessingSessionStatus(null);
     setProcessingJobType(null);
     setProcessingError(null);
+    hasRestoredDraftRef.current = false;
     setGeneralInfo({
       company_name: "",
       company_logo_url: null,
@@ -4612,12 +5068,7 @@ const handleSaveAndExport = async () => {
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button
                 type="button"
-                onClick={() => {
-                  resetEntryDraft();
-                  setCreateMode("single");
-                  setCreateStep("items");
-                  setCreateDialogOpen(true);
-                }}
+                onClick={() => handleStartCreateFlow("single")}
                 className="h-12 gap-2 gradient-primary border-0 text-foreground font-semibold"
               >
                 <Plus className="h-4 w-4" />
@@ -4626,13 +5077,7 @@ const handleSaveAndExport = async () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  resetEntryDraft();
-                  setPreviewFocusEntryId(null);
-                  setCreateMode("bulk");
-                  setCreateStep("general");
-                  setCreateDialogOpen(true);
-                }}
+                onClick={() => handleStartCreateFlow("bulk")}
                 className="h-12 gap-2"
               >
                 <Sparkles className="h-4 w-4" />
