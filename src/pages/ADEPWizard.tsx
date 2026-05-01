@@ -1,10 +1,11 @@
 ﻿// src/pages/ADEPWizard.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Suspense, lazy, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStorageObjectRef } from "@/lib/storageObject";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { toast } from "sonner";
 
 import {
@@ -151,12 +152,9 @@ const AdepStepFallback = () => (
   </div>
 );
 
-const getAdepDraftStorageKey = (userId: string, draftId: string) =>
-  `adep-wizard-draft:${userId}:${draftId}`;
-
 export default function ADEPWizard() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -174,7 +172,70 @@ export default function ADEPWizard() {
   const [moduleCountsLoading, setModuleCountsLoading] = useState<boolean>(false);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string>("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string>("");
-  const [draftHydrated, setDraftHydrated] = useState(false);
+  const routeDraftId = searchParams.get("id") || "new";
+  const draftId = routeDraftId;
+  const restoreToastSessionKey = useMemo(
+    () =>
+      user?.id
+        ? `adep-draft-restored-toast:${user.id}:${profile?.organization_id ?? "no-org"}:${draftId}`
+        : null,
+    [draftId, profile?.organization_id, user?.id],
+  );
+  const hasShownRestoreToastRef = useRef(false);
+  const {
+    hasRestoredDraftRef,
+    shouldProtectFromDefaults,
+    mergeDefaults,
+    markSubmitted,
+  } = usePersistentFormDraft({
+    formId: `adep-wizard:${draftId}`,
+    enabled: Boolean(user?.id),
+    userId: user?.id,
+    organizationId: profile?.organization_id ?? null,
+    storage: "indexedDb",
+    value: {
+      currentStep,
+      planRow,
+    },
+    initialValue: {
+      currentStep: 1,
+      planRow: null,
+    },
+    isDirty:
+      Boolean(planRow?.plan_name?.trim()) ||
+      Boolean(planRow?.company_name?.trim()) ||
+      Boolean(planRow?.employee_count) ||
+      Boolean(planRow?.plan_data),
+    shouldPersist: (draft) => Boolean(draft.planRow),
+    onRestore: (draft) => {
+      setCurrentStep(
+        typeof draft.currentStep === "number" ? draft.currentStep : 1,
+      );
+      if (draft.planRow) {
+        setPlanRow({
+          ...draft.planRow,
+          plan_data: safeMergePlanData(draft.planRow.plan_data),
+        });
+      }
+
+      if (hasShownRestoreToastRef.current) return;
+
+      let shouldShowToast = true;
+      if (typeof window !== "undefined" && restoreToastSessionKey) {
+        shouldShowToast = sessionStorage.getItem(restoreToastSessionKey) !== "1";
+      }
+
+      if (shouldShowToast) {
+        toast.info("Kaydedilmemiş ADEP taslağı geri yüklendi.");
+        if (typeof window !== "undefined" && restoreToastSessionKey) {
+          sessionStorage.setItem(restoreToastSessionKey, "1");
+        }
+      }
+
+      hasShownRestoreToastRef.current = true;
+    },
+    debugLabel: "ADEPWizard",
+  });
 
   const canUseWizard = !!user;
 
@@ -222,69 +283,6 @@ export default function ADEPWizard() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
-
-  useEffect(() => {
-    if (!user?.id || !planRow || draftHydrated) return;
-
-    const draftId = searchParams.get("id") || "new";
-    const storageKey = getAdepDraftStorageKey(user.id, draftId);
-    const rawDraft = window.localStorage.getItem(storageKey);
-
-    if (rawDraft) {
-      try {
-        const parsedDraft = JSON.parse(rawDraft) as Partial<ADEPPlanRow>;
-        setPlanRow((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            ...parsedDraft,
-            plan_data: safeMergePlanData(parsedDraft.plan_data || prev.plan_data),
-          };
-        });
-      } catch (error) {
-        console.warn("ADEP draft hydrate failed:", error);
-      }
-    }
-
-    setDraftHydrated(true);
-  }, [draftHydrated, planRow, searchParams, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !planRow || !draftHydrated) return;
-
-    const draftId = planId || searchParams.get("id") || "new";
-    const storageKey = getAdepDraftStorageKey(user.id, draftId);
-
-    window.localStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        company_id: planRow.company_id || null,
-        plan_name: planRow.plan_name,
-        company_name: planRow.company_name,
-        sector: planRow.sector || null,
-        hazard_class: planRow.hazard_class,
-        employee_count: planRow.employee_count,
-        status: planRow.status,
-        completion_percentage: planRow.completion_percentage,
-        next_review_date: planRow.next_review_date || null,
-        pdf_url: planRow.pdf_url || null,
-        plan_data: planRow.plan_data,
-      }),
-    );
-  }, [draftHydrated, planId, planRow, searchParams, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !planId) return;
-
-    const newDraftKey = getAdepDraftStorageKey(user.id, "new");
-    const savedDraftKey = getAdepDraftStorageKey(user.id, planId);
-    const newDraft = window.localStorage.getItem(newDraftKey);
-
-    if (newDraft && !window.localStorage.getItem(savedDraftKey)) {
-      window.localStorage.setItem(savedDraftKey, newDraft);
-      window.localStorage.removeItem(newDraftKey);
-    }
-  }, [planId, user?.id]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -359,9 +357,16 @@ export default function ADEPWizard() {
         plan_data: safeMergePlanData((data as any).plan_data),
       };
 
-      setPlanRow(merged);
+      setPlanRow((prev) => {
+        if (hasRestoredDraftRef.current || shouldProtectFromDefaults) {
+          return mergeDefaults({
+            planRow: merged,
+          }).planRow;
+        }
+
+        return merged;
+      });
       setPlanId((data as any).id);
-      setDraftHydrated(false);
       toast.success("Plan yüklendi");
     } catch (e: any) {
       console.error(e);
@@ -439,27 +444,10 @@ export default function ADEPWizard() {
         plan_data: safeMergePlanData(saved.plan_data),
       };
       setPlanRow(merged);
-      if (user?.id) {
-        const persistedKey = getAdepDraftStorageKey(user.id, saved.id);
-        window.localStorage.setItem(
-          persistedKey,
-          JSON.stringify({
-            company_id: merged.company_id || null,
-            plan_name: merged.plan_name,
-            company_name: merged.company_name,
-            sector: merged.sector || null,
-            hazard_class: merged.hazard_class,
-            employee_count: merged.employee_count,
-            status: merged.status,
-            completion_percentage: merged.completion_percentage,
-            next_review_date: merged.next_review_date || null,
-            pdf_url: merged.pdf_url || null,
-            plan_data: merged.plan_data,
-          }),
-        );
-      }
-
       if (!silent) toast.success("Kaydedildi");
+      if (markCompleted) {
+        await markSubmitted();
+      }
       return saved as ADEPPlanRow;
     } catch (e: any) {
       console.error(e);

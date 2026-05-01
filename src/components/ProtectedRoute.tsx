@@ -16,6 +16,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   if (loading) {
+    if (session) {
+      return <>{children}</>;
+    }
+
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="mx-auto max-w-screen-2xl animate-pulse space-y-6">

@@ -33,7 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { generateAgendaWithAI } from "@/utils/aiAgendaGenerator";
-import { usePersistentDraft } from "@/hooks/usePersistentDraft";
+import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import type {
   MeetingAttendee,
   MeetingAgenda,
@@ -65,11 +65,21 @@ type EditableAgendaItem = Omit<MeetingAgenda, "id" | "meeting_id" | "created_at"
   client_id: string;
 };
 
+const createInitialMeetingFormData = () => ({
+  company_id: "",
+  meeting_date: new Date().toISOString().split("T")[0],
+  meeting_time: "14:00",
+  location: "",
+  president_name: "",
+  secretary_name: "",
+  notes: "",
+});
+
 export default function BoardMeetingForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const isEditMode = !!id;
   const requestedCompanyId = searchParams.get("companyId") || "";
 
@@ -82,15 +92,7 @@ export default function BoardMeetingForm() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   
   // Form Data
-  const [formData, setFormData] = useState({
-    company_id: "",
-    meeting_date: new Date().toISOString().split("T")[0],
-    meeting_time: "14:00",
-    location: "",
-    president_name: "",
-    secretary_name: "",
-    notes: "",
-  });
+  const [formData, setFormData] = useState(createInitialMeetingFormData);
 
   // Attendees
   const [attendees, setAttendees] = useState<EditableAttendee[]>([]);
@@ -101,31 +103,68 @@ export default function BoardMeetingForm() {
   // Selected company for employee filtering
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
-  const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
+  const [, setHasRestoredDraft] = useState(false);
 
   const draftKey = useMemo(
     () =>
-      `board-meeting:${user?.id || "guest"}:${id || "new"}:${requestedCompanyId || formData.company_id || "no-company"}`,
-    [formData.company_id, id, requestedCompanyId, user?.id],
+      `board-meeting:${id || "new"}:${requestedCompanyId || formData.company_id || "no-company"}`,
+    [formData.company_id, id, requestedCompanyId],
   );
 
-  const { clearDraft } = usePersistentDraft({
-    key: draftKey,
+  const {
+    discardDraft,
+    markSubmitted,
+    hasRestoredDraftRef,
+    shouldProtectFromDefaults,
+    mergeDefaults,
+  } = usePersistentFormDraft({
+    formId: draftKey,
     enabled: Boolean(user?.id),
-    version: 1,
+    userId: user?.id,
+    organizationId: profile?.organization_id ?? null,
+    version: 2,
+    debounceMs: 500,
+    ttlMs: 1000 * 60 * 60 * 24 * 14,
+    storage: "localStorage",
     value: {
       formData,
       attendees,
       agendaItems,
     },
+    initialValue: {
+      formData: createInitialMeetingFormData(),
+      attendees: [],
+      agendaItems: [],
+    },
+    isDirty:
+      Boolean(formData.company_id) ||
+      Boolean(formData.location.trim()) ||
+      Boolean(formData.president_name.trim()) ||
+      Boolean(formData.secretary_name.trim()) ||
+      Boolean(formData.notes.trim()) ||
+      attendees.length > 0 ||
+      agendaItems.length > 0,
+    shouldPersist: (draft) =>
+      Boolean(draft.formData.company_id) ||
+      Boolean(draft.formData.location.trim()) ||
+      Boolean(draft.formData.president_name.trim()) ||
+      Boolean(draft.formData.secretary_name.trim()) ||
+      Boolean(draft.formData.notes.trim()) ||
+      draft.attendees.length > 0 ||
+      draft.agendaItems.length > 0,
     onRestore: (draft) => {
-      setFormData(draft.formData || formData);
+      setFormData(
+        draft.formData
+          ? mergeDefaults({ formData: draft.formData }).formData
+          : createInitialMeetingFormData(),
+      );
       setAttendees(Array.isArray(draft.attendees) ? draft.attendees : []);
       setAgendaItems(Array.isArray(draft.agendaItems) ? draft.agendaItems : []);
       setHasRestoredDraft(true);
       setRestoredDraftLabel(isEditMode ? "Toplantı düzenleme taslağı" : "Toplantı taslağı");
       toast.info("Kaydedilmemiş toplantı taslağı geri yüklendi.");
     },
+    debugLabel: "BoardMeetingForm",
   });
 
   useEffect(() => {
@@ -171,9 +210,16 @@ export default function BoardMeetingForm() {
     setFormData((prev) =>
       prev.company_id === requestedCompanyId
         ? prev
-        : { ...prev, company_id: requestedCompanyId }
+        : shouldProtectFromDefaults
+          ? mergeDefaults({
+              formData: {
+                ...prev,
+                company_id: requestedCompanyId,
+              },
+            }).formData
+          : { ...prev, company_id: requestedCompanyId }
     );
-  }, [companies, isEditMode, requestedCompanyId]);
+  }, [companies, isEditMode, mergeDefaults, requestedCompanyId, shouldProtectFromDefaults]);
 
   const fetchCompanies = async () => {
     try {
@@ -220,7 +266,7 @@ export default function BoardMeetingForm() {
       setEmployees(typedEmployees);
 
       // ✅ Çalışanları otomatik katılımcı olarak ekle (sadece yeni toplantıda)
-      if (!isEditMode && typedEmployees.length > 0) {
+      if (!isEditMode && typedEmployees.length > 0 && !hasRestoredDraftRef.current) {
         const autoAttendees: EditableAttendee[] = 
           typedEmployees.map((emp, index) => ({
             client_id: buildDeterministicClientId("board-attendee", [companyId, emp.id, emp.first_name, emp.last_name], index),
@@ -261,17 +307,29 @@ export default function BoardMeetingForm() {
 
       if (meetingError) throw meetingError;
 
-      if (!hasRestoredDraft) {
-        setFormData({
-          company_id: meeting.company_id,
-          meeting_date: meeting.meeting_date,
-          meeting_time: meeting.meeting_time || "",
-          location: meeting.location || "",
-          president_name: meeting.president_name,
-          secretary_name: meeting.secretary_name || "",
-          notes: meeting.notes || "",
-        });
-      }
+      setFormData(
+        shouldProtectFromDefaults
+          ? mergeDefaults({
+              formData: {
+                company_id: meeting.company_id,
+                meeting_date: meeting.meeting_date,
+                meeting_time: meeting.meeting_time || "",
+                location: meeting.location || "",
+                president_name: meeting.president_name,
+                secretary_name: meeting.secretary_name || "",
+                notes: meeting.notes || "",
+              },
+            }).formData
+          : {
+              company_id: meeting.company_id,
+              meeting_date: meeting.meeting_date,
+              meeting_time: meeting.meeting_time || "",
+              location: meeting.location || "",
+              president_name: meeting.president_name,
+              secretary_name: meeting.secretary_name || "",
+              notes: meeting.notes || "",
+            },
+      );
 
       // Fetch attendees
       const { data: attendeesData, error: attendeesError } = await supabase
@@ -293,7 +351,7 @@ export default function BoardMeetingForm() {
           notes: attendee.notes,
         }));
 
-      if (!hasRestoredDraft) {
+      if (!hasRestoredDraftRef.current) {
         setAttendees(typedAttendees);
       }
 
@@ -320,7 +378,7 @@ export default function BoardMeetingForm() {
           risk_item_id: item.risk_item_id,
         }));
 
-      if (!hasRestoredDraft) {
+      if (!hasRestoredDraftRef.current) {
         setAgendaItems(typedAgenda);
       }
     } catch (error: any) {
@@ -525,7 +583,7 @@ export default function BoardMeetingForm() {
       }
 
       toast.success(`✅ Toplantı ${isEditMode ? "güncellendi" : "oluşturuldu"}!`);
-      clearDraft();
+      await markSubmitted();
       setHasRestoredDraft(false);
       setRestoredDraftLabel(null);
       navigate(`/board-meetings/${meetingId}`);
@@ -615,7 +673,7 @@ export default function BoardMeetingForm() {
               type="button"
               variant="outline"
               onClick={() => {
-                clearDraft();
+                void discardDraft();
                 setHasRestoredDraft(false);
                 setRestoredDraftLabel(null);
               }}

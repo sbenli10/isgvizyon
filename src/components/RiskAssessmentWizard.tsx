@@ -5,7 +5,7 @@ import jsPDF from "jspdf";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { usePersistentDraft } from "@/hooks/usePersistentDraft";
+import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStorageObjectRef } from "@/lib/storageObject";
 import { cn } from "@/lib/utils";
@@ -175,21 +175,29 @@ export default function RiskAssessmentWizard() {
     employeeRepresentativeSignatureUrl: formData.employeeRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employeeRepresentativeSignatureUrl,
     supportPersonnelSignatureUrl: formData.supportPersonnelSignatureUrl?.startsWith("data:") ? null : formData.supportPersonnelSignatureUrl,
   }), [formData]);
-  const { clearDraft } = usePersistentDraft<RiskAssessmentWizardDraft>({
-    key: `risk-assessment-wizard:${draftContextKey}`,
+  const { clearDraft } = usePersistentFormDraft<RiskAssessmentWizardDraft>({
+    formId: `risk-assessment-wizard:${draftContextKey}`,
     enabled: Boolean(user?.id),
     version: 1,
-    storage: "localStorage",
+    storage: "indexedDb",
     ttlMs: 14 * 24 * 60 * 60 * 1000,
     debounceMs: 500,
-    scope: {
-      userId: user?.id,
-      orgId: profile?.organization_id ?? null,
-    },
+    userId: user?.id,
+    organizationId: profile?.organization_id ?? null,
     value: {
       currentStep,
       formData: draftFormData,
     },
+    initialValue: {
+      currentStep: 0,
+      formData: createInitialFormData(),
+    },
+    isDirty:
+      Object.values(draftFormData).some((entry) => {
+        if (typeof entry === "string") return entry.trim().length > 0;
+        if (typeof entry === "boolean") return entry;
+        return entry !== null && typeof entry !== "undefined";
+      }) || currentStep > 0,
     onRestore: (draft) => {
       setCurrentStep(
         typeof draft.currentStep === "number"
@@ -202,6 +210,7 @@ export default function RiskAssessmentWizard() {
       });
       toast.info("Kaydedilmemiş risk değerlendirme taslağı geri yüklendi.");
     },
+    debugLabel: "RiskAssessmentWizard",
   });
   const resetWizardDraft = () => {
     clearDraft();
