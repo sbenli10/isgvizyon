@@ -440,7 +440,7 @@ export default function DataPrivacy() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowCorrectionDialog(false); clearCorrectionDraft(); }}
+            <Button variant="outline" onClick={() => { setShowCorrectionDialog(false); clearCorrectionDraft(); }}>
               İptal
             </Button>
             <Button onClick={handleCorrection} disabled={loading === "correction"}>
@@ -526,7 +526,7 @@ export default function DataPrivacy() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowObjectionDialog(false); clearObjectionDraft(); }}
+            <Button variant="outline" onClick={() => { setShowObjectionDialog(false); clearObjectionDraft(); }}>
               İptal
             </Button>
             <Button onClick={handleObjection} disabled={loading === "objection"}>
