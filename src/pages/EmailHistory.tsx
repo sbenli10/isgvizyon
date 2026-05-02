@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFormDraft } from "@/hooks/useFormDraft";
 import {
   Mail,
   CalendarDays,
@@ -48,6 +49,23 @@ interface EmailLog {
   status: EmailStatus;
   created_at: string;
 }
+
+/** Sekme değişiminde kaybolmaması gereken filtre state'i */
+interface EmailFilterDraft {
+  search: string;
+  statusFilter: EmailStatus | "all";
+  typeFilter: ReportType | "all";
+  startDate: string;
+  endDate: string;
+}
+
+const INITIAL_FILTER_DRAFT: EmailFilterDraft = {
+  search: "",
+  statusFilter: "all",
+  typeFilter: "all",
+  startDate: "",
+  endDate: "",
+};
 
 const PAGE_SIZE = 8;
 
@@ -114,11 +132,11 @@ export default function EmailHistory() {
   const { user } = useAuth();
   const [logs, setLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<EmailStatus | "all">("all");
-  const [typeFilter, setTypeFilter] = useState<ReportType | "all">("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [filters, setFilters] = useFormDraft<EmailFilterDraft>(
+    "emailHistory:filters",
+    INITIAL_FILTER_DRAFT,
+  );
+  const { search, statusFilter, typeFilter, startDate, endDate } = filters;
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -127,7 +145,7 @@ export default function EmailHistory() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, typeFilter, startDate, endDate]);
+  }, [filters]);
 
   const loadEmailLogs = async () => {
     if (!user?.id) {
@@ -288,11 +306,11 @@ export default function EmailHistory() {
                 placeholder="Alıcı, konu veya rapor türü ara..."
                 className="h-11 rounded-2xl border-border bg-background pl-10 text-foreground placeholder:text-muted-foreground"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => setFilters((prev) => ({ ...prev, search: event.target.value }))}
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as EmailStatus | "all")}>
+            <Select value={statusFilter} onValueChange={(value) => setFilters((prev) => ({ ...prev, statusFilter: value as EmailStatus | "all" }))}>
               <SelectTrigger className="h-11 rounded-2xl border-border bg-background text-foreground">
                 <SelectValue placeholder="Durum filtrele" />
               </SelectTrigger>
@@ -304,7 +322,7 @@ export default function EmailHistory() {
               </SelectContent>
             </Select>
 
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as ReportType | "all")}>
+            <Select value={typeFilter} onValueChange={(value) => setFilters((prev) => ({ ...prev, typeFilter: value as ReportType | "all" }))}>
               <SelectTrigger className="h-11 rounded-2xl border-border bg-background text-foreground">
                 <SelectValue placeholder="Rapor türü" />
               </SelectTrigger>
@@ -320,14 +338,14 @@ export default function EmailHistory() {
             <Input
               type="date"
               value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
+              onChange={(event) => setFilters((prev) => ({ ...prev, startDate: event.target.value }))}
               className="h-11 rounded-2xl border-border bg-background text-foreground"
             />
 
             <Input
               type="date"
               value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
+              onChange={(event) => setFilters((prev) => ({ ...prev, endDate: event.target.value }))}
               className="h-11 rounded-2xl border-border bg-background text-foreground"
             />
           </div>
@@ -345,8 +363,7 @@ export default function EmailHistory() {
                 size="sm"
                 className="rounded-xl border-border bg-background text-foreground hover:bg-muted"
                 onClick={() => {
-                  setStartDate("");
-                  setEndDate("");
+                  setFilters((prev) => ({ ...prev, startDate: "", endDate: "" }));
                 }}
               >
                 Tarih filtresini temizle
