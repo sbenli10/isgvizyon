@@ -145,7 +145,7 @@ export default function EmailHistory() {
 
   useEffect(() => {
     setPage(1);
-  }, [filters]);
+  }, [search, statusFilter, typeFilter, startDate, endDate]);
 
   const loadEmailLogs = async () => {
     if (!user?.id) {
