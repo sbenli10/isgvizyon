@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿//src\pages\CAPA.tsx
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import {
   Plus,
@@ -718,35 +719,20 @@ export default function CAPA() {
     if (!silent) setLoading(true);
 
     try {
-      const { data: profile } = await supabase
+      // 1. SORGULARI HAZIRLA (Henüz beklemeye başlama)
+      const profileQuery = supabase
         .from("profiles")
         .select("organization_id, full_name")
         .eq("id", user.id)
         .maybeSingle();
 
-      setCurrentProfileName(profile?.full_name || user.email || "");
-
-      const { data: capaData, error: capaError } = await supabase
+      const capaQuery = supabase
         .from("capa_records")
         .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (capaError && capaError.code !== "PGRST116") throw capaError;
-
-      const capaRecords: CAPARecord[] = (capaData || []).map((record: any) => ({
-        ...record,
-        company_id: record.company_id || null,
-        status: record.status as CAPAStatus,
-        priority: record.priority as CAPAPriority,
-        source: "capa",
-        document_urls: Array.isArray(record.document_urls) ? record.document_urls : [],
-        file_urls: Array.isArray(record.file_urls) ? record.file_urls : [],
-        media_urls: record.media_urls || [],
-        notes: record.notes || "",
-      }));
-
-      const { data: findingsData, error: findingsError } = await supabase
+      const findingsQuery = supabase
         .from("findings")
         .select(`
           *,
@@ -764,9 +750,53 @@ export default function CAPA() {
         .eq("inspection.user_id", user.id)
         .order("created_at", { ascending: false });
 
-      if (findingsError && findingsError.code !== "PGRST116") throw findingsError;
+      let escalationQuery: any = Promise.resolve({ data: [], error: null });
+      if (capaActivityLogsFeatureAvailable !== false) {
+        let q = supabase
+          .from("capa_activity_logs")
+          .select("id, action_type, title, description, created_at, metadata, company_id, capa_record_id, finding_id")
+          .eq("user_id", user.id)
+          .eq("action_type", "escalated")
+          .order("created_at", { ascending: false })
+          .limit(100);
 
-      const findingsAsCapa: CAPARecord[] = (findingsData || []).map((finding: any) => {
+        if (activeCompanyId) {
+          q = q.eq("company_id", activeCompanyId);
+        }
+        escalationQuery = q;
+      }
+
+      // 2. TÜM SORGULARI AYNI ANDA (PARALEL) ÇALIŞTIR
+      const [profileRes, capaRes, findingsRes, escRes] = await Promise.all([
+        profileQuery,
+        capaQuery,
+        findingsQuery,
+        escalationQuery
+      ]);
+
+      // 3. HATALARI KONTROL ET
+      if (capaRes.error && capaRes.error.code !== "PGRST116") throw capaRes.error;
+      if (findingsRes.error && findingsRes.error.code !== "PGRST116") throw findingsRes.error;
+      if (escRes.error) handleCapaActivityLogsError(escRes.error, "escalation fetch");
+      else if (capaActivityLogsFeatureAvailable !== false) capaActivityLogsFeatureAvailable = true;
+
+      // 4. VERİLERİ İŞLE VE STATE'E YAZ
+      const profile = profileRes.data;
+      setCurrentProfileName(profile?.full_name || user.email || "");
+
+      const capaRecords: CAPARecord[] = (capaRes.data || []).map((record: any) => ({
+        ...record,
+        company_id: record.company_id || null,
+        status: record.status as CAPAStatus,
+        priority: record.priority as CAPAPriority,
+        source: "capa",
+        document_urls: Array.isArray(record.document_urls) ? record.document_urls : [],
+        file_urls: Array.isArray(record.file_urls) ? record.file_urls : [],
+        media_urls: record.media_urls || [],
+        notes: record.notes || "",
+      }));
+
+      const findingsAsCapa: CAPARecord[] = (findingsRes.data || []).map((finding: any) => {
         const inspection = finding.inspection;
         return {
           id: finding.id,
@@ -811,32 +841,8 @@ export default function CAPA() {
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
 
-      let escalationLogs: CAPAActivityLogRow[] = [];
-
-      if (capaActivityLogsFeatureAvailable !== false) {
-        let escalationQuery = supabase
-          .from("capa_activity_logs")
-          .select("id, action_type, title, description, created_at, metadata, company_id, capa_record_id, finding_id")
-          .eq("user_id", user.id)
-          .eq("action_type", "escalated")
-          .order("created_at", { ascending: false })
-          .limit(100);
-
-        if (activeCompanyId) {
-          escalationQuery = escalationQuery.eq("company_id", activeCompanyId);
-        }
-
-        const { data, error } = await escalationQuery;
-
-        if (error) {
-          handleCapaActivityLogsError(error, "escalation fetch");
-        } else {
-          capaActivityLogsFeatureAvailable = true;
-          escalationLogs = (data || []) as CAPAActivityLogRow[];
-        }
-      }
-
-      setRecords(allRecords);
+      const escalationLogs = (escRes.data || []) as CAPAActivityLogRow[];
+      
       const nextEscalationMap = escalationLogs.reduce<Record<string, CAPAActivityLogRow>>((acc, log: any) => {
         const key = log.capa_record_id || log.finding_id;
         if (key && !acc[key]) {
@@ -844,14 +850,18 @@ export default function CAPA() {
         }
         return acc;
       }, {});
+
       const nextEscalationCountMap = escalationLogs.reduce<Record<string, number>>((acc, log: any) => {
         const key = log.capa_record_id || log.finding_id;
         if (key) acc[key] = (acc[key] || 0) + 1;
         return acc;
       }, {});
+
+      setRecords(allRecords);
       setEscalationMap(nextEscalationMap);
       setEscalationCountMap(nextEscalationCountMap);
       saveCapaCache(user.id, allRecords);
+
     } catch (error: any) {
       console.error("CAPA yükleme hatası:", error);
       toast.error(`Veriler çekilirken sorun oluştu: ${error.message}`);

@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Lock, Eye, Trash2, FileText, Scale, Users } from "lucide-react";
+import { ArrowLeft, Shield, Lock, Eye, Trash2, FileText, Scale, Users, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -9,7 +9,7 @@ const sections = [
     id: "sorumlu",
     title: "1. Veri Sorumlusu",
     icon: Users,
-    content: `Denetron İSG Platformu ("Platform") veri sorumlusu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verilerinizi aşağıda açıklanan şekilde işlemektedir.
+    content: `İSGVİZYON İSG Platformu ("Platform") veri sorumlusu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verilerinizi aşağıda açıklanan şekilde işlemektedir.
 
 İletişim:
 • E-posta: kvkk@isgvizyon.com
@@ -142,7 +142,7 @@ export default function PrivacyPolicy() {
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <CardContent className="p-6">
             <p className="text-sm leading-relaxed text-foreground/90">
-              Denetron İSG Platformu olarak, kişisel verilerinizin güvenliği en yüksek önceliğimizdir.
+              İSGVİZYON İSG Platformu olarak, kişisel verilerinizin güvenliği en yüksek önceliğimizdir.
               Bu politika, hangi verilerin toplandığını, nasıl kullanıldığını ve haklarınızı açıklamaktadır.
               KVKK Madde 10 uyarınca, verilerinizin işlenmesi hakkında açık bilgilendirme yapılmaktadır.
             </p>
@@ -173,15 +173,33 @@ export default function PrivacyPolicy() {
           })}
         </div>
 
+        {/* YENİ: Kurumsal Müşteriler İçin Yönlendirme Notu */}
+        <div className="my-8 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-6 text-center">
+          <h4 className="text-base font-semibold text-foreground mb-2">
+            Kurumsal Müşterilerimiz İçin Bilgilendirme
+          </h4>
+          <p className="text-sm text-muted-foreground mb-4 max-w-2xl mx-auto">
+            Bu sayfa, platformun genel kullanımına yönelik özet aydınlatma metnidir. Kurumsal müşterilerimiz (OSGB ve İşverenler) için hazırlanan kapsamlı <strong>Veri İşleyen Sözleşmesi (DPA)</strong> ve detaylı KVKK Politikası dokümanlarına kurumsal web sitemiz üzerinden ulaşabilirsiniz.
+          </p>
+          <a 
+            href="https://www.isgvizyon.com/legal/dpa" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:underline transition-colors"
+          >
+            Detaylı Kurumsal KVKK ve DPA Metnini İnceleyin <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+          </a>
+        </div>
+
         <Separator className="my-8" />
 
         {/* Footer */}
-        <div className="text-center">
-          <Button variant="outline" onClick={() => navigate("/data-privacy")}>
+        <div className="text-center pb-8">
+          <Button variant="outline" onClick={() => navigate("/data-privacy")} className="mb-6">
             Veri Haklarım Sayfasına Git
           </Button>
-          <p className="mt-4 text-xs text-muted-foreground">
-            Bu gizlilik politikası, Denetron İSG Platformu kullanıcılarını bilgilendirmek amacıyla
+          <p className="text-xs text-muted-foreground">
+            Bu gizlilik politikası, İSGVİZYON İSG Platformu kullanıcılarını bilgilendirmek amacıyla
             6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında hazırlanmıştır.
           </p>
         </div>

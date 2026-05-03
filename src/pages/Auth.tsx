@@ -30,6 +30,13 @@ import { startNamedFlow } from "@/lib/perfTiming";
 import { getUserFacingError, getUserFacingErrorDescription, getUserFacingErrorMessage } from "@/lib/userFacingError";
 import { toast } from "sonner";
 import { isDeviceTrusted, trustCurrentDevice } from "@/utils/deviceFingerprint";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 type AuthMode = "login" | "register" | "wait" | "mfa";
 type NoticeType = "info" | "success" | "warning" | "error";
@@ -44,6 +51,8 @@ interface FormData {
   fullName: string;
   orgName: string;
   accountType: AccountType;
+  consentDataProcessing: boolean; // YENİ: KVKK Onayı
+  consentMarketing: boolean;      // YENİ: Pazarlama Onayı
 }
 
 type FieldErrors = Partial<Record<keyof FormData | "mfaCode" | "forgotEmail", string>>;
@@ -278,6 +287,8 @@ export default function Auth() {
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
+  const [showKvkkModal, setShowKvkkModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   const [notice, setNotice] = useState<{ type: NoticeType; title: string; description?: string } | null>({
     type: "info",
@@ -294,6 +305,8 @@ export default function Auth() {
     fullName: "",
     orgName: "",
     accountType: "individual",
+    consentDataProcessing: false, // Varsayılan olarak işaretlenmemiş
+    consentMarketing: false,      // Varsayılan olarak işaretlenmemiş
   });
 
   // ✅ 2FA
@@ -475,11 +488,17 @@ export default function Auth() {
       ok = false;
     }
 
+    // YENİ: KVKK Checkbox Kontrolü
+    if (!formData.consentDataProcessing) {
+      setFieldError("consentDataProcessing", "Kayıt olmak için Aydınlatma Metni ve Kullanıcı Sözleşmesini onaylamanız gerekmektedir.");
+      ok = false;
+    }
+
     if (!ok) setNotice({ type: "error", title: "Lütfen alanları kontrol edin", description: "Eksik veya hatalı bilgi var." });
     return ok;
   };
 
-  // ✅ LOGIN (Supabase queries unchanged)
+  // ✅ LOGIN
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateLoginForm()) return;
@@ -557,7 +576,7 @@ export default function Auth() {
     }
   };
 
-  // ✅ VERIFY 2FA (Supabase queries unchanged)
+  // ✅ VERIFY 2FA
   const handleVerify2FA = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -607,7 +626,7 @@ export default function Auth() {
     }
   };
 
-  // ✅ REGISTER (Supabase queries unchanged)
+  // ✅ REGISTER
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRegisterForm()) return;
@@ -627,6 +646,11 @@ export default function Auth() {
             full_name: formData.fullName.trim(),
             account_type: formData.accountType,
             organization_name: formData.orgName.trim() || null,
+            // YENİ: KVKK verileri metadata içine yazılır
+            consent_data_processing: formData.consentDataProcessing,
+            consent_marketing: formData.consentMarketing,
+            consent_version: "v1.0",
+            consent_date: new Date().toISOString(),
           },
         },
       });
@@ -661,7 +685,7 @@ export default function Auth() {
     }
   };
 
-  // ✅ Resend email (Supabase query unchanged)
+  // ✅ Resend email
   const handleResendEmail = async () => {
     try {
       const { error } = await supabase.auth.resend({
@@ -683,7 +707,7 @@ export default function Auth() {
     }
   };
 
-  // ✅ Forgot password (Supabase auth only)
+  // ✅ Forgot password
   const handleForgotPassword = async () => {
     setFieldError("forgotEmail", undefined);
 
@@ -1220,6 +1244,58 @@ export default function Auth() {
                       </Label>
                     </div>
 
+                   {/* KVKK ve Sözleşme Onay Alanları */}
+                      <div className="space-y-3 mt-4 mb-2">
+                        <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                          <Checkbox
+                            id="consentDataProcessing"
+                            checked={formData.consentDataProcessing}
+                            onCheckedChange={(checked) => {
+                              setFormData((prev) => ({ ...prev, consentDataProcessing: Boolean(checked) }));
+                              setFieldError("consentDataProcessing", undefined);
+                            }}
+                            disabled={isBusy}
+                            className="mt-1"
+                          />
+                          <div className="flex-1">
+                            <Label htmlFor="consentDataProcessing" className="text-xs text-slate-300 cursor-pointer leading-5">
+                              <button 
+                                type="button" 
+                                onClick={(e) => { e.preventDefault(); setShowKvkkModal(true); }} 
+                                className="text-cyan-400 hover:underline"
+                              >
+                                KVKK Aydınlatma Metni
+                              </button>
+                              'ni ve{' '}
+                              <button 
+                                type="button" 
+                                onClick={(e) => { e.preventDefault(); setShowTermsModal(true); }} 
+                                className="text-cyan-400 hover:underline"
+                              >
+                                Kullanıcı Sözleşmesi
+                              </button>
+                              'ni okudum, kişisel verilerimin işlenmesini onaylıyorum.
+                            </Label>
+                            {fieldErrors.consentDataProcessing && (
+                              <p className="mt-1 text-[11px] text-rose-400">{fieldErrors.consentDataProcessing}</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                          <Checkbox
+                            id="consentMarketing"
+                            checked={formData.consentMarketing}
+                            onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, consentMarketing: Boolean(checked) }))}
+                            disabled={isBusy}
+                            className="mt-1"
+                          />
+                          <Label htmlFor="consentMarketing" className="text-xs text-slate-300 cursor-pointer leading-5 flex-1">
+                            İndirimler, yeni özellikler ve İSG sektörel güncellemeleri hakkında e-posta almayı kabul ediyorum. (Opsiyonel)
+                          </Label>
+                        </div>
+                      </div>
+
                     <Button
                       type="submit"
                       disabled={isBusy}
@@ -1234,10 +1310,6 @@ export default function Auth() {
                         "Hesabı Oluştur"
                       )}
                     </Button>
-
-                    <div className="text-xs text-slate-400 leading-5">
-                      Hesap oluşturarak kullanım koşullarını ve gizlilik politikasını kabul etmiş olursunuz.
-                    </div>
                   </form>
                 </AnimatedPanel>
               )}
@@ -1381,6 +1453,60 @@ export default function Auth() {
           <p className="text-center text-xs text-slate-400/70">© 2026 İSGVizyon. Tüm hakları saklıdır.</p>
         </div>
       </div>
+      {/* ↓↓↓ YENİ EKLENEN MODALLAR ↓↓↓ */}
+      <Dialog open={showKvkkModal} onOpenChange={setShowKvkkModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-200">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">KVKK Aydınlatma Metni</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Kişisel verilerinizin işlenmesi hakkında bilgilendirme.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm leading-relaxed mt-4">
+            <h4 className="font-semibold text-white">1. Veri Sorumlusu</h4>
+            <p>İSGVİZYON İSG Platformu veri sorumlusu olarak, 6698 sayılı KVKK kapsamında kişisel verilerinizi işlemektedir.</p>
+            
+            <h4 className="font-semibold text-white mt-4">2. İşlenen Kişisel Veriler ve Amaçları</h4>
+            <p>Ad, soyad, e-posta ve çalıştığınız kurum bilgileri; platform hizmetlerinin sunulması, risk değerlendirmelerinin yapılması ve yasal yükümlülüklerin yerine getirilmesi amacıyla işlenir.</p>
+            
+            <h4 className="font-semibold text-white mt-4">3. Veri Güvenliği</h4>
+            <p>Verileriniz, rol tabanlı erişim kontrolü (RLS) ve şifreleme yöntemleriyle SOC 2 uyumlu sunucularda yüksek güvenlik standartlarında korunmaktadır.</p>
+            
+            <h4 className="font-semibold text-white mt-4">4. Haklarınız</h4>
+            <p>KVKK Madde 11 kapsamında verilerinizin silinmesini, güncellenmesini veya dışa aktarılmasını talep etme hakkına sahipsiniz. Bu işlemleri platform içindeki "Veri Haklarım" menüsünden gerçekleştirebilirsiniz.</p>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => setShowKvkkModal(false)} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">Okudum, Anladım</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showTermsModal} onOpenChange={setShowTermsModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-slate-700 bg-slate-950 text-slate-200">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Kullanıcı Sözleşmesi</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Platformun kullanım koşulları ve hizmet şartları.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm leading-relaxed mt-4">
+            <h4 className="font-semibold text-white">1. Taraflar ve Kapsam</h4>
+            <p>Bu sözleşme, İSGVizyon platformunu kullanan bireysel uzmanlar ve kurumsal OSGB'ler ile platform yönetimi arasındaki kullanım şartlarını belirler.</p>
+            
+            <h4 className="font-semibold text-white mt-4">2. Hizmet Kullanımı</h4>
+            <p>Kullanıcı, platforma girdiği verilerin (risk analizleri, denetimler, personel kayıtları) doğruluğundan bizzat sorumludur. Platform, sağlanan yasal içeriklerin (mevzuat özetleri vb.) sadece bilgilendirme amaçlı olduğunu beyan eder.</p>
+            
+            <h4 className="font-semibold text-white mt-4">3. Fikri Mülkiyet</h4>
+            <p>Uygulama içindeki AI analiz algoritmaları, risk matrisi tasarımları ve arayüz öğeleri İSGVizyon'a aittir, kopyalanamaz ve çoğaltılamaz.</p>
+            
+            <h4 className="font-semibold text-white mt-4">4. Sözleşme Feshi</h4>
+            <p>Kullanıcı dilediği zaman aboneliğini iptal edebilir ve verilerinin dışa aktarımını talep ettikten sonra tamamen silinmesini isteyebilir.</p>
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button onClick={() => setShowTermsModal(false)} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">Okudum, Anladım</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

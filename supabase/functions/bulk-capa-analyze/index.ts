@@ -65,34 +65,23 @@ interface RequestBody {
   draftPayload?: SessionJobDraftPayload;
 }
 
-const DEFAULT_PROMPT = `Bir is sagligi ve guvenligi uzmani gibi davran ve verilen gorselleri dikkatle incele.
-
-Amac:
-- Her gorselde yalnizca net olarak gorulen uygunsuzluklari, guvensiz durumlari ve riskleri belirle.
-- Net gorunmeyen, emin olunmayan veya fotograf disi kalan ayrintilari varsayma.
-- Sonucu tek bir genel CAPA/DOF bulgusu gibi birlestir.
-- Duzeltici ve onleyici faaliyetleri uygulanabilir, sahaya uygun ve net maddeler halinde ver.
+// --- CONSTANTS & PROMPTS ---
+const DEFAULT_PROMPT = `Lütfen bir iş sağlığı ve güvenliği uzmanı gibi davran ve gönderilen GÖRSELLERİ dikkatle incele.
+Her GÖRSELDE gözüken tüm uygunsuzlukları ve riskleri tespit et.
 
 Kurallar:
-- Sadece gorselde desteklenen tespitler yaz.
-- Belirsiz ayrintilar icin "goruntu yetersiz" benzeri not kullan; tahmin etme.
-- Aciklama, risk tanimi, duzeltici faaliyet ve onleyici faaliyet alanlarini doldur.
-- Cikti sadece gecerli bir JSON nesnesi olsun.
+- Analiz çıktısı SADECE geçerli ve tek bir JSON nesnesinden oluşmalı, çıktının ilk karakteri { olmalı.
+- ASLA herhangi bir açıklama, açıklayıcı cümle veya markdown etiketi (örn. \`\`\`json) ekleme.
+- Cevabın tamamı saf JSON olacak ve başında ya da sonunda fazladan karakter bulunmayacak.
 
-JSON formati:
+JSON formatı tam olarak böyle:
 {
-  "description": "4-5 cumlelik bulgu ozeti",
-  "riskDefinition": "En fazla 4 cumlelik genel risk ozeti",
-  "correctiveAction": "- madde 1\\n- madde 2\\n- madde 3",
-  "preventiveAction": "- madde 1\\n- madde 2\\n- madde 3",
+  "description": "bulgu özeti",
+  "riskDefinition": "risk özeti",
+  "correctiveAction": "- madde 1\\n- madde 2",
+  "preventiveAction": "- madde 1\\n- madde 2",
   "importance_level": "Orta"
-}
-
-importance_level secimi:
-- Elektrik, yangin, kimyasal veya ciddi yaralanma riski varsa Kritik
-- Yaralanma veya kaza ihtimali yuksekse Yuksek
-- Duzen, housekeeping veya daha dusuk etkili uygunsuzluklarda Orta
-- Cok sinirli etkili ve dusuk olasilikli durumlarda Dusuk`;
+}`;
 
 function getApproxPayloadSize(images: string[], prompt: string) {
   return images.reduce((total, image) => total + image.length, prompt.length);
@@ -109,119 +98,86 @@ function normalizeJobType(value: unknown): JobType | null {
     : null;
 }
 
+// --- HELPERS ---
 function coerceText(value: unknown): string {
   if (typeof value === "string") return value;
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => (typeof item === "string" ? item : String(item ?? "")))
-      .filter(Boolean)
-      .join("\n");
-  }
-  if (value == null) return "";
-  return String(value);
+  if (Array.isArray(value)) return value.map(i => String(i ?? "")).filter(Boolean).join("\n");
+  return String(value ?? "");
 }
 
 function parseAnalysis(text: string): BulkCapaAnalysis {
-  const parsed = JSON.parse(cleanJsonText(text));
+  try {
+    const cleaned = cleanJsonText(text);
+    const parsed = JSON.parse(cleaned);
 
-  if (
-    typeof parsed?.description !== "string" ||
-    typeof parsed?.riskDefinition !== "string" ||
-    typeof parsed?.correctiveAction !== "string" ||
-    typeof parsed?.preventiveAction !== "string"
-  ) {
-    throw new GeminiHttpError(
-      502,
-      "empty_response",
-      "Yapay zeka yaniti beklenen JSON formatinda degil.",
-    );
+    return {
+      description: coerceText(parsed.description || "Bulgu özeti üretilemedi."),
+      riskDefinition: coerceText(parsed.riskDefinition || "Risk tanımı üretilemedi."),
+      correctiveAction: coerceText(parsed.correctiveAction || "- Aksiyon belirtilmedi."),
+      preventiveAction: coerceText(parsed.preventiveAction || "- Önleyici faaliyet belirtilmedi."),
+      importance_level: parsed.importance_level || "Orta",
+    };
+  } catch (e) {
+    // Uygulama çökmemeli! Varsayılan analiz objesi dönülür
+    console.error("JSON Parse Error Content in parseAnalysis:", text);
+    console.error("Parse exception:", e);
+    return {
+      description: "Analiz üretilemedi",
+      riskDefinition: "Analiz üretilemedi",
+      correctiveAction: "Analiz üretilemedi",
+      preventiveAction: "Analiz üretilemedi",
+      importance_level: "Orta",
+    };
   }
-
-  return {
-    description: parsed.description.trim(),
-    riskDefinition: parsed.riskDefinition.trim(),
-    correctiveAction: parsed.correctiveAction.trim(),
-    preventiveAction: parsed.preventiveAction.trim(),
-    importance_level: parsed.importance_level || "Orta",
-  };
 }
 
-async function runBulkCapaAnalysis(images: string[], prompt?: string) {
+async function runBulkCapaAnalysis(images: string[], prompt?: string, forceJson = true) {
   const apiKey = getRequiredGoogleApiKey();
   const model = getGoogleModel();
-  const modelCandidates = getModelCandidates(model);
+  const modelCandidates = [model, ...getGoogleModelChain("lite")].filter((m, i, l) => m && l.indexOf(m) === i);
   const effectivePrompt = prompt?.trim() || DEFAULT_PROMPT;
-  const requestSummary = {
-    imageCount: images.length,
-    hasPrompt: Boolean(prompt?.trim()),
-    promptLength: effectivePrompt.length,
-    approxPayloadChars: getApproxPayloadSize(images, effectivePrompt),
-    model,
-    fallbackModels: modelCandidates.slice(1),
-  };
-
-  console.info("bulk-capa-analyze request:", requestSummary);
 
   const parts = [
     { text: effectivePrompt },
-    ...images.map((image) => toInlineDataPart(parseImageInput(image))),
+    ...images.map((img) => toInlineDataPart(parseImageInput(img))),
   ];
 
+  const generationConfig: Record<string, any> = {
+    temperature: forceJson ? 0.1 : 0.4,
+    maxOutputTokens: 4096,
+  };
+  if (forceJson) {
+    generationConfig.response_mime_type = "application/json";
+  }
+
   const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts,
-      },
-    ],
-    generationConfig: {
-      temperature: 0.15,
-      topP: 0.95,
-      topK: 40,
-      maxOutputTokens: 4096,
-    },
+    contents: [{ role: "user", parts }],
+    generationConfig,
   };
 
   const { payload, model: resolvedModel } = await callGeminiWithRetryAndFallback({
     apiKey,
-    models: modelCandidates,
+    models: modelCandidates as string[],
     body: requestBody,
     requestLabel: "bulk-capa-analyze",
-    logMeta: requestSummary,
   });
 
   const text = extractTextFromGeminiResponse(payload);
   let analysis: BulkCapaAnalysis | null = null;
 
-  try {
+  if (forceJson) {
     analysis = parseAnalysis(text);
-  } catch (parseError) {
-    console.warn("bulk-capa-analyze parse warning:", {
-      ...requestSummary,
-      error: parseError instanceof Error ? parseError.message : String(parseError),
-      responsePreview: text.slice(0, 500),
-    });
-    analysis = null;
   }
 
   return { analysis, text, resolvedModel };
 }
 
-function getSuggestedTerminDate(importanceLevel: BulkCapaAnalysis["importance_level"]) {
-  const days =
-    importanceLevel === "Kritik"
-      ? 1
-      : importanceLevel === "Yüksek"
-      ? 3
-      : importanceLevel === "Orta"
-      ? 7
-      : 14;
-
+function getSuggestedTerminDate(importanceLevel: string) {
+  const days = importanceLevel === "Kritik" ? 1 : importanceLevel === "Yüksek" ? 3 : importanceLevel === "Orta" ? 7 : 14;
   const next = new Date();
   next.setDate(next.getDate() + days);
   return next.toISOString().split("T")[0];
 }
-
 function buildBulkEntryFromAnalysis(
   analysis: BulkCapaAnalysis,
   imageUrl: string,
@@ -392,18 +348,14 @@ Deno.serve(async (req) => {
     try {
       if (jobType === "single_analysis") {
         const { analysis } = await runBulkCapaAnalysis(images);
-        if (!analysis) {
-          throw new GeminiHttpError(502, "empty_response", "Fotograflar analiz edilemedi.");
-        }
-
         resultPayload = {
           jobType,
           newEntry: {
-            description: analysis.description,
-            riskDefinition: analysis.riskDefinition,
-            correctiveAction: analysis.correctiveAction,
-            preventiveAction: analysis.preventiveAction,
-            importance_level: analysis.importance_level,
+            description: analysis?.description ?? "Analiz üretilemedi",
+            riskDefinition: analysis?.riskDefinition ?? "Analiz üretilemedi",
+            correctiveAction: analysis?.correctiveAction ?? "Analiz üretilemedi",
+            preventiveAction: analysis?.preventiveAction ?? "Analiz üretilemedi",
+            importance_level: analysis?.importance_level ?? "Orta",
             ai_analyzed: true,
           },
         };
@@ -442,7 +394,7 @@ ${generatedEntries
   )
   .join("\n\n")}`;
 
-        const { text } = await runBulkCapaAnalysis([], overallPrompt);
+        const { text } = await runBulkCapaAnalysis([], overallPrompt, false);
 
         resultPayload = {
           jobType,
@@ -484,7 +436,7 @@ ${generatedEntries
       }
 
       if (jobType === "overall_analysis") {
-        const { text } = await runBulkCapaAnalysis([], prompt);
+        const { text } = await runBulkCapaAnalysis([], prompt, false);
         const overallAnalysis = coerceText(text).trim();
         if (!overallAnalysis) {
           throw new GeminiHttpError(502, "empty_response", "Genel analiz metni üretilemedi.");
