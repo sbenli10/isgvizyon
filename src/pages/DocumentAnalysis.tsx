@@ -142,25 +142,28 @@ export default function DocumentAnalysis() {
   const [creatingAction, setCreatingAction] = useState<null | "capa" | "inspection" | "report-pdf" | "report-word">(null);
   const [restoredDraftLabel, setRestoredDraftLabel] = useState<string | null>(null);
 
-  const { clearDraft } = usePersistentDraft({
-    key: `document-analysis:${profile?.organization_id || "no-org"}:${user?.id || "guest"}:${activeCompanyId || "no-company"}`,
-    enabled: Boolean(user?.id),
-    version: 1,
-    value: {
-      selectedCompanyId,
-      documentType,
-      contextNote,
-    },
-    onRestore: (draft) => {
-      setSelectedCompanyId(draft.selectedCompanyId || activeCompanyId);
+  // Eski key'i bununla değiştir
+const { clearDraft } = usePersistentDraft({
+  // Sadece user ve org bazlı sabit bir key kullanıyoruz
+  key: `document-analysis:${profile?.organization_id || "no-org"}:${user?.id || "guest"}`,
+  enabled: Boolean(user?.id),
+  version: 1,
+  value: {
+    selectedCompanyId,
+    documentType,
+    contextNote,
+  },
+  onRestore: (draft) => {
+    // Sadece gerçekten geri yüklenecek veri varsa çalıştır
+    if (draft.selectedCompanyId || draft.contextNote) {
+      setSelectedCompanyId(draft.selectedCompanyId || "");
       setDocumentType((draft.documentType as DocumentAnalysisType) || "legislation");
       setContextNote(draft.contextNote || "");
+      // Başarı durumunda etiketi set et ama toast kalabalığını engelle
       setRestoredDraftLabel("Belge analiz taslağı");
-      toast.info("Kaydedilmemiş taslak geri yüklendi.", {
-        description: "Belge tekrar seçilmelidir; dosyalar tarayıcıda taslak olarak saklanmaz.",
-      });
-    },
-  });
+    }
+  },
+});
 
   const selectedCompany = useMemo(
     () => companies.find((company) => company.id === selectedCompanyId) || null,
@@ -173,18 +176,28 @@ export default function DocumentAnalysis() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  useEffect(() => {
-    const next = new URLSearchParams(searchParams);
-    if (selectedCompanyId) {
-      next.set("companyId", selectedCompanyId);
-    } else {
-      next.delete("companyId");
-    }
-    next.set("docType", documentType);
-    if (next.toString() !== searchParams.toString()) {
-      setSearchParams(next, { replace: true });
-    }
-  }, [documentType, searchParams, selectedCompanyId, setSearchParams]);
+ useEffect(() => {
+  const currentParams = Object.fromEntries(searchParams.entries());
+  const nextParams = new URLSearchParams(searchParams);
+
+  // URL'deki değerlerle state'teki değerler farklıysa güncelle
+  let hasChanged = false;
+  
+  if (selectedCompanyId && currentParams.companyId !== selectedCompanyId) {
+    nextParams.set("companyId", selectedCompanyId);
+    hasChanged = true;
+  }
+  
+  if (documentType && currentParams.docType !== documentType) {
+    nextParams.set("docType", documentType);
+    hasChanged = true;
+  }
+
+  if (hasChanged) {
+    setSearchParams(nextParams, { replace: true });
+  }
+  // searchParams bağımlılığını çıkararak sonsuz döngüyü kırıyoruz
+}, [selectedCompanyId, documentType]);
 
   const loadCompanies = async () => {
     if (!user?.id) return;
@@ -205,6 +218,18 @@ export default function DocumentAnalysis() {
       setSelectedCompanyId(activeCompanyId);
     }
   };
+
+  const handleCompanySelection = (id: string) => {
+  setSelectedCompanyId(id); // State güncelle
+  
+  const next = new URLSearchParams(searchParams);
+  if (id) {
+    next.set("companyId", id);
+  } else {
+    next.delete("companyId");
+  }
+  setSearchParams(next, { replace: true }); // URL güncelle
+};
 
   const loadHistory = async () => {
     if (!user?.id) return;
@@ -650,30 +675,35 @@ export default function DocumentAnalysis() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {restoredDraftLabel ? (
-              <div className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-cyan-50 md:flex-row md:items-center md:justify-between">
+            {restoredDraftLabel && !selectedFile && !analyzing && (
+              <div className="flex flex-col gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-cyan-50 md:flex-row md:items-center md:justify-between mb-5">
                 <div>
                   <p className="font-semibold">{restoredDraftLabel} geri yüklendi</p>
-                  <p className="mt-1 text-sm text-cyan-100/80">Belge hariç kaydedilmemiş alanlar otomatik olarak geri getirildi.</p>
+                  <p className="mt-1 text-sm text-cyan-100/80">Belge hariç kaydedilmemiş alanlar otomatik getirildi.</p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     clearDraft();
                     setRestoredDraftLabel(null);
                     setContextNote("");
+                    setSelectedCompanyId("");
                   }}
                   className="border-cyan-300/30 bg-transparent text-cyan-50 hover:bg-cyan-400/10"
                 >
-                  Taslağı temizle
+                  Temizle
                 </Button>
               </div>
-            ) : null}
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Firma</Label>
-                <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <Select 
+                  value={selectedCompanyId} 
+                  onValueChange={handleCompanySelection} // Burada yeni fonksiyonu çağırıyoruz
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Firma seçin" />
                   </SelectTrigger>

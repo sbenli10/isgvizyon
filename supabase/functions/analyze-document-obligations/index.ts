@@ -389,7 +389,7 @@ ${rawResponse.slice(0, 12000)}
   const repairResponse = await callGeminiWithRetryAndFallback({
     apiKey,
     modelPreference: "fallback",
-    models: [getGoogleFallbackModel("gemini-2.5-flash")],
+    models: ["gemini-1.5-pro", "gemini-1.5-flash"],
     requestLabel: "analyze-document-obligations:repair",
     maxAttemptsPerModel: 1,
     body: {
@@ -438,9 +438,9 @@ async function analyzeChunk({
     body: {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.1,
         topP: 0.9,
-        maxOutputTokens: 4096,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
       },
@@ -522,50 +522,12 @@ serve(async (request) => {
           companyName: payload.companyName || null,
           fileName: payload.fileName || null,
           contextNote: payload.contextNote || null,
-          text: truncateText(text, 18000),
+          text: truncateText(text, 150000),
         }),
       });
-    } catch (primaryError) {
-      console.warn(`[analyze-document-obligations][${requestId}] tek parça analiz başarısız, belge parçalanarak tekrar deneniyor`, {
-        message: primaryError instanceof Error ? primaryError.message : String(primaryError),
-      });
-
-      const chunks = chunkText(text, 12000).slice(0, 6);
-      if (!chunks.length) {
-        throw primaryError;
-      }
-
-      const chunkResults: DocumentAnalysisResult[] = [];
-      for (let index = 0; index < chunks.length; index += 1) {
-        try {
-          const chunkResult = await analyzeChunk({
-            apiKey,
-            requestId: `${requestId}-chunk${index + 1}`,
-            documentType,
-            fileName: payload.fileName || null,
-            prompt: buildPrompt({
-              documentType,
-              companyName: payload.companyName || null,
-              fileName: payload.fileName || null,
-              contextNote: payload.contextNote || null,
-              text: chunks[index],
-              chunkInfo: `${index + 1}/${chunks.length}`,
-            }),
-          });
-          chunkResults.push(chunkResult);
-        } catch (chunkError) {
-          console.warn(`[analyze-document-obligations][${requestId}] belge parçası atlandı`, {
-            chunk: index + 1,
-            message: chunkError instanceof Error ? chunkError.message : String(chunkError),
-          });
-        }
-      }
-
-      if (!chunkResults.length) {
-        throw primaryError;
-      }
-
-      result = mergeChunkResults(chunkResults);
+    } catch (error) {
+      console.error(`[analyze-document-obligations][${requestId}] analiz sırasında hata`, error);
+      throw new Error("Belge analizi başarısız oldu.");
     }
 
     console.log(`[analyze-document-obligations][${requestId}] analiz tamamlandı`, {

@@ -159,6 +159,15 @@ export default function Inspections() {
   }, [location.state]);
 
   useEffect(() => {
+  if (detailsOpen) {
+    document.body.style.overflow = 'hidden';
+  } else {
+    document.body.style.overflow = 'unset';
+  }
+  return () => { document.body.style.overflow = 'unset'; };
+}, [detailsOpen]);
+
+  useEffect(() => {
     const focusInspectionId = location.state?.focusInspectionId as string | undefined;
     if (!focusInspectionId || loading || focusInspectionHandled === focusInspectionId || inspections.length === 0) {
       return;
@@ -1351,12 +1360,12 @@ export default function Inspections() {
 
       {/* DETAILS MODAL */}
       {selectedInspection && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all ${
-          detailsOpen ? "bg-black/50 backdrop-blur-sm" : "bg-black/0 pointer-events-none"
-        }`}>
-          <div className={`w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-[28px] border border-cyan-500/20 bg-[linear-gradient(180deg,rgba(9,16,32,0.98),rgba(10,17,30,0.96))] shadow-[0_35px_90px_rgba(2,8,23,0.6)] transition-all ${
-            detailsOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"
+        <div className={`fixed inset-0 z-50 flex justify-center p-4 overflow-y-auto pt-10 pb-10 transition-all ${
+            detailsOpen ? "bg-black/50 backdrop-blur-sm" : "bg-black/0 pointer-events-none"
           }`}>
+          <div className={`w-full max-w-5xl h-fit rounded-[28px] border border-cyan-500/20 bg-[linear-gradient(180deg,rgba(9,16,32,0.98),rgba(10,17,30,0.96))] shadow-[0_35px_90px_rgba(2,8,23,0.6)] transition-all ${
+              detailsOpen ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4"
+            }`}>
             <div className="sticky top-0 z-10 border-b border-white/10 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.22),_transparent_28%),linear-gradient(90deg,rgba(8,15,29,0.98),rgba(12,22,36,0.96),rgba(18,24,41,0.95))] p-6 md:p-7">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-3">
