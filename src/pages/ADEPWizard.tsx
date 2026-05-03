@@ -154,7 +154,7 @@ const AdepStepFallback = () => (
 
 export default function ADEPWizard() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -187,6 +187,7 @@ export default function ADEPWizard() {
     shouldProtectFromDefaults,
     mergeDefaults,
     markSubmitted,
+    draftLoaded, // YENİ: Taslağın yüklenip yüklenmediğini kontrol edeceğiz
   } = usePersistentFormDraft({
     formId: `adep-wizard:${draftId}`,
     enabled: Boolean(user?.id),
@@ -243,6 +244,10 @@ export default function ADEPWizard() {
   // Helpers
   // ------------------------------------
   const ensureAuth = () => {
+    if (authLoading) {
+      return false;
+    }
+
     if (!user) {
       toast.error("Oturum bulunamadı. Lütfen giriş yapın.");
       navigate("/auth");
@@ -257,6 +262,7 @@ export default function ADEPWizard() {
   // Load existing plan
   // ------------------------------------
   useEffect(() => {
+    if (authLoading) return;
     if (!ensureAuth()) return;
 
     const id = searchParams.get("id");
@@ -282,7 +288,7 @@ export default function ADEPWizard() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [authLoading, user]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -1706,7 +1712,8 @@ export default function ADEPWizard() {
     );
   }
 
-  if (loading || !planRow) {
+  // EKLENDİ: !draftLoaded kontrolü. IndexedDB'den taslak okunana kadar form render olmaz.
+  if (loading || !planRow || !draftLoaded) {
     return (
       <Card>
         <CardContent className="py-12 flex items-center justify-center gap-3 text-muted-foreground">
@@ -2066,8 +2073,8 @@ export default function ADEPWizard() {
           </div>
         </CardHeader>
 
-        <CardContent className="bg-transparent pt-6 text-foreground dark:text-slate-100">
-          <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-border [&_.bg-card]:bg-card [&_.shadow-sm]:shadow-sm [&_.text-card-foreground]:text-foreground [&_h3]:text-foreground [&_p.text-muted-foreground]:text-muted-foreground [&_label]:text-foreground [&_input]:border-border [&_input]:bg-background [&_input]:!text-white [&_input]:placeholder:text-slate-400 [&_textarea]:border-border [&_textarea]:bg-background [&_textarea]:!text-white [&_textarea]:placeholder:text-slate-400 [&_[role='combobox']]:border-border [&_[role='combobox']]:bg-background [&_[role='combobox']]:!text-white [&_[role='combobox']_[data-slot='select-value']]:!text-white [&_[role='combobox']]:data-[placeholder]:text-slate-400 [&_button.variant-outline]:border-border [&_button.variant-outline]:bg-background dark:[&_.border]:border-white/10 dark:[&_.bg-card]:bg-slate-950/55 dark:[&_.shadow-sm]:shadow-[0_18px_40px_rgba(2,6,23,0.18)] dark:[&_.text-card-foreground]:text-slate-100 dark:[&_h3]:text-white dark:[&_p.text-muted-foreground]:text-slate-400 dark:[&_label]:text-slate-200 dark:[&_input]:border-white/10 dark:[&_input]:bg-slate-950/60 dark:[&_input]:!text-white dark:[&_input]:placeholder:text-slate-400 dark:[&_textarea]:border-white/10 dark:[&_textarea]:bg-slate-950/60 dark:[&_textarea]:!text-white dark:[&_textarea]:placeholder:text-slate-400 dark:[&_[role='combobox']]:border-white/10 dark:[&_[role='combobox']]:bg-slate-950/60 dark:[&_[role='combobox']]:!text-white dark:[&_[role='combobox']_[data-slot='select-value']]:!text-white dark:[&_[role='combobox']]:data-[placeholder]:text-slate-400 dark:[&_button.variant-outline]:border-white/10 dark:[&_button.variant-outline]:bg-white/5">
+        <CardContent className="bg-transparent pt-6">
+          <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-border [&_.bg-card]:bg-card [&_.shadow-sm]:shadow-sm [&_.text-card-foreground]:text-foreground [&_h3]:text-foreground [&_p.text-muted-foreground]:text-muted-foreground [&_label]:text-foreground [&_input]:border-border [&_input]:bg-background/50 [&_input]:!text-foreground [&_input]:placeholder:text-muted-foreground [&_textarea]:border-border [&_textarea]:bg-background/50 [&_textarea]:!text-foreground [&_textarea]:placeholder:text-muted-foreground [&_[role='combobox']]:border-border [&_[role='combobox']]:bg-background/50 [&_[role='combobox']]:!text-foreground [&_[role='combobox']_[data-slot='select-value']]:!text-foreground [&_[role='combobox']]:data-[placeholder]:text-muted-foreground [&_button.variant-outline]:border-border [&_button.variant-outline]:bg-background">
             <Suspense fallback={<AdepStepFallback />}>{renderStep()}</Suspense>
           </div>
         </CardContent>

@@ -1,4 +1,6 @@
 const CHUNK_RECOVERY_KEY = "isgvizyon:chunk-recovery";
+export const APP_RELOAD_REQUEST_EVENT = "denetron:reload-requested";
+let appRecoveryInstalled = false;
 
 const getErrorText = (error: unknown) => {
   if (error instanceof Error) return `${error.name} ${error.message}`;
@@ -22,7 +24,7 @@ export const isChunkLoadError = (error: unknown) => {
   ].some((pattern) => message.includes(pattern));
 };
 
-const recoverFromChunkError = () => {
+export const requestAppReload = (reason: string) => {
   if (typeof window === "undefined") return;
 
   const now = Date.now();
@@ -31,22 +33,31 @@ const recoverFromChunkError = () => {
   if (now - lastRecovery < 30_000) return;
 
   window.sessionStorage.setItem(CHUNK_RECOVERY_KEY, String(now));
-  window.location.reload();
+  window.dispatchEvent(
+    new CustomEvent(APP_RELOAD_REQUEST_EVENT, {
+      detail: {
+        reason,
+        requestedAt: now,
+      },
+    }),
+  );
 };
 
 export const installAppRecoveryHandlers = () => {
   if (typeof window === "undefined") return;
+  if (appRecoveryInstalled) return;
+  appRecoveryInstalled = true;
 
   window.addEventListener("error", (event) => {
     const error = event.error || event.message;
     if (!isChunkLoadError(error)) return;
     event.preventDefault();
-    recoverFromChunkError();
+    requestAppReload("chunk-error");
   });
 
   window.addEventListener("unhandledrejection", (event) => {
     if (!isChunkLoadError(event.reason)) return;
     event.preventDefault();
-    recoverFromChunkError();
+    requestAppReload("chunk-rejection");
   });
 };

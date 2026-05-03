@@ -1,5 +1,5 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
-import { isChunkLoadError } from "@/lib/appRecovery";
+import { isChunkLoadError, requestAppReload } from "@/lib/appRecovery";
 
 type ModuleLoader<T extends ComponentType<any>> = () => Promise<{ default: T }>;
 
@@ -26,7 +26,7 @@ export function lazyWithRetry<T extends ComponentType<any>>(
 
       if (!alreadyRetried) {
         window.sessionStorage.setItem(storageKey, "1");
-        window.location.reload();
+        requestAppReload(`lazy-chunk:${key}`);
         return new Promise<never>(() => {});
       }
 

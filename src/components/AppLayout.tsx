@@ -17,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 import { ChevronRight, LogOut, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const routeMeta = [
@@ -63,6 +64,18 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const isPremiumMember = plan === "premium" && status !== "past_due";
   const isCollapsed = state === "collapsed";
   const desktopOffset = isCollapsed ? DESKTOP_SIDEBAR_COLLAPSED_WIDTH : DESKTOP_SIDEBAR_WIDTH;
+
+  useEffect(() => {
+    console.log("AppLayoutShell MOUNTED", {
+      pathname: location.pathname,
+    });
+
+    return () => {
+      console.log("AppLayoutShell UNMOUNTED", {
+        pathname: location.pathname,
+      });
+    };
+  }, []);
 
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.08),transparent_24%),radial-gradient(circle_at_top_right,rgba(99,102,241,0.08),transparent_22%),hsl(var(--background))]">
@@ -258,6 +271,13 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    console.log("AppLayout MOUNTED");
+    return () => {
+      console.log("AppLayout UNMOUNTED");
+    };
+  }, []);
+
   return (
     <SidebarProvider>
       <AppLayoutShell>{children}</AppLayoutShell>

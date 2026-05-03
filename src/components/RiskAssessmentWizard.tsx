@@ -1,6 +1,10 @@
 ﻿import { ChangeEvent, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, Download, FilePenLine, FileSearch, FileSignature, FileText, Loader2, ShieldCheck, Upload, Users, X } from "lucide-react";
+import { 
+  AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, 
+  Download, FilePenLine, FileSearch, FileSignature, FileText, 
+  Loader2, ShieldCheck, Upload, Users, X 
+} from "lucide-react";
 import jsPDF from "jspdf";
 import { toast } from "sonner";
 
@@ -71,7 +75,9 @@ const hazardConfig = {
   "Tehlikeli": { years: 4, icon: "🟡", pillClass: "border-amber-400/20 bg-amber-500/10 text-amber-100", accentClass: "from-amber-500/20 to-orange-500/5", summary: "Tehlikeli işyerlerinde rapor en geç 4 yılda bir yenilenmelidir.", renewalLabel: "4 yılda bir" },
   "Çok Tehlikeli": { years: 2, icon: "🔴", pillClass: "border-red-400/20 bg-red-500/10 text-red-100", accentClass: "from-red-500/20 to-rose-500/5", summary: "Çok tehlikeli işyerlerinde rapor en geç 2 yılda bir yenilenmelidir.", renewalLabel: "2 yılda bir" },
 } as const;
+
 const methodOptions: RiskMethod[] = ["L Tipi Matris", "Fine-Kinney", "5x5 Matris", "Kontrol Listesi Destekli Matris"];
+
 const signatureRoleConfigs: SignatureRoleConfig[] = [
   { key: "employerRepresentativeSignatureUrl", nameKey: "employerRepresentativeName", title: "İşveren / Vekili İmza Alanı", helper: "İşveren veya vekilinin imza ya da onay görselini yükleyin.", subtitle: "İşveren / İşveren Vekili" },
   { key: "occupationalSafetySpecialistSignatureUrl", nameKey: "occupationalSafetySpecialistName", title: "İSG Uzmanı İmza / Kaşe", helper: "Uzman imzası veya kaşe görselini yükleyin.", subtitle: "İş Güvenliği Uzmanı" },
@@ -79,29 +85,34 @@ const signatureRoleConfigs: SignatureRoleConfig[] = [
   { key: "employeeRepresentativeSignatureUrl", nameKey: "employeeRepresentativeName", title: "Çalışan Temsilcisi İmza Alanı", helper: "Temsilci için imza görseli eklenebilir.", subtitle: "Çalışan Temsilcisi" },
   { key: "supportPersonnelSignatureUrl", nameKey: "supportPersonnelName", title: "Destek Elemanı İmza Alanı", helper: "Destek elemanı için imza ya da onay görseli yükleyin.", subtitle: "Destek Elemanı" },
 ];
+
 type SignatureStatusKey =
   | "employer_representative_approval_status"
   | "occupational_safety_specialist_approval_status"
   | "workplace_doctor_approval_status"
   | "employee_representative_approval_status"
   | "support_personnel_approval_status";
+
 type SignatureSignedAtKey =
   | "employer_representative_signed_at"
   | "occupational_safety_specialist_signed_at"
   | "workplace_doctor_signed_at"
   | "employee_representative_signed_at"
   | "support_personnel_signed_at";
+
 type SignatureUrlDbKey =
   | "employer_representative_signature_url"
   | "occupational_safety_specialist_signature_url"
   | "workplace_doctor_signature_url"
   | "employee_representative_signature_url"
   | "support_personnel_signature_url";
+
 type SignatureDbConfig = SignatureRoleConfig & {
   dbUrlKey: SignatureUrlDbKey;
   dbStatusKey: SignatureStatusKey;
   dbSignedAtKey: SignatureSignedAtKey;
 };
+
 const signatureDbConfigs: SignatureDbConfig[] = [
   { ...signatureRoleConfigs[0], dbUrlKey: "employer_representative_signature_url", dbStatusKey: "employer_representative_approval_status", dbSignedAtKey: "employer_representative_signed_at" },
   { ...signatureRoleConfigs[1], dbUrlKey: "occupational_safety_specialist_signature_url", dbStatusKey: "occupational_safety_specialist_approval_status", dbSignedAtKey: "occupational_safety_specialist_signed_at" },
@@ -109,8 +120,10 @@ const signatureDbConfigs: SignatureDbConfig[] = [
   { ...signatureRoleConfigs[3], dbUrlKey: "employee_representative_signature_url", dbStatusKey: "employee_representative_approval_status", dbSignedAtKey: "employee_representative_signed_at" },
   { ...signatureRoleConfigs[4], dbUrlKey: "support_personnel_signature_url", dbStatusKey: "support_personnel_approval_status", dbSignedAtKey: "support_personnel_signed_at" },
 ];
+
 const cleanText = (text?: string | null) => (text || "").replace(/\s+/g, " ").trim();
 const asciiSlug = (value: string) => cleanText(value).toLocaleLowerCase("tr-TR").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "risk-raporu";
+
 const calculateValidityDate = (reportDate: string, hazardLevel: HazardLevel) => {
   if (!reportDate) return "";
   const baseDate = new Date(`${reportDate}T00:00:00`);
@@ -118,13 +131,16 @@ const calculateValidityDate = (reportDate: string, hazardLevel: HazardLevel) => 
   baseDate.setFullYear(baseDate.getFullYear() + hazardConfig[hazardLevel].years);
   return baseDate.toISOString().split("T")[0];
 };
+
 const defaultRenewalNote = (hazardLevel: HazardLevel) => `${hazardConfig[hazardLevel].summary} İşyerinde iş kazası olması, çalışma yönteminin değişmesi veya yeni makine alınması gibi durumlarda bu süreler beklenmeksizin rapor tamamen veya kısmen yenilenmelidir.`;
+
 const formatDisplayDate = (value?: string) => {
   if (!value) return "-";
   const date = value.includes("T") ? new Date(value) : new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(date);
 };
+
 const buildSignatureMeta = (roleKey: SignatureFieldKey, imageUrl: string | null, timestampIso: string) => {
   const config = signatureDbConfigs.find((entry) => entry.key === roleKey);
   if (!config) return null;
@@ -136,6 +152,7 @@ const buildSignatureMeta = (roleKey: SignatureFieldKey, imageUrl: string | null,
     signedAt: imageUrl ? timestampIso : null,
   };
 };
+
 const createInitialFormData = (): FormData => ({
   firmName: "", workplaceTitle: "", workplaceAddress: "", employerName: "", department: "", hazardLevel: "Tehlikeli", method: "5x5 Matris",
   reportDate: today, validityDate: calculateValidityDate(today, "Tehlikeli"), logo: null,
@@ -157,15 +174,18 @@ export default function RiskAssessmentWizard() {
     employeeRepresentativeSignatureUrl: null,
     supportPersonnelSignatureUrl: null,
   });
+
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<FormData>(createInitialFormData);
   const [signaturePreview, setSignaturePreview] = useState<{ title: string; imageUrl: string; field: SignatureFieldKey } | null>(null);
+  
   const locationState = location.state as { companyId?: string | null } | null;
   const draftContextKey = useMemo(
     () => `${location.pathname}:${locationState?.companyId || "general"}`,
     [location.pathname, locationState?.companyId],
   );
+
   const draftFormData = useMemo<FormData>(() => ({
     ...formData,
     logo: formData.logo?.startsWith("data:") ? null : formData.logo,
@@ -175,6 +195,7 @@ export default function RiskAssessmentWizard() {
     employeeRepresentativeSignatureUrl: formData.employeeRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employeeRepresentativeSignatureUrl,
     supportPersonnelSignatureUrl: formData.supportPersonnelSignatureUrl?.startsWith("data:") ? null : formData.supportPersonnelSignatureUrl,
   }), [formData]);
+
   const { clearDraft } = usePersistentFormDraft<RiskAssessmentWizardDraft>({
     formId: `risk-assessment-wizard:${draftContextKey}`,
     enabled: Boolean(user?.id),
@@ -193,11 +214,10 @@ export default function RiskAssessmentWizard() {
       formData: createInitialFormData(),
     },
     isDirty:
-      Object.values(draftFormData).some((entry) => {
-        if (typeof entry === "string") return entry.trim().length > 0;
-        if (typeof entry === "boolean") return entry;
-        return entry !== null && typeof entry !== "undefined";
-      }) || currentStep > 0,
+      draftFormData.firmName.trim().length > 0 ||
+      draftFormData.workplaceTitle.trim().length > 0 ||
+      draftFormData.employerName.trim().length > 0 ||
+      currentStep > 0,
     onRestore: (draft) => {
       setCurrentStep(
         typeof draft.currentStep === "number"
@@ -208,10 +228,11 @@ export default function RiskAssessmentWizard() {
         ...createInitialFormData(),
         ...(draft.formData || {}),
       });
-      toast.info("Kaydedilmemiş risk değerlendirme taslağı geri yüklendi.");
+      // toast.info satırını sildik, artık uyarı vermeyecek.
     },
     debugLabel: "RiskAssessmentWizard",
   });
+
   const resetWizardDraft = () => {
     clearDraft();
     setCurrentStep(0);
@@ -225,10 +246,18 @@ export default function RiskAssessmentWizard() {
   const completionRatio = ((currentStep + 1) / steps.length) * 100;
   const brandedCompanyName = cleanText(formData.firmName) || "Kurumsal risk değerlendirme raporu";
   const createdAtLabel = useMemo(() => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date()), []);
-  const checklist = useMemo(() => [formData.workplaceTitle, formData.workplaceAddress, formData.employerName, formData.employerRepresentativeName, formData.occupationalSafetySpecialistName, formData.workplaceDoctorName, formData.employeeRepresentativeName, formData.supportPersonnelName, formData.reportDate, formData.validityDate, formData.method, formData.hazardSources, formData.identifiedRisks, formData.controlMeasures, formData.responsiblePersons].map(cleanText), [formData]);
+  
+  const checklist = useMemo(() => [
+    formData.workplaceTitle, formData.workplaceAddress, formData.employerName, formData.employerRepresentativeName, 
+    formData.occupationalSafetySpecialistName, formData.workplaceDoctorName, formData.employeeRepresentativeName, 
+    formData.supportPersonnelName, formData.reportDate, formData.validityDate, formData.method, formData.hazardSources, 
+    formData.identifiedRisks, formData.controlMeasures, formData.responsiblePersons
+  ].map(cleanText), [formData]);
+  
   const completedFields = checklist.filter(Boolean).length;
   const pdfReady = completedFields >= 13;
   const signatureCount = signatureRoleConfigs.filter((role) => Boolean(formData[role.key])).length;
+  
   const stepCompletionCounts = useMemo(() => {
     const counters = [
       [formData.firmName, formData.workplaceTitle, formData.workplaceAddress, formData.employerName, formData.department, formData.logo ? "logo" : ""],
@@ -240,11 +269,24 @@ export default function RiskAssessmentWizard() {
     ];
     return counters.map((items) => ({ completed: items.filter((item) => cleanText(item).length > 0).length, total: items.length }));
   }, [formData, pdfReady]);
+
   const formalCardClass = "border-slate-200/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.92))] shadow-[0_18px_42px_rgba(2,6,23,0.24)]";
 
   const updateForm = <K extends keyof FormData>(key: K, value: FormData[K]) => setFormData((prev) => ({ ...prev, [key]: value }));
-  const handleHazardLevelChange = (level: HazardLevel) => setFormData((prev) => ({ ...prev, hazardLevel: level, validityDate: calculateValidityDate(prev.reportDate, level), renewalTriggersNote: cleanText(prev.renewalTriggersNote) === cleanText(defaultRenewalNote(prev.hazardLevel)) || !cleanText(prev.renewalTriggersNote) ? defaultRenewalNote(level) : prev.renewalTriggersNote }));
-  const handleReportDateChange = (date: string) => setFormData((prev) => ({ ...prev, reportDate: date, validityDate: date ? calculateValidityDate(date, prev.hazardLevel) : "" }));
+  
+  const handleHazardLevelChange = (level: HazardLevel) => setFormData((prev) => ({ 
+    ...prev, 
+    hazardLevel: level, 
+    validityDate: calculateValidityDate(prev.reportDate, level), 
+    renewalTriggersNote: cleanText(prev.renewalTriggersNote) === cleanText(defaultRenewalNote(prev.hazardLevel)) || !cleanText(prev.renewalTriggersNote) ? defaultRenewalNote(level) : prev.renewalTriggersNote 
+  }));
+  
+  const handleReportDateChange = (date: string) => setFormData((prev) => ({ 
+    ...prev, 
+    reportDate: date, 
+    validityDate: date ? calculateValidityDate(date, prev.hazardLevel) : "" 
+  }));
+
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -254,6 +296,7 @@ export default function RiskAssessmentWizard() {
     reader.readAsDataURL(file);
     event.target.value = "";
   };
+
   const handleSignatureUpload = (field: SignatureFieldKey, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -263,6 +306,7 @@ export default function RiskAssessmentWizard() {
     reader.readAsDataURL(file);
     event.target.value = "";
   };
+
   const uploadDataUrlToStorage = async (dataUrl: string | null, assessmentId: string, slot: string) => {
     if (!dataUrl || !user?.id) return null;
     if (!dataUrl.startsWith("data:")) return dataUrl;
@@ -274,6 +318,7 @@ export default function RiskAssessmentWizard() {
     if (error) throw error;
     return buildStorageObjectRef("risk-assessment-signatures", path);
   };
+
   const generatePDFPreview = () => {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const hasCustomFont = addInterFontsToJsPDF(doc);
@@ -283,7 +328,9 @@ export default function RiskAssessmentWizard() {
     const contentWidth = pageWidth - marginX * 2;
     const leftWidth = 52;
     let cursorY = 16;
+    
     const font = (style: "normal" | "bold" = "normal", size = 10) => { doc.setFont(hasCustomFont ? "Inter" : "helvetica", style); doc.setFontSize(size); };
+    
     const footer = () => {
       doc.setDrawColor(214, 223, 236); doc.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12);
       font("normal", 8.5); doc.setTextColor(100, 116, 139);
@@ -291,8 +338,10 @@ export default function RiskAssessmentWizard() {
       doc.text(`Oluşturulma: ${createdAtLabel}`, pageWidth / 2, pageHeight - 6.5, { align: "center" });
       doc.text("İSG Risk Değerlendirme Raporu", pageWidth - marginX, pageHeight - 6.5, { align: "right" });
     };
+
     const sectionGap = 4;
     const ensure = (needed: number) => { if (cursorY + needed <= pageHeight - 22) return; footer(); doc.addPage(); doc.setFillColor(245, 247, 251); doc.rect(0, 0, pageWidth, pageHeight, "F"); cursorY = 16; };
+    
     const section = (title: string, content: string) => {
       const lines = doc.splitTextToSize(cleanText(content) || "Belirtilmedi", contentWidth - leftWidth - 8);
       const height = Math.max(22, lines.length * 5 + 12) + 10; ensure(height + sectionGap);
@@ -303,6 +352,7 @@ export default function RiskAssessmentWizard() {
       doc.line(marginX + leftWidth, cursorY, marginX + leftWidth, cursorY + height); doc.line(marginX, cursorY + 10, marginX + contentWidth, cursorY + 10);
       font("normal", 9.3); doc.setTextColor(31, 41, 55); doc.text(lines, marginX + leftWidth + 4, cursorY + 17); cursorY += height + sectionGap;
     };
+
     const table = (title: string, rows: Array<[string, string]>) => {
       const rowHeight = 9; const height = 10 + rows.length * rowHeight; ensure(height + sectionGap);
       doc.setDrawColor(214, 226, 241); doc.setFillColor(255, 255, 255); doc.roundedRect(marginX, cursorY, contentWidth, height, 2, 2, "FD");
@@ -313,6 +363,7 @@ export default function RiskAssessmentWizard() {
       rows.forEach(([label, value], i) => { const y = cursorY + 10 + i * rowHeight; if (i) doc.line(marginX, y, marginX + contentWidth, y); font("bold", 9); doc.setTextColor(51, 65, 85); doc.text(label, marginX + 4, y + 6); font("normal", 9.4); doc.setTextColor(15, 23, 42); doc.text(value || "-", marginX + leftWidth + 4, y + 6); });
       cursorY += height + sectionGap;
     };
+
     const signatureTable = () => {
       const previewTimestampIso = new Date().toISOString();
       const rows = signatureDbConfigs.map((config) => {
@@ -447,271 +498,593 @@ export default function RiskAssessmentWizard() {
   };
 
   const inputField = (label: string, value: string, setter: (value: string) => void, placeholder: string, className?: string) => (
-    <div className={cn("space-y-2", className)}><Label className="text-sm font-semibold text-slate-200">{label}</Label><Input value={value} onChange={(e) => setter(e.target.value)} placeholder={placeholder} className="h-12 rounded-2xl border-slate-200/10 bg-slate-950/55 text-slate-100 placeholder:text-slate-500" /></div>
+    <div className={cn("space-y-2", className)}>
+      <Label>{label}</Label>
+      <Input 
+        value={value} 
+        onChange={(e) => setter(e.target.value)} 
+        placeholder={placeholder} 
+        // Profil sayfasındaki gibi daha standart bir styling:
+        className="h-12 bg-background/50 border-input" 
+      />
+    </div>
   );
+
   const textField = (label: string, value: string, setter: (value: string) => void, placeholder: string, helper?: string) => (
-    <div className="space-y-2"><Label className="text-sm font-semibold text-slate-200">{label}</Label><Textarea value={value} onChange={(e) => setter(e.target.value)} placeholder={placeholder} className="min-h-[150px] rounded-[24px] border-slate-200/10 bg-slate-950/55 text-slate-100 placeholder:text-slate-500" />{helper ? <p className="text-xs text-slate-500">{helper}</p> : null}</div>
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Textarea 
+        value={value} 
+        onChange={(e) => setter(e.target.value)} 
+        placeholder={placeholder} 
+        // Profil sayfasındaki gibi daha standart bir styling:
+        className="min-h-[150px] bg-background/50 border-input" 
+      />
+      {helper ? <p className="text-xs text-muted-foreground">{helper}</p> : null}
+    </div>
   );
+
   const renderSignatureCard = (role: SignatureRoleConfig) => {
     const imageUrl = formData[role.key];
     const signerName = cleanText(formData[role.nameKey]);
-    return <div key={role.key} className="rounded-[24px] border border-slate-200/10 bg-slate-950/55 p-4 shadow-[0_10px_26px_rgba(2,6,23,0.18)]"><div className="flex items-start justify-between gap-3 border-b border-slate-200/10 pb-3"><div><p className="text-sm font-semibold text-white">{role.title}</p><p className="mt-1 text-xs font-medium text-slate-300">{role.subtitle}</p><p className="mt-1 text-xs leading-5 text-slate-500">{role.helper}</p></div><Badge className={cn("rounded-full border", imageUrl ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-slate-200/10 bg-white/[0.04] text-slate-300")}>{imageUrl ? "Hazır" : "Bekliyor"}</Badge></div><div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]"><button type="button" onClick={() => imageUrl && setSignaturePreview({ title: role.title, imageUrl, field: role.key })} className="flex h-28 w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200/10 bg-slate-900/80 transition hover:border-slate-300/20 hover:bg-slate-900 disabled:cursor-default" disabled={!imageUrl}>{imageUrl ? <img src={imageUrl} alt={`${role.title} görseli`} className="h-full w-full object-contain p-3" /> : <FileSignature className="h-7 w-7 text-slate-500" />}</button><div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Ad Soyad</p><p className="mt-1 text-sm font-semibold text-white">{signerName || "-"}</p></div><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Onay Durumu</p><p className="mt-1 text-sm font-semibold text-white">{imageUrl ? "Hazır" : "Bekliyor"}</p></div><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2 sm:col-span-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">İmza Tarihi</p><p className="mt-1 text-sm font-semibold text-white">{imageUrl ? formatDisplayDate(formData.reportDate) : "-"}</p></div></div><div className="flex flex-1 flex-wrap gap-2"><Button type="button" variant="outline" className="rounded-2xl border-slate-200/10 bg-white/[0.05] text-slate-100 hover:bg-white/[0.1]" onClick={() => signatureInputRefs.current[role.key]?.click()}><Upload className="mr-2 h-4 w-4" />İmza / Kaşe Yükle</Button>{imageUrl ? <Button type="button" variant="outline" className="rounded-2xl border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15" onClick={() => setSignaturePreview({ title: role.title, imageUrl, field: role.key })}><FileSearch className="mr-2 h-4 w-4" />Büyüt</Button> : null}{imageUrl ? <Button type="button" variant="outline" className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15" onClick={() => updateForm(role.key, null)}><X className="mr-2 h-4 w-4" />Kaldır</Button> : null}</div></div><input ref={(node) => { signatureInputRefs.current[role.key] = node; }} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => handleSignatureUpload(role.key, event)} /></div></div>;
+    return (
+      <div key={role.key} className="rounded-[24px] border border-slate-200/10 bg-slate-950/55 p-4 shadow-[0_10px_26px_rgba(2,6,23,0.18)]">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200/10 pb-3">
+          <div>
+            <p className="text-sm font-semibold text-white">{role.title}</p>
+            <p className="mt-1 text-xs font-medium text-slate-300">{role.subtitle}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{role.helper}</p>
+          </div>
+          <Badge className={cn("rounded-full border", imageUrl ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-slate-200/10 bg-white/[0.04] text-slate-300")}>
+            {imageUrl ? "Hazır" : "Bekliyor"}
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[180px_1fr]">
+          <button type="button" onClick={() => imageUrl && setSignaturePreview({ title: role.title, imageUrl, field: role.key })} className="flex h-28 w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200/10 bg-slate-900/80 transition hover:border-slate-300/20 hover:bg-slate-900 disabled:cursor-default" disabled={!imageUrl}>
+            {imageUrl ? <img src={imageUrl} alt={`${role.title} görseli`} className="h-full w-full object-contain p-3" /> : <FileSignature className="h-7 w-7 text-slate-500" />}
+          </button>
+          <div className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Ad Soyad</p>
+                <p className="mt-1 text-sm font-semibold text-white">{signerName || "-"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Onay Durumu</p>
+                <p className="mt-1 text-sm font-semibold text-white">{imageUrl ? "Hazır" : "Bekliyor"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2 sm:col-span-2">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">İmza Tarihi</p>
+                <p className="mt-1 text-sm font-semibold text-white">{imageUrl ? formatDisplayDate(formData.reportDate) : "-"}</p>
+              </div>
+            </div>
+            <div className="flex flex-1 flex-wrap gap-2">
+              <Button type="button" variant="outline" className="rounded-2xl border-slate-200/10 bg-white/[0.05] text-slate-100 hover:bg-white/[0.1]" onClick={() => signatureInputRefs.current[role.key]?.click()}>
+                <Upload className="mr-2 h-4 w-4" />İmza / Kaşe Yükle
+              </Button>
+              {imageUrl ? (
+                <Button type="button" variant="outline" className="rounded-2xl border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15" onClick={() => setSignaturePreview({ title: role.title, imageUrl, field: role.key })}>
+                  <FileSearch className="mr-2 h-4 w-4" />Büyüt
+                </Button>
+              ) : null}
+              {imageUrl ? (
+                <Button type="button" variant="outline" className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15" onClick={() => updateForm(role.key, null)}>
+                  <X className="mr-2 h-4 w-4" />Kaldır
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          <input ref={(node) => { signatureInputRefs.current[role.key] = node; }} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => handleSignatureUpload(role.key, event)} />
+        </div>
+      </div>
+    );
   };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 0:
-        return <div className="space-y-6"><div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/80">1. Adım · İşyeri Bilgileri</p><p className="mt-2 text-sm leading-6 text-slate-300">İşyeri unvanı, adres, işveren adı ve tehlike sınıfını resmî üst bilgi olarak hazırlayın.</p></div><div className="grid gap-4 md:grid-cols-2">{inputField("Firma / Rapor Başlığı *", formData.firmName, (v) => updateForm("firmName", v), "Örn: ABC Endüstri A.Ş. Risk Değerlendirme Raporu", "md:col-span-2")}{inputField("İşyeri Unvanı *", formData.workplaceTitle, (v) => updateForm("workplaceTitle", v), "Resmî işyeri unvanı")}{inputField("İşveren Adı *", formData.employerName, (v) => updateForm("employerName", v), "İşveren veya şirket yetkilisi")}{inputField("İşyeri Adresi *", formData.workplaceAddress, (v) => updateForm("workplaceAddress", v), "Açık adres bilgisi", "md:col-span-2")}{inputField("Bölüm / Alan", formData.department, (v) => updateForm("department", v), "Örn: Üretim hattı")}<div className="space-y-2"><Label className="text-sm font-semibold text-slate-200">Tehlike Sınıfı *</Label><Select value={formData.hazardLevel} onValueChange={(value) => handleHazardLevelChange(value as HazardLevel)}><SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/[0.04] text-slate-100"><SelectValue /></SelectTrigger><SelectContent className="border-white/10 bg-slate-950 text-slate-100"><SelectItem value="Az Tehlikeli">🟢 Az Tehlikeli</SelectItem><SelectItem value="Tehlikeli">🟡 Tehlikeli</SelectItem><SelectItem value="Çok Tehlikeli">🔴 Çok Tehlikeli</SelectItem></SelectContent></Select></div></div><div className="space-y-3"><Label className="text-sm font-semibold text-slate-200">Firma Logosu</Label>{formData.logo ? <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/60 p-4"><img src={formData.logo} alt="Firma logosu" className="h-40 w-full rounded-2xl object-contain bg-white/[0.03]" /><Button type="button" size="icon" variant="outline" className="absolute right-6 top-6 rounded-xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15" onClick={() => updateForm("logo", null)}><X className="h-4 w-4" /></Button></div> : <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full rounded-[24px] border border-dashed border-white/15 bg-white/[0.03] p-8 text-center transition-colors hover:border-cyan-400/30 hover:bg-cyan-500/5"><Upload className="mx-auto h-8 w-8 text-cyan-200" /><p className="mt-3 text-sm font-semibold text-slate-100">Kurumsal logo yükleyin</p><p className="mt-1 text-xs text-slate-500">PNG, JPG veya SVG · maksimum 2 MB</p></button>}<input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" /></div></div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/80">1. Adım · İşyeri Bilgileri</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">İşyeri unvanı, adres, işveren adı ve tehlike sınıfını resmî üst bilgi olarak hazırlayın.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {inputField("Firma / Rapor Başlığı *", formData.firmName, (v) => updateForm("firmName", v), "Örn: ABC Endüstri A.Ş. Risk Değerlendirme Raporu", "md:col-span-2")}
+              {inputField("İşyeri Unvanı *", formData.workplaceTitle, (v) => updateForm("workplaceTitle", v), "Resmî işyeri unvanı")}
+              {inputField("İşveren Adı *", formData.employerName, (v) => updateForm("employerName", v), "İşveren veya şirket yetkilisi")}
+              {inputField("İşyeri Adresi *", formData.workplaceAddress, (v) => updateForm("workplaceAddress", v), "Açık adres bilgisi", "md:col-span-2")}
+              {inputField("Bölüm / Alan", formData.department, (v) => updateForm("department", v), "Örn: Üretim hattı")}
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-slate-200">Tehlike Sınıfı *</Label>
+                <Select value={formData.hazardLevel} onValueChange={(value) => handleHazardLevelChange(value as HazardLevel)}>
+                  <SelectTrigger className="h-12 rounded-2xl border-white/10 bg-white/[0.04] !text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-slate-950 text-slate-100">
+                    <SelectItem value="Az Tehlikeli">🟢 Az Tehlikeli</SelectItem>
+                    <SelectItem value="Tehlikeli">🟡 Tehlikeli</SelectItem>
+                    <SelectItem value="Çok Tehlikeli">🔴 Çok Tehlikeli</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold text-slate-200">Firma Logosu</Label>
+              {formData.logo ? (
+                <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/60 p-4">
+                  <img src={formData.logo} alt="Firma logosu" className="h-40 w-full rounded-2xl object-contain bg-white/[0.03]" />
+                  <Button type="button" size="icon" variant="outline" className="absolute right-6 top-6 rounded-xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15" onClick={() => updateForm("logo", null)}><X className="h-4 w-4" /></Button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full rounded-[24px] border border-dashed border-white/15 bg-white/[0.03] p-8 text-center transition-colors hover:border-cyan-400/30 hover:bg-cyan-500/5">
+                  <Upload className="mx-auto h-8 w-8 text-cyan-200" />
+                  <p className="mt-3 text-sm font-semibold text-slate-100">Kurumsal logo yükleyin</p>
+                  <p className="mt-1 text-xs text-slate-500">PNG, JPG veya SVG · maksimum 2 MB</p>
+                </button>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            </div>
+          </div>
+        );
       case 1:
-        return <div className="space-y-6"><div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">2. Adım · Risk Değerlendirme Ekibi</p><p className="mt-2 text-sm leading-6 text-slate-300">Ekip üyeleri, raporda rol bazlı imza ve onay alanlarıyla birlikte resmî tabloda gösterilir. Önce isimleri, ardından varsa imza / kaşe görsellerini hazırlayın.</p></div><div className="rounded-[24px] border border-slate-200/10 bg-slate-950/45 p-4"><div className="mb-4 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Toplam Rol</p><p className="mt-1 text-sm font-semibold text-white">5 ekip üyesi</p></div><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Hazır İmza</p><p className="mt-1 text-sm font-semibold text-white">{signatureCount}/5</p></div><div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2"><p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Onay Yapısı</p><p className="mt-1 text-sm font-semibold text-white">Rol bazlı tablo düzeni</p></div></div><div className="grid gap-4 md:grid-cols-2">{inputField("İşveren / Vekili *", formData.employerRepresentativeName, (v) => updateForm("employerRepresentativeName", v), "Ad Soyad")}{inputField("İSG Uzmanı *", formData.occupationalSafetySpecialistName, (v) => updateForm("occupationalSafetySpecialistName", v), "Ad Soyad")}{inputField("İşyeri Hekimi *", formData.workplaceDoctorName, (v) => updateForm("workplaceDoctorName", v), "Ad Soyad")}{inputField("Çalışan Temsilcisi *", formData.employeeRepresentativeName, (v) => updateForm("employeeRepresentativeName", v), "Ad Soyad")}{inputField("Destek Elemanı *", formData.supportPersonnelName, (v) => updateForm("supportPersonnelName", v), "Ad Soyad", "md:col-span-2")}</div></div><div className="grid gap-4 xl:grid-cols-2">{signatureRoleConfigs.map(renderSignatureCard)}</div></div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">2. Adım · Risk Değerlendirme Ekibi</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Ekip üyeleri, raporda rol bazlı imza ve onay alanlarıyla birlikte resmî tabloda gösterilir. Önce isimleri, ardından varsa imza / kaşe görsellerini hazırlayın.</p>
+            </div>
+            <div className="rounded-[24px] border border-slate-200/10 bg-slate-950/45 p-4">
+              <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Toplam Rol</p>
+                  <p className="mt-1 text-sm font-semibold text-white">5 ekip üyesi</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Hazır İmza</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{signatureCount}/5</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Onay Yapısı</p>
+                  <p className="mt-1 text-sm font-semibold text-white">Rol bazlı tablo düzeni</p>
+                </div>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {inputField("İşveren / Vekili *", formData.employerRepresentativeName, (v) => updateForm("employerRepresentativeName", v), "Ad Soyad")}
+                {inputField("İSG Uzmanı *", formData.occupationalSafetySpecialistName, (v) => updateForm("occupationalSafetySpecialistName", v), "Ad Soyad")}
+                {inputField("İşyeri Hekimi *", formData.workplaceDoctorName, (v) => updateForm("workplaceDoctorName", v), "Ad Soyad")}
+                {inputField("Çalışan Temsilcisi *", formData.employeeRepresentativeName, (v) => updateForm("employeeRepresentativeName", v), "Ad Soyad")}
+                {inputField("Destek Elemanı *", formData.supportPersonnelName, (v) => updateForm("supportPersonnelName", v), "Ad Soyad", "md:col-span-2")}
+              </div>
+            </div>
+            <div className="grid gap-4 xl:grid-cols-2">
+              {signatureRoleConfigs.map(renderSignatureCard)}
+            </div>
+          </div>
+        );
       case 2:
-        return <div className="space-y-6"><div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">3. Adım · Yöntem ve Geçerlilik</p><p className="mt-2 text-sm leading-6 text-slate-300">Bu bölüm, resmî rapordaki analiz takvimi tablosunu oluşturur. Yöntem, analiz tarihi, yenileme periyodu ve geçerlilik tarihi doğrudan belge kapağına ve özet tablolarına yansır.</p></div><div className="grid gap-4 md:grid-cols-2"><div className="space-y-2"><Label className="text-sm font-semibold text-slate-200">Risk Analiz Yöntemi *</Label><Select value={formData.method} onValueChange={(value) => updateForm("method", value as RiskMethod)}><SelectTrigger className="h-12 rounded-2xl border-slate-200/10 bg-slate-950/55 text-slate-100"><SelectValue /></SelectTrigger><SelectContent className="border-white/10 bg-slate-950 text-slate-100">{methodOptions.map((method) => <SelectItem key={method} value={method}>{method}</SelectItem>)}</SelectContent></Select></div><div className="space-y-2"><Label className="text-sm font-semibold text-slate-200">Analiz Tarihi *</Label><Input type="date" value={formData.reportDate} onChange={(e) => handleReportDateChange(e.target.value)} className="h-12 rounded-2xl border-slate-200/10 bg-slate-950/55 text-slate-100" /></div><div className="space-y-2"><Label className="text-sm font-semibold text-slate-200">Geçerlilik Bitişi</Label><Input type="date" value={formData.validityDate} disabled className="h-12 cursor-not-allowed rounded-2xl border-slate-200/10 bg-slate-950/50 text-slate-400" /></div><div className="rounded-2xl border border-slate-200/10 bg-slate-950/45 p-4"><p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Yenileme Periyodu</p><p className="mt-2 text-sm font-semibold text-white">{hazardCfg.renewalLabel}</p><p className="mt-2 text-xs leading-5 text-slate-400">{hazardCfg.summary}</p></div></div>{textField("Yenileme ve Güncelleme Notu", formData.renewalTriggersNote, (v) => updateForm("renewalTriggersNote", v), "Kaza, proses değişikliği veya yeni makine alınması durumunda yapılacak güncelleme notunu yazın.")}</div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">3. Adım · Yöntem ve Geçerlilik</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Bu bölüm, resmî rapordaki analiz takvimi tablosunu oluşturur. Yöntem, analiz tarihi, yenileme periyodu ve geçerlilik tarihi doğrudan belge kapağına ve özet tablolarına yansır.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-slate-200">Risk Analiz Yöntemi *</Label>
+                <Select value={formData.method} onValueChange={(value) => updateForm("method", value as RiskMethod)}>
+                  <SelectTrigger className="h-12 rounded-2xl border-slate-200/10 bg-slate-950/55 !text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-slate-950 text-slate-100">
+                    {methodOptions.map((method) => <SelectItem key={method} value={method}>{method}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-slate-200">Analiz Tarihi *</Label>
+                <Input type="date" value={formData.reportDate} onChange={(e) => handleReportDateChange(e.target.value)} className="h-12 rounded-2xl border-slate-200/10 bg-slate-950/55 !text-white [color-scheme:dark]" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm font-semibold text-slate-200">Geçerlilik Bitişi</Label>
+                <Input type="date" value={formData.validityDate} disabled className="h-12 cursor-not-allowed rounded-2xl border-slate-200/10 bg-slate-950/50 !text-slate-400 [color-scheme:dark]" />
+              </div>
+              <div className="rounded-2xl border border-slate-200/10 bg-slate-950/45 p-4">
+                <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Yenileme Periyodu</p>
+                <p className="mt-2 text-sm font-semibold text-white">{hazardCfg.renewalLabel}</p>
+                <p className="mt-2 text-xs leading-5 text-slate-400">{hazardCfg.summary}</p>
+              </div>
+            </div>
+            {textField("Yenileme ve Güncelleme Notu", formData.renewalTriggersNote, (v) => updateForm("renewalTriggersNote", v), "Kaza, proses değişikliği veya yeni makine alınması durumunda yapılacak güncelleme notunu yazın.")}
+          </div>
+        );
       case 3:
-        return <div className="space-y-6"><div className="rounded-2xl border border-rose-400/15 bg-rose-500/5 p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-rose-200/80">4. Adım · Tehlike Tanımları</p><p className="mt-2 text-sm leading-6 text-slate-300">Tehlike kaynaklarını ve bunlardan doğabilecek riskleri net biçimde yazın.</p></div>{textField("Tehlike Kaynakları *", formData.hazardSources, (v) => updateForm("hazardSources", v), "Makine, ekipman, proses, kimyasal veya çevresel kaynaklı tehlikeleri yazın.")}{textField("Doğabilecek Riskler *", formData.identifiedRisks, (v) => updateForm("identifiedRisks", v), "Yaralanma, meslek hastalığı, yangın, patlama, düşme gibi sonuçları yazın.")}</div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-rose-400/15 bg-rose-500/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-rose-200/80">4. Adım · Tehlike Tanımları</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Tehlike kaynaklarını ve bunlardan doğabilecek riskleri net biçimde yazın.</p>
+            </div>
+            {textField("Tehlike Kaynakları *", formData.hazardSources, (v) => updateForm("hazardSources", v), "Makine, ekipman, proses, kimyasal veya çevresel kaynaklı tehlikeleri yazın.")}
+            {textField("Doğabilecek Riskler *", formData.identifiedRisks, (v) => updateForm("identifiedRisks", v), "Yaralanma, meslek hastalığı, yangın, patlama, düşme gibi sonuçları yazın.")}
+          </div>
+        );
       case 4:
-        return <div className="space-y-6"><div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/80">5. Adım · Kontrol Tedbirleri</p><p className="mt-2 text-sm leading-6 text-slate-300">Düzeltici ve önleyici faaliyetleri, sorumluları ve mevzuat notlarını resmileştirin.</p></div>{textField("Kontrol Tedbirleri *", formData.controlMeasures, (v) => updateForm("controlMeasures", v), "Kararlaştırılan düzeltici ve önleyici faaliyetleri yazın.")}{textField("Uygulama Sorumluları *", formData.responsiblePersons, (v) => updateForm("responsiblePersons", v), "Sorumlu kişileri ve takip rollerini yazın.")}{textField("Mevzuat / Uygunluk Notları", formData.legislationNotes, (v) => updateForm("legislationNotes", v), "İlgili yönetmelik, standart veya prosedür referanslarını ekleyin.")}</div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/80">5. Adım · Kontrol Tedbirleri</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Düzeltici ve önleyici faaliyetleri, sorumluları ve mevzuat notlarını resmileştirin.</p>
+            </div>
+            {textField("Kontrol Tedbirleri *", formData.controlMeasures, (v) => updateForm("controlMeasures", v), "Kararlaştırılan düzeltici ve önleyici faaliyetleri yazın.")}
+            {textField("Uygulama Sorumluları *", formData.responsiblePersons, (v) => updateForm("responsiblePersons", v), "Sorumlu kişileri ve takip rollerini yazın.")}
+            {textField("Mevzuat / Uygunluk Notları", formData.legislationNotes, (v) => updateForm("legislationNotes", v), "İlgili yönetmelik, standart veya prosedür referanslarını ekleyin.")}
+          </div>
+        );
       default:
-        return <div className="space-y-6"><div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">6. Adım · Resmî Önizleme</p><p className="mt-2 text-sm leading-6 text-slate-300">Bu görünüm, oluşturulacak PDF raporunun belge karakterini yansıtır. Kapağın, analiz takviminin ve ekip/onay tablosunun nasıl görüneceğini burada sakin ve resmî bir düzende kontrol edin.</p></div><div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]"><Card className="border-slate-200/10 bg-[#f8fbff] shadow-[0_16px_36px_rgba(15,23,42,0.1)]"><CardContent className="p-6 text-slate-900"><div className="rounded-[24px] border border-slate-200 bg-white"><div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4"><div className="flex items-center gap-4"><div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">{formData.logo ? <img src={formData.logo} alt="Logo" className="h-full w-full object-cover" /> : <FileText className="h-5 w-5 text-slate-500" />}</div><div><p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">İSG Risk Değerlendirme Raporu</p><p className="mt-2 text-lg font-black text-slate-900">{brandedCompanyName}</p><p className="mt-1 text-sm text-slate-500">{formData.workplaceTitle || "İşyeri unvanı bekleniyor"}</p></div></div><div className="min-w-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right"><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Revizyon</p><p className="mt-1 text-xs font-semibold text-slate-700">Rev. 1</p><p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Geçerlilik</p><p className="mt-1 text-xs font-semibold text-slate-700">{formatDisplayDate(formData.validityDate)}</p><p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Oluşturulma</p><p className="mt-1 text-xs font-semibold text-slate-700">{createdAtLabel}</p></div></div><div className="grid gap-4 p-5"><div className="rounded-2xl border border-slate-200"><div className="grid grid-cols-[180px_1fr]"><div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">İşyeri Bilgileri</div><div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Resmî üst bilgi tablosu</div></div><div className="grid gap-px border-t border-slate-200 bg-slate-200 md:grid-cols-2">{[["İşyeri Unvanı", formData.workplaceTitle || "-"], ["İşveren Adı", formData.employerName || "-"], ["İşyeri Adresi", formData.workplaceAddress || "-"], ["Bölüm / Alan", formData.department || "-"]].map(([label, value]) => <div key={label} className="grid grid-cols-[140px_1fr] bg-white"><div className="border-r border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div><div className="px-4 py-3 text-sm font-medium text-slate-800">{value}</div></div>)}</div></div><div className="rounded-2xl border border-slate-200"><div className="grid grid-cols-[180px_1fr]"><div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">Analiz Takvimi</div><div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Yöntem ve geçerlilik bilgisi</div></div><div className="grid gap-px border-t border-slate-200 bg-slate-200 md:grid-cols-2">{[["Analiz Tarihi", formatDisplayDate(formData.reportDate)], ["Geçerlilik Bitişi", formatDisplayDate(formData.validityDate)], ["Risk Analiz Yöntemi", formData.method], ["Yenileme Periyodu", hazardCfg.renewalLabel]].map(([label, value]) => <div key={label} className="grid grid-cols-[140px_1fr] bg-white"><div className="border-r border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div><div className="px-4 py-3 text-sm font-medium text-slate-800">{value}</div></div>)}</div></div><div className="rounded-2xl border border-slate-200"><div className="grid grid-cols-[180px_1fr]"><div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">İmza / Onay</div><div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Rol bazlı onay tablosu</div></div><div className="grid grid-cols-[1.1fr_1.1fr_0.7fr_0.8fr] border-t border-slate-200 bg-slate-100 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500"><div className="border-r border-slate-200 px-4 py-3">Rol</div><div className="border-r border-slate-200 px-4 py-3">Ad Soyad</div><div className="border-r border-slate-200 px-4 py-3">Tarih / Durum</div><div className="px-4 py-3">İmza</div></div><div className="divide-y divide-slate-200">{signatureRoleConfigs.map((role) => { const imageUrl = formData[role.key]; return <div key={role.key} className="grid grid-cols-[1.1fr_1.1fr_0.7fr_0.8fr] bg-white"><div className="border-r border-slate-200 px-4 py-3"><p className="text-sm font-semibold text-slate-800">{role.subtitle}</p><p className="mt-1 text-xs text-slate-500">{role.title}</p></div><div className="border-r border-slate-200 px-4 py-3 text-sm font-medium text-slate-800">{cleanText(formData[role.nameKey]) || "-"}</div><div className="border-r border-slate-200 px-4 py-3"><p className="text-xs text-slate-500">{imageUrl ? formatDisplayDate(formData.reportDate) : "-"}</p><p className="mt-1 text-sm font-semibold text-slate-800">{imageUrl ? "Hazır" : "Bekliyor"}</p></div><div className="flex items-center justify-center px-4 py-3">{imageUrl ? <img src={imageUrl} alt={role.title} className="h-12 w-full rounded-xl border border-slate-200 object-contain p-1" /> : <div className="h-12 w-full rounded-xl border border-dashed border-slate-300 bg-slate-50" />}</div></div>; })}</div></div></div></div></CardContent></Card><div className="space-y-4"><Card className="border-slate-200/10 bg-slate-950/55"><CardContent className="p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Yönetmelik Kontrolü</p><div className="mt-3 grid gap-2">{[["İşyeri bilgileri", cleanText(formData.workplaceTitle) && cleanText(formData.workplaceAddress) && cleanText(formData.employerName)], ["Ekip üyeleri", cleanText(formData.employerRepresentativeName) && cleanText(formData.occupationalSafetySpecialistName) && cleanText(formData.workplaceDoctorName) && cleanText(formData.employeeRepresentativeName) && cleanText(formData.supportPersonnelName)], ["Analiz tarihi ve geçerlilik", cleanText(formData.reportDate) && cleanText(formData.validityDate)], ["Tehlike ve risk tanımları", cleanText(formData.hazardSources) && cleanText(formData.identifiedRisks)], ["Yöntem bilgisi", cleanText(formData.method)], ["Kontrol tedbirleri ve sorumlular", cleanText(formData.controlMeasures) && cleanText(formData.responsiblePersons)]].map(([label, ok]) => <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2 text-sm text-slate-200"><span>{label}</span><Badge className={cn("rounded-full border", ok ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100")}>{ok ? "Hazır" : "Eksik"}</Badge></div>)}</div></CardContent></Card><Card className="border-slate-200/10 bg-slate-950/55"><CardContent className="p-4"><p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Belge Notu</p><p className="mt-3 text-sm leading-6 text-slate-300">PDF çıktısı, bu önizlemedeki düzeni takip eden klasik kapak, bilgi tabloları ve rol bazlı onay alanlarıyla oluşturulur. Ekranda gördüğünüz bilgi yapısı belgenin de karakterini belirler.</p></CardContent></Card><Button type="button" onClick={generatePDFPreview} className="w-full rounded-2xl bg-slate-100 text-slate-950 hover:bg-white"><Download className="mr-2 h-4 w-4" />PDF İndir</Button></div></div></div>;
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200/10 bg-white/[0.025] p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">6. Adım · Resmî Önizleme</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Bu görünüm, oluşturulacak PDF raporunun belge karakterini yansıtır. Kapağın, analiz takviminin ve ekip/onay tablosunun nasıl görüneceğini burada sakin ve resmî bir düzende kontrol edin.</p>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <Card className="border-slate-200/10 bg-[#f8fbff] shadow-[0_16px_36px_rgba(15,23,42,0.1)]">
+                <CardContent className="p-6 text-slate-900">
+                  <div className="rounded-[24px] border border-slate-200 bg-white">
+                    <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                          {formData.logo ? <img src={formData.logo} alt="Logo" className="h-full w-full object-cover" /> : <FileText className="h-5 w-5 text-slate-500" />}
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-slate-400">İSG Risk Değerlendirme Raporu</p>
+                          <p className="mt-2 text-lg font-black text-slate-900">{brandedCompanyName}</p>
+                          <p className="mt-1 text-sm text-slate-500">{formData.workplaceTitle || "İşyeri unvanı bekleniyor"}</p>
+                        </div>
+                      </div>
+                      <div className="min-w-[180px] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Revizyon</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-700">Rev. 1</p>
+                        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Geçerlilik</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-700">{formatDisplayDate(formData.validityDate)}</p>
+                        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">Oluşturulma</p>
+                        <p className="mt-1 text-xs font-semibold text-slate-700">{createdAtLabel}</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-4 p-5">
+                      <div className="rounded-2xl border border-slate-200">
+                        <div className="grid grid-cols-[180px_1fr]">
+                          <div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">İşyeri Bilgileri</div>
+                          <div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Resmî üst bilgi tablosu</div>
+                        </div>
+                        <div className="grid gap-px border-t border-slate-200 bg-slate-200 md:grid-cols-2">
+                          {[["İşyeri Unvanı", formData.workplaceTitle || "-"], ["İşveren Adı", formData.employerName || "-"], ["İşyeri Adresi", formData.workplaceAddress || "-"], ["Bölüm / Alan", formData.department || "-"]].map(([label, value]) => (
+                            <div key={label} className="grid grid-cols-[140px_1fr] bg-white">
+                              <div className="border-r border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                              <div className="px-4 py-3 text-sm font-medium text-slate-800">{value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200">
+                        <div className="grid grid-cols-[180px_1fr]">
+                          <div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">Analiz Takvimi</div>
+                          <div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Yöntem ve geçerlilik bilgisi</div>
+                        </div>
+                        <div className="grid gap-px border-t border-slate-200 bg-slate-200 md:grid-cols-2">
+                          {[["Analiz Tarihi", formatDisplayDate(formData.reportDate)], ["Geçerlilik Bitişi", formatDisplayDate(formData.validityDate)], ["Risk Analiz Yöntemi", formData.method], ["Yenileme Periyodu", hazardCfg.renewalLabel]].map(([label, value]) => (
+                            <div key={label} className="grid grid-cols-[140px_1fr] bg-white">
+                              <div className="border-r border-slate-200 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                              <div className="px-4 py-3 text-sm font-medium text-slate-800">{value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200">
+                        <div className="grid grid-cols-[180px_1fr]">
+                          <div className="border-r border-slate-200 bg-slate-900 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-white">İmza / Onay</div>
+                          <div className="bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Rol bazlı onay tablosu</div>
+                        </div>
+                        <div className="grid grid-cols-[1.1fr_1.1fr_0.7fr_0.8fr] border-t border-slate-200 bg-slate-100 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                          <div className="border-r border-slate-200 px-4 py-3">Rol</div>
+                          <div className="border-r border-slate-200 px-4 py-3">Ad Soyad</div>
+                          <div className="border-r border-slate-200 px-4 py-3">Tarih / Durum</div>
+                          <div className="px-4 py-3">İmza</div>
+                        </div>
+                        <div className="divide-y divide-slate-200">
+                          {signatureRoleConfigs.map((role) => {
+                            const imageUrl = formData[role.key];
+                            return (
+                              <div key={role.key} className="grid grid-cols-[1.1fr_1.1fr_0.7fr_0.8fr] bg-white">
+                                <div className="border-r border-slate-200 px-4 py-3">
+                                  <p className="text-sm font-semibold text-slate-800">{role.subtitle}</p>
+                                  <p className="mt-1 text-xs text-slate-500">{role.title}</p>
+                                </div>
+                                <div className="border-r border-slate-200 px-4 py-3 text-sm font-medium text-slate-800">{cleanText(formData[role.nameKey]) || "-"}</div>
+                                <div className="border-r border-slate-200 px-4 py-3">
+                                  <p className="text-xs text-slate-500">{imageUrl ? formatDisplayDate(formData.reportDate) : "-"}</p>
+                                  <p className="mt-1 text-sm font-semibold text-slate-800">{imageUrl ? "Hazır" : "Bekliyor"}</p>
+                                </div>
+                                <div className="flex items-center justify-center px-4 py-3">
+                                  {imageUrl ? <img src={imageUrl} alt={role.title} className="h-12 w-full rounded-xl border border-slate-200 object-contain p-1" /> : <div className="h-12 w-full rounded-xl border border-dashed border-slate-300 bg-slate-50" />}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <div className="space-y-4">
+                <Card className="border-slate-200/10 bg-slate-950/55">
+                  <CardContent className="p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Yönetmelik Kontrolü</p>
+                    <div className="mt-3 grid gap-2">
+                      {[
+                        ["İşyeri bilgileri", cleanText(formData.workplaceTitle) && cleanText(formData.workplaceAddress) && cleanText(formData.employerName)],
+                        ["Ekip üyeleri", cleanText(formData.employerRepresentativeName) && cleanText(formData.occupationalSafetySpecialistName) && cleanText(formData.workplaceDoctorName) && cleanText(formData.employeeRepresentativeName) && cleanText(formData.supportPersonnelName)],
+                        ["Analiz tarihi ve geçerlilik", cleanText(formData.reportDate) && cleanText(formData.validityDate)],
+                        ["Tehlike ve risk tanımları", cleanText(formData.hazardSources) && cleanText(formData.identifiedRisks)],
+                        ["Yöntem bilgisi", cleanText(formData.method)],
+                        ["Kontrol tedbirleri ve sorumlular", cleanText(formData.controlMeasures) && cleanText(formData.responsiblePersons)]
+                      ].map(([label, ok]) => (
+                        <div key={label as string} className="flex items-center justify-between rounded-2xl border border-slate-200/10 bg-white/[0.03] px-3 py-2 text-sm text-slate-200">
+                          <span>{label}</span>
+                          <Badge className={cn("rounded-full border", ok ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-100" : "border-amber-400/20 bg-amber-500/10 text-amber-100")}>{ok ? "Hazır" : "Eksik"}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-slate-200/10 bg-slate-950/55">
+                  <CardContent className="p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Belge Notu</p>
+                    <p className="mt-3 text-sm leading-6 text-slate-300">PDF çıktısı, bu önizlemedeki düzeni takip eden klasik kapak, bilgi tabloları ve rol bazlı onay alanlarıyla oluşturulur. Ekranda gördüğünüz bilgi yapısı belgenin de karakterini belirler.</p>
+                  </CardContent>
+                </Card>
+                <Button type="button" onClick={generatePDFPreview} className="w-full rounded-2xl bg-slate-100 text-slate-950 hover:bg-white">
+                  <Download className="mr-2 h-4 w-4" />PDF İndir
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
     }
   };
 
   return (
     <>
-    <div className="theme-page-readable space-y-8">
-      <section className="overflow-hidden rounded-[30px] border border-slate-200/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94))] p-6 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-          <div>
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <Badge className="rounded-full border border-slate-200/10 bg-white/[0.04] text-slate-200">Risk Değerlendirme Akışı</Badge>
-              <div className="flex min-w-[240px] items-center gap-3 rounded-2xl border border-slate-200/10 bg-white/[0.03] px-4 py-3">
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200/10 bg-slate-950/70">
-                  {formData.logo ? (
-                    <img src={formData.logo} alt="Firma logosu" className="h-full w-full object-cover" />
-                  ) : (
-                    <Building2 className="h-5 w-5 text-cyan-100" />
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Marka Alanı</p>
-                  <p className="truncate text-sm font-semibold text-white">{brandedCompanyName}</p>
-                  <div className="mt-1 flex items-center gap-2"><p className="text-xs text-slate-400">{formData.logo ? "Logo hazır" : "Logo eklendiğinde burada görünür"}</p>{formData.logo ? <Badge className="rounded-full border border-emerald-400/20 bg-emerald-500/10 text-[10px] text-emerald-100">Hazır</Badge> : null}</div>
-                </div>
-                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="ml-auto rounded-xl border-slate-200/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
-                  <Upload className="mr-2 h-3.5 w-3.5" />
-                  Logo Yükle
-                </Button>
-              </div>
-            </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-white">Resmî içerik zorunluluklarına göre risk raporu hazırlayın</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-              Bu sihirbaz, yönetmeliğin 12. maddesinde yer alan işyeri bilgileri, ekip üyeleri, yöntem, tehlike tanımları, kontrol tedbirleri ve imza alanlarını eksiksiz toplar.
-            </p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-              {[
-                { label: "Resmî Alan", value: `${completedFields}/15`, hint: "Yönetmelik içeriği" },
-                { label: "Geçerlilik", value: hazardCfg.renewalLabel, hint: formData.hazardLevel },
-                { label: "İmza Alanı", value: `${signatureCount}/5`, hint: "Hazır imza / kaşe" },
-              ].map((metric) => (
-                <div key={metric.label} className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{metric.label}</p>
-                  <p className="mt-2 text-sm font-semibold text-white">{metric.value}</p>
-                  <p className="mt-1 text-xs text-slate-400">{metric.hint}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-4">
-            <div className="rounded-[26px] border border-slate-200/10 bg-white/[0.03] p-5">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Tehlike Profili</p>
-                  <p className="mt-2 text-lg font-black text-white">{hazardCfg.icon} {formData.hazardLevel}</p>
-                </div>
-                <Badge className="border-slate-200/10 bg-white/[0.04] text-slate-100">{hazardCfg.renewalLabel}</Badge>
-              </div>
-              <p className="mt-3 text-sm text-slate-300">{hazardCfg.summary}</p>
-            </div>
-            <div className="rounded-[26px] border border-slate-200/10 bg-slate-950/55 p-5">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Adım Rehberi</p>
-              <h2 className="mt-2 text-lg font-bold text-white">{currentStepConfig.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{currentStepConfig.description}</p>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
-                <div className="h-full rounded-full bg-slate-200" style={{ width: `${completionRatio}%` }} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-        <Card className={formalCardClass}>
-          <CardContent className="space-y-6 p-6">
-            <div className="grid gap-3 md:grid-cols-3">
-              {steps.map((step, index) => {
-                const isActive = index === currentStep;
-                const isCompleted = index < currentStep;
-                const progressPercent = Math.round((stepCompletionCounts[index].completed / stepCompletionCounts[index].total) * 100);
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    onClick={() => setCurrentStep(index)}
-                    className={cn(
-                      "rounded-2xl border p-4 text-left transition-all",
-                      isActive && "border-slate-300/20 bg-white/[0.05]",
-                      isCompleted && "border-emerald-400/20 bg-emerald-500/10",
-                      !isActive && !isCompleted && "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+      <div className="theme-page-readable space-y-8">
+        <section className="overflow-hidden rounded-[30px] border border-slate-200/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94))] p-6 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
+          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+            <div>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <Badge className="rounded-full border border-slate-200/10 bg-white/[0.04] text-slate-200">Risk Değerlendirme Akışı</Badge>
+                <div className="flex min-w-[240px] items-center gap-3 rounded-2xl border border-slate-200/10 bg-white/[0.03] px-4 py-3">
+                  <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border border-slate-200/10 bg-slate-950/70">
+                    {formData.logo ? (
+                      <img src={formData.logo} alt="Firma logosu" className="h-full w-full object-cover" />
+                    ) : (
+                      <Building2 className="h-5 w-5 text-cyan-100" />
                     )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl border", isActive && "border-slate-300/20 bg-white/[0.06] text-white", isCompleted && "border-emerald-400/25 bg-emerald-500/12 text-emerald-50", !isActive && !isCompleted && "border-white/10 bg-white/[0.04] text-slate-300")}>
-                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step.icon}
-                      </div>
-                      <Badge className={cn("rounded-full border text-[10px] uppercase tracking-[0.18em]", isActive && "border-cyan-400/20 bg-cyan-500/10 text-cyan-100", isCompleted && "border-emerald-400/20 bg-emerald-500/10 text-emerald-100", !isActive && !isCompleted && "border-white/10 bg-white/[0.04] text-slate-400")}>
-                        {isCompleted ? "Hazır" : isActive ? "Aktif" : "Bekliyor"}
-                      </Badge>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Marka Alanı</p>
+                    <p className="truncate text-sm font-semibold text-white">{brandedCompanyName}</p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <p className="text-xs text-slate-400">{formData.logo ? "Logo hazır" : "Logo eklendiğinde burada görünür"}</p>
+                      {formData.logo ? <Badge className="rounded-full border border-emerald-400/20 bg-emerald-500/10 text-[10px] text-emerald-100">Hazır</Badge> : null}
                     </div>
-                    <p className="mt-4 text-sm font-semibold text-white">{step.label}</p>
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                      <span>Tamamlama</span>
-                      <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-medium text-slate-200">{stepCompletionCounts[index].completed}/{stepCompletionCounts[index].total}</span>
-                    </div>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-                      <div className={cn("h-full rounded-full transition-all", isCompleted && "bg-emerald-400", isActive && "bg-slate-200", !isActive && !isCompleted && "bg-white/15")} style={{ width: `${progressPercent}%` }} />
-                    </div>
-                    <p className="mt-2 text-right text-[11px] font-medium text-slate-400">%{progressPercent}</p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="rounded-[28px] border border-slate-200/10 bg-white/[0.02] p-5">{renderStepContent()}</div>
-
-            <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <Button type="button" variant="outline" onClick={() => setCurrentStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0} className="rounded-2xl border-slate-200/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
-                <ChevronLeft className="mr-2 h-4 w-4" />
-                Geri
-              </Button>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button type="button" variant="outline" onClick={resetWizardDraft} disabled={submitting} className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15">
-                  <X className="mr-2 h-4 w-4" />
-                  Taslağı Temizle
-                </Button>
-                <Button type="button" onClick={currentStep === steps.length - 1 ? handleSubmit : () => setCurrentStep(currentStep + 1)} disabled={submitting} className="rounded-2xl bg-slate-100 text-slate-950 hover:bg-white">
-                  {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Editör hazırlanıyor...</> : currentStep === steps.length - 1 ? <><FilePenLine className="mr-2 h-4 w-4" />Kaydet ve Editöre Geç</> : <>İleri<ChevronRight className="ml-2 h-4 w-4" /></>}
-                </Button>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} className="ml-auto rounded-xl border-slate-200/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
+                    <Upload className="mr-2 h-3.5 w-3.5" />
+                    Logo Yükle
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card className={formalCardClass}>
-            <CardContent className="p-5">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Resmî Özet</p>
-              <div className="mt-4 space-y-3">
-                {[["Firma / Rapor", formData.firmName || "Henüz belirtilmedi"], ["Risk Analiz Yöntemi", formData.method], ["Geçerlilik Bitişi", formData.validityDate ? formatDisplayDate(formData.validityDate) : "Otomatik hesaplanacak"], ["Belge Durumu", pdfReady ? "Resmî rapor üretimine hazır" : "Zorunlu alanlar tamamlanıyor"]].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                    <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+              <h1 className="mt-4 text-3xl font-black tracking-tight text-white">Resmî içerik zorunluluklarına göre risk raporu hazırlayın</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                Bu sihirbaz, yönetmeliğin 12. maddesinde yer alan işyeri bilgileri, ekip üyeleri, yöntem, tehlike tanımları, kontrol tedbirleri ve imza alanlarını eksiksiz toplar.
+              </p>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {[
+                  { label: "Resmî Alan", value: `${completedFields}/15`, hint: "Yönetmelik içeriği" },
+                  { label: "Geçerlilik", value: hazardCfg.renewalLabel, hint: formData.hazardLevel },
+                  { label: "İmza Alanı", value: `${signatureCount}/5`, hint: "Hazır imza / kaşe" },
+                ].map((metric) => (
+                  <div key={metric.label} className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">{metric.label}</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{metric.value}</p>
+                    <p className="mt-1 text-xs text-slate-400">{metric.hint}</p>
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <div className="space-y-4">
+              <div className="rounded-[26px] border border-slate-200/10 bg-white/[0.03] p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Tehlike Profili</p>
+                    <p className="mt-2 text-lg font-black text-white">{hazardCfg.icon} {formData.hazardLevel}</p>
+                  </div>
+                  <Badge className="border-slate-200/10 bg-white/[0.04] text-slate-100">{hazardCfg.renewalLabel}</Badge>
+                </div>
+                <p className="mt-3 text-sm text-slate-300">{hazardCfg.summary}</p>
+              </div>
+              <div className="rounded-[26px] border border-slate-200/10 bg-slate-950/55 p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Adım Rehberi</p>
+                <h2 className="mt-2 text-lg font-bold text-white">{currentStepConfig.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{currentStepConfig.description}</p>
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <div className="h-full rounded-full bg-slate-200" style={{ width: `${completionRatio}%` }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
           <Card className={formalCardClass}>
-            <CardContent className="p-5">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Resmî İçerik Notu</p>
-              <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
-                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">İşyeri ve Ekip</p>
-                  <p className="mt-2">İşyeri bilgileri, ekip üyeleri ve imza/onay alanları PDF içinde ayrı resmî tablolar halinde gösterilir.</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Geçerlilik ve Yenileme</p>
-                  <p className="mt-2">Tehlike sınıfına göre yenileme süresi otomatik hesaplanır; kaza, yeni makine veya proses değişikliğinde revizyon notu ayrıca yazdırılır.</p>
-                </div>
-                <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Kayıt ve Belge Akışı</p>
-                  <p className="mt-2">Kullanıcı kaydettiğinde kayıt risk_assessments tablosuna yazılır ve aynı veri yapısı editör ekranına köprülenir.</p>
+            <CardContent className="space-y-6 p-6">
+              <div className="grid gap-3 md:grid-cols-3">
+                {steps.map((step, index) => {
+                  const isActive = index === currentStep;
+                  const isCompleted = index < currentStep;
+                  const progressPercent = Math.round((stepCompletionCounts[index].completed / stepCompletionCounts[index].total) * 100);
+                  return (
+                    <button
+                      key={step.id}
+                      type="button"
+                      onClick={() => setCurrentStep(index)}
+                      className={cn(
+                        "rounded-2xl border p-4 text-left transition-all",
+                        isActive && "border-slate-300/20 bg-white/[0.05]",
+                        isCompleted && "border-emerald-400/20 bg-emerald-500/10",
+                        !isActive && !isCompleted && "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className={cn("flex h-10 w-10 items-center justify-center rounded-2xl border", isActive && "border-slate-300/20 bg-white/[0.06] text-white", isCompleted && "border-emerald-400/25 bg-emerald-500/12 text-emerald-50", !isActive && !isCompleted && "border-white/10 bg-white/[0.04] text-slate-300")}>
+                          {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step.icon}
+                        </div>
+                        <Badge className={cn("rounded-full border text-[10px] uppercase tracking-[0.18em]", isActive && "border-cyan-400/20 bg-cyan-500/10 text-cyan-100", isCompleted && "border-emerald-400/20 bg-emerald-500/10 text-emerald-100", !isActive && !isCompleted && "border-white/10 bg-white/[0.04] text-slate-400")}>
+                          {isCompleted ? "Hazır" : isActive ? "Aktif" : "Bekliyor"}
+                        </Badge>
+                      </div>
+                      <p className="mt-4 text-sm font-semibold text-white">{step.label}</p>
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                        <span>Tamamlama</span>
+                        <span className="rounded-full border border-white/10 bg-white/[0.04] px-2 py-1 font-medium text-slate-200">{stepCompletionCounts[index].completed}/{stepCompletionCounts[index].total}</span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+                        <div className={cn("h-full rounded-full transition-all", isCompleted && "bg-emerald-400", isActive && "bg-slate-200", !isActive && !isCompleted && "bg-white/15")} style={{ width: `${progressPercent}%` }} />
+                      </div>
+                      <p className="mt-2 text-right text-[11px] font-medium text-slate-400">%{progressPercent}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="rounded-[28px] border border-slate-200/10 bg-white/[0.02] p-5">{renderStepContent()}</div>
+
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
+                <Button type="button" variant="outline" onClick={() => setCurrentStep(Math.max(0, currentStep - 1))} disabled={currentStep === 0} className="rounded-2xl border-slate-200/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
+                  <ChevronLeft className="mr-2 h-4 w-4" />
+                  Geri
+                </Button>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Button type="button" variant="outline" onClick={resetWizardDraft} disabled={submitting} className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15">
+                    <X className="mr-2 h-4 w-4" />
+                    Taslağı Temizle
+                  </Button>
+                  <Button type="button" onClick={currentStep === steps.length - 1 ? handleSubmit : () => setCurrentStep(currentStep + 1)} disabled={submitting} className="rounded-2xl bg-slate-100 text-slate-950 hover:bg-white">
+                    {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Editör hazırlanıyor...</> : currentStep === steps.length - 1 ? <><FilePenLine className="mr-2 h-4 w-4" />Kaydet ve Editöre Geç</> : <>İleri<ChevronRight className="ml-2 h-4 w-4" /></>}
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          <div className="space-y-4">
+            <Card className={formalCardClass}>
+              <CardContent className="p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Resmî Özet</p>
+                <div className="mt-4 space-y-3">
+                  {[
+                    ["Firma / Rapor", formData.firmName || "Henüz belirtilmedi"],
+                    ["Risk Analiz Yöntemi", formData.method],
+                    ["Geçerlilik Bitişi", formData.validityDate ? formatDisplayDate(formData.validityDate) : "Otomatik hesaplanacak"],
+                    ["Belge Durumu", pdfReady ? "Resmî rapor üretimine hazır" : "Zorunlu alanlar tamamlanıyor"]
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">{label}</p>
+                      <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className={formalCardClass}>
+              <CardContent className="p-5">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Resmî İçerik Notu</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-slate-300">
+                  <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">İşyeri ve Ekip</p>
+                    <p className="mt-2">İşyeri bilgileri, ekip üyeleri ve imza/onay alanları PDF içinde ayrı resmî tablolar halinde gösterilir.</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Geçerlilik ve Yenileme</p>
+                    <p className="mt-2">Tehlike sınıfına göre yenileme süresi otomatik hesaplanır; kaza, yeni makine veya proses değişikliğinde revizyon notu ayrıca yazdırılır.</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Kayıt ve Belge Akışı</p>
+                    <p className="mt-2">Kullanıcı kaydettiğinde kayıt risk_assessments tablosuna yazılır ve aynı veri yapısı editör ekranına köprülenir.</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
-    </div>
-    <Dialog open={Boolean(signaturePreview)} onOpenChange={(open) => !open && setSignaturePreview(null)}>
-      <DialogContent className="max-w-3xl border-white/10 bg-slate-950 text-white">
-        <DialogHeader>
-          <DialogTitle>{signaturePreview?.title || "İmza Önizleme"}</DialogTitle>
-        </DialogHeader>
-        {signaturePreview ? (
-          <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <Badge className="border-cyan-400/20 bg-cyan-500/10 text-cyan-100">Büyük Önizleme</Badge>
-              <p className="text-xs text-slate-400">İmza / kaşe görseli PDF tablosunda ilgili ekip üyesine basılır.</p>
+      
+      <Dialog open={Boolean(signaturePreview)} onOpenChange={(open) => !open && setSignaturePreview(null)}>
+        <DialogContent className="max-w-3xl border-white/10 bg-slate-950 text-white">
+          <DialogHeader>
+            <DialogTitle>{signaturePreview?.title || "İmza Önizleme"}</DialogTitle>
+          </DialogHeader>
+          {signaturePreview ? (
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <Badge className="border-cyan-400/20 bg-cyan-500/10 text-cyan-100">Büyük Önizleme</Badge>
+                <p className="text-xs text-slate-400">İmza / kaşe görseli PDF tablosunda ilgili ekip üyesine basılır.</p>
+              </div>
+              <div className="flex min-h-[360px] items-center justify-center rounded-[20px] border border-white/10 bg-slate-900/70 p-6">
+                <img src={signaturePreview.imageUrl} alt={signaturePreview.title} className="max-h-[420px] w-full object-contain" />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-white/10 bg-white/[0.05] text-slate-100 hover:bg-white/[0.1]"
+                  onClick={() => {
+                    const link = document.createElement("a");
+                    link.href = signaturePreview.imageUrl;
+                    link.download = `${asciiSlug(signaturePreview.title)}-${Date.now()}.png`;
+                    link.click();
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  İndir
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15"
+                  onClick={() => signatureInputRefs.current[signaturePreview.field]?.click()}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Yeni Görsel Yükle
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15"
+                  onClick={() => {
+                    updateForm(signaturePreview.field, null);
+                    setSignaturePreview(null);
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Kaldır
+                </Button>
+              </div>
             </div>
-            <div className="flex min-h-[360px] items-center justify-center rounded-[20px] border border-white/10 bg-slate-900/70 p-6">
-              <img src={signaturePreview.imageUrl} alt={signaturePreview.title} className="max-h-[420px] w-full object-contain" />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-2xl border-white/10 bg-white/[0.05] text-slate-100 hover:bg-white/[0.1]"
-                onClick={() => {
-                  const link = document.createElement("a");
-                  link.href = signaturePreview.imageUrl;
-                  link.download = `${asciiSlug(signaturePreview.title)}-${Date.now()}.png`;
-                  link.click();
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                İndir
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-2xl border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15"
-                onClick={() => signatureInputRefs.current[signaturePreview.field]?.click()}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Yeni Görsel Yükle
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-2xl border-red-400/20 bg-red-500/10 text-red-100 hover:bg-red-500/15"
-                onClick={() => {
-                  updateForm(signaturePreview.field, null);
-                  setSignaturePreview(null);
-                }}
-              >
-                <X className="mr-2 h-4 w-4" />
-                Kaldır
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

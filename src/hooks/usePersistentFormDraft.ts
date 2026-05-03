@@ -1,3 +1,4 @@
+//src\hooks\usePersistentFormDraft.ts
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import {
@@ -8,6 +9,13 @@ import {
 } from "@/hooks/usePersistentDraft";
 
 type FormDraftStorage = "localStorage" | "sessionStorage" | "indexedDb";
+
+type FormDraftStorageAdapter<T> = {
+  debugStorageKey?: string;
+  read: () => Promise<T | null> | T | null;
+  write: (value: T) => Promise<void> | void;
+  clear: () => Promise<void> | void;
+};
 
 type UsePersistentFormDraftOptions<T> = {
   formId: string;
@@ -25,6 +33,7 @@ type UsePersistentFormDraftOptions<T> = {
   shouldPersist?: (value: T) => boolean;
   onRestore?: (value: T) => void;
   debugLabel?: string;
+  storageAdapter?: FormDraftStorageAdapter<T>;
 };
 
 type IndexedDbEnvelope<T> = {
@@ -184,6 +193,7 @@ export function usePersistentFormDraft<T>({
   shouldPersist,
   onRestore,
   debugLabel,
+  storageAdapter,
 }: UsePersistentFormDraftOptions<T>) {
   const location = useLocation();
   const [hasRestoredDraft, setHasRestoredDraft] = useState(false);
@@ -204,9 +214,10 @@ export function usePersistentFormDraft<T>({
     [organizationId, userId],
   );
   const storageKey = useMemo(() => buildDraftStorageKey(key, scope), [key, scope]);
+  const effectiveStorageKey = storageAdapter?.debugStorageKey || storageKey;
   const debugEnabled = useMemo(() => {
     if (!isBrowser()) return false;
-    return new URLSearchParams(location.search).get("debugFormPersistence") === "1";
+    return import.meta.env.DEV && new URLSearchParams(location.search).get("debugFormPersistence") === "1";
   }, [location.search]);
   const debugName = debugLabel || formId;
 
@@ -219,13 +230,13 @@ export function usePersistentFormDraft<T>({
         formId,
         debugName,
         storage,
-        storageKey,
+        storageKey: effectiveStorageKey,
         hasRestoredDraft: hasRestoredDraftRef.current,
         isDirty: isDirtyRef.current,
         ...details,
       });
     },
-    [debugEnabled, debugName, formId, routeIdentity, storage, storageKey],
+    [debugEnabled, debugName, effectiveStorageKey, formId, routeIdentity, storage],
   );
 
   useEffect(() => {
@@ -239,6 +250,10 @@ export function usePersistentFormDraft<T>({
   const readDraft = useCallback(async () => {
     if (!enabled || !isBrowser()) return null;
 
+    if (storageAdapter) {
+      return await storageAdapter.read();
+    }
+
     if (storage === "indexedDb") {
       return readIndexedDbDraft<T>(storageKey, version, ttlMs);
     }
@@ -247,11 +262,16 @@ export function usePersistentFormDraft<T>({
       ttlMs,
       scope,
     });
-  }, [enabled, key, scope, storage, storageKey, ttlMs, version]);
+  }, [enabled, key, scope, storage, storageAdapter, storageKey, ttlMs, version]);
 
   const writeDraft = useCallback(
     async (nextValue: T) => {
       if (!enabled || !isBrowser()) return;
+
+      if (storageAdapter) {
+        await storageAdapter.write(nextValue);
+        return;
+      }
 
       if (storage === "indexedDb") {
         await writeIndexedDbDraft(storageKey, nextValue, version);
@@ -259,13 +279,15 @@ export function usePersistentFormDraft<T>({
         writeStoredDraft(key, nextValue, version, storage, { scope });
       }
     },
-    [enabled, key, scope, storage, storageKey, version],
+    [enabled, key, scope, storage, storageAdapter, storageKey, version],
   );
 
   const clearDraft = useCallback(async () => {
     if (!isBrowser()) return;
 
-    if (storage === "indexedDb") {
+    if (storageAdapter) {
+      await storageAdapter.clear();
+    } else if (storage === "indexedDb") {
       await clearIndexedDbDraft(storageKey);
     } else {
       clearStoredDraft(key, storage, { scope });
@@ -276,7 +298,7 @@ export function usePersistentFormDraft<T>({
     lastSavedValueRef.current = null;
     lastSavedFingerprintRef.current = null;
     debugLog("draft cleared", {});
-  }, [debugLog, key, scope, storage, storageKey]);
+  }, [debugLog, key, scope, storage, storageAdapter, storageKey]);
 
   const restoreDraft = useCallback(async () => {
     debugLog("draft restore started", {});
@@ -479,8 +501,26 @@ export function usePersistentFormDraft<T>({
     [debugLog, isDirty, value],
   );
 
+  // EKLENEN KOD BAŞLANGICI
+  useEffect(() => {
+    return () => {
+      // Bileşen DOM'dan silinirken (unmount), mevcut URL formun URL'sinden farklıysa
+      // (Yani kullanıcı sayfayı yenilemedi, bilerek başka bir modüle / sayfaya geçtiyse)
+      if (isBrowser() && window.location.pathname !== routeIdentity) {
+        debugLog("Sayfadan çıkıldı, taslak temizleniyor", {
+          from: routeIdentity,
+          to: window.location.pathname
+        });
+        
+        // Taslağı kalıcı olarak sil
+        void clearDraft();
+      }
+    };
+  }, [routeIdentity, clearDraft, debugLog]);
+  // EKLENEN KOD BİTİŞİ
+
   return {
-    draftKey: storageKey,
+    draftKey: effectiveStorageKey,
     clearDraft,
     discardDraft,
     restoreDraft,

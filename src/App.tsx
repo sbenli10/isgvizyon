@@ -13,7 +13,7 @@ import { RouteTimingObserver } from "@/components/RouteTimingObserver";
 import { RouteWarmup } from "@/components/RouteWarmup";
 import { ThemeProvider } from "@/components/theme-provider";
 import { lazyWithRetry } from "@/lib/lazyWithRetry";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import BoardMeetings from "@/pages/BoardMeetings";
 import BoardMeetingForm from "@/pages/BoardMeetingForm";
@@ -36,6 +36,8 @@ import { SentryRuntimeContext } from "@/components/SentryRuntimeContext";
 import { OverlayPortalProvider } from "@/components/overlay/OverlayPortalProvider";
 import { SupabaseServiceStatusOverlay } from "@/components/SupabaseServiceStatusOverlay";
 import { RouteStatePersistence } from "@/components/RouteStatePersistence";
+import { APP_RELOAD_REQUEST_EVENT, installAppRecoveryHandlers } from "@/lib/appRecovery";
+import { toast } from "sonner";
 
 // ============================================
 // CORE PAGES
@@ -153,6 +155,8 @@ const routeWarmupTasks = [
   { key: "reports", load: loadReportsPage },
 ];
 
+
+
 // ============================================
 // QUERY CLIENT CONFIGURATION
 // ============================================
@@ -203,11 +207,23 @@ const ProtectedShell = () => {
   const { session, loading } = useAuth();
   const location = useLocation();
 
+  useEffect(() => {
+    console.log("ProtectedShell MOUNTED", {
+      pathname: location.pathname,
+    });
+
+    return () => {
+      console.log("ProtectedShell UNMOUNTED", {
+        pathname: location.pathname,
+      });
+    };
+  }, []);
+
   return (
     <ProtectedRoute>
       <RouteWarmup enabled={!loading && !!session} tasks={routeWarmupTasks} />
       <AppLayout>
-        <RouteErrorBoundary routeKey={`${location.pathname}${location.search}`}>
+        <RouteErrorBoundary routeKey={location.pathname}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ============================================ */}
@@ -360,32 +376,80 @@ const ProtectedShell = () => {
 // ============================================
 // MAIN APP COMPONENT
 // ============================================
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="dark"
-      enableSystem={false}
-      storageKey="denetron-theme"
-      disableTransitionOnChange
-    >
-      <TooltipProvider>
-        <OverlayPortalProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <AuthProvider>
-              <SentryRuntimeContext />
-              <SupabaseServiceStatusOverlay />
-              <RouteTimingObserver />
-              <RouteStatePersistence />
-              <CookieConsent />
-              <Routes>
+const App = () => {
+
+  useEffect(() => {
+    console.log("[ZNC-ROOT] APP MOUNTED", window.location.pathname);
+    return () => {
+      console.log("[ZNC-ROOT] APP UNMOUNTED", window.location.pathname);
+    };
+  }, []);
+  
+  useEffect(() => {
+    console.log("App MOUNTED");
+    return () => {
+      console.log("App UNMOUNTED");
+    };
+  }, []);
+
+  useEffect(() => {
+    installAppRecoveryHandlers();
+
+    const handleReloadRequested = (event: Event) => {
+      const customEvent = event as CustomEvent<{ reason?: string }>;
+      const reason = customEvent.detail?.reason || "runtime-update";
+
+      toast.warning("Uygulama için yeni bir sürüm hazır", {
+        description: "Çalışmanız korunur. Yenilemeyi siz onayladığınızda uygulama yeniden yüklenir.",
+        action: {
+          label: "Şimdi yenile",
+          onClick: () => window.location.reload(),
+        },
+        cancel: {
+          label: "Daha sonra",
+          onClick: () => undefined,
+        },
+        duration: 12000,
+      });
+
+      console.log("App reload requested", {
+        reason,
+      });
+    };
+
+    window.addEventListener(APP_RELOAD_REQUEST_EVENT, handleReloadRequested as EventListener);
+
+    return () => {
+      window.removeEventListener(APP_RELOAD_REQUEST_EVENT, handleReloadRequested as EventListener);
+    };
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        enableSystem={false}
+        storageKey="denetron-theme"
+        disableTransitionOnChange
+      >
+        <TooltipProvider>
+          <OverlayPortalProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
+              <AuthProvider>
+                <SentryRuntimeContext />
+                <SupabaseServiceStatusOverlay />
+                <RouteTimingObserver />
+                <RouteStatePersistence />
+                <CookieConsent />
+                <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/landing" element={<Index />} />
               <Route path="/landing/product" element={<LandingProduct />} />
@@ -434,13 +498,14 @@ const App = () => (
                 }
               />
               <Route path="/*" element={<ProtectedShell />} />
-              </Routes>
-            </AuthProvider>
-          </BrowserRouter>
-        </OverlayPortalProvider>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
-);
+                </Routes>
+              </AuthProvider>
+            </BrowserRouter>
+          </OverlayPortalProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

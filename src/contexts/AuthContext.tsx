@@ -1,3 +1,4 @@
+//src\contexts\AuthContext.tsx
 import {
   createContext,
   useCallback,
@@ -189,6 +190,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const extensionAuthSentRef = useRef(false);
+  const signOutInProgressRef = useRef(false);
+
+  useEffect(() => {
+    console.log("AuthProvider MOUNTED");
+    return () => {
+      console.log("AuthProvider UNMOUNTED");
+    };
+  }, []);
 
   const fetchProfile = useCallback(async (userId: string | null) => {
     if (!userId) {
@@ -251,8 +260,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const applySession = async (nextSession: Session | null, finishLoading = false) => {
       if (!mounted) return;
 
-      setSession(nextSession);
+      console.log("AuthProvider applySession", {
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+        finishLoading,
+      });
 
+      // 1. Gereksiz Render'ı Engelleme
+      setSession((prevSession) => {
+        if (prevSession?.user?.id === nextSession?.user?.id) {
+          return prevSession; // Referans değişmez, sayfa yenilenmez!
+        }
+        return nextSession;
+      });
+
+      // 2. Sentry Kullanıcı Güncellemesi
       Sentry.setUser(
         nextSession?.user
           ? {
@@ -262,7 +284,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : null,
       );
 
-      await fetchProfile(nextSession?.user?.id ?? null);
+      // 3. Profil Güncellemesi (Sadece kullanıcı değiştiyse veya profil boşsa çek)
+      setProfile((prevProfile) => {
+        if (prevProfile?.id === nextSession?.user?.id) {
+           return prevProfile; // Profil zaten var, tekrar çekmeye gerek yok
+        }
+        
+        // Eğer profil yoksa veya kullanıcı değiştiyse, arka planda çek
+        void fetchProfile(nextSession?.user?.id ?? null);
+        return prevProfile;
+      });
 
       if (mounted && finishLoading) {
         setLoading(false);
@@ -271,12 +302,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      console.log("AuthProvider onAuthStateChange", {
+        event,
+        hasSession: Boolean(nextSession),
+        userId: nextSession?.user?.id ?? null,
+        initialSessionResolved,
+      });
+
+      if (event === "SIGNED_OUT" && !signOutInProgressRef.current) {
+        void (async () => {
+          for (let attempt = 0; attempt < 3; attempt += 1) {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+              console.log("AuthProvider SIGNED_OUT recovered existing session", {
+                userId: data.session.user?.id ?? null,
+                attempt,
+              });
+              await applySession(data.session, true);
+              return;
+            }
+            await wait(250 * (attempt + 1));
+          }
+
+          await applySession(null, true);
+        })();
+        return;
+      }
+
       void applySession(nextSession, initialSessionResolved);
     });
 
     const initializeSession = async () => {
       setLoading(true);
+      console.log("AuthProvider initializeSession:start", {
+        hasAuthParams,
+      });
 
       if (hasAuthParams) {
         for (let attempt = 0; attempt < 12; attempt += 1) {
@@ -291,6 +352,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (!mounted) return;
 
             initialSessionResolved = true;
+            console.log("AuthProvider initializeSession:resolved-from-auth-params", {
+              userId: data.session.user?.id ?? null,
+            });
 
             await maybeSendExtensionAuth(data.session);
             await applySession(data.session, true);
@@ -311,6 +375,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       initialSessionResolved = true;
+      console.log("AuthProvider initializeSession:resolved", {
+        hasSession: Boolean(data.session),
+        userId: data.session?.user?.id ?? null,
+      });
 
       await maybeSendExtensionAuth(data.session);
       await applySession(data.session, true);
@@ -329,6 +397,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let signOutError: unknown = null;
 
     try {
+      signOutInProgressRef.current = true;
       await supabase.auth.signOut();
     } catch (error) {
       signOutError = error;
@@ -350,6 +419,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (signOutError) {
+      signOutInProgressRef.current = false;
       throw signOutError;
     }
   };

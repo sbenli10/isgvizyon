@@ -1,6 +1,7 @@
 ﻿//src\pages\BulkCAPA.tsx
 import { Component, ReactNode, Suspense, lazy, useMemo, useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import {
   Download,
   Plus,
@@ -218,6 +219,8 @@ interface BulkCapaProcessingSessionRow {
 
 type ErrorBoundaryProps = {
   children: ReactNode;
+  onRetry?: () => void;
+  onOpenFresh?: () => void;
 };
 
 type ErrorBoundaryState = {
@@ -251,6 +254,8 @@ const getSerializedPayloadSize = (value: unknown) => {
     return -1;
   }
 };
+
+
 
 const hasMeaningfulBulkCapaDraft = (snapshot: Partial<BulkCAPADraftSnapshot> | null | undefined) => {
   if (!snapshot) return false;
@@ -399,6 +404,8 @@ const readBulkCapaDraftFromIndexedDb = async (key: string) => {
   });
 };
 
+
+
 const writeBulkCapaDraftToIndexedDb = async (key: string, snapshot: BulkCAPADraftSnapshot) => {
   const db = await openBulkCapaDraftDb();
   if (!db) return;
@@ -491,17 +498,25 @@ export const attachBulkCapaDraftFlushListeners = ({
   flushDraft: () => void;
 }) => {
   const handleVisibilityChange = () => {
+    // Sadece sekme kapanırken (unloading) veya tamamen gizlendiğinde kaydet
+    // Anlık sekme değişimlerinde formun sıfırlanmasını engellemek için
+    // flushDraft'ın formu ezmediğinden emin ol.
     if (document.visibilityState === "hidden") {
-      flushDraft();
+       // Opsiyonel: flushDraft() çağrısını burada tamamen kaldırabilirsin.
+       // Çünkü zaten useEffect'ler ile her değişiklikte kayıt yapıyorsun.
+       flushDraft(); 
     }
   };
 
-  window.addEventListener("pagehide", flushDraft);
+  // 'pagehide' olayını kaldırıyoruz. Bu olay mobil cihazlarda agresif çalışır
+  // ve formun silinmesine neden olabilir.
+  // window.addEventListener("pagehide", flushDraft); 
+  
   document.addEventListener("visibilitychange", handleVisibilityChange);
 
   return () => {
     flushDraft();
-    window.removeEventListener("pagehide", flushDraft);
+    // window.removeEventListener("pagehide", flushDraft);
     document.removeEventListener("visibilitychange", handleVisibilityChange);
   };
 };
@@ -606,8 +621,8 @@ class BulkCAPAErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryS
                 <h2 className="text-xl font-semibold text-foreground">Bu sayfada bir sorun olustu</h2>
                 <p className="text-sm text-muted-foreground">{this.state.message}</p>
                 <div className="flex gap-3">
-                  <Button onClick={() => window.location.reload()}>Sayfayi yenile</Button>
-                  <Button variant="outline" onClick={() => window.location.assign("/bulk-capa")}>
+                  <Button onClick={() => this.props.onRetry?.()}>Sayfayi yenile</Button>
+                  <Button variant="outline" onClick={() => this.props.onOpenFresh?.()}>
                     Sayfayi yeniden aç
                   </Button>
                 </div>
@@ -1988,7 +2003,6 @@ export function BulkCAPAContent() {
   const providerLogoInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
   const activeAnalysisRef = useRef(0);
-  const draftHydratedRef = useRef(false);
   const isMountedRef = useRef(true);
   const [entries, setEntries] = useState<HazardEntry[]>(() => initialDraftSnapshotRef.current?.entries || []);
   const [orgData, setOrgData] = useState<OrganizationData | null>(null);
@@ -2010,11 +2024,7 @@ export function BulkCAPAContent() {
   const [lastSingleInspectionId, setLastSingleInspectionId] = useState<string | null>(null);
   const [lastSingleCreatedAt, setLastSingleCreatedAt] = useState<string | null>(null);
   const [editBaselineEntry, setEditBaselineEntry] = useState<HazardEntry | null>(null);
-  const [createDialogOpen, setCreateDialogOpen] = useState(
-    () =>
-      initialDraftSnapshotRef.current?.createDialogOpen === true ||
-      hasMeaningfulBulkCapaDraft(initialDraftSnapshotRef.current),
-  );
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createMode, setCreateMode] = useState<"single" | "bulk">(
     initialDraftSnapshotRef.current?.createMode === "bulk" ? "bulk" : "single",
   );
@@ -2053,7 +2063,7 @@ export function BulkCAPAContent() {
   const hasRestoredDraftRef = useRef(hasMeaningfulBulkCapaDraft(initialDraftSnapshotRef.current));
   const debugDraftEnabled = useMemo(() => {
     if (typeof window === "undefined") return false;
-    return new URLSearchParams(location.search).get("debugDraft") === "1";
+    return import.meta.env.DEV && new URLSearchParams(location.search).get("debugDraft") === "1";
   }, [location.search]);
 
   useRouteOverlayCleanup(() => {
@@ -2061,6 +2071,8 @@ export function BulkCAPAContent() {
     setPreviewOpen(false);
     setTemplateDialogOpen(false);
   });
+
+  
 
   const getBootstrapCacheKey = (userId: string) => `${userId}:bulk-capa:bootstrap`;
   const [itemTemplateTags, setItemTemplateTags] = useState<string[]>([]);
@@ -2120,6 +2132,8 @@ export function BulkCAPAContent() {
 
     return snapshot.createMode === mode;
   };
+
+  
 
   const persistDraftOverride = async (overrides?: Partial<BulkCAPADraftSnapshot>) => {
     const snapshot = buildDraftSnapshot(overrides);
@@ -2222,7 +2236,7 @@ export function BulkCAPAContent() {
   };
   const draftSnapshotRef = useRef<BulkCAPADraftSnapshot | null>(null);
 
-  const applyDraftSnapshot = (parsedDraft: Partial<BulkCAPADraftSnapshot>) => {
+  function applyDraftSnapshot(parsedDraft: Partial<BulkCAPADraftSnapshot>) {
     debugDraftLog("API/query result applied to form", {
       reason: "applyDraftSnapshot",
       previousFormSnapshot: getDebugFormSnapshot(),
@@ -2274,16 +2288,16 @@ export function BulkCAPAContent() {
     if (parsedDraft.createStep === "general" || parsedDraft.createStep === "items") {
       setCreateStep(parsedDraft.createStep);
     }
-    if (
-      parsedDraft.createDialogOpen === true ||
-      (parsedDraft.newEntry?.description && coerceText(parsedDraft.newEntry.description).trim().length > 0) ||
-      (Array.isArray(parsedDraft.newEntry?.media_urls) && parsedDraft.newEntry!.media_urls.length > 0) ||
-      (Array.isArray(parsedDraft.bulkSourceImages) && parsedDraft.bulkSourceImages.length > 0)
-    ) {
-      setCreateDialogOpen(true);
-    } else if (typeof parsedDraft.createDialogOpen === "boolean") {
-      setCreateDialogOpen(parsedDraft.createDialogOpen);
-    }
+    // if (
+    //   parsedDraft.createDialogOpen === true ||
+    //   (parsedDraft.newEntry?.description && coerceText(parsedDraft.newEntry.description).trim().length > 0) ||
+    //   (Array.isArray(parsedDraft.newEntry?.media_urls) && parsedDraft.newEntry!.media_urls.length > 0) ||
+    //   (Array.isArray(parsedDraft.bulkSourceImages) && parsedDraft.bulkSourceImages.length > 0)
+    // ) {
+    //   setCreateDialogOpen(true);
+    // } else if (typeof parsedDraft.createDialogOpen === "boolean") {
+    //   setCreateDialogOpen(parsedDraft.createDialogOpen);
+    // }
     if (typeof parsedDraft.sessionId === "string" || parsedDraft.sessionId === null) {
       setActiveSessionId(parsedDraft.sessionId || null);
     }
@@ -2295,81 +2309,15 @@ export function BulkCAPAContent() {
     }
 
     return true;
-  };
-
-  const restoreDraftFromStorage = (rawDraft: string | null) => {
-    if (!rawDraft) {
-      return false;
-    }
-
-    const parsedDraft = JSON.parse(rawDraft) as Partial<BulkCAPADraftSnapshot>;
-    return applyDraftSnapshot(parsedDraft);
-  };
+  }
 
   useEffect(() => {
     isMountedRef.current = true;
-    let cancelled = false;
-
-    const hydrateDraft = async () => {
-      draftHydratedRef.current = false;
-      debugDraftLog("draft restore started", {
-        reason: "hydrateDraft",
-        keyUsed:
-          draftStorageKey ||
-          window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
-          BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY,
-      });
-
-      try {
-        const preferredKey =
-          draftStorageKey ||
-          window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
-          BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
-
-        const indexedDbDraft =
-          (preferredKey ? await readBulkCapaDraftFromIndexedDb(preferredKey) : null) ||
-          (preferredKey !== BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY
-            ? await readBulkCapaDraftFromIndexedDb(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY)
-            : null);
-
-        if (cancelled) return;
-
-        const restored =
-          restoreDraftFromStorage(indexedDbDraft) ||
-          restoreDraftFromStorage(window.localStorage.getItem(preferredKey)) ||
-          restoreDraftFromStorage(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY));
-
-        if (!restored) {
-          debugDraftLog("draft restore completed", {
-            reason: "hydrateDraft",
-            keyUsed: preferredKey,
-            restored: false,
-          });
-          draftHydratedRef.current = true;
-          return;
-        }
-        debugDraftLog("draft restore completed", {
-          reason: "hydrateDraft",
-          keyUsed: preferredKey,
-          restored: true,
-          formSnapshot: getDebugFormSnapshot(),
-        });
-      } catch (error) {
-        console.warn("Bulk CAPA draft could not be restored:", error);
-      } finally {
-        if (!cancelled) {
-          draftHydratedRef.current = true;
-        }
-      }
-    };
-
-    void hydrateDraft();
 
     return () => {
-      cancelled = true;
       isMountedRef.current = false;
     };
-  }, [draftStorageKey, user]);
+  }, []);
 
   const applySessionJobResult = async (session: BulkCapaProcessingSessionRow) => {
     debugDraftLog("API/query result applied to form", {
@@ -2552,21 +2500,95 @@ export function BulkCAPAContent() {
     ai_analyzed: initialDraftSnapshotRef.current?.newEntry?.ai_analyzed || false,
   }));
 
+  const readPersistedDraftSnapshot = async (): Promise<BulkCAPADraftSnapshot | null> => {
+    if (typeof window === "undefined") return null;
+
+    const preferredKey =
+      draftStorageKey ||
+      window.localStorage.getItem(BULK_CAPA_DRAFT_LAST_KEY_STORAGE_KEY) ||
+      BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY;
+
+    const parseDraft = (rawDraft: string | null) => {
+      if (!rawDraft) return null;
+
+      try {
+        return JSON.parse(rawDraft) as BulkCAPADraftSnapshot;
+      } catch {
+        return null;
+      }
+    };
+
+    const indexedDbDraft =
+      (preferredKey ? await readBulkCapaDraftFromIndexedDb(preferredKey) : null) ||
+      (preferredKey !== BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY
+        ? await readBulkCapaDraftFromIndexedDb(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY)
+        : null);
+
+    return (
+      parseDraft(indexedDbDraft) ||
+      parseDraft(window.localStorage.getItem(preferredKey)) ||
+      parseDraft(window.localStorage.getItem(BULK_CAPA_DRAFT_FALLBACK_STORAGE_KEY))
+    );
+  };
+
+  const formDraftState = useMemo<BulkCAPADraftSnapshot>(
+    () => buildDraftSnapshot(),
+    [
+      activeSessionId,
+      bulkSourceImages,
+      companyInputMode,
+      createDialogOpen,
+      createMode,
+      createStep,
+      entries,
+      generalInfo,
+      manualCompanyName,
+      newEntry,
+      overallAnalysis,
+      processingJobType,
+      processingSessionStatus,
+      selectedCompanyId,
+    ],
+  );
+
+  const storageAdapter = useMemo(() => ({
+    debugStorageKey: draftStorageKey || `${BULK_CAPA_DRAFT_STORAGE_KEY_PREFIX}:anonymous`,
+    read: readPersistedDraftSnapshot,
+    write: async (snapshot: BulkCAPADraftSnapshot) => {
+      draftSnapshotRef.current = snapshot;
+      await persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
+    },
+    clear: async () => {
+      draftSnapshotRef.current = null;
+      await clearPersistedBulkCapaDraft(draftStorageKey);
+    },
+  }), [draftStorageKey]);
+
+  const {
+    markSubmitted,
+    logFormReset,
+    draftLoaded,
+  } = usePersistentFormDraft<BulkCAPADraftSnapshot>({
+    formId: "bulk-capa-workflow",
+    routeKey: location.pathname,
+    enabled: Boolean(user?.id),
+    userId: user?.id,
+    organizationId: orgData?.id ?? null,
+    storage: "indexedDb",
+    storageAdapter,
+    value: formDraftState,
+    initialValue: buildDraftSnapshot(initialDraftSnapshotRef.current ?? undefined),
+    isDirty: hasMeaningfulBulkCapaDraft(formDraftState),
+    shouldPersist: (snapshot) => hasMeaningfulBulkCapaDraft(snapshot),
+    onRestore: (snapshot) => {
+      applyDraftSnapshot(snapshot);
+      draftSnapshotRef.current = snapshot;
+    },
+    debugLabel: "BulkCAPA",
+  });
+
   const getDebugFormSnapshot = () => ({
-    companyInputMode,
-    selectedCompanyId,
-    manualCompanyName,
-    generalInfo,
-    newEntry,
-    bulkSourceImages,
-    entries,
-    overallAnalysis,
-    createMode,
-    createStep,
-    createDialogOpen,
-    activeSessionId,
-    processingSessionStatus,
-    processingJobType,
+    ...formDraftState,
     processingError,
   });
 
@@ -2594,6 +2616,7 @@ export function BulkCAPAContent() {
     nextSnapshot: Partial<BulkCAPADraftSnapshot>,
     extra?: Record<string, unknown>,
   ) => {
+    logFormReset(reason, nextSnapshot);
     if (!debugDraftEnabled) return;
     const previousSnapshot = buildDraftSnapshot();
     console.log("[BulkCAPA debugDraft] form-reset", {
@@ -2658,6 +2681,7 @@ export function BulkCAPAContent() {
     processingJobType,
     processingError,
   ]);
+  /*
 
   useEffect(() => {
     if (!debugDraftEnabled) return;
@@ -2714,7 +2738,7 @@ export function BulkCAPAContent() {
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [debugDraftEnabled, location.pathname, location.search, draftStorageKey]);
+  }, [debugDraftEnabled, location.pathname, location.search, draftStorageKey]);*/
 
   const requiredFieldChecks = useMemo(() => [
     { label: "Bulgu açiklamasi", ready: newEntry.description.trim().length > 0 },
@@ -2789,106 +2813,6 @@ export function BulkCAPAContent() {
     generalInfo.company_name || selectedCompanyName || "",
     [generalInfo.company_name, selectedCompanyName]
   );
-
-  useEffect(() => {
-    if (!draftHydratedRef.current) {
-      return;
-    }
-
-    const snapshot = buildDraftSnapshot();
-    draftSnapshotRef.current = snapshot;
-
-    const hasMeaningfulDraft =
-      Boolean(activeSessionId) ||
-      processingSessionStatus === "processing" ||
-      entries.length > 0 ||
-      manualCompanyName.trim().length > 0 ||
-      selectedCompanyId.trim().length > 0 ||
-      overallAnalysis.trim().length > 0 ||
-      generalInfo.company_name.trim().length > 0 ||
-      generalInfo.area_region.trim().length > 0 ||
-      generalInfo.observation_range.trim().length > 0 ||
-      generalInfo.observer_name.trim().length > 0 ||
-      generalInfo.employer_representative_name.trim().length > 0 ||
-      generalInfo.report_no.trim().length > 0 ||
-      newEntry.description.trim().length > 0 ||
-      newEntry.riskDefinition.trim().length > 0 ||
-      newEntry.correctiveAction.trim().length > 0 ||
-      newEntry.preventiveAction.trim().length > 0 ||
-      newEntry.media_urls.length > 0 ||
-      bulkSourceImages.length > 0;
-
-    try {
-      if (!hasMeaningfulDraft) {
-        hasRestoredDraftRef.current = false;
-        debugDraftLog("draft save started", {
-          reason: "empty-draft-clear",
-          keyUsed: draftStorageKey,
-          payloadSize: 0,
-          snapshot,
-        });
-        void clearPersistedBulkCapaDraft(draftStorageKey);
-        debugDraftLog("draft save completed", {
-          reason: "empty-draft-clear",
-          keyUsed: draftStorageKey,
-          cleared: true,
-        });
-        return;
-      }
-
-      debugDraftLog("draft save started", {
-        reason: "state-sync-effect",
-        keyUsed: draftStorageKey,
-        payloadSize: getSerializedPayloadSize(snapshot),
-        snapshot,
-      });
-      void persistBulkCapaDraftSnapshot(draftStorageKey, snapshot);
-      debugDraftLog("draft save completed", {
-        reason: "state-sync-effect",
-        keyUsed: draftStorageKey,
-        payloadSize: getSerializedPayloadSize(snapshot),
-      });
-    } catch (error) {
-      console.warn("Bulk CAPA draft could not be saved:", error);
-    }
-  }, [
-    createDialogOpen,
-    companyInputMode,
-    bulkSourceImages,
-    createMode,
-    createStep,
-    draftStorageKey,
-    entries,
-    generalInfo,
-    manualCompanyName,
-    newEntry,
-    overallAnalysis,
-    activeSessionId,
-    processingJobType,
-    processingSessionStatus,
-    selectedCompanyId,
-  ]);
-
-  useEffect(() => {
-    const flushDraft = () => {
-      if (!draftSnapshotRef.current) return;
-
-      debugDraftLog("draft save started", {
-        reason: "flushDraft",
-        keyUsed: draftStorageKey,
-        payloadSize: getSerializedPayloadSize(draftSnapshotRef.current),
-        snapshot: draftSnapshotRef.current,
-      });
-      void persistBulkCapaDraftSnapshot(draftStorageKey, draftSnapshotRef.current);
-      debugDraftLog("draft save completed", {
-        reason: "flushDraft",
-        keyUsed: draftStorageKey,
-        payloadSize: getSerializedPayloadSize(draftSnapshotRef.current),
-      });
-    };
-
-    return attachBulkCapaDraftFlushListeners({ flushDraft });
-  }, [draftStorageKey]);
 
   const effectiveLocation = useMemo(() =>
     generalInfo.area_region || reportCompanyName,
@@ -3894,14 +3818,14 @@ ${bulkSourceImages
       } finally {
         debugDraftLog("auth/session loading or user change", {
           reason: "fetchOrgData:complete",
-          userId: user.id,
+          userId: user?.id,
         });
         setLoading(false);
       }
     };
 
     fetchOrgData();
-  }, [user]);
+  }, [user?.id, user?.email]); // <-- ÇÖZÜM: Sadece ID ve Email değişirse tetiklenir
 
   useEffect(() => {
     if (companyInputMode === "existing" && selectedCompany) {
@@ -4862,6 +4786,7 @@ const handleSaveAndExport = async () => {
 
     await downloadBlob(wordBlob, reportFileName);
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
+    await markSubmitted();
 
     debugDraftReset(
       "handleSaveAndExport:success-full-reset",
@@ -4939,7 +4864,7 @@ const handleSaveAndExport = async () => {
   }
 };
 
-  if (loading) {
+  if (loading || !draftLoaded) { // EKLENDI: Taslak yüklenmeden formu ekrana çizmesini engelliyoruz
     return (
       <div className="space-y-8">
         <div className="space-y-2">
@@ -4951,6 +4876,8 @@ const handleSaveAndExport = async () => {
       </div>
     );
   }
+
+
 
   return (
     <div className="theme-page-readable space-y-8">
@@ -6572,8 +6499,15 @@ const handleSaveAndExport = async () => {
 }
 
 export default function BulkCAPA() {
+  const navigate = useNavigate();
+  const [boundaryNonce, setBoundaryNonce] = useState(0);
+
   return (
-    <BulkCAPAErrorBoundary>
+    <BulkCAPAErrorBoundary
+      key={boundaryNonce}
+      onRetry={() => setBoundaryNonce((current) => current + 1)}
+      onOpenFresh={() => navigate("/bulk-capa", { replace: true })}
+    >
       <BulkCAPAContent />
     </BulkCAPAErrorBoundary>
   );
