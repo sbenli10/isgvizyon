@@ -32,7 +32,7 @@ function normalizeStatus(overview: BillingOverview | null): SubscriptionStatus {
     return "past_due";
   }
 
-  if (overview.planCode === "premium" && overview.status !== "canceled") {
+  if ((overview.planCode === "premium" || overview.planCode === "osgb") && overview.status !== "canceled") {
     return "premium";
   }
 
@@ -58,8 +58,8 @@ function deriveLegacyFeatures(entitlements: SubscriptionFeatureEntitlement[], pl
     maxEmployees: featureMap["employees.count"]?.limitValue ?? DEFAULT_FEATURES.maxEmployees,
     aiRiskAnalysis: Boolean(featureMap["ai.risk_generation_monthly"]?.isEnabled),
     pdfExport: Boolean(featureMap["reports.export_monthly"]?.isEnabled),
-    excelExport: plan === "premium",
-    prioritySupport: plan === "premium",
+    excelExport: plan !== "free",
+    prioritySupport: plan !== "free",
   };
 }
 
@@ -92,12 +92,21 @@ export function useSubscription() {
   }, [refetch]);
 
   const status = useMemo(() => normalizeStatus(overview), [overview]);
-  const plan = (overview?.planCode === "premium" ? "premium" : "free") as SubscriptionPlan;
+  const plan = (
+    overview?.planCode === "osgb"
+      ? "osgb"
+      : overview?.planCode === "premium"
+        ? "premium"
+        : "free"
+  ) as SubscriptionPlan;
   const entitlements = overview?.entitlements ?? [];
   const featureMap = useMemo(() => entitlementMap(entitlements), [entitlements]);
   const features = useMemo(() => deriveLegacyFeatures(entitlements, plan), [entitlements, plan]);
   const trialEndsAt = overview?.trialEndsAt ? new Date(overview.trialEndsAt) : null;
   const isTrialExpired = status === "trial" && (overview?.daysLeftInTrial ?? 0) <= 0;
+  const isPremiumPlan = plan === "premium";
+  const isOsgbPlan = plan === "osgb";
+  const isPaidPlan = plan === "premium" || plan === "osgb";
 
   const getFeatureEntitlement = useCallback(
     (featureKey: FeatureKey | string) => featureMap[featureKey] ?? null,
@@ -134,6 +143,9 @@ export function useSubscription() {
     currentPeriodEnd: overview?.currentPeriodEnd ? new Date(overview.currentPeriodEnd) : null,
     trialEndsAt,
     isTrialExpired,
+    isPremiumPlan,
+    isOsgbPlan,
+    isPaidPlan,
     daysLeftInTrial: overview?.daysLeftInTrial ?? 0,
     getFeatureEntitlement,
     isFeatureAllowed,

@@ -41,6 +41,7 @@ function buildBannerCopy(
   premiumPrice: number,
   daysLeftInTrial: number,
   currentPeriodEnd: Date | null,
+  planLabel: string,
 ): BannerCopy {
   const formattedPrice = `₺${premiumPrice.toLocaleString("tr-TR")}/ay`;
   const endDate = formatDate(currentPeriodEnd);
@@ -90,8 +91,8 @@ function buildBannerCopy(
 
     case "premium":
       return {
-        eyebrow: "Premium Aktif",
-        title: "Tüm premium araçlar hesabınızda açık",
+        eyebrow: `${planLabel} Aktif`,
+        title: `Tüm ${planLabel.toLocaleLowerCase("tr-TR")} araçları hesabınızda açık`,
         description:
           "Yüksek AI kotaları, premium modüller ve genişletilmiş limitler şu anda kullanılabilir. Faturalama detaylarını istediğiniz zaman yönetebilirsiniz.",
         cta: "Üyeliği Yönet",
@@ -103,7 +104,7 @@ function buildBannerCopy(
           "border-emerald-500/25 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200",
         iconWrapClassName: "bg-emerald-500/10 ring-1 ring-emerald-500/20",
         iconClassName: "text-emerald-700 dark:text-emerald-200",
-        statText: "Premium koruma açık",
+        statText: `${planLabel} koruma açık`,
         icon: ShieldCheck,
         trigger: "manual",
       };
@@ -112,8 +113,8 @@ function buildBannerCopy(
       return {
         eyebrow: "Üyelik Uyarısı",
         title: endDate
-          ? `Premium erişim ${endDate} tarihinde kapanacak`
-          : "Premium erişim dönem sonunda kapanacak",
+          ? `${planLabel} erişim ${endDate} tarihinde kapanacak`
+          : `${planLabel} erişim dönem sonunda kapanacak`,
         description:
           "Dönem sonrasında premium modülleri kaybetmemek için abonelik ayarlarınızı gözden geçirmeniz iyi olur.",
         cta: "Aboneliği Yönet",
@@ -133,9 +134,9 @@ function buildBannerCopy(
     case "past_due":
       return {
         eyebrow: "Ödeme Sorunu",
-        title: "Premium faturalama güncellemesi gerekiyor",
+        title: `${planLabel} faturalama güncellemesi gerekiyor`,
         description:
-          "Ödeme alınamadı. Premium erişiminizin kesintiye uğramaması için faturalama bilgilerinizi güncelleyin.",
+          `Ödeme alınamadı. ${planLabel} erişiminizin kesintiye uğramaması için faturalama bilgilerinizi güncelleyin.`,
         cta: "Faturalamayı Yönet",
         surfaceClassName: cn(
           baseSurface,
@@ -177,6 +178,7 @@ export function SubscriptionBanner() {
     loading,
     plan,
     status,
+    isPaidPlan,
     plans,
     daysLeftInTrial,
     isTrialExpired,
@@ -189,16 +191,17 @@ export function SubscriptionBanner() {
 
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
   const premiumPrice = premiumPlan?.price ?? PREMIUM_PRICE_FALLBACK;
+  const activePlanLabel = plan === "osgb" ? "OSGB" : "Premium";
 
   const variant = useMemo<BannerVariant | null>(() => {
     if (loading) return null;
     if (status === "past_due") return "past_due";
     if (status === "trial" && isTrialExpired) return "trial_expired";
     if (status === "trial") return "trial";
-    if (plan === "premium" && cancelAtPeriodEnd) return "premium_canceling";
-    if (plan === "premium") return "premium";
+    if (isPaidPlan && cancelAtPeriodEnd) return "premium_canceling";
+    if (isPaidPlan) return "premium";
     return "free";
-  }, [cancelAtPeriodEnd, isTrialExpired, loading, plan, status]);
+  }, [cancelAtPeriodEnd, isPaidPlan, isTrialExpired, loading, status]);
 
   const bannerKey = useMemo(() => {
     if (!variant) return null;
@@ -220,7 +223,7 @@ export function SubscriptionBanner() {
 
   if (!variant || !bannerKey || dismissedKey === bannerKey) return null;
 
-  const copy = buildBannerCopy(variant, premiumPrice, daysLeftInTrial, currentPeriodEnd);
+  const copy = buildBannerCopy(variant, premiumPrice, daysLeftInTrial, currentPeriodEnd, activePlanLabel);
   const Icon = copy.icon;
 
   const handleDismiss = () => {

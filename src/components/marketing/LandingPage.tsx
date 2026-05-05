@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { AudienceSection } from "@/components/marketing/AudienceSection";
 import { FeaturesSection } from "@/components/marketing/FeaturesSection";
-import { FinalCTASection } from "@/components/marketing/FinalCTASection";
+
 import { HeroSection } from "@/components/marketing/HeroSection";
 import { LandingFooter } from "@/components/marketing/LandingFooter";
 import { ProblemSection } from "@/components/marketing/ProblemSection";
@@ -35,7 +35,6 @@ export function LandingPage() {
       <FeaturesSection />
       <AudienceSection />
       <TrustSection />
-      <FinalCTASection onRequestDemo={handleRequestDemo} />
       <LandingFooter />
     </div>
   );

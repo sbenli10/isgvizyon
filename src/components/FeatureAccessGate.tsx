@@ -28,7 +28,9 @@ export function FeatureAccessGate({
   } = useSubscription();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  const isOsgbFeature = featureKey === "osgb.access";
   const entitlement = getFeatureEntitlement(featureKey);
+
   const isLocked = useMemo(() => {
     if (loading) {
       return false;
@@ -38,7 +40,7 @@ export function FeatureAccessGate({
       return true;
     }
 
-    return entitlement ? !entitlement.allowed : plan !== "premium";
+    return entitlement ? !entitlement.allowed : plan === "free";
   }, [entitlement, isTrialExpired, loading, plan, status]);
 
   if (loading) {
@@ -62,6 +64,19 @@ export function FeatureAccessGate({
   }
 
   const triggeredBy = status === "trial" && isTrialExpired ? "trial_expired" : "feature_locked";
+  const label = isOsgbFeature ? "OSGB Paketi" : "Premium Özellik";
+  const badgeText = plan === "free" ? "Free planda kilitli" : "Üyelik güncellemesi gerekiyor";
+  const lockSummary =
+    status === "trial" && isTrialExpired
+      ? "Deneme süreniz sona erdi. Uygun planı yeniden etkinleştirerek bu modülü kullanmaya devam edebilirsiniz."
+      : isOsgbFeature
+        ? "Bu ekran yalnızca OSGB planında açılır. Upgrade ekranında Free, Premium ve OSGB plan farklarını birlikte görebilirsiniz."
+        : "Bu ekran ücretli plan kapsamındadır. Upgrade ekranında modül farklarını, AI kotalarını ve limit artışlarını karşılaştırabilirsiniz.";
+  const cardTitle = isOsgbFeature ? "OSGB planı ile açılır" : "Premium ile açılır";
+  const cardDescription = isOsgbFeature
+    ? "Firma havuzu, görevlendirme, kapasite, portal ve OSGB operasyon ekranları"
+    : "Bulk CAPA, Blueprint, ISG Bot, gelişmiş raporlama ve daha fazlası";
+  const actionLabel = isOsgbFeature ? "OSGB paketini incele" : "Planları incele";
 
   return (
     <>
@@ -70,24 +85,24 @@ export function FeatureAccessGate({
           <div className="max-w-3xl">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="rounded-full bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
-                Premium Özellik
+                {label}
               </Badge>
               <Badge className="rounded-full border border-white/10 bg-slate-950/55 px-3 py-1 text-slate-200">
-                {plan === "premium" ? "Üyelik güncellemesi gerekiyor" : "Free planda kilitli"}
+                {badgeText}
               </Badge>
             </div>
             <div className="mt-4 flex items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-950/55 text-white">
-                {status === "trial" && isTrialExpired ? <Sparkles className="h-5 w-5" /> : <LockKeyhole className="h-5 w-5" />}
+                {status === "trial" && isTrialExpired ? (
+                  <Sparkles className="h-5 w-5" />
+                ) : (
+                  <LockKeyhole className="h-5 w-5" />
+                )}
               </div>
               <div>
                 <h1 className="text-2xl font-semibold text-white">{title}</h1>
                 <p className="mt-2 text-sm leading-6 text-slate-200/90">{description}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
-                  {status === "trial" && isTrialExpired
-                    ? "Premium denemeniz sona erdi. Aynı ekrandan premium planı yeniden etkinleştirerek bu modülü kullanmaya devam edebilirsiniz."
-                    : "Bu ekran premium plana dahil. Upgrade ekranında tüm modül farklarını, AI kotalarını ve limit artışlarını karşılaştırabilirsiniz."}
-                </p>
+                <p className="mt-3 text-sm leading-6 text-slate-300">{lockSummary}</p>
               </div>
             </div>
           </div>
@@ -98,8 +113,8 @@ export function FeatureAccessGate({
                 <Crown className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-white">Premium ile açılır</p>
-                <p className="text-xs text-slate-400">Bulk CAPA, Blueprint, ISG Bot, OSGB ve daha fazlası</p>
+                <p className="text-sm font-semibold text-white">{cardTitle}</p>
+                <p className="text-xs text-slate-400">{cardDescription}</p>
               </div>
             </div>
 
@@ -108,10 +123,10 @@ export function FeatureAccessGate({
                 onClick={() => setShowUpgradeModal(true)}
                 className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
               >
-                Premium'u İncele
+                {actionLabel}
               </Button>
               <p className="text-xs leading-5 text-slate-400">
-                Free ve Premium arasındaki tüm farkları, limitleri ve avantajlı fiyat bilgisini bu ekrandan görebilirsiniz.
+                Free, Premium ve OSGB planları arasındaki farkları, limitleri ve açılan modülleri bu ekrandan görebilirsiniz.
               </p>
             </div>
           </div>

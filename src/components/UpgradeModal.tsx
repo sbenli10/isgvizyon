@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Brain,
@@ -16,10 +17,11 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
-import { backfillMyFeatureUsage, openBillingPortal, startPremiumCheckout, startPremiumTrial } from "@/lib/billing";
+import { backfillMyFeatureUsage, openBillingPortal, startPlanCheckout, startPremiumTrial } from "@/lib/billing";
 import { getUserFacingError, getUserFacingErrorDescription } from "@/lib/userFacingError";
-import type { BillingCatalogPlan, BillingPeriod } from "@/types/subscription";
+import type { BillingCatalogPlan, BillingPeriod, SubscriptionPlan } from "@/types/subscription";
 
 interface UpgradeModalProps {
   open: boolean;
@@ -226,7 +228,21 @@ function isPremiumPlan(planCode: string) {
   return planCode === "premium";
 }
 
+function isOsgbPlan(planCode: string) {
+  return planCode === "osgb";
+}
+
+function getPlanDisplayPrice(entry: BillingCatalogPlan) {
+  if (entry.planCode === "premium") {
+    return PREMIUM_MONTHLY_PRICE;
+  }
+
+  return entry.price;
+}
+
 export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: UpgradeModalProps) {
+  const navigate = useNavigate();
+  const { profile } = useAuth();
   const {
     plan,
     status,
@@ -240,10 +256,15 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     refetch,
   } = useSubscription();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const hasOrganization = Boolean(profile?.organization_id);
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
-  const planCards = useMemo(() => [freePlan, premiumPlan].filter(Boolean) as BillingCatalogPlan[], [freePlan, premiumPlan]);
+  const osgbPlan = plans.find((entry) => entry.planCode === "osgb");
+  const planCards = useMemo(
+    () => [freePlan, premiumPlan, osgbPlan].filter(Boolean) as BillingCatalogPlan[],
+    [freePlan, premiumPlan, osgbPlan],
+  );
   const freeFeatureMap = useMemo(
     () => new Map((freePlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
     [freePlan],
@@ -251,6 +272,10 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const premiumFeatureMap = useMemo(
     () => new Map((premiumPlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
     [premiumPlan],
+  );
+  const osgbFeatureMap = useMemo(
+    () => new Map((osgbPlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
+    [osgbPlan],
   );
   const entitlementMap = useMemo(
     () => new Map(entitlements.map((feature) => [feature.featureKey, feature])),
@@ -308,10 +333,18 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
       });
     });
 
-  const handleCheckout = (billingPeriod: BillingPeriod) =>
-    runAction(`checkout-${billingPeriod}`, async () => {
-      await startPremiumCheckout(billingPeriod);
+  const handleCheckout = (planCode: Extract<SubscriptionPlan, "premium" | "osgb">, billingPeriod: BillingPeriod) =>
+    runAction(`checkout-${planCode}-${billingPeriod}`, async () => {
+      await startPlanCheckout(planCode, billingPeriod);
     });
+
+  const handleOpenOrganizationSetup = () => {
+    onOpenChange(false);
+    navigate("/profile?tab=workspace&action=create");
+    toast.info("OSGB üyeliği için önce organizasyon oluşturun.", {
+      description: "Çalışma Alanı sekmesinden organizasyonunuzu kurup ardından OSGB paketini başlatabilirsiniz.",
+    });
+  };
 
   const handlePortal = () =>
     runAction("portal", async () => {
@@ -339,7 +372,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               <div>
                 <p>Faturalama ve üyelik yönetimi</p>
                 <p className="mt-2 text-sm font-normal leading-6 text-slate-300">
-                  Free ve Premium planları bütün modüller, limitler ve kilitli araçlar üzerinden karşılaştırın. Kullanıcı burada neyin açıldığını ve ne kadar arttığını net görür.
+                  Free, Premium ve OSGB planlarını bütün modüller, limitler ve kilitli araçlar üzerinden karşılaştırın. Kullanıcı burada neyin açıldığını ve hangi pakette açıldığını net görür.
                 </p>
               </div>
             </div>
@@ -356,7 +389,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
         {triggeredBy === "trial_expired" && (
           <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-100">
-            Premium deneme süreniz sona erdi. Aynı ekrandan Premium plana geçebilir veya Free planda devam edebilirsiniz.
+            Deneme süreniz sona erdi. Aynı ekrandan uygun ücretli plana geçebilir veya Free planda devam edebilirsiniz.
           </div>
         )}
 
@@ -372,13 +405,20 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
           </div>
         )}
 
+        {!hasOrganization && (
+          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
+            OSGB üyeliği, firma havuzu ve çoklu operasyon yapısı nedeniyle önce bir organizasyon kurulmasını gerektirir. Çalışma alanınızı oluşturduktan sonra OSGB paketini başlatabilirsiniz.
+          </div>
+        )}
+
         <div className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
               {planCards.map((entry) => {
                 const premium = isPremiumPlan(entry.planCode);
+                const osgb = isOsgbPlan(entry.planCode);
                 const current = entry.isCurrent;
-                const displayPrice = premium ? PREMIUM_MONTHLY_PRICE : entry.price;
+                const displayPrice = getPlanDisplayPrice(entry);
 
                 return (
                   <div
@@ -403,7 +443,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                         <div>
                           <p className="text-xl font-semibold text-white">{entry.planName}</p>
                           <p className="text-sm text-slate-300">
-                            {entry.description || (premium ? "Kurumsal ekipler ve yüksek hacimli kullanım için." : "Temel kullanım ve kontrollü başlangıç için.")}
+                            {entry.description || (osgb ? "Çoklu firma ve OSGB operasyonları için." : premium ? "Kurumsal ekipler ve yüksek hacimli kullanım için." : "Temel kullanım ve kontrollü başlangıç için.")}
                           </p>
                         </div>
                       </div>
@@ -411,42 +451,68 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                         <Badge className="border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-emerald-100">
                           Aktif
                         </Badge>
-                      ) : premium ? (
+                      ) : premium || osgb ? (
                         <div className="flex items-center gap-2">
-                          <Badge className="bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
-                            Avantajlı fiyat
-                          </Badge>
+                          {premium ? (
+                            <Badge className="bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
+                              Avantajlı fiyat
+                            </Badge>
+                          ) : null}
                           <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
-                            Önerilen
+                            {osgb ? "OSGB paketi" : "Önerilen"}
                           </Badge>
                         </div>
                       ) : null}
                     </div>
 
                     <div className="mt-6">
-                      <p className="text-3xl font-semibold text-white">{formatPrice(displayPrice, entry.currency, entry.billingPeriod)}</p>
+                      <p className="text-3xl font-semibold text-white">
+                        {osgb && (!displayPrice || displayPrice <= 0)
+                          ? "Özel fiyat"
+                          : formatPrice(displayPrice, entry.currency, entry.billingPeriod)}
+                      </p>
                       <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
                         {entry.billingPeriod === "yearly" ? "yıllık plan" : "aylık plan"}
                       </p>
                     </div>
 
-                    {premium ? (
+                    {premium || osgb ? (
                       <div className="mt-6 space-y-3">
-                        <Button
-                          onClick={() => void handleCheckout("monthly")}
-                          disabled={loadingAction !== null || !isOrganizationAdmin}
-                          className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
-                        >
-                          {loadingAction === "checkout-monthly" ? "Hazırlanıyor..." : "Premium aylık satın al"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => void handleCheckout("yearly")}
-                          disabled={loadingAction !== null || !isOrganizationAdmin}
-                          className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
-                        >
-                          {loadingAction === "checkout-yearly" ? "Hazırlanıyor..." : "Premium yıllık satın al"}
-                        </Button>
+                        {osgb && !hasOrganization ? (
+                          <Button
+                            onClick={handleOpenOrganizationSetup}
+                            disabled={loadingAction !== null}
+                            className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
+                          >
+                            Önce organizasyon oluştur
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "monthly")}
+                              disabled={loadingAction !== null || !isOrganizationAdmin}
+                              className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
+                            >
+                              {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-monthly`
+                                ? "Hazırlanıyor..."
+                                : osgb
+                                  ? "OSGB paketini seç"
+                                  : "Premium aylık satın al"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "yearly")}
+                              disabled={loadingAction !== null || !isOrganizationAdmin}
+                              className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                            >
+                              {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-yearly`
+                                ? "Hazırlanıyor..."
+                                : osgb
+                                  ? "OSGB yıllık planı seç"
+                                  : "Premium yıllık satın al"}
+                            </Button>
+                          </>
+                        )}
                       </div>
                     ) : (
                       <div className="mt-6">
@@ -461,7 +527,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
             </div>
 
             <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Premium ile açılanlar</p>
+              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Üst planlarla açılanlar</p>
               <h3 className="mt-2 text-xl font-semibold text-white">
                 {premiumOnlyOrExpanded.length} başlıkta fark var
               </h3>
@@ -470,6 +536,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   const Icon = feature.icon;
                   const freeFeature = freeFeatureMap.get(feature.key);
                   const premiumFeature = premiumFeatureMap.get(feature.key);
+                  const osgbFeature = osgbFeatureMap.get(feature.key);
 
                   return (
                     <div key={feature.key} className="rounded-2xl border border-fuchsia-400/10 bg-[linear-gradient(180deg,rgba(168,85,247,0.08),rgba(15,23,42,0.26))] p-4">
@@ -485,6 +552,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                             </Badge>
                             <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
                               Premium: {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
+                            </Badge>
+                            <Badge className="border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">
+                              OSGB: {formatFeatureValue(Boolean(osgbFeature?.isEnabled), osgbFeature?.limitValue ?? null, feature.kind)}
                             </Badge>
                           </div>
                           <p className="mt-2 text-sm leading-6 text-slate-300">{feature.description}</p>
@@ -509,7 +579,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   </Button>
                 )}
 
-                {(hasStripeSubscription || plan === "premium") && (
+                {(hasStripeSubscription || plan === "premium" || plan === "osgb") && (
                   <Button
                     variant="outline"
                     onClick={() => void handlePortal()}
@@ -541,7 +611,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   <p className="mt-2 text-sm leading-6 text-slate-200">
                     {status === "trial"
                       ? `${daysLeftInTrial} gün daha tüm premium modülleri deneyebilirsiniz.`
-                      : plan === "premium"
+                      : plan === "premium" || plan === "osgb"
                         ? cancelAtPeriodEnd
                           ? "Aboneliğiniz dönem sonunda iptale ayarlı, ancak şu an tüm premium modüller açık."
                           : "Premium araçlar ve yüksek limitler hesabınızda aktif."
@@ -557,7 +627,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Detaylı karşılaştırma</p>
               <h2 className="mt-2 text-lg font-semibold text-white">Hangi ekranda ne açılıyor, hangi limit ne kadar artıyor?</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Her satırda Free ve Premium değerlerini birlikte görürsünüz. Son sütun, mevcut hesabınızda özelliğin açık mı kilitli mi olduğunu gösterir.
+                Her satırda Free ve ücretli plan değerlerini birlikte görürsünüz. Son sütun, mevcut hesabınızda özelliğin açık mı kilitli mi olduğunu gösterir.
               </p>
             </div>
 
@@ -575,13 +645,14 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                     {group.items.map((feature) => {
                       const freeFeature = freeFeatureMap.get(feature.key);
                       const premiumFeature = premiumFeatureMap.get(feature.key);
+                      const osgbFeature = osgbFeatureMap.get(feature.key);
                       const currentFeature = entitlementMap.get(feature.key);
                       const Icon = feature.icon;
 
                       return (
                         <div
                           key={feature.key}
-                          className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:grid-cols-[1.5fr_0.55fr_0.55fr_0.48fr] lg:items-center"
+                          className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:grid-cols-[1.35fr_0.5fr_0.5fr_0.5fr_0.46fr] lg:items-center"
                         >
                           <div className="flex items-start gap-3">
                             <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-slate-200">
@@ -604,6 +675,13 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                             <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-200/70">Premium</p>
                             <p className="mt-2 text-sm font-semibold text-white">
                               {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
+                            </p>
+                          </div>
+
+                          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
+                            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/70">OSGB</p>
+                            <p className="mt-2 text-sm font-semibold text-white">
+                              {formatFeatureValue(Boolean(osgbFeature?.isEnabled), osgbFeature?.limitValue ?? null, feature.kind)}
                             </p>
                           </div>
 

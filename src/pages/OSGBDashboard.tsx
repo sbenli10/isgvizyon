@@ -163,8 +163,13 @@ export default function OSGBDashboard() {
               Nasıl kullanılır
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => navigate("/osgb/company-tracking")} disabled={!canViewCompanyHub}>
-              Firma havuzunu aç
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => navigate(profile?.organization_id ? "/osgb/company-tracking" : "/profile?tab=workspace&action=create")}
+              disabled={profile?.organization_id ? !canViewCompanyHub : false}
+            >
+              {profile?.organization_id ? "Firma havuzunu aç" : "Organizasyon oluştur"}
             </Button>
             <Button size="lg" variant="outline" onClick={() => navigate("/osgb/isgkatip")}>
               İSG-KATİP merkezine git
@@ -172,6 +177,22 @@ export default function OSGBDashboard() {
           </div>
         </div>
       </section>
+
+      {!profile?.organization_id ? (
+        <Card className="border-cyan-500/20 bg-cyan-500/10">
+          <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">OSGB modülünü denemek için önce çalışma alanınızı oluşturun</p>
+              <p className="mt-1 text-sm text-slate-300">
+                Dashboard ve rehber ekranları açıktır; gerçek OSGB operasyonlarını kullanmak ve üyelik başlatmak için organizasyon kurmanız gerekir.
+              </p>
+            </div>
+            <Button onClick={() => navigate("/profile?tab=workspace&action=create")}>
+              Organizasyon oluştur
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card className="border-slate-800 bg-slate-900/70">

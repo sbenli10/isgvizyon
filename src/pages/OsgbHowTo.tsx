@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 
 const steps = [
   {
@@ -60,6 +61,7 @@ const moduleLinks = [
 
 export default function OsgbHowTo() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   return (
     <div className="container mx-auto space-y-6 py-6">
@@ -79,8 +81,8 @@ export default function OsgbHowTo() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => navigate("/osgb/company-tracking")}>
-              Firma havuzunu aç
+            <Button onClick={() => navigate(profile?.organization_id ? "/osgb/company-tracking" : "/profile?tab=workspace&action=create")}>
+              {profile?.organization_id ? "Firma havuzunu aç" : "Organizasyon oluştur"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={() => navigate("/osgb/dashboard")}>
@@ -89,6 +91,22 @@ export default function OsgbHowTo() {
           </div>
         </div>
       </section>
+
+      {!profile?.organization_id ? (
+        <Card className="border-cyan-500/20 bg-cyan-500/10">
+          <CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">OSGB paketi organizasyonla başlar</p>
+              <p className="mt-1 text-sm text-slate-300">
+                Rehberi inceleyebilirsiniz; ancak OSGB üyeliği ve operasyon ekranları için önce çalışma alanınızı oluşturmanız gerekir.
+              </p>
+            </div>
+            <Button onClick={() => navigate("/profile?tab=workspace&action=create")}>
+              Çalışma alanı oluştur
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-slate-800 bg-slate-900/70">

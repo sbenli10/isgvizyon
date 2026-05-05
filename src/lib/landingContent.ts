@@ -44,36 +44,36 @@ export type LandingCard = {
 };
 
 export const landingValueProps = [
-  "Risk, denetim, düzeltici ve önleyici faaliyet, plan ve belge süreçlerini tek yapıda toplar.",
-  "Yapay zeka destekli modüllerle değerlendirme süresini azaltır ve saha kararlarını hızlandırır.",
-  "Ücretsiz plan ile başlanır, profesyonel plan ile gelişmiş modüller ve yüksek limitler açılır.",
+  "Risk, denetim, uygunsuzluk, aksiyon, plan ve rapor akışını tek veri omurgasında birleştirir.",
+  "Yapay zeka destekli analizler saha verisini yalnızca kaydetmez; tekrar eden riskleri ve öncelikli müdahale alanlarını görünür kılar.",
+  "Kurumsal ekipler, OSGB yapıları ve çok lokasyonlu operasyonlar için ölçülebilir, izlenebilir ve yönetilebilir bir İSG standardı oluşturur.",
 ];
 
 export const productOverviewCards: LandingCard[] = [
   {
     title: "Tek omurgada İSG yönetimi",
     description:
-      "Gösterge paneli, risk, denetim, düzeltici ve önleyici faaliyet, rapor ve belge akışı aynı veri yapısında ilerler.",
+      "Gösterge paneli, riskler, saha denetimleri, uygunsuzluklar, aksiyonlar ve rapor akışı aynı veri yapısında ilerler.",
     icon: LayoutDashboard,
   },
   {
-    title: "Yapay zeka destekli hız katmanı",
+    title: "Yapay zeka destekli karar katmanı",
     description:
-      "Toplu düzeltici faaliyet analizi, faaliyet sınıfı analizi, tahliye üretimi ve İSG asistanı gibi akıllı yardımcılar profesyonel planda çalışır.",
+      "Risk önceliklendirme, bulgu yorumlama, tekrar analizi ve akıllı öneri akışlarıyla ekiplerin karar hızını artırır.",
     icon: Bot,
-    badge: "Profesyonel",
+    badge: "AI Katmanı",
   },
   {
     title: "OSGB operasyon merkezi",
     description:
-      "Personel, görevlendirme, kapasite, şirket, finans ve doküman modülleri tek panelde toplanır.",
+      "Personel, görevlendirme, kapasite, firma, finans ve doküman yönetimi tek panelde toplanır.",
     icon: Briefcase,
-    badge: "Profesyonel",
+    badge: "B2B Akış",
   },
   {
     title: "Belge ve plan üretimi",
     description:
-      "Acil durum planı, yıllık plan, görevlendirme yazısı, sertifika ve rapor süreçleri aynı kurumsal dilde yönetilir.",
+      "Acil durum planı, kurul toplantısı, görevlendirme yazıları, sertifikalar ve çıktı süreçleri aynı kurumsal dilde yönetilir.",
     icon: FileCheck2,
   },
 ];
@@ -85,15 +85,15 @@ export const productModuleCards: LandingCard[] = [
     icon: ShieldAlert,
   },
   {
-    title: "Denetim ve bulgu takibi",
-    description: "Saha kayıtları, uygunsuzluklar, takip notları ve denetim raporları.",
+    title: "Dijital saha denetimleri",
+    description: "Saha kayıtları, uygunsuzluklar, fotoğraflar, takip notları ve denetim raporları.",
     icon: ClipboardCheck,
   },
   {
     title: "DÖF ve toplu analiz",
     description: "Tekil DÖF kaydı yanında toplu görsel analiz ve seri aksiyon üretimi.",
     icon: Workflow,
-    badge: "Profesyonel",
+    badge: "AI Destekli",
   },
   {
     title: "Firma ve çalışan yönetimi",
@@ -104,118 +104,116 @@ export const productModuleCards: LandingCard[] = [
     title: "OSGB modülü",
     description: "Personel, görevlendirme, kapasite, finans, doküman, görev ve analitik ekranları.",
     icon: Users,
-    badge: "Profesyonel",
+    badge: "Operasyon",
   },
   {
-    title: "Sertifika ve belge merkezi",
-    description: "Sertifika üretimi, geçmiş görünümü, görevlendirme yazıları ve rapor akışı.",
+    title: "Dokümantasyon merkezi",
+    description: "Sertifikalar, görevlendirme yazıları, rapor çıktıları ve plan dokümanları.",
     icon: FileCheck2,
-    badge: "Kısmen Profesyonel",
+    badge: "Kurumsal Çıktı",
   },
 ];
 
 export const featureHighlightCards: LandingCard[] = [
   {
-    title: "Toplu DÖF analizi",
+    title: "Dijital saha denetimleri",
     description:
-      "Çoklu görsel üzerinden uygunsuzluk analizi, risk yorumu ve toplu DÖF akışı üretir.",
-    icon: Sparkles,
-    badge: "Profesyonel",
+      "Denetim, gözlem, fotoğraf ve saha kayıtlarını merkezi, hızlı ve izlenebilir bir yapıda toplayın.",
+    icon: ClipboardCheck,
+    badge: "Operasyon",
   },
   {
-    title: "Yerleşim planı analizi",
+    title: "Uygunsuzluk ve aksiyon takibi",
     description:
-      "Plan, kroki ve yerleşim görsellerini yorumlayarak gelişmiş analiz ekranı sunar.",
-    icon: Sparkles,
-    badge: "Profesyonel",
+      "Sorumluları, termin tarihlerini ve kapanış oranlarını tek ekranda yönetin.",
+    icon: Target,
   },
   {
-    title: "İSG asistanı",
+    title: "AI risk önceliklendirme",
     description:
-      "Hızlı yorum, öneri ve yardımcı akışlarla operasyon kararlarını destekler.",
+      "Yapay zeka, risk seviyesi, tekrar olasılığı ve müdahale önceliğini analiz ederek yön verir.",
     icon: Bot,
-    badge: "Profesyonel",
+    badge: "AI",
   },
   {
-    title: "Faaliyet sınıfı analizi",
+    title: "Akıllı aksiyon önerileri",
     description:
-      "NACE sorgulama ve sektör bazlı öneri akışlarını daha hızlı hale getirir.",
+      "Benzer saha kayıtlarından öğrenen öneri kutuları ile çözüm adımlarını hızlandırın.",
     icon: Sparkles,
   },
   {
-    title: "Tahliye üretimi",
+    title: "Trend ve tekrar analizi",
     description:
-      "Tahliye planı ve tahliye görseli üretimiyle kritik senaryo kurgusunu hızlandırır.",
-    icon: Workflow,
-    badge: "Profesyonel",
+      "Tekrarlayan problemleri, yüksek riskli alanları ve gecikme eğilimlerini erken görün.",
+    icon: TrendingUp,
   },
   {
-    title: "Bildirim görünürlüğü",
+    title: "Yönetici raporlama paneli",
     description:
-      "Yaklaşan işler, açık görevler ve kritik operasyon baskısını görünür tutar.",
-    icon: BellRing,
+      "Yönetim için özet, metrik ve kapanış performansını profesyonel dashboard’larda sunun.",
+    icon: LayoutDashboard,
   },
 ];
 
 export const workflowSteps = [
   {
     step: "01",
-    title: "Temel kayıtları kurun",
+    title: "Saha verisini toplayın",
     description:
-      "Firma, çalışan, KKD, sağlık gözetimi ve temel operasyon kayıtları platforma alınır.",
+      "Denetim, uygunsuzluk, fotoğraf ve gözlem kayıtlarını dijital olarak toplayın.",
   },
   {
     step: "02",
-    title: "Risk ve denetim akışını işletin",
+    title: "AI ile analiz edin",
     description:
-      "Risk değerlendirme, denetim, DÖF, rapor ve bildirim akışı günlük operasyon omurgasını oluşturur.",
+      "Yapay zeka risk seviyelerini, tekrar eden problemleri ve öncelikli alanları analiz eder.",
   },
   {
     step: "03",
-    title: "Belge ve plan katmanını ekleyin",
+    title: "Aksiyonları atayın",
     description:
-      "Acil durum planı, yıllık plan, görevlendirme yazıları ve rapor çıktıları tek noktadan yönetilir.",
+      "Sorumluları, terminleri ve aksiyon planlarını merkezi olarak yönetin.",
   },
   {
     step: "04",
-    title: "Gelişmiş modüllerle ölçekleyin",
+    title: "Sonuçları izleyin",
     description:
-      "Toplu DÖF analizi, yerleşim planı analizi, sertifikalar, İSG asistanı ve OSGB modülü ile ekip büyürken kontrol kaybedilmez.",
+      "Dashboard üzerinden risk trendlerini, kapanma sürelerini ve performansı takip edin.",
   },
 ];
 
 export const trustCards: LandingCard[] = [
   {
-    title: "Rol bazlı erişim ve koruma",
+    title: "Merkezi kayıt",
     description:
-      "Korunan sayfa yapısı, organizasyon bazlı plan yönetimi ve profesyonel erişim kontrolü birlikte çalışır.",
+      "Kritik İSG verilerini tek sistemde toplayarak dağınık kayıt riskini azaltın.",
+    icon: FileCheck2,
+  },
+  {
+    title: "İzlenebilir aksiyonlar",
+    description:
+      "Atanan sorumlular, terminler ve tamamlanma durumu tek akışta görünür kalır.",
+    icon: Target,
+  },
+  {
+    title: "Yetkilendirilmiş erişim",
+    description:
+      "Rol, organizasyon ve modül seviyesinde kontrollü erişim modeliyle ilerler.",
     icon: ShieldAlert,
   },
   {
-    title: "KVKK ve veri talepleri altyapısı",
+    title: "KVKK odaklı yaklaşım",
     description:
-      "Gizlilik politikası, veri talep kayıtları ve rıza alanları için veritabanı altyapısı hazırdır.",
+      "Veri işleme, görünürlük ve süreç yönetimi kurumsal sorumlulukları destekleyecek şekilde tasarlanır.",
     icon: CheckCircle2,
-  },
-  {
-    title: "Sunucu taraflı yapay zeka mimarisi",
-    description:
-      "AI çağrıları tarayıcıdan değil, kontrollü sunucu katmanından yürütülür.",
-    icon: Sparkles,
-  },
-  {
-    title: "Abonelik ve deneme kontrolü",
-    description:
-      "Ücretsiz, profesyonel ve deneme üyelikleri plan ve limit bazlı izlenir.",
-    icon: BellRing,
   },
 ];
 
 export const trustMetrics = [
-  { label: "Çekirdek modül kümesi", value: "20+" },
-  { label: "Operasyon görünürlüğü", value: "Tek panel" },
-  { label: "Dışa aktarma", value: "Excel / CSV" },
-  { label: "Kullanım modeli", value: "Firma + ekip" },
+  { label: "Erişim modeli", value: "Rol bazlı" },
+  { label: "Süreç görünürlüğü", value: "Tek panel" },
+  { label: "Raporlama", value: "İzlenebilir" },
+  { label: "Kullanım yapısı", value: "Firma + ekip" },
 ];
 
 export const trustUseCases = [
@@ -229,47 +227,72 @@ export const pricingPlans = [
   {
     title: "Ücretsiz",
     badge: "Başlangıç",
+    price: "₺0",
     description:
-      "Temel İSG süreçlerini gerçek verilerle başlatmak ve sistemi kontrollü denemek isteyen ekipler için.",
+      "Temel İSG süreçlerini başlatmak ve platformu kontrollü şekilde denemek isteyen ekipler için.",
     bullets: [
-      "1 firma yönetimi",
-      "25 çalışan limiti",
-      "3 risk değerlendirme kaydı",
-      "Aylık 10 denetim",
-      "Sınırlı yapay zeka ve dışa aktarma kapasitesi",
+      "Tek firma ile hızlı başlangıç",
+      "Temel risk, denetim ve DÖF akışları",
+      "Sınırlı yapay zeka kullanımı",
+      "Platformu gerçek veriyle deneme imkanı",
     ],
-    cta: "Ücretsiz planla başla",
+    cta: "Panele Git",
     recommended: false,
   },
   {
-    title: "Profesyonel",
-    badge: "Avantajlı fiyat",
+    title: "Premium",
+    badge: "Popüler",
+    price: "₺250 / ay",
     description:
-      "Yapay zeka modülleri, yüksek limitler ve gelişmiş operasyon ekranlarını aktif kullanmak isteyen ekipler için.",
+      "Yapay zeka destekli analizleri ve yüksek kullanım limitlerini aktif operasyonlarında kullanan ekipler için.",
     bullets: [
-      "₺250 / ay",
-      "7 günlük profesyonel deneme",
-      "Toplu DÖF analizi, yerleşim planı analizi ve İSG asistanı",
-      "Sertifika ve OSGB modülü",
-      "Yüksek yapay zeka kotaları ve daha geniş limitler",
+      "Toplu DÖF ve plan analizi",
+      "İSG asistanı ve akıllı öneriler",
+      "Gelişmiş raporlama ve dışa aktarma",
+      "Daha yüksek kullanıcı ve işlem limitleri",
     ],
-    cta: "Profesyonel planı incele",
+    cta: "Fiyatlandırmayı İncele",
     recommended: true,
   },
   {
-    title: "Kurumsal",
-    badge: "Planlı geçiş",
+    title: "OSGB",
+    badge: "Çoklu Firma",
+    price: "Özel planlama",
     description:
-      "Çok ekipli veya çok firmalı yapılarda onboarding, kullanım modeli ve geçiş planını birlikte netleştirmek için.",
+      "Birden fazla firmayı, personeli ve operasyon akışını tek merkezden yöneten OSGB yapıları için.",
     bullets: [
-      "Profesyonel plan omurgası üzerine kurulur",
-      "Ekip ve süreç yapısına göre planlama",
-      "Geçiş ve onboarding odaklı kurulum",
-      "Kurumsal görüşme ile netleştirilir",
+      "Çoklu firma ve görevlendirme akışları",
+      "OSGB personel, kapasite ve finans ekranları",
+      "Müşteri portalı ve doküman yönetimi",
+      "Operasyon modeline göre ölçeklenebilir kurulum",
     ],
-    cta: "Kurumsal görüşme talep et",
+    cta: "Firma Girişi",
     recommended: false,
   },
+];
+
+export type PricingComparisonValue = "Var" | "Kısıtlı" | "Yok" | string;
+
+export type PricingComparisonRow = {
+  feature: string;
+  free: PricingComparisonValue;
+  premium: PricingComparisonValue;
+  osgb: PricingComparisonValue;
+};
+
+export const pricingComparisonRows: PricingComparisonRow[] = [
+  { feature: "Firma yönetimi", free: "1 firma", premium: "Var", osgb: "Çoklu firma" },
+  { feature: "Çalışan yönetimi", free: "Kısıtlı", premium: "Var", osgb: "Var" },
+  { feature: "Risk değerlendirme", free: "Kısıtlı", premium: "Var", osgb: "Var" },
+  { feature: "Dijital saha denetimi", free: "Kısıtlı", premium: "Var", osgb: "Var" },
+  { feature: "DÖF ve aksiyon takibi", free: "Var", premium: "Var", osgb: "Var" },
+  { feature: "Toplu DÖF analizi", free: "Yok", premium: "Var", osgb: "Var" },
+  { feature: "Yapay zeka destekli öneriler", free: "Kısıtlı", premium: "Var", osgb: "Var" },
+  { feature: "İSG asistanı", free: "Yok", premium: "Var", osgb: "Var" },
+  { feature: "Raporlama ve dışa aktarma", free: "Kısıtlı", premium: "Var", osgb: "Var" },
+  { feature: "OSGB operasyon modülü", free: "Yok", premium: "Kısıtlı", osgb: "Var" },
+  { feature: "Görevlendirme ve kapasite takibi", free: "Yok", premium: "Yok", osgb: "Var" },
+  { feature: "Müşteri portalı", free: "Yok", premium: "Kısıtlı", osgb: "Var" },
 ];
 
 export type LandingStat = {
@@ -281,22 +304,28 @@ export type LandingStat = {
 
 export const landingHeroStats: LandingStat[] = [
   {
-    label: "Operasyon görünürlüğü",
-    value: "Tek panel",
-    hint: "Dağınık kayıtları tek merkezde toplayın.",
+    label: "AI Risk Skoru",
+    value: "84/100",
+    hint: "Kritik alanları hızlıca görün.",
     icon: LayoutDashboard,
   },
   {
-    label: "Çalışan akışı",
-    value: "Firma bazlı",
-    hint: "Aktif/pasif çalışan takibini merkezileştirin.",
-    icon: Users,
+    label: "Kritik Uygunsuzluk",
+    value: "17",
+    hint: "Öncelikli aksiyonları ayırın.",
+    icon: AlertTriangle,
   },
   {
-    label: "Raporlama",
-    value: "İzlenebilir",
-    hint: "Yönetici görünürlüğünü artırın.",
+    label: "Tamamlanan Denetim",
+    value: "%92",
+    hint: "Süreç performansını izleyin.",
     icon: TrendingUp,
+  },
+  {
+    label: "Akıllı Öneri",
+    value: "9",
+    hint: "Geciken aksiyonları yönetin.",
+    icon: BellRing,
   },
 ];
 
@@ -372,98 +401,98 @@ export type ProductScreenTab = {
 export const landingProductScreenTabs: ProductScreenTab[] = [
   {
     id: "operations",
-    label: "Operasyon Merkezi",
-    title: "Günlük operasyonu tek ekranda görün",
+    label: "Risk Intelligence",
+    title: "Riskleri yalnızca listelemeyin, önceliklendirin",
     description:
-      "Açık aksiyonları, kritik işleri, yaklaşan denetimleri ve ekip baskısını tek merkezden takip edin.",
+      "Dashboard, tekrar eden bulguları, yüksek riskli alanları ve kapanması geciken aksiyonları yöneticiler için okunabilir hale getirir.",
     bullets: [
-      "Öncelikli aksiyon görünümü",
-      "Firma ve ekip bazlı takip",
-      "Bildirim ve durum görünürlüğü",
+      "AI risk skoru ve öncelik görünümü",
+      "Kritik saha aksiyon listesi",
+      "Yöneticiler için okunabilir özet kartlar",
     ],
     stats: [
-      { label: "Açık aksiyon", value: "24" },
-      { label: "Kritik iş", value: "6" },
-      { label: "Aktif firma", value: "18" },
+      { label: "AI Risk Skoru", value: "84/100" },
+      { label: "Kritik DÖF", value: "17" },
+      { label: "Geciken aksiyon", value: "9" },
     ],
-    panelTitle: "Operasyon Merkezi",
-    panelSubtitle: "Bugün öne çıkan başlıklar",
+    panelTitle: "İSGVizyon Risk Intelligence Paneli",
+    panelSubtitle: "Günün en kritik sinyalleri",
     panelRows: [
-      { label: "Kritik denetimler", value: "06", tone: "warning" },
-      { label: "Termin yaklaşan işler", value: "14", tone: "primary" },
-      { label: "Tamamlanan görevler", value: "32", tone: "success" },
+      { label: "Yüksek riskli alan", value: "04", tone: "warning" },
+      { label: "Akıllı öneri", value: "09", tone: "primary" },
+      { label: "Kapanan iş", value: "32", tone: "success" },
     ],
   },
   {
     id: "employees",
-    label: "Çalışan Yönetimi",
-    title: "Firma bazlı çalışan havuzunu tek yerde yönetin",
+    label: "Saha ve Ekip",
+    title: "Firma ve ekip akışını tek operasyon görünümüne bağlayın",
     description:
-      "Çalışan kayıtlarını, aktif/pasif durumlarını ve toplu içe aktarma süreçlerini düzenli tutun.",
+      "Çalışan, firma ve saha akışları ayrı listeler olarak değil; aksiyon takibini besleyen ortak operasyon verisi olarak ilerler.",
     bullets: [
       "Firma bazlı çalışan görünümü",
-      "Toplu Excel/CSV içe aktarma",
-      "Aktif ve pasif ayrımı",
+      "Evrak ve durum takibi",
+      "Operasyonel sorumluluk eşleştirmesi",
     ],
     stats: [
-      { label: "Toplam çalışan", value: "1.248" },
-      { label: "Pasif kayıt", value: "38" },
-      { label: "Excel eşleşme", value: "%99" },
+      { label: "Aktif firma", value: "12" },
+      { label: "Bekleyen evrak", value: "11" },
+      { label: "Sorumlu atama", value: "27" },
     ],
-    panelTitle: "Çalışan Havuzu",
-    panelSubtitle: "Kayıt akışı",
+    panelTitle: "Operasyon ve Ekip Akışı",
+    panelSubtitle: "Sahadan merkeze görünürlük",
     panelRows: [
-      { label: "Bugün eklenen", value: "19", tone: "success" },
-      { label: "Evrak bekleyen", value: "11", tone: "warning" },
-      { label: "Şirket filtresi", value: "12 firma", tone: "primary" },
+      { label: "Yeni kayıt", value: "19", tone: "success" },
+      { label: "Açık görev", value: "14", tone: "primary" },
+      { label: "Kritik gecikme", value: "03", tone: "warning" },
     ],
   },
   {
     id: "inspections",
-    label: "Denetimler",
-    title: "Saha bulgularını aksiyona dönüştürün",
+    label: "Denetim ve DÖF",
+    title: "Bulguyu kayıttan aksiyona taşıyan akış",
     description:
-      "Denetim notlarını, uygunsuzlukları ve sorumlu atamalarını izlenebilir bir akışta toplayın.",
+      "Fotoğraf, uygunsuzluk, DÖF ve sorumlu ataması aynı ekran mantığıyla ilerler; denetim sonrası takip dağılmaz.",
     bullets: [
-      "Bulgu ve DÖF eşleştirme",
-      "Termin ve sorumlu takibi",
-      "Yönetici görünürlüğü",
+      "Fotoğraflı bulgu akışı",
+      "DÖF ve sorumlu eşleştirmesi",
+      "Termin ve kapanış takibi",
     ],
     stats: [
       { label: "Bu ay denetim", value: "42" },
       { label: "Açık uygunsuzluk", value: "17" },
       { label: "Kapanış oranı", value: "%81" },
     ],
-    panelTitle: "Denetim Takibi",
-    panelSubtitle: "Saha akışı",
+    panelTitle: "Denetim Akışı",
+    panelSubtitle: "Bulgu, aksiyon ve sonuç",
     panelRows: [
-      { label: "Yeni bulgular", value: "08", tone: "warning" },
-      { label: "Atanan sorumlular", value: "17", tone: "primary" },
-      { label: "Kapanan kayıtlar", value: "29", tone: "success" },
+      { label: "Yeni bulgu", value: "08", tone: "warning" },
+      { label: "Atanan sorumlu", value: "17", tone: "primary" },
+      { label: "Tamamlanan iş", value: "29", tone: "success" },
     ],
   },
   {
     id: "risk",
-    label: "Risk Sihirbazı",
-    title: "Risk süreçlerini yaşayan bir kayıt sistemine taşıyın",
+    label: "Raporlama",
+    title: "Yönetici raporlarını sonradan değil, süreç içinde üretin",
     description:
-      "Risk değerlendirme, aksiyon planı ve dokümantasyon akışını aynı operasyon yapısında yönetin.",
+      "Risk değerlendirme, acil durum, denetim ve aksiyon verileri aynı akışta tutulduğu için raporlama daha hızlı ve daha güvenilir hale gelir.",
     bullets: [
-      "Sektör ve şablon bazlı başlangıç",
-      "Maddeler üzerinde düzenlenebilir akış",
-      "Raporlama ve dışa aktarma",
+      "Kurumsal çıktı mantığı",
+      "Excel / CSV dışa aktarma",
+      "Karar destekli yönetici görünümü",
     ],
     stats: [
-      { label: "Açık risk planı", value: "12" },
-      { label: "Yüksek risk", value: "5" },
       { label: "Hazır şablon", value: "40+" },
+      { label: "Aktif rapor", value: "12" },
+      { label: "Trend görünümü", value: "Canlı" },
     ],
-    panelTitle: "Risk Yönetimi",
-    panelSubtitle: "Öncelikli maddeler",
+    panelTitle: "Raporlama ve Yönetim",
+    panelSubtitle: "İzlenebilir çıktı yapısı",
     panelRows: [
-      { label: "Kritik risk", value: "05", tone: "warning" },
-      { label: "Gözden geçirme", value: "09", tone: "primary" },
-      { label: "Kapatılan aksiyon", value: "21", tone: "success" },
+      { label: "Hazır özet", value: "06", tone: "primary" },
+      { label: "Yüksek risk", value: "05", tone: "warning" },
+      { label: "Tamamlanan süreç", value: "21", tone: "success" },
     ],
   },
 ];
@@ -476,24 +505,24 @@ export type FeatureGroup = {
 
 export const landingFeatureGroups: FeatureGroup[] = [
   {
-    title: "Operasyon",
+    title: "Dijital Saha Denetimleri",
     icon: Waypoints,
-    items: ["Görev takibi", "Denetim planlama", "Saha aksiyonları", "Durum takibi"],
+    items: ["Mobil uyumlu denetim akışı", "Fotoğraf ve gözlem kaydı", "Hızlı saha notları", "Planlı denetim görünümü"],
   },
   {
-    title: "Çalışan",
-    icon: Users,
-    items: ["Çalışan havuzu", "Firma bazlı filtreleme", "Aktif/pasif durum", "Excel import/export"],
+    title: "Uygunsuzluk ve Aksiyon Takibi",
+    icon: Target,
+    items: ["Sorumlu ve termin atama", "Açık / kapalı aksiyon görünümü", "Geciken iş takibi", "Merkezi iş listesi"],
   },
   {
-    title: "İSG Süreçleri",
-    icon: ShieldAlert,
-    items: ["Risk değerlendirme", "Acil durum planı", "Kurul toplantıları", "Atama yazıları", "İş kazası kayıtları"],
+    title: "AI Risk Önceliklendirme",
+    icon: Sparkles,
+    items: ["Risk skoru görünümü", "Tekrar eden problem tespiti", "Öncelik sıralama", "Veri temelli yorumlama"],
   },
   {
-    title: "Raporlama",
+    title: "Yönetici Raporlama Paneli",
     icon: Activity,
-    items: ["Dashboard", "Firma bazlı görünüm", "CSV/Excel dışa aktarma", "Yönetici raporları"],
+    items: ["Trend ve tekrar analizi", "Firma bazlı görünüm", "CSV / Excel dışa aktarma", "Karar destek özeti"],
   },
 ];
 
@@ -538,17 +567,17 @@ export const landingAudienceItems: AudienceItem[] = [
 
 export const landingTrustPoints = [
   "Merkezi kayıt",
-  "Sorumlu atama",
-  "Termin takibi",
-  "Firma bazlı raporlama",
-  "Excel/CSV dışa aktarma",
-  "Yönetim görünürlüğü",
+  "İzlenebilir aksiyonlar",
+  "Yetkilendirilmiş erişim",
+  "KVKK odaklı yaklaşım",
+  "Raporlanabilir süreçler",
+  "Karar desteği",
 ];
 
 export const landingFooterGroups = [
   {
     title: "Ürün",
-    links: ["Operasyon Merkezi", "Çalışan Yönetimi", "Denetimler", "Risk Sihirbazı"],
+    links: ["Risk Intelligence", "Saha Denetimleri", "Aksiyon Takibi", "Raporlama"],
   },
   {
     title: "Modüller",
@@ -556,7 +585,7 @@ export const landingFooterGroups = [
   },
   {
     title: "İletişim",
-    links: ["Demo Talebi", "Destek", "info@isgvizyon.com", "www.isgvizyon.com"],
+    links: ["Firma Girişi", "Destek", "info@isgvizyon.com", "www.isgvizyon.com"],
   },
   {
     title: "Yasal",

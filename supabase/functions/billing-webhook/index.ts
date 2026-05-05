@@ -34,6 +34,25 @@ function normalizeSubscriptionStatus(status: string) {
   return "active";
 }
 
+function inferPlanCodeFromSubscription(subscription: StripeSubscriptionLike) {
+  const metadataPlanCode = subscription.metadata?.plan_code;
+  if (metadataPlanCode === "osgb" || metadataPlanCode === "premium") {
+    return metadataPlanCode;
+  }
+
+  const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
+  const osgbPriceIds = [
+    Deno.env.get("STRIPE_OSGB_MONTHLY_PRICE_ID"),
+    Deno.env.get("STRIPE_OSGB_YEARLY_PRICE_ID"),
+  ].filter(Boolean);
+
+  if (priceId && osgbPriceIds.includes(priceId)) {
+    return "osgb";
+  }
+
+  return "premium";
+}
+
 async function findOrganizationSubscription(adminClient: ReturnType<typeof createAdminSupabaseClient>, lookup: {
   orgId?: string | null;
   stripeSubscriptionId?: string | null;
@@ -88,7 +107,8 @@ async function upsertFromStripeSubscription(
     throw new Error("Stripe aboneligini esleyecek organization id bulunamadi.");
   }
 
-  const nextPlanCode = normalizeSubscriptionStatus(subscription.status) === "canceled" ? "free" : "premium";
+  const resolvedPlanCode = inferPlanCodeFromSubscription(subscription);
+  const nextPlanCode = normalizeSubscriptionStatus(subscription.status) === "canceled" ? "free" : resolvedPlanCode;
 
   await adminClient
     .from("organization_subscriptions")
@@ -139,7 +159,7 @@ async function handleInvoiceEvent(
     .insert({
       user_id: billingOwnerUserId,
       organization_id: subscription.org_id,
-      plan_name: "Premium",
+      plan_name: subscription.plan_code === "osgb" ? "OSGB" : "Premium",
       amount: ((status === "paid" ? invoice.amount_paid : invoice.amount_due) ?? 0) / 100,
       currency: invoice.currency?.toUpperCase() ?? "TRY",
       status,

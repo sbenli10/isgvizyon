@@ -39,7 +39,7 @@ const NAVBAR_HEIGHT = "5.25rem";
 function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const { state } = useSidebar();
   const { user, signOut } = useAuth();
-  const { plan, status } = useSubscription();
+  const { plan, status, isPaidPlan } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,7 +61,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
 
   const userDisplayName =
     user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Kullanıcı";
-  const isPremiumMember = plan === "premium" && status !== "past_due";
+  const membershipLabel = plan === "osgb" ? "OSGB" : plan === "premium" ? "Premium" : null;
   const isCollapsed = state === "collapsed";
   const desktopOffset = isCollapsed ? DESKTOP_SIDEBAR_COLLAPSED_WIDTH : DESKTOP_SIDEBAR_WIDTH;
 
@@ -126,10 +126,10 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   Sistem hazır
                 </div>
-                {isPremiumMember && (
+                {isPaidPlan && status !== "past_due" && membershipLabel && (
                   <div className="flex items-center gap-2 rounded-full border border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.16),rgba(251,191,36,0.08))] px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm dark:text-amber-200">
                     <Sparkles className="h-3.5 w-3.5" />
-                    Premium aktif
+                    {membershipLabel} aktif
                   </div>
                 )}
                 <div className="flex items-center gap-2 rounded-full border border-primary/15 bg-primary/8 px-3 py-2 text-xs font-medium text-foreground/80">

@@ -1,5 +1,5 @@
 export type SubscriptionStatus = "trial" | "free" | "premium" | "cancelled" | "past_due";
-export type SubscriptionPlan = "free" | "premium";
+export type SubscriptionPlan = "free" | "premium" | "osgb";
 export type BillingPeriod = "monthly" | "yearly";
 
 export type FeatureKey =

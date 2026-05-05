@@ -6,8 +6,8 @@ export default function LandingFeatures() {
   return (
     <LandingLayout
       eyebrow="Özellikler"
-      title="Gerçek ekranlar ve plan farklarıyla ürün özellikleri"
-      description="Ücretsiz plan ile başlayan temel akışların yanında, profesyonel plana geçen ekipler toplu düzeltici faaliyet analizi, yerleşim planı analizi, İSG asistanı, sertifika ve ortak sağlık güvenlik birimi modüllerini aktif olarak kullanır."
+      title="İSG yönetimini akıllı ve ölçülebilir hale getiren özellikler"
+      description="Denetimden raporlamaya, uygunsuzluk takibinden yapay zeka destekli risk analizine kadar tüm süreci tek platformda yönetin."
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {featureHighlightCards.map((card) => {
@@ -15,14 +15,14 @@ export default function LandingFeatures() {
           return (
             <article
               key={card.title}
-              className="rounded-[28px] border border-white/10 bg-white/[0.04] p-6"
+              className="rounded-[28px] border border-[rgba(148,163,184,0.18)] bg-[rgba(15,23,42,0.72)] p-6 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/26"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
                   <Icon className="h-5 w-5" />
                 </div>
                 {card.badge ? (
-                  <Badge className="rounded-full border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
+                  <Badge className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">
                     {card.badge}
                   </Badge>
                 ) : null}
@@ -34,10 +34,10 @@ export default function LandingFeatures() {
         })}
       </section>
 
-      <section className="rounded-[30px] border border-white/10 bg-white/[0.04] p-6 md:p-8">
-        <p className="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300/80">Plan karşılaştırması</p>
+      <section className="rounded-[30px] border border-[rgba(148,163,184,0.18)] bg-[rgba(15,23,42,0.72)] p-6 backdrop-blur-xl md:p-8">
+        <p className="text-xs font-medium uppercase tracking-[0.24em] text-cyan-300/80">Plan görünümü</p>
         <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-white">
-          Ücretsiz ve profesyonel plan arasında açılan farklar burada netleşir.
+          Paketler ürünün gerçek operasyon yoğunluğuna göre ayrışır.
         </h2>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           {pricingPlans.map((plan) => (
@@ -45,8 +45,8 @@ export default function LandingFeatures() {
               key={plan.title}
               className={`rounded-[26px] border p-5 ${
                 plan.recommended
-                  ? "border-cyan-400/20 bg-cyan-400/[0.08]"
-                  : "border-white/10 bg-[#101726]"
+                  ? "border-cyan-400/25 bg-cyan-400/[0.08]"
+                  : "border-white/10 bg-[#0B1F3A]/72"
               }`}
             >
               <div className="flex items-center justify-between gap-3">

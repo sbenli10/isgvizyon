@@ -117,6 +117,7 @@ export default function Settings() {
     cancelAtPeriodEnd,
     currentPeriodEnd,
     features,
+    isPaidPlan,
   } = useSubscription();
 
   const [currentTab, setCurrentTab] = useState<TabType>("general");
@@ -179,6 +180,8 @@ export default function Settings() {
   const [reviewingJoinRequestId, setReviewingJoinRequestId] = useState<string | null>(null);
   const [deactivatingInviteId, setDeactivatingInviteId] = useState<string | null>(null);
   const [regeneratingInviteId, setRegeneratingInviteId] = useState<string | null>(null);
+  const activePlanLabel = plan === "osgb" ? "OSGB Paket" : plan === "premium" ? "Premium Paket" : "Free Paket";
+  const activePlanShortLabel = plan === "osgb" ? "OSGB" : "Premium";
 
 useEffect(() => {
   if (user) {
@@ -2439,10 +2442,10 @@ const handleForceReset2FA = async () => {
                         </div>
                         <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/10 p-4">
                           <p className="text-sm font-semibold text-white">
-                            {plan === "premium" ? "Premium plan kullanıyorsunuz" : "Yükseltme ekranında tüm farklar listelenir"}
+                            {isPaidPlan ? `${activePlanShortLabel} plan kullanıyorsunuz` : "Yükseltme ekranında tüm farklar listelenir"}
                           </p>
                           <p className="mt-2 text-sm leading-6 text-slate-300">
-                            Free ve Premium arasındaki modül farkları, AI kotaları, kilitli araçlar ve tüm limitler artık Upgrade modal içinde daha net gösterilir.
+                            Free, Premium ve OSGB paketleri arasındaki modül farkları, AI kotaları, kilitli araçlar ve tüm limitler artık Upgrade modal içinde daha net gösterilir.
                           </p>
                           <div className="mt-4 flex flex-wrap gap-2">
                             <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
@@ -2465,15 +2468,15 @@ const handleForceReset2FA = async () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-lg font-bold">
-                            {plan === 'premium' ? 'Premium Paket' : 'Free Paket'}
+                            {activePlanLabel}
                           </p>
                           <p className="text-sm text-muted-foreground mt-1">
                             {status === 'trial'
                               ? `Deneme sürümü · ${daysLeftInTrial} gün kaldı`
                               : status === 'premium'
                               ? cancelAtPeriodEnd && currentPeriodEnd
-                                ? `Premium aktif · ${new Date(currentPeriodEnd).toLocaleDateString("tr-TR")} tarihinde kapanacak`
-                                : 'Premium üyelik aktif'
+                                ? `${activePlanShortLabel} aktif · ${new Date(currentPeriodEnd).toLocaleDateString("tr-TR")} tarihinde kapanacak`
+                                : `${activePlanShortLabel} üyelik aktif`
                               : 'Temel özellikler'}
                           </p>
                           {plan === 'premium' && (
@@ -2495,7 +2498,7 @@ const handleForceReset2FA = async () => {
                             className={premiumPrimaryButtonClassName}
                           >
                             <Crown className="h-4 w-4 mr-2" />
-                            {plan === 'premium' ? 'Aboneliği Yönet' : 'Yükselt'}
+                            {isPaidPlan ? 'Aboneliği Yönet' : 'Yükselt'}
                           </Button>
                         </div>
                       </div>

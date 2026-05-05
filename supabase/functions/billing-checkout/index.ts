@@ -2,6 +2,20 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
+type CheckoutPlanCode = "premium" | "osgb";
+
+function resolvePriceId(planCode: CheckoutPlanCode, billingPeriod: "monthly" | "yearly") {
+  if (planCode === "osgb") {
+    return billingPeriod === "yearly"
+      ? Deno.env.get("STRIPE_OSGB_YEARLY_PRICE_ID")
+      : Deno.env.get("STRIPE_OSGB_MONTHLY_PRICE_ID");
+  }
+
+  return billingPeriod === "yearly"
+    ? Deno.env.get("STRIPE_PREMIUM_YEARLY_PRICE_ID")
+    : Deno.env.get("STRIPE_PREMIUM_MONTHLY_PRICE_ID");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -22,16 +36,20 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const billingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
+    const planCode: CheckoutPlanCode = body?.planCode === "osgb" ? "osgb" : "premium";
     const successPath = typeof body?.successPath === "string" ? body.successPath : "/settings";
     const cancelPath = typeof body?.cancelPath === "string" ? body.cancelPath : "/settings";
-    const priceId = billingPeriod === "yearly"
-      ? Deno.env.get("STRIPE_PREMIUM_YEARLY_PRICE_ID")
-      : Deno.env.get("STRIPE_PREMIUM_MONTHLY_PRICE_ID");
+    const priceId = resolvePriceId(planCode, billingPeriod);
 
     if (!priceId) {
       return jsonResponse(500, {
         success: false,
-        error: { message: "Stripe fiyat tanimi eksik. STRIPE_PREMIUM_*_PRICE_ID secret'lerini ekleyin." },
+        error: {
+          message:
+            planCode === "osgb"
+              ? "Stripe OSGB fiyat tanimi eksik. STRIPE_OSGB_*_PRICE_ID secret'lerini ekleyin."
+              : "Stripe premium fiyat tanimi eksik. STRIPE_PREMIUM_*_PRICE_ID secret'lerini ekleyin.",
+        },
       });
     }
 
@@ -74,14 +92,14 @@ serve(async (req) => {
       metadata: {
         org_id: context.profile.organization_id,
         user_id: context.user.id,
-        plan_code: "premium",
+        plan_code: planCode,
         billing_period: billingPeriod,
       },
       subscription_data: {
         metadata: {
           org_id: context.profile.organization_id,
           user_id: context.user.id,
-          plan_code: "premium",
+          plan_code: planCode,
           billing_period: billingPeriod,
         },
       },

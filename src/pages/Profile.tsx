@@ -281,6 +281,17 @@ export default function Profile() {
   }, [user]);
 
   useEffect(() => {
+    const tabFromUrl = searchParams.get("tab");
+    const actionFromUrl = searchParams.get("action");
+
+    if (tabFromUrl === "workspace") {
+      setCurrentTab("workspace");
+    }
+
+    if (actionFromUrl === "create" || actionFromUrl === "invite" || actionFromUrl === "request") {
+      setWorkspaceAction(actionFromUrl);
+    }
+
     const inviteFromUrl = searchParams.get("invite");
     if (!inviteFromUrl) return;
 

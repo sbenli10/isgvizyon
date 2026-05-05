@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { BillingOverview, BillingPeriod } from "@/types/subscription";
+import type { BillingOverview, BillingPeriod, SubscriptionPlan } from "@/types/subscription";
 
 interface EdgeBillingResponse {
   success?: boolean;
@@ -62,8 +62,21 @@ async function openBillingUrl(functionName: string, body: Record<string, unknown
   window.location.assign(payload.url);
 }
 
+export type CheckoutPlanCode = Extract<SubscriptionPlan, "premium" | "osgb">;
+
+export async function startPlanCheckout(planCode: CheckoutPlanCode, period: BillingPeriod) {
+  await openBillingUrl("billing-checkout", {
+    billingPeriod: period,
+    planCode,
+  });
+}
+
 export async function startPremiumCheckout(period: BillingPeriod) {
-  await openBillingUrl("billing-checkout", { billingPeriod: period });
+  await startPlanCheckout("premium", period);
+}
+
+export async function startOsgbCheckout(period: BillingPeriod) {
+  await startPlanCheckout("osgb", period);
 }
 
 export async function openBillingPortal() {
