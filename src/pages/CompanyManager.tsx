@@ -70,6 +70,7 @@ import { RouteErrorBoundary } from "@/components/RouteErrorBoundary";
 import { getBulkCompanyPreviewKey, getParsedEmployeePreviewKey } from "@/lib/companyManagerKeys";
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { usePersistentDraft } from "@/hooks/usePersistentDraft";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 interface NACEVirtualListProps {
   items: NACECode[];
@@ -857,13 +858,7 @@ export default function CompanyManager() {
     try {
       const fileExtension = file.name.split(".").pop() || "png";
       const fileName = `${user.id}/${crypto.randomUUID()}.${fileExtension}`;
-
-      const { error } = await supabase.storage.from("company-logos").upload(fileName, file, {
-        upsert: true,
-        cacheControl: "3600",
-      });
-
-      if (error) throw error;
+      await uploadFileOptimized("company-logos", fileName, file);
 
       setFormData((prev) => ({ ...prev, logo_url: fileName }));
       await syncCompanyLogoPreview(fileName);

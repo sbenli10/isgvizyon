@@ -43,6 +43,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/hooks/useSubscription";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { backfillMyFeatureUsage } from "@/lib/billing";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { terminateSession, recordSession } from "@/utils/sessionManager";
 import type { BillingHistory, UserSession } from "@/types/subscription";
 import { TwoFactorSetupModal } from '@/components/TwoFactorSetupModal';
@@ -490,29 +491,19 @@ useEffect(() => {
     try {
       const fileExt = file.name.split(".").pop() || "png";
       const fileName = `stamps/${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("dof-images")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage.from("dof-images").getPublicUrl(fileName);
+      const publicUrl = await uploadFileOptimized("dof-images", fileName, file);
 
       const { error: updateError } = await supabase
         .from("profiles")
         .update({
-          stamp_url: urlData.publicUrl,
+          stamp_url: publicUrl,
           updated_at: new Date().toISOString(),
         })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
 
-      setProfileData((prev) => (prev ? { ...prev, stamp_url: urlData.publicUrl } : prev));
+      setProfileData((prev) => (prev ? { ...prev, stamp_url: publicUrl } : prev));
       toast.success("İSG uzmanı kaşesi güncellendi");
     } catch (err: any) {
       console.error("Stamp upload error:", err);

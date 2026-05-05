@@ -28,6 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 type LibraryTab = "topics" | "official" | "archive";
 type CollectionRow = Database["public"]["Tables"]["library_collections"]["Row"];
@@ -370,8 +371,7 @@ export default function SafetyLibrary() {
     try {
       const safeOriginalName = file.name.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim();
       const fileName = `${Date.now()}__${safeOriginalName}`;
-      const { error } = await supabase.storage.from("safety_documents").upload(fileName, file);
-      if (error) throw error;
+      await uploadFileOptimized("safety_documents", fileName, file);
 
       toast.success("Doküman arşive yüklendi.");
       await fetchFiles();

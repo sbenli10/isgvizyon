@@ -4,6 +4,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { buildStorageObjectRef } from "@/lib/storageObject";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { toast } from "sonner";
@@ -1112,17 +1113,10 @@ export default function ADEPWizard() {
         .toISOString()
         .split("T")[0]}.pdf`;
       const storagePath = `adep-reports/${user.id}/${fileName}`;
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+      await uploadFileOptimized("reports", storagePath, pdfFile);
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("reports")
-        .upload(storagePath, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      setCurrentReportUrl(buildStorageObjectRef("reports", uploadData.path));
+      setCurrentReportUrl(buildStorageObjectRef("reports", storagePath));
       setCurrentReportFilename(fileName);
       setSendModalOpen(true);
       toast.success("Rapor e-posta gönderimi için hazır.");
@@ -2225,6 +2219,5 @@ export default function ADEPWizard() {
     </div>
   );
 }
-
 
 

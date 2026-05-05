@@ -60,6 +60,7 @@ import { toast } from "sonner";
 import { useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import { withTemporaryBodyChild } from "@/lib/safeDom";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef, parseStorageObjectRef, resolveStorageObjectUrl, resolveStorageObjectUrls } from "@/lib/storageObject";
 
 interface StatCard {
@@ -667,15 +668,8 @@ export default function Inspections() {
       const pdfBlob = doc.output("blob");
       const fileName = `inspection-${activeInspection.id}.pdf`;
       const storagePath = `inspection-reports/${user.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("reports")
-        .upload(storagePath, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
+      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
+      await uploadFileOptimized("reports", storagePath, pdfFile);
 
       setCurrentReportUrl(buildStorageObjectRef("reports", storagePath));
       setCurrentReportFilename(fileName);
@@ -1610,5 +1604,4 @@ export default function Inspections() {
     </div>
   );
 }
-
 

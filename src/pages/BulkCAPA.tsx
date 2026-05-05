@@ -59,6 +59,7 @@ import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getBulkCapaLegalBasis } from "@/lib/bulkCapaLegalBasis";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import type {
   BulkCapaOfficialCompany,
   BulkCapaOfficialEntry,
@@ -4397,20 +4398,18 @@ ${entries
 
       if (reportStorageOwnerId) {
         const storagePath = `${reportStorageOwnerId}/${singleFileName}`;
-        const { data: uploadData, error } = await supabase.storage
-          .from("dof-reports")
-          .upload(storagePath, singleWordBlob, {
-            contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            upsert: true,
-          });
+        const singleWordFile = new File(
+          [singleWordBlob],
+          singleFileName,
+          { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+        );
 
-        uploadError = error;
-        if (error) {
+        try {
+          savedReportUrl = await uploadFileOptimized("dof-reports", storagePath, singleWordFile);
+        } catch (error: any) {
+          uploadError = error;
           console.warn("Single DOF storage upload failed:", error);
           toast.warning("Arşiv yüklemesi başarısız oldu, dosya yine de indirilecek.");
-        } else if (uploadData?.path) {
-          const { data: publicUrlData } = supabase.storage.from("dof-reports").getPublicUrl(uploadData.path);
-          savedReportUrl = publicUrlData.publicUrl;
         }
       }
 
@@ -4720,24 +4719,18 @@ const handleSaveAndExport = async () => {
 
     if (reportStorageOwnerId) {
       const storagePath = `${reportStorageOwnerId}/${reportFileName}`;
+      const wordFile = new File(
+        [wordBlob],
+        reportFileName,
+        { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+      );
 
-      const { data: uploadData, error } = await supabase.storage
-        .from("dof-reports")
-        .upload(storagePath, wordBlob, {
-          contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          upsert: true,
-        });
-
-      uploadError = error;
-      if (error) {
+      try {
+        savedReportUrl = await uploadFileOptimized("dof-reports", storagePath, wordFile);
+      } catch (error: any) {
+        uploadError = error;
         console.error("Storage upload error:", error);
         toast.error(getUserFriendlyErrorMessage(`storage upload: ${error.message}`, "export"));
-      } else {
-        const { data: publicUrlData } = supabase.storage
-          .from("dof-reports")
-          .getPublicUrl(uploadData.path);
-
-        savedReportUrl = publicUrlData.publicUrl;
       }
     }
 

@@ -52,6 +52,7 @@ import { toast } from "sonner";
 import { differenceInCalendarDays, format, isPast, parseISO } from "date-fns";
 import { withTemporaryBodyChild } from "@/lib/safeDom";
 import { resolveStorageObjectUrl } from "@/lib/storageObject";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 
 type CAPAStatus = "Açık" | "Devam Ediyor" | "Tamamlandı";
@@ -1110,11 +1111,8 @@ export default function CAPA() {
       setUploadProgress((prev) => ({ ...prev, [progressKey]: 5 }));
       for (const file of files) {
         const safeName = `${folder}/${orgId}/${recordId}/${Date.now()}-${file.name.replace(/\s+/g, "-")}`;
-        const { error } = await supabase.storage.from(CAPA_EVIDENCE_BUCKET).upload(safeName, file, { upsert: true });
-        if (error) throw error;
-        const { data } = supabase.storage.from(CAPA_EVIDENCE_BUCKET).getPublicUrl(safeName);
         uploaded.push({
-          url: data.publicUrl,
+          url: await uploadFileOptimized(CAPA_EVIDENCE_BUCKET, safeName, file),
           name: file.name,
           size: file.size,
           mime: file.type || "application/octet-stream",

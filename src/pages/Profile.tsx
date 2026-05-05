@@ -45,6 +45,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 interface ProfileData {
   id: string;
@@ -692,28 +693,17 @@ export default function Profile() {
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
+      const publicUrl = await uploadFileOptimized("avatars", fileName, file);
 
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: urlData.publicUrl })
+        .update({ avatar_url: publicUrl })
         .eq("id", user.id);
 
       if (updateError) throw updateError;
 
       setProfile((prev) =>
-        prev ? { ...prev, avatar_url: urlData.publicUrl } : null
+        prev ? { ...prev, avatar_url: publicUrl } : null
       );
 
       toast.success("Avatar güncellendi");

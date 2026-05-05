@@ -4,6 +4,7 @@ import {
   getOsgbCompanyOptions,
   type OsgbCompanyOption,
 } from "@/lib/osgbOperations";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 type IncidentLooseClient = typeof supabase & {
   from: (table: string) => {
@@ -428,11 +429,7 @@ export const uploadIncidentAttachment = async (
   file: File,
 ): Promise<IncidentAttachmentRecord> => {
   const safeFileName = `${userId}/${reportId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-  const { error: uploadError } = await supabase.storage
-    .from("incident-files")
-    .upload(safeFileName, file, { upsert: true });
-
-  if (uploadError) throw uploadError;
+  await uploadFileOptimized("incident-files", safeFileName, file);
 
   const { data, error } = await db
     .from("incident_attachments")

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { buildStorageObjectRef, parseStorageObjectRef } from "@/lib/storageObject";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 const BUCKET_NAME = "inspection-photos";
 
@@ -7,15 +8,7 @@ export async function uploadInspectionPhoto(file: File, userId: string): Promise
   try {
     const fileExt = file.name.split(".").pop();
     const fileName = `${userId}/${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(fileName, file, {
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (uploadError) throw uploadError;
+    await uploadFileOptimized(BUCKET_NAME, fileName, file);
 
     return buildStorageObjectRef(BUCKET_NAME, fileName);
   } catch (error) {

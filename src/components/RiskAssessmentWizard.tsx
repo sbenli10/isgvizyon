@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef } from "@/lib/storageObject";
 import { cn } from "@/lib/utils";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
@@ -314,8 +315,8 @@ export default function RiskAssessmentWizard() {
     const blob = await response.blob();
     const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
     const path = `${user.id}/${assessmentId}/${slot}-${Date.now()}.${extension}`;
-    const { error } = await supabase.storage.from("risk-assessment-signatures").upload(path, blob, { contentType: blob.type || "image/png", upsert: true });
-    if (error) throw error;
+    const file = new File([blob], `${slot}.${extension}`, { type: blob.type || "image/png" });
+    await uploadFileOptimized("risk-assessment-signatures", path, file);
     return buildStorageObjectRef("risk-assessment-signatures", path);
   };
 

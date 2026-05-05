@@ -1,5 +1,6 @@
 ﻿import { createOsgbTask } from "@/lib/osgbOperations";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 type LooseClient = typeof supabase & {
   from: (table: string) => {
@@ -288,8 +289,7 @@ export const uploadHealthSurveillanceFile = async (
   fileSummary?: string | null,
 ): Promise<HealthSurveillanceFileRecord> => {
   const safeFileName = `${userId}/${recordId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
-  const { error: uploadError } = await supabase.storage.from("health-surveillance-files").upload(safeFileName, file, { upsert: true });
-  if (uploadError) throw uploadError;
+  await uploadFileOptimized("health-surveillance-files", safeFileName, file);
 
   const { data, error } = await db
     .from("health_surveillance_files")

@@ -46,6 +46,7 @@ import {
 } from "@/lib/documentAnalysisTypes";
 import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { buildStorageObjectRef } from "@/lib/storageObject";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 interface CompanyOption {
   id: string;
@@ -334,8 +335,7 @@ const { clearDraft } = usePersistentDraft({
   const uploadSourceFile = async (file: File) => {
     if (!user?.id) throw new Error("Dosya yüklemek için oturum gerekli.");
     const filePath = `${user.id}/${selectedCompanyId || "no-company"}/${Date.now()}-${safeFileName(file.name)}`;
-    const { error } = await supabase.storage.from(DOCUMENT_BUCKET).upload(filePath, file, { upsert: false });
-    if (error) throw error;
+    await uploadFileOptimized(DOCUMENT_BUCKET, filePath, file);
     return { filePath, publicUrl: buildStorageObjectRef(DOCUMENT_BUCKET, filePath) };
   };
 

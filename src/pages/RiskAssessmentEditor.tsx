@@ -76,6 +76,7 @@ import {
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { RISK_SECTOR_CATALOG, buildCatalogKey } from "@/lib/riskSectorCatalog";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef, parseStorageObjectRef, resolveStorageObjectUrl } from "@/lib/storageObject";
 import {
   Dialog,
@@ -2485,15 +2486,7 @@ useEffect(() => {
     try {
       const fileExt = file.name.split(".").pop() || "jpg";
       const storagePath = `${user.id}/${assessment.id}/${itemId}-${Date.now()}.${fileExt.toLowerCase()}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("risk-item-photos")
-        .upload(storagePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
+      await uploadFileOptimized("risk-item-photos", storagePath, file);
 
       await updateRiskItem(itemId, "photo_url", buildStorageObjectRef("risk-item-photos", storagePath));
       toast.success("Risk maddesi fotoğrafı yüklendi");
@@ -4012,21 +4005,17 @@ const exportToPDFAndShare = async () => {
     // 2. SUPABASE STORAGE'A YÜKLE
     const fileName = `risk-assessment-${assessment.id}-${Date.now()}.pdf`;
     const storagePath = `risk-reports/${user?.id}/${fileName}`;
+    const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from("reports")
-      .upload(storagePath, pdfBlob, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
+    try {
+      await uploadFileOptimized("reports", storagePath, pdfFile);
+    } catch (uploadError: any) {
       console.error("Storage upload error:", uploadError);
       toast.error("Dosya yüklenemedi", { description: uploadError.message });
       return;
     }
 
-    const reportUrl = buildStorageObjectRef("reports", uploadData.path);
+    const reportUrl = buildStorageObjectRef("reports", storagePath);
 
     // 4. LOCAL İNDİR
     doc.save(fileName);

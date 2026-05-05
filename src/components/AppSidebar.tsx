@@ -229,7 +229,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [collapsedSubmenus, setCollapsedSubmenus] = useState<string[]>([]);
+  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>(["OSGB Modülü"]);
   const [draftMeetingsCount, setDraftMeetingsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -380,13 +380,12 @@ export function AppSidebar() {
 
   const toggleSubmenu = (label: string) => {
     if (collapsed) return;
-    setCollapsedSubmenus((prev) => (prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label]));
+    setExpandedSubmenus((prev) => (prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label]));
   };
 
   const isSubmenuOpen = (item: MenuItem) => {
     if (!item.children?.length) return false;
-    const childActive = item.children.some((child) => isItemActive(child));
-    return childActive || !collapsedSubmenus.includes(item.title);
+    return expandedSubmenus.includes(item.title);
   };
 
   const handleSignOut = async () => {

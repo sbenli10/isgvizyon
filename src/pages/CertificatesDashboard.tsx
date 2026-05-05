@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -537,8 +538,7 @@ export default function CertificatesDashboard() {
 
   async function uploadCertificateAsset(file: File) {
     const fileName = `logos/${crypto.randomUUID()}-${file.name}`;
-    const { error } = await supabase.storage.from("certificate-files").upload(fileName, file, { upsert: true });
-    if (error) throw error;
+    await uploadFileOptimized("certificate-files", fileName, file);
     return fileName;
   }
 
