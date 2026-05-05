@@ -8,7 +8,7 @@ import {
   type ADEPDocumentTeam,
 } from "@/lib/adepDocumentBundle";
 
-const TEMPLATE_PATH = "/templates/Atilla_Coskun_Acil_Durum_Plani_2026.docx";
+const TEMPLATE_PATH = "/templates/Acil_Durum_Plani_2026.docx";
 const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
 const PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
