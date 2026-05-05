@@ -302,8 +302,8 @@ export function AppSidebar() {
                 icon: Briefcase,
                 badge: "NEW",
                 children: [
-                  canViewDashboard ? { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null } : null,
-                  canViewDashboard ? { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null } : null,
+                  { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
+                  { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null },
                   canViewCompanyHub ? { title: "Firma Havuzu", url: "/osgb/company-tracking", icon: Building2, badge: null } : null,
                   canViewPeople ? { title: "Personel ve Atamalar", url: "/osgb/assignments", icon: Briefcase, badge: null } : null,
                   canViewPeople ? { title: "Dakika ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null } : null,
@@ -360,7 +360,17 @@ export function AppSidebar() {
         ],
       },
     ],
-    [draftMeetingsCount],
+    [
+      canViewAnalytics,
+      canViewAutomation,
+      canViewCompanyHub,
+      canViewDocuments,
+      canViewFinance,
+      canViewKatip,
+      canViewPeople,
+      canViewPortal,
+      draftMeetingsCount,
+    ],
   );
 
   const isItemActive = (item: MenuItem) => {
