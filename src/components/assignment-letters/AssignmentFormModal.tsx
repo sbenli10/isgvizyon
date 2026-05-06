@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { AssignmentType, HazardClass } from "@/lib/assignmentPdfGenerator";
+import type { AssignmentType, HazardClass } from "@/lib/assignmentWordGenerator";
 import type { Company, Employee } from "@/types/companies";
 
 export interface AssignmentFormValues {
@@ -68,11 +68,11 @@ export function AssignmentFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl border-border bg-card text-foreground">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-1rem)] overflow-y-auto border-border bg-card text-foreground sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{assignmentType ? assignmentTitles[assignmentType] : "Atama Yazısı"}</DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Firma, personel ve görevlendirme bilgilerini doldurun. Kayıt tamamlandığında resmi PDF belgesi oluşturulur.
+            Firma, personel ve görevlendirme bilgilerini doldurun. Kayıt tamamlandığında resmi Word belgesi oluşturulur.
           </DialogDescription>
         </DialogHeader>
 
@@ -177,7 +177,7 @@ export function AssignmentFormModal({
           </Button>
           <Button onClick={onSubmit} disabled={saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {mode === "edit" ? "Kaydet ve PDF Güncelle" : "Belgeyi Oluştur"}
+            {mode === "edit" ? "Kaydet ve Word Güncelle" : "Word Belgesi Oluştur"}
           </Button>
         </DialogFooter>
       </DialogContent>

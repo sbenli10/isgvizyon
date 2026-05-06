@@ -283,7 +283,7 @@ export function AppSidebar() {
             icon: Users,
             badge: draftMeetingsCount > 0 ? draftMeetingsCount : null,
           },
-          { title: "Atama Yazıları", url: "/assignment-letters", icon: FileText, badge: null },
+          { title: "İSG FORMLARI", url: "/assignment-letters", icon: FileText, badge: null },
           { title: "İş Kazası / Ramak Kala", url: "/incidents", icon: ShieldAlert, badge: "NEW" },
           { title: "Periyodik Kontrol", url: "/periodic-controls", icon: CalendarClock, badge: "NEW" },
         ],

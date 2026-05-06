@@ -69,6 +69,7 @@ interface EmployeeRow {
   company_id: string;
   first_name: string;
   last_name: string;
+  tc_number: string | null;
   job_title: string;
   department: string | null;
   is_active: boolean | null;
@@ -122,6 +123,7 @@ export interface PpeAssignmentRecord {
 export interface PpeEmployeeOption {
   id: string;
   fullName: string;
+  tcNumber: string | null;
   companyId: string;
   companyName: string | null;
   department: string | null;
@@ -378,7 +380,7 @@ export const listPpeEmployeeOptions = async (): Promise<PpeEmployeeOption[]> => 
     await Promise.all([
       db
         .from("employees")
-        .select("id, company_id, first_name, last_name, job_title, department, is_active")
+        .select("id, company_id, first_name, last_name, tc_number, job_title, department, is_active")
         .order("first_name", { ascending: true }),
       db.from("companies").select("id, name").order("name", { ascending: true }),
     ]);
@@ -398,6 +400,7 @@ export const listPpeEmployeeOptions = async (): Promise<PpeEmployeeOption[]> => 
     return {
       id: employee.id,
       fullName: `${employee.first_name} ${employee.last_name}`.trim(),
+      tcNumber: employee.tc_number || null,
       companyId: employee.company_id,
       companyName: companyMap.get(employee.company_id) ?? null,
       department: employee.department,

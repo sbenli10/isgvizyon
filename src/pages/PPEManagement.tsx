@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Boxes,
   ExternalLink,
+  FileSpreadsheet,
   PackageCheck,
   RefreshCcw,
   RotateCcw,
@@ -14,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAccessRole } from "@/hooks/useAccessRole";
+import { supabase } from "@/integrations/supabase/client";
 import { downloadCsv } from "@/lib/csvExport";
 import { readPageSessionCache, writePageSessionCache } from "@/lib/pageSessionCache";
 import {
@@ -55,6 +57,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { PpeDeliveryFormDialog, type PpeDeliveryFormState, type PpeDeliverySelectionItem } from "@/components/ppe/PpeDeliveryFormDialog";
+import { generatePpeDeliveryWord } from "@/lib/ppeDeliveryWordGenerator";
+import type { Company } from "@/types/companies";
 
 type InventoryFormState = {
   itemName: string;
@@ -78,6 +83,8 @@ type AssignmentFormState = {
   notes: string;
 };
 
+type CompanyOption = Pick<Company, "id" | "company_name">;
+
 const emptyInventoryForm: InventoryFormState = {
   itemName: "",
   category: "",
@@ -100,6 +107,25 @@ const emptyAssignmentForm: AssignmentFormState = {
   notes: "",
 };
 
+const emptyDeliveryForm: PpeDeliveryFormState = {
+  companyMode: "system",
+  companyId: "",
+  manualCompanyName: "",
+  employeeMode: "system",
+  employeeId: "",
+  manualEmployeeName: "",
+  manualEmployeeTc: "",
+  manualEmployeeJobTitle: "",
+  deliveryDate: new Date().toISOString().slice(0, 10),
+  periodicControlDate: "",
+  delivererName: "",
+  delivererTc: "",
+  delivererJobTitle: "",
+  selectedItems: [],
+  manualItemName: "",
+  manualItemQuantity: "1",
+};
+
 const PPE_CACHE_TTL = 5 * 60 * 1000;
 const PPE_ASSIGNMENT_PAGE_SIZE = 10;
 const PPE_INVENTORY_PAGE_SIZE = 10;
@@ -109,23 +135,27 @@ const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDa
 
 export default function PPEManagement() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { canManage, isViewer } = useAccessRole();
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [inventory, setInventory] = useState<PpeInventoryRecord[]>([]);
   const [assignments, setAssignments] = useState<PpeAssignmentRecord[]>([]);
   const [employees, setEmployees] = useState<PpeEmployeeOption[]>([]);
   const [inventoryOptions, setInventoryOptions] = useState<PpeInventoryOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deliverySaving, setDeliverySaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [employeeFilter, setEmployeeFilter] = useState("ALL");
   const [inventoryDialogOpen, setInventoryDialogOpen] = useState(false);
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
   const [editingInventory, setEditingInventory] = useState<PpeInventoryRecord | null>(null);
   const [editingAssignment, setEditingAssignment] = useState<PpeAssignmentRecord | null>(null);
   const [inventoryForm, setInventoryForm] = useState<InventoryFormState>(emptyInventoryForm);
   const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>(emptyAssignmentForm);
+  const [deliveryForm, setDeliveryForm] = useState<PpeDeliveryFormState>(emptyDeliveryForm);
   const [assignmentPage, setAssignmentPage] = useState(1);
   const [inventoryPage, setInventoryPage] = useState(1);
   const [employeePage, setEmployeePage] = useState(1);
@@ -137,6 +167,7 @@ export default function PPEManagement() {
 
     const cacheKey = `ppe:${user.id}`;
     const cached = readPageSessionCache<{
+      companies: CompanyOption[];
       inventory: PpeInventoryRecord[];
       assignments: PpeAssignmentRecord[];
       employees: PpeEmployeeOption[];
@@ -146,6 +177,7 @@ export default function PPEManagement() {
     }>(cacheKey, PPE_CACHE_TTL);
 
     if (cached) {
+      setCompanies(cached.companies);
       setInventory(cached.inventory);
       setAssignments(cached.assignments);
       setEmployees(cached.employees);
@@ -158,7 +190,8 @@ export default function PPEManagement() {
 
     setLoading(true);
     try {
-      const [inventoryRows, assignmentRows, employeeRows, inventoryOptionRows] = await Promise.all([
+      const [companyRows, inventoryRows, assignmentRows, employeeRows, inventoryOptionRows] = await Promise.all([
+        (supabase as any).from("companies").select("id, name").eq("is_active", true).order("name", { ascending: true }),
         listPpeInventoryPage(user.id, {
           page: inventoryPage,
           pageSize: PPE_INVENTORY_PAGE_SIZE,
@@ -173,6 +206,16 @@ export default function PPEManagement() {
         listPpeInventoryOptions(user.id),
       ]);
 
+      if (companyRows.error) {
+        throw companyRows.error;
+      }
+
+      const mappedCompanies = (companyRows.data || []).map((row: any) => ({
+        id: String(row.id),
+        company_name: String(row.name || "Firma"),
+      }));
+
+      setCompanies(mappedCompanies);
       setInventory(inventoryRows.rows);
       setAssignments(assignmentRows.rows);
       setEmployees(employeeRows);
@@ -181,6 +224,7 @@ export default function PPEManagement() {
       setInventoryTotalCount(inventoryRows.count);
       setError(null);
       writePageSessionCache(cacheKey, {
+        companies: mappedCompanies,
         inventory: inventoryRows.rows,
         assignments: assignmentRows.rows,
         employees: employeeRows,
@@ -295,6 +339,31 @@ export default function PPEManagement() {
     setEditingAssignment(null);
     setAssignmentForm(emptyAssignmentForm);
     setAssignmentDialogOpen(true);
+  };
+
+  const openDeliveryDialog = () => {
+    const nextSelectedItems: PpeDeliverySelectionItem[] = inventory
+      .filter((item) => item.is_active)
+      .map((item) => ({
+        key: item.id,
+        itemName: item.item_name,
+        category: item.category,
+        quantity: "1",
+        selected: false,
+      }));
+
+    setDeliveryForm({
+      ...emptyDeliveryForm,
+      delivererName: profile?.full_name || "",
+      delivererJobTitle: profile?.position || "İş Güvenliği Uzmanı",
+      selectedItems: nextSelectedItems,
+    });
+    setDeliveryDialogOpen(true);
+  };
+
+  const resetDeliveryDialog = () => {
+    setDeliveryDialogOpen(false);
+    setDeliveryForm(emptyDeliveryForm);
   };
 
   const openAssignmentEdit = (item: PpeAssignmentRecord) => {
@@ -425,6 +494,129 @@ export default function PPEManagement() {
     );
   };
 
+  const handleDeliveryFormChange = (patch: Partial<PpeDeliveryFormState>) => {
+    setDeliveryForm((prev) => {
+      const next = { ...prev, ...patch };
+
+      if (patch.companyMode === "manual") {
+        next.companyId = "";
+      }
+
+      if (patch.employeeMode === "manual") {
+        next.employeeId = "";
+      }
+
+      if (patch.employeeId) {
+        const employee = employees.find((item) => item.id === patch.employeeId);
+        if (employee) {
+          next.manualEmployeeName = employee.fullName;
+          next.manualEmployeeTc = employee.tcNumber || next.manualEmployeeTc;
+          next.manualEmployeeJobTitle = employee.jobTitle || employee.department || "";
+        }
+      }
+
+      return next;
+    });
+  };
+
+  const handleToggleDeliveryItem = (key: string, checked: boolean) => {
+    setDeliveryForm((prev) => ({
+      ...prev,
+      selectedItems: prev.selectedItems.map((item) => (item.key === key ? { ...item, selected: checked } : item)),
+    }));
+  };
+
+  const handleDeliveryItemQuantityChange = (key: string, quantity: string) => {
+    setDeliveryForm((prev) => ({
+      ...prev,
+      selectedItems: prev.selectedItems.map((item) => (item.key === key ? { ...item, quantity } : item)),
+    }));
+  };
+
+  const handleAddManualDeliveryItem = () => {
+    const itemName = deliveryForm.manualItemName.trim();
+    const quantity = deliveryForm.manualItemQuantity.trim() || "1";
+
+    if (!itemName) {
+      toast.error("Manuel KKD adı girin.");
+      return;
+    }
+
+    setDeliveryForm((prev) => ({
+      ...prev,
+      selectedItems: [
+        ...prev.selectedItems,
+        {
+          key: `manual-${Date.now()}`,
+          itemName,
+          category: "Manuel",
+          quantity,
+          selected: true,
+        },
+      ],
+      manualItemName: "",
+      manualItemQuantity: "1",
+    }));
+  };
+
+  const handleDeliveryExport = async () => {
+    const companyName =
+      deliveryForm.companyMode === "manual"
+        ? deliveryForm.manualCompanyName.trim()
+        : companies.find((item) => item.id === deliveryForm.companyId)?.company_name || "";
+    const selectedEmployee = employees.find((item) => item.id === deliveryForm.employeeId);
+    const employeeName =
+      deliveryForm.employeeMode === "manual"
+        ? deliveryForm.manualEmployeeName.trim()
+        : selectedEmployee?.fullName || "";
+    const employeeTc =
+      deliveryForm.employeeMode === "manual"
+        ? deliveryForm.manualEmployeeTc.trim()
+        : selectedEmployee?.tcNumber || "";
+    const employeeJobTitle =
+      deliveryForm.employeeMode === "manual"
+        ? deliveryForm.manualEmployeeJobTitle.trim()
+        : selectedEmployee?.jobTitle || selectedEmployee?.department || "";
+    const selectedItems = deliveryForm.selectedItems.filter((item) => item.selected && item.itemName.trim());
+
+    if (!companyName || !employeeName || !deliveryForm.deliveryDate || !deliveryForm.delivererName.trim()) {
+      toast.error("Firma, çalışan, teslim tarihi ve teslim eden bilgileri zorunludur.");
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      toast.error("En az bir KKD seçin.");
+      return;
+    }
+
+    setDeliverySaving(true);
+    try {
+      await generatePpeDeliveryWord({
+        companyName,
+        employeeName,
+        employeeTc,
+        employeeJobTitle,
+        deliveryDate: deliveryForm.deliveryDate,
+        periodicControlDate: deliveryForm.periodicControlDate || undefined,
+        delivererName: deliveryForm.delivererName,
+        delivererTc: deliveryForm.delivererTc,
+        delivererJobTitle: deliveryForm.delivererJobTitle,
+        items: selectedItems.map((item) => ({
+          itemName: item.itemName,
+          quantity: item.quantity || "1",
+          deliveryDate: deliveryForm.deliveryDate,
+        })),
+      });
+
+      toast.success("KKD zimmet formu Word çıktısı hazırlandı.");
+      resetDeliveryDialog();
+    } catch (exportError) {
+      toast.error(exportError instanceof Error ? exportError.message : "KKD Word çıktısı oluşturulamadı.");
+    } finally {
+      setDeliverySaving(false);
+    }
+  };
+
   return (
     <div className="theme-page-readable container mx-auto space-y-6 py-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -444,10 +636,55 @@ export default function PPEManagement() {
           <Button variant="outline" onClick={handleExport}>Dışa Aktar</Button>
           <Button variant="outline" className="gap-2" onClick={() => void loadData()}><RefreshCcw className="h-4 w-4" />Yenile</Button>
           <Button variant="outline" className="gap-2" onClick={() => navigate("/employees")}><ExternalLink className="h-4 w-4" />Çalışan Ekranı</Button>
+          <Button variant="outline" className="gap-2" onClick={openDeliveryDialog}><FileSpreadsheet className="h-4 w-4" />KKD Formu</Button>
           <Button className="gap-2" onClick={openInventoryCreate} disabled={!canManage}><Boxes className="h-4 w-4" />Yeni KKD</Button>
           <Button className="gap-2" onClick={openAssignmentCreate} disabled={!canManage}><PackageCheck className="h-4 w-4" />Yeni Zimmet</Button>
         </div>
       </div>
+
+      <Card className="overflow-hidden border-slate-800 bg-slate-950/70 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
+        <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className="space-y-4 p-6">
+            <Badge className="w-fit border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-200">Profesyonel KKD Teslim Akışı</Badge>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white md:text-3xl">KKD zimmetini tek ekranda yönet, resmi formu anında üret</h2>
+              <p className="max-w-2xl text-sm leading-6 text-slate-400 md:text-base">
+                Kullanıcı ister sistemdeki firma ve çalışanlardan seçim yapabilir, ister manuel girişle hızlı bir zimmet formu hazırlayabilir. Word çıktısı kurumsal formatta, mobil uyumlu akışla hazırlanır.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button className="gap-2 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-600 text-white hover:opacity-95" onClick={openDeliveryDialog}>
+                <FileSpreadsheet className="h-4 w-4" />
+                KKD Zimmet Formu Oluştur
+              </Button>
+              <Button variant="outline" className="gap-2" onClick={openAssignmentCreate} disabled={!canManage}>
+                <PackageCheck className="h-4 w-4" />
+                Sisteme Zimmet Kaydı Ekle
+              </Button>
+            </div>
+          </div>
+          <div className="border-t border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 lg:border-l lg:border-t-0">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Form Akışı</p>
+                <p className="mt-2 text-lg font-semibold text-white">Sistemden seç veya manuel gir</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Çıktı</p>
+                <p className="mt-2 text-lg font-semibold text-white">Kurumsal Word zimmet formu</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Mobil Kullanım</p>
+                <p className="mt-2 text-lg font-semibold text-white">Tek kolon uyumlu veri girişi</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Esneklik</p>
+                <p className="mt-2 text-lg font-semibold text-white">Firma, çalışan ve KKD alanlarında hibrit seçim</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
 
       {isViewer && <Alert className="border-slate-700 bg-slate-900/60 text-slate-100"><AlertTriangle className="h-4 w-4" /><AlertTitle>Görüntüleme yetkisi</AlertTitle><AlertDescription>Bu rolde kayıtları inceleyebilirsiniz; düzenleme işlemleri kapalıdır.</AlertDescription></Alert>}
       {error && <Alert className="border-red-500/20 bg-red-500/10 text-red-100"><AlertTriangle className="h-4 w-4" /><AlertTitle>KKD verisi yüklenemedi</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
@@ -499,6 +736,27 @@ export default function PPEManagement() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <PpeDeliveryFormDialog
+        open={deliveryDialogOpen}
+        saving={deliverySaving}
+        companies={companies}
+        employees={employees}
+        inventory={inventory}
+        value={deliveryForm}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetDeliveryDialog();
+            return;
+          }
+          setDeliveryDialogOpen(true);
+        }}
+        onValueChange={handleDeliveryFormChange}
+        onToggleItem={handleToggleDeliveryItem}
+        onChangeItemQuantity={handleDeliveryItemQuantityChange}
+        onAddManualItem={handleAddManualDeliveryItem}
+        onSubmit={() => void handleDeliveryExport()}
+      />
 
       <Dialog open={inventoryDialogOpen} onOpenChange={setInventoryDialogOpen}>
         <DialogContent className="max-w-2xl">

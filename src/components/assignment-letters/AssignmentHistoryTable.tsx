@@ -58,7 +58,7 @@ export function AssignmentHistoryTable({ items, onDownload, onEdit, onDelete }: 
                         </Button>
                         <Button variant="outline" size="sm" className="gap-2" onClick={() => onDownload(item.id)}>
                           <Download className="h-4 w-4" />
-                          PDF İndir
+                          Word İndir
                         </Button>
                         <Button
                           variant="outline"
