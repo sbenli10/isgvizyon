@@ -200,7 +200,7 @@ export function useSubscription() {
     : personalTrialEndsAt;
   const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
   const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
-  const isPremiumPlan = plan === "premium";
+  const isPremiumPlan = plan === "premium" || status === "trial";
   const isOsgbPlan = plan === "osgb";
   const isPaidPlan = plan === "premium" || plan === "osgb";
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;

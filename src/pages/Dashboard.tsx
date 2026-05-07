@@ -20,6 +20,7 @@ import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useSafeMode } from "@/hooks/useSafeMode";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import NotificationWidget from "@/components/NotificationWidget";
+import { supabase } from "@/integrations/supabase/client";
 import { startPremiumTrial } from "@/lib/billing";
 import { toast } from "sonner";
 import {
@@ -27,6 +28,7 @@ import {
   fetchDashboardSnapshot,
   readDashboardSnapshot,
   writeDashboardSnapshot,
+  type DashboardFinding,
   type DashboardInspection,
   type DashboardInspectionStatus,
   type DashboardRiskLevel,
@@ -199,6 +201,7 @@ export default function Dashboard() {
 
   const hasHydratedFromCache = useRef(false);
   const isFetching = useRef(false);
+  const hasPremiumAccess = status === "trial" || plan === "premium";
 
   const applySnapshot = useCallback((snapshot: DashboardSnapshot) => {
     setOrgId(snapshot.orgId);
@@ -211,9 +214,147 @@ export default function Dashboard() {
     setRecentInspections(snapshot.recentInspections);
   }, []);
 
+  const fetchPersonalDashboardData = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    const { data: companies, error: companiesError } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("is_active", true);
+
+    if (companiesError) {
+      throw new Error(`Firma verileri alınamadı: ${companiesError.message}`);
+    }
+
+    const companyIds = (companies ?? []).map((company) => company.id);
+
+    const [
+      { count: employeesCount, error: employeesError },
+      { count: riskAssessmentCount, error: riskAssessmentsError },
+      { data: inspections, error: inspectionsError },
+      { count: analysisCount, error: analysisError },
+    ] = await Promise.all([
+      companyIds.length > 0
+        ? supabase
+            .from("employees")
+            .select("id", { count: "exact", head: true })
+            .in("company_id", companyIds)
+            .eq("is_active", true)
+        : Promise.resolve({ count: 0, error: null, data: null }),
+      supabase
+        .from("risk_assessments")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_deleted", false),
+      supabase
+        .from("inspections")
+        .select("id, location_name, risk_level, status, created_at, org_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("document_analyses")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]);
+
+    if (employeesError) {
+      throw new Error(`Çalışan verileri alınamadı: ${employeesError.message}`);
+    }
+
+    if (riskAssessmentsError) {
+      throw new Error(`Risk değerlendirme verileri alınamadı: ${riskAssessmentsError.message}`);
+    }
+
+    if (inspectionsError) {
+      throw new Error(`Denetim verileri alınamadı: ${inspectionsError.message}`);
+    }
+
+    if (analysisError) {
+      throw new Error(`Analiz verileri alınamadı: ${analysisError.message}`);
+    }
+
+    const inspectionList = (inspections ?? []) as DashboardInspection[];
+    let findingsList: DashboardFinding[] = [];
+
+    if (inspectionList.length > 0) {
+      const inspectionIds = inspectionList.map((inspection) => inspection.id);
+      const { data: findings, error: findingsError } = await supabase
+        .from("findings")
+        .select("id, description, due_date, is_resolved, inspection_id")
+        .in("inspection_id", inspectionIds);
+
+      if (findingsError) {
+        throw new Error(`Bulgu verileri alınamadı: ${findingsError.message}`);
+      }
+
+      findingsList = (findings ?? []) as DashboardFinding[];
+    }
+
+    const activeInspectionsCount = inspectionList.filter((inspection) => inspection.status === "in_progress").length;
+    const openFindingsCount = findingsList.filter((finding) => !finding.is_resolved).length;
+    const criticalCount = inspectionList.filter((inspection) => inspection.risk_level === "critical").length;
+    const criticalPercent = inspectionList.length > 0 ? Math.round((criticalCount / inspectionList.length) * 100) : 0;
+    const today = new Date();
+    const overdueCount = findingsList.filter(
+      (finding) => !finding.is_resolved && finding.due_date && new Date(finding.due_date) < today,
+    ).length;
+
+    setOrgId("personal");
+    setActiveInspections(activeInspectionsCount);
+    setOpenFindings(openFindingsCount);
+    setCriticalRiskPercent(criticalPercent);
+    setOverdueActions(overdueCount);
+    setRiskDistribution(
+      [
+        { name: "Düşük", value: inspectionList.filter((item) => item.risk_level === "low").length, color: "#10b981" },
+        { name: "Orta", value: inspectionList.filter((item) => item.risk_level === "medium").length, color: "#f59e0b" },
+        { name: "Yüksek", value: inspectionList.filter((item) => item.risk_level === "high").length, color: "#f97316" },
+        { name: "Kritik", value: criticalCount, color: "#ef4444" },
+      ].filter((item) => item.value > 0),
+    );
+    setMonthlyTrend(() => {
+      const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
+      const last6Months: Array<{ month: string; denetimler: number }> = [];
+      const baseDate = new Date();
+
+      for (let i = 5; i >= 0; i -= 1) {
+        const date = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 1);
+        const count = inspectionList.filter((inspection) => {
+          const createdAt = new Date(inspection.created_at);
+          return createdAt.getMonth() === date.getMonth() && createdAt.getFullYear() === date.getFullYear();
+        }).length;
+
+        last6Months.push({
+          month: months[date.getMonth()],
+          denetimler: count,
+        });
+      }
+
+      return last6Months;
+    });
+    setRecentInspections(inspectionList.slice(0, 5));
+
+    return {
+      companiesCount: companyIds.length,
+      employeesCount: employeesCount ?? 0,
+      riskAssessmentCount: riskAssessmentCount ?? 0,
+      documentAnalysisCount: analysisCount ?? 0,
+    };
+  }, [user]);
+
   const fetchDashboardData = useCallback(
     async (isRefresh = false, force = false) => {
-      if (!user || !profile?.organization_id || isFetching.current) {
+      if (!user || isFetching.current) {
+        return;
+      }
+
+      const shouldUseOrganizationDashboard = Boolean(profile?.organization_id);
+      const shouldUsePersonalDashboard = !profile?.organization_id && hasPremiumAccess;
+
+      if (!shouldUseOrganizationDashboard && !shouldUsePersonalDashboard) {
         return;
       }
 
@@ -230,14 +371,21 @@ export default function Dashboard() {
       }
 
       try {
-        const snapshot = await fetchDashboardSnapshot(profile.organization_id);
-        applySnapshot(snapshot);
-        writeDashboardSnapshot(user.id, snapshot);
+        if (shouldUseOrganizationDashboard && profile?.organization_id) {
+          const snapshot = await fetchDashboardSnapshot(profile.organization_id);
+          applySnapshot(snapshot);
+          writeDashboardSnapshot(user.id, snapshot);
+        } else {
+          await fetchPersonalDashboardData();
+        }
+
         hasHydratedFromCache.current = true;
 
         if (isRefresh) {
           toast.success("Dashboard güncellendi", {
-            description: `${snapshot.openFindings} açık bulgu, ${snapshot.activeInspections} aktif denetim`,
+            description: shouldUseOrganizationDashboard
+              ? "Organizasyon verileri yenilendi."
+              : "Bireysel premium metrikleri güncellendi.",
           });
         }
       } catch (error: any) {
@@ -274,7 +422,7 @@ export default function Dashboard() {
         isFetching.current = false;
       }
     },
-    [applySnapshot, profile?.organization_id, user]
+    [applySnapshot, fetchPersonalDashboardData, hasPremiumAccess, profile?.organization_id, user]
   );
 
   useEffect(() => {
@@ -282,24 +430,30 @@ export default function Dashboard() {
       return;
     }
 
-    if (!profile.organization_id) {
+    if (!profile.organization_id && !hasPremiumAccess) {
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
-    const cachedSnapshot = readDashboardSnapshot(user.id);
-    const isCacheFresh =
-      cachedSnapshot && Date.now() - cachedSnapshot.timestamp < DASHBOARD_CACHE_TTL;
+    if (profile.organization_id) {
+      const cachedSnapshot = readDashboardSnapshot(user.id);
+      const isCacheFresh =
+        cachedSnapshot && Date.now() - cachedSnapshot.timestamp < DASHBOARD_CACHE_TTL;
 
-    if (cachedSnapshot) {
-      applySnapshot(cachedSnapshot);
-      hasHydratedFromCache.current = true;
-      setLoading(false);
+      if (cachedSnapshot) {
+        applySnapshot(cachedSnapshot);
+        hasHydratedFromCache.current = true;
+        setLoading(false);
+      }
+
+      void fetchDashboardData(false, !isCacheFresh);
+      return;
     }
 
-    void fetchDashboardData(false, !isCacheFresh);
-  }, [applySnapshot, fetchDashboardData, profile, user]);
+    hasHydratedFromCache.current = false;
+    void fetchDashboardData(false, true);
+  }, [applySnapshot, fetchDashboardData, hasPremiumAccess, profile, user]);
 
   const handleRefresh = () => {
     void fetchDashboardData(true, true);
@@ -322,14 +476,12 @@ export default function Dashboard() {
     }
   };
 
-  if (user && profile && !profile.organization_id) {
+  if (user && profile && !profile.organization_id && !hasPremiumAccess) {
     const trialButtonDisabled = startingTrial || !canStartTrial;
-    const hasPremiumAccess = status === "trial" || plan === "premium";
-    const heroTitle = hasPremiumAccess ? "Premium erişiminiz aktif" : "Bireysel hesabınız hazır";
-    const heroDescription = hasPremiumAccess
-      ? "Premium üyeliğiniz aktif. Organizasyon oluşturmadan bireysel premium özellikleri kullanabilirsiniz. Sadece OSGB modülü, ekip yönetimi ve finans operasyonları için organizasyon gerekir."
-      : "Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.";
-    const secondaryActionLabel = hasPremiumAccess ? "Premium özelliklerini incele" : "Premium'u incele";
+    const heroTitle = "Bireysel hesabınız hazır";
+    const heroDescription =
+      "Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.";
+    const secondaryActionLabel = "Premium'u incele";
     const secondaryActionTarget = "/settings?tab=billing&upgrade=1";
 
     return (
@@ -517,6 +669,44 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 notranslate" translate="no">
+      {!profile?.organization_id && hasPremiumAccess && (
+        <RevealBlock disabled={reduceMotion}>
+          <section className="rounded-[24px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(6,78,59,0.24),rgba(15,23,42,0.92))] p-4 shadow-[0_16px_48px_rgba(4,120,87,0.18)] md:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-100">
+                    {status === "trial" ? `Premium demo aktif · ${daysLeftInTrial} gün` : "Premium üyelik aktif"}
+                  </Badge>
+                  <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                    Bireysel kullanım modu
+                  </Badge>
+                </div>
+                <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Premium araçlarınız hazır</h2>
+                <p className="max-w-3xl text-sm leading-6 text-slate-300">
+                  AI analiz, raporlama ve premium üretim ekranları bireysel hesabınızda aktif. Sadece OSGB, ekip yönetimi ve finans operasyonları için organizasyon kaydı gerekir.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button
+                  onClick={() => navigate("/settings?tab=billing&upgrade=1")}
+                  className="bg-white text-slate-950 hover:bg-slate-100"
+                >
+                  Premium avantajlarını yönet
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate("/profile?tab=workspace&action=create")}
+                  className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                >
+                  Organizasyon Oluştur
+                </Button>
+              </div>
+            </div>
+          </section>
+        </RevealBlock>
+      )}
+
       <RevealBlock disabled={reduceMotion}>
         <section className="relative overflow-hidden rounded-[24px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),radial-gradient(circle_at_80%_20%,_rgba(59,130,246,0.16),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-4 shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:rounded-[28px] md:p-8">
         <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.04)_45%,transparent_100%)]" />
