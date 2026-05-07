@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { createAdminSupabaseClient, createUserSupabaseClient, requireBillingContext } from "../_shared/billing.ts";
+import { createUserSupabaseClient, requireBillingContext } from "../_shared/billing.ts";
 
 function addDaysIso(days: number) {
   const next = new Date();
@@ -8,15 +8,19 @@ function addDaysIso(days: number) {
   return next.toISOString();
 }
 
-serve(async (req) => {
+serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const context = await requireBillingContext(req, { allowNoOrganization: true });
+    const contextOptions = {
+      allowNoOrganization: true,
+    } as Parameters<typeof requireBillingContext>[1] & { requireStripe?: boolean };
+    contextOptions.requireStripe = false;
+    const context = await requireBillingContext(req, contextOptions);
     if ("errorResponse" in context) {
-      return context.errorResponse;
+      return context.errorResponse as Response;
     }
 
     if (context.profile.organization_id) {
@@ -28,7 +32,7 @@ serve(async (req) => {
       }
 
       const userClient = createUserSupabaseClient(req);
-      const { data, error } = await (userClient as any).rpc("start_my_premium_trial");
+      const { data, error } = await userClient.rpc("start_my_premium_trial");
 
       if (error) {
         return jsonResponse(400, {
@@ -43,7 +47,6 @@ serve(async (req) => {
       });
     }
 
-    const adminClient = createAdminSupabaseClient();
     const existingStatus = context.profile.subscription_status?.toLowerCase() ?? null;
     const existingPlan = context.profile.subscription_plan?.toLowerCase() ?? null;
     const hasUsedTrialBefore = Boolean(context.profile.subscription_started_at || context.profile.trial_ends_at);
@@ -65,7 +68,7 @@ serve(async (req) => {
     const nowIso = new Date().toISOString();
     const trialEndsAt = addDaysIso(7);
 
-    const { error: updateError } = await adminClient
+    const { error: updateError } = await context.adminClient
       .from("profiles")
       .update({
         subscription_plan: "premium",

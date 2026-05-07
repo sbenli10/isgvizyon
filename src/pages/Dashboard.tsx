@@ -15,10 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
 import { useSafeMode } from "@/hooks/useSafeMode";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import NotificationWidget from "@/components/NotificationWidget";
+import { startPremiumTrial } from "@/lib/billing";
 import { toast } from "sonner";
 import {
   DASHBOARD_CACHE_TTL,
@@ -171,11 +173,13 @@ function AnimatedNumber({ value, disabled = false }: { value: number; disabled?:
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
+  const { status, plan, canStartTrial, daysLeftInTrial, refetch: refetchSubscription } = useSubscription();
   const { safeMode } = useSafeMode();
   const prefersReducedMotion = useReducedMotion();
   const reduceMotion = safeMode || prefersReducedMotion;
   const [loading, setLoading] = useState(true);
+  const [startingTrial, setStartingTrial] = useState(false);
   usePageDataTiming(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [, setOrgId] = useState<string | null>(null);
@@ -301,7 +305,26 @@ export default function Dashboard() {
     void fetchDashboardData(true, true);
   };
 
+  const handleStartTrial = async () => {
+    setStartingTrial(true);
+    try {
+      await startPremiumTrial();
+      await refreshProfile();
+      await refetchSubscription();
+      toast.success("7 günlük premium deneme başlatıldı", {
+        description: "Deneme süresince Premium üyeliğin açtığı tüm özellikler ve ekranlar aktif.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Deneme üyeliği başlatılamadı.";
+      toast.error("Deneme üyeliği başlatılamadı", { description: message });
+    } finally {
+      setStartingTrial(false);
+    }
+  };
+
   if (user && profile && !profile.organization_id) {
+    const trialButtonDisabled = startingTrial || !canStartTrial;
+
     return (
       <div className="space-y-6">
         <section className="rounded-[28px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-6 text-white shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:p-8">
@@ -311,6 +334,19 @@ export default function Dashboard() {
             Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button
+              onClick={() => void handleStartTrial()}
+              disabled={trialButtonDisabled}
+              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {startingTrial
+                ? "Premium deneme başlatılıyor..."
+                : status === "trial"
+                  ? `Premium demo aktif · ${daysLeftInTrial} gün`
+                  : plan === "premium"
+                    ? "Premium üyelik zaten aktif"
+                    : "7 günlük premium denemeyi başlat"}
+            </Button>
             <Button
               onClick={() => navigate("/profile?tab=workspace&action=create")}
               className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
@@ -325,6 +361,9 @@ export default function Dashboard() {
               ISGBot ile Devam Et
             </Button>
           </div>
+          <p className="mt-4 max-w-2xl text-xs leading-5 text-slate-400">
+            Premium deneme sırasında Premium üyeliğin açtığı tüm AI, raporlama, çıktı ve gelişmiş operasyon ekranları erişilebilir olur. OSGB modülü bu kapsama dahil değildir.
+          </p>
         </section>
       </div>
     );

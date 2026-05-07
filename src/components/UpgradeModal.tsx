@@ -304,7 +304,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const canManageOrganizationBilling = hasOrganization && isOrganizationAdmin;
   const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
   const canPurchaseOsgb = hasOrganization && isOrganizationAdmin;
-  const canStartTrialCta = canStartTrial || (!hasOrganization && plan === "free" && status === "free");
+  const canStartTrialCta = canStartTrial;
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");

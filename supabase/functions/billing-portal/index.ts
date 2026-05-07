@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
-serve(async (req) => {
+serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -10,7 +10,7 @@ serve(async (req) => {
   try {
     const context = await requireBillingContext(req);
     if ("errorResponse" in context) {
-      return context.errorResponse;
+      return context.errorResponse as Response;
     }
 
     if (!context.isOrgAdmin) {

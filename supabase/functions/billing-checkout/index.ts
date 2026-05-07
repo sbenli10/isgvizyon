@@ -1,8 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { buildAppUrl, createUserSupabaseClient, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
+import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
 type CheckoutPlanCode = "premium" | "osgb";
+
+type CheckoutProfile = {
+  id: string;
+  email: string | null;
+  full_name: string | null;
+  organization_id: string | null;
+  role: string | null;
+  subscription_plan: string | null;
+  subscription_status: string | null;
+  subscription_started_at: string | null;
+  trial_ends_at: string | null;
+};
 
 function resolvePriceId(planCode: CheckoutPlanCode, billingPeriod: "monthly" | "yearly") {
   if (planCode === "osgb") {
@@ -30,7 +42,89 @@ function buildPersonalWorkspaceName(email: string | null, fullName: string | nul
   return "Kisisel Calisma Alani";
 }
 
-serve(async (req) => {
+function slugifyValue(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ç/g, "c")
+    .replace(/ğ/g, "g")
+    .replace(/ı/g, "i")
+    .replace(/ö/g, "o")
+    .replace(/ş/g, "s")
+    .replace(/ü/g, "u")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+async function ensurePersonalBillingOrganization(adminClient: any, profile: CheckoutProfile) {
+  if (profile.organization_id) {
+    return profile;
+  }
+
+  const workspaceName = buildPersonalWorkspaceName(profile.email, profile.full_name);
+  const slugBase = slugifyValue(workspaceName) || "kisisel-calisma-alani";
+  let slug = `${slugBase}-${profile.id.slice(0, 8)}`;
+  let suffix = 1;
+
+  while (true) {
+    const { data: existingOrg, error: existingOrgError } = await adminClient
+      .from("organizations")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (existingOrgError) {
+      throw new Error(existingOrgError.message || "Organizasyon slugu kontrol edilemedi.");
+    }
+
+    if (!existingOrg) {
+      break;
+    }
+
+    suffix += 1;
+    slug = `${slugBase}-${profile.id.slice(0, 8)}-${suffix}`;
+  }
+
+  const { data: organization, error: organizationError } = await adminClient
+    .from("organizations")
+    .insert({
+      name: workspaceName,
+      slug,
+      country: "Türkiye",
+    })
+    .select("id")
+    .single();
+
+  if (organizationError || !organization?.id) {
+    throw new Error(organizationError?.message || "Kisisel organizasyon olusturulamadi.");
+  }
+
+  const { error: profileUpdateError } = await adminClient
+    .from("profiles")
+    .update({
+      organization_id: organization.id,
+      role: "admin",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", profile.id);
+
+  if (profileUpdateError) {
+    throw new Error(profileUpdateError.message || "Profil organizasyon baglantisi kurulamadi.");
+  }
+
+  const { data: refreshedProfile, error: refreshedProfileError } = await adminClient
+    .from("profiles")
+    .select("id, email, full_name, organization_id, role, subscription_plan, subscription_status, subscription_started_at, trial_ends_at")
+    .eq("id", profile.id)
+    .single();
+
+  if (refreshedProfileError || !refreshedProfile?.organization_id) {
+    throw new Error(refreshedProfileError?.message || "Organizasyon baglantisi tamamlanamadi.");
+  }
+
+  return refreshedProfile as CheckoutProfile;
+}
+
+serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -41,7 +135,7 @@ serve(async (req) => {
     const planCode: CheckoutPlanCode = body?.planCode === "osgb" ? "osgb" : "premium";
     const context = await requireBillingContext(req, { allowNoOrganization: planCode === "premium" });
     if ("errorResponse" in context) {
-      return context.errorResponse;
+      return context.errorResponse as Response;
     }
 
     if (planCode === "osgb" && !context.profile.organization_id) {
@@ -52,38 +146,18 @@ serve(async (req) => {
     }
 
     if (planCode === "premium" && !context.profile.organization_id) {
-      const userClient = createUserSupabaseClient(req);
-      const workspaceName = buildPersonalWorkspaceName(context.user.email ?? null, context.profile.full_name ?? null);
-      const { error: createOrgError } = await (userClient as any).rpc("create_workspace_organization", {
-        p_name: workspaceName,
-        p_industry: null,
-        p_city: null,
-        p_phone: null,
-        p_website: null,
-      });
-
-      if (createOrgError) {
+      try {
+        const refreshedProfile = await ensurePersonalBillingOrganization(context.adminClient, context.profile);
+        context.profile = refreshedProfile;
+        context.isOrgAdmin = refreshedProfile.role?.toLowerCase() === "admin";
+      } catch (error) {
         return jsonResponse(400, {
           success: false,
-          error: { message: createOrgError.message || "Premium plan icin kisisel organizasyon olusturulamadi." },
+          error: {
+            message: error instanceof Error ? error.message : "Premium plan icin kisisel organizasyon olusturulamadi.",
+          },
         });
       }
-
-      const { data: refreshedProfile, error: refreshedProfileError } = await context.adminClient
-        .from("profiles")
-        .select("id, email, full_name, organization_id, role")
-        .eq("id", context.user.id)
-        .maybeSingle();
-
-      if (refreshedProfileError || !refreshedProfile?.organization_id) {
-        return jsonResponse(500, {
-          success: false,
-          error: { message: "Premium plan icin organizasyon baglantisi tamamlanamadi." },
-        });
-      }
-
-      context.profile = refreshedProfile;
-      context.isOrgAdmin = refreshedProfile.role?.toLowerCase() === "admin";
     }
 
     if (!context.isOrgAdmin) {
