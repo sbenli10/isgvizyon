@@ -185,6 +185,19 @@ export default function Settings() {
   const activePlanLabel = plan === "osgb" ? "OSGB Paket" : plan === "premium" ? "Premium Paket" : "Free Paket";
   const activePlanShortLabel = plan === "osgb" ? "OSGB" : "Premium";
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const openUpgrade = searchParams.get("upgrade");
+
+    if (tab === "general" || tab === "security" || tab === "billing" || tab === "notifications" || tab === "ai-health") {
+      setCurrentTab(tab);
+    }
+
+    if (openUpgrade === "1") {
+      setShowUpgradeModal(true);
+    }
+  }, [searchParams]);
+
 useEffect(() => {
   if (user) {
     const cached = sessionStorage.getItem(getSettingsCacheKey(user.id));
@@ -2801,16 +2814,3 @@ const handleForceReset2FA = async () => {
     </>
   );
 }
-
-
-
-  useEffect(() => {
-    const tab = searchParams.get("tab");
-    const openUpgrade = searchParams.get("upgrade");
-    if (tab === "general" || tab === "security" || tab === "billing" || tab === "notifications" || tab === "ai-health") {
-      setCurrentTab(tab);
-    }
-    if (openUpgrade === "1") {
-      setShowUpgradeModal(true);
-    }
-  }, [searchParams]);

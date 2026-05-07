@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { lazy, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -169,6 +170,7 @@ function AnimatedNumber({ value, disabled = false }: { value: number; disabled?:
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { safeMode } = useSafeMode();
   const prefersReducedMotion = useReducedMotion();
@@ -276,6 +278,12 @@ export default function Dashboard() {
       return;
     }
 
+    if (!profile.organization_id) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     const cachedSnapshot = readDashboardSnapshot(user.id);
     const isCacheFresh =
       cachedSnapshot && Date.now() - cachedSnapshot.timestamp < DASHBOARD_CACHE_TTL;
@@ -292,6 +300,35 @@ export default function Dashboard() {
   const handleRefresh = () => {
     void fetchDashboardData(true, true);
   };
+
+  if (user && profile && !profile.organization_id) {
+    return (
+      <div className="space-y-6">
+        <section className="rounded-[28px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-6 text-white shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:p-8">
+          <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Hoş geldiniz</Badge>
+          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">Bireysel hesabınız hazır</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+            Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button
+              onClick={() => navigate("/profile?tab=workspace&action=create")}
+              className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+            >
+              Organizasyon Oluştur
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => navigate("/isg-bot")}
+              className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+            >
+              ISGBot ile Devam Et
+            </Button>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   const getRiskColor = (level: RiskLevel) => {
     const colors: Record<RiskLevel, string> = {

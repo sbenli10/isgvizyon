@@ -64,12 +64,23 @@ function deriveLegacyFeatures(entitlements: SubscriptionFeatureEntitlement[], pl
 }
 
 export function useSubscription() {
-  const { user } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
 
   const refetch = useCallback(async () => {
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
+
     if (!user) {
+      setOverview(null);
+      setLoading(false);
+      return;
+    }
+
+    if (!profile?.organization_id) {
       setOverview(null);
       setLoading(false);
       return;
@@ -85,7 +96,7 @@ export function useSubscription() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [authLoading, profile?.organization_id, user]);
 
   useEffect(() => {
     void refetch();
