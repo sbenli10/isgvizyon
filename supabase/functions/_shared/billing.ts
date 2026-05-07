@@ -10,6 +10,10 @@ type BillingUserProfile = {
   role: string | null;
 };
 
+type RequireBillingContextOptions = {
+  allowNoOrganization?: boolean;
+};
+
 export function createStripeClient() {
   const secretKey = Deno.env.get("STRIPE_SECRET_KEY");
 
@@ -50,7 +54,7 @@ export function createAdminSupabaseClient() {
   return createClient(supabaseUrl, serviceRoleKey);
 }
 
-export async function requireBillingContext(req: Request) {
+export async function requireBillingContext(req: Request, options: RequireBillingContextOptions = {}) {
   const userClient = createUserSupabaseClient(req);
   const adminClient = createAdminSupabaseClient();
   const stripe = createStripeClient();
@@ -80,7 +84,7 @@ export async function requireBillingContext(req: Request) {
     };
   }
 
-  if (!profile.organization_id) {
+  if (!profile.organization_id && !options.allowNoOrganization) {
     return {
       errorResponse: jsonResponse(400, {
         success: false,

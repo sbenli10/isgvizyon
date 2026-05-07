@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { getBillingOverview } from "@/lib/billing";
+import { getBillingCatalog, getBillingOverview } from "@/lib/billing";
 import type {
+  BillingCatalogPlan,
   BillingOverview,
   FeatureKey,
   SubscriptionFeatureEntitlement,
@@ -67,6 +68,7 @@ export function useSubscription() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
+  const [catalogPlans, setCatalogPlans] = useState<BillingCatalogPlan[]>([]);
 
   const refetch = useCallback(async () => {
     if (authLoading) {
@@ -76,13 +78,23 @@ export function useSubscription() {
 
     if (!user) {
       setOverview(null);
+      setCatalogPlans([]);
       setLoading(false);
       return;
     }
 
     if (!profile?.organization_id) {
-      setOverview(null);
-      setLoading(false);
+      try {
+        const catalog = await getBillingCatalog();
+        setCatalogPlans(catalog.map((entry) => ({ ...entry, isCurrent: entry.planCode === "free" })));
+        setOverview(null);
+      } catch (error) {
+        console.error("Subscription catalog fetch error:", error);
+        setCatalogPlans([]);
+        setOverview(null);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -90,9 +102,17 @@ export function useSubscription() {
     try {
       const nextOverview = await getBillingOverview();
       setOverview(nextOverview);
+      setCatalogPlans(nextOverview.plans ?? []);
     } catch (error) {
       console.error("Subscription fetch error:", error);
       setOverview(null);
+      try {
+        const catalog = await getBillingCatalog();
+        setCatalogPlans(catalog.map((entry) => ({ ...entry, isCurrent: entry.planCode === "free" })));
+      } catch (catalogError) {
+        console.error("Subscription catalog fallback error:", catalogError);
+        setCatalogPlans([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -143,7 +163,7 @@ export function useSubscription() {
     rawStatus: overview?.status ?? "active",
     plan,
     features,
-    plans: overview?.plans ?? [],
+    plans: overview?.plans ?? catalogPlans,
     entitlements,
     featureMap,
     isOrganizationAdmin: overview?.isOrganizationAdmin ?? false,

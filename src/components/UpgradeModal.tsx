@@ -38,6 +38,15 @@ type BillingFeatureMeta = {
   icon: typeof Brain;
 };
 
+type PlanPresentation = {
+  audience: string;
+  eligibility: string;
+  usageModel: string;
+  highlights: string[];
+  demoLabel?: string;
+  demoDescription?: string;
+};
+
 const FEATURE_CATALOG: BillingFeatureMeta[] = [
   {
     key: "bulk_capa.access",
@@ -194,6 +203,41 @@ const CATEGORY_ORDER = [
 
 const PREMIUM_MONTHLY_PRICE = 250;
 
+const PLAN_PRESENTATION: Record<SubscriptionPlan, PlanPresentation> = {
+  free: {
+    audience: "Bireysel başlangıç yapan kullanıcılar",
+    eligibility: "Her kullanıcı anında kullanabilir",
+    usageModel: "Temel modüller ve kontrollü kullanım limitleri",
+    highlights: [
+      "Temel İSG kayıtları ve standart operasyon ekranları",
+      "Sınırlı firma ve çalışan kapasitesi",
+      "Premium araçlar kapalı, çekirdek akışlar açık",
+    ],
+  },
+  premium: {
+    audience: "İSG uzmanları, danışmanlar ve profesyonel ekipler",
+    eligibility: "Bireysel veya organizasyonlu kullanıcılar kullanabilir",
+    usageModel: "AI, raporlama ve yüksek limitli profesyonel kullanım",
+    highlights: [
+      "AI destekli analizler, gelişmiş raporlar ve üretim araçları",
+      "Daha yüksek operasyon limitleri ve premium ekranlar",
+      "Organizasyon olmadan bireysel olarak da satın alınabilir",
+    ],
+    demoLabel: "7 günlük demo mevcut",
+    demoDescription: "Demo Premium paket içindir. AI, analiz ve premium üretim araçlarını 7 gün deneyebilirsiniz.",
+  },
+  osgb: {
+    audience: "OSGB'ler, çoklu firma yöneten ekipler ve kurumsal operasyonlar",
+    eligibility: "Yalnızca organizasyon kaydı olan kullanıcılar",
+    usageModel: "Premium'un tüm yetenekleri + OSGB yönetim modülleri",
+    highlights: [
+      "Premium'un tüm özellikleri dahildir",
+      "OSGB dashboard, finans, kapasite ve belge akışları açılır",
+      "Ekip, çoklu firma ve kurumsal süreç yönetimi için tasarlanmıştır",
+    ],
+  },
+};
+
 function formatPrice(price: number | null, currency: string, period: BillingPeriod) {
   if (!price || price <= 0) {
     return "Ücretsiz";
@@ -257,6 +301,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   } = useSubscription();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const hasOrganization = Boolean(profile?.organization_id);
+  const canManageOrganizationBilling = hasOrganization && isOrganizationAdmin;
+  const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
+  const canPurchaseOsgb = hasOrganization && isOrganizationAdmin;
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
@@ -360,6 +407,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
       });
     });
 
+  const trialPackageLabel = "Premium Paket";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] text-white shadow-[0_30px_90px_rgba(8,145,178,0.16)]">
@@ -399,17 +448,41 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
           </div>
         )}
 
-        {!isOrganizationAdmin && (
+        {hasOrganization && !isOrganizationAdmin && (
           <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
             Üyelik ve faturalama işlemlerini yalnızca organizasyon yöneticisi başlatabilir. Bilgileri görebilir, fakat satın alma ve iptal işlemleri için yönetici hesabına geçmeniz gerekir.
           </div>
         )}
 
-        {!hasOrganization && (
+        {false && !hasOrganization && (
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
             OSGB modülünü aktifleştirmek için bir kurum kaydı oluşturmanız gerekmektedir.
           </div>
         )}
+
+        <div className="grid gap-4 xl:grid-cols-3">
+          <div className="rounded-[24px] border border-emerald-400/15 bg-emerald-400/10 p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/80">Free</p>
+            <p className="mt-2 text-lg font-semibold text-white">Temel bireysel baslangic</p>
+            <p className="mt-2 text-sm leading-6 text-slate-200">
+              Standart ekranlara erismek, temel kayitlari tutmak ve platformu dusuk hacimde kullanmak isteyen kullanicilar icin uygundur.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-fuchsia-400/15 bg-fuchsia-500/10 p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-fuchsia-200/80">Premium</p>
+            <p className="mt-2 text-lg font-semibold text-white">Profesyonel kullanim + 7 gunluk demo</p>
+            <p className="mt-2 text-sm leading-6 text-slate-200">
+              Bireysel kullanicilar da Premium satin alabilir. 7 gunluk demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin gecerlidir.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-500/10 p-5">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/80">OSGB</p>
+            <p className="mt-2 text-lg font-semibold text-white">Kurumsal ve coklu firma yonetimi</p>
+            <p className="mt-2 text-sm leading-6 text-slate-200">
+              Premium'un tum yeteneklerine ek olarak OSGB dashboard, finans, kapasite ve belge akislarini acar. Bu plan icin organizasyon kaydi gereklidir.
+            </p>
+          </div>
+        </div>
 
         <div className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
           <div className="space-y-4">
@@ -419,6 +492,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                 const osgb = isOsgbPlan(entry.planCode);
                 const current = entry.isCurrent;
                 const displayPrice = getPlanDisplayPrice(entry);
+                const presentation =
+                  PLAN_PRESENTATION[(osgb ? "osgb" : premium ? "premium" : "free") as SubscriptionPlan];
 
                 return (
                   <div
@@ -461,6 +536,11 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                           <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
                             {osgb ? "OSGB paketi" : "Önerilen"}
                           </Badge>
+                          {osgb ? (
+                            <Badge className="border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">
+                              Premium'un tum ozelliklerini icerir
+                            </Badge>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -474,6 +554,41 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                       <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
                         {entry.billingPeriod === "yearly" ? "yıllık plan" : "aylık plan"}
                       </p>
+                    </div>
+
+                    {osgb && !hasOrganization ? (
+                      <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm text-cyan-100">
+                        Bu ozellik/plan icin organizasyon kaydi gereklidir.
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 space-y-3 rounded-[22px] border border-white/10 bg-slate-950/45 p-4">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Kimler icin</p>
+                        <p className="mt-1 text-sm font-medium text-white">{presentation.audience}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Kimler kullanabilir</p>
+                        <p className="mt-1 text-sm text-slate-300">{presentation.eligibility}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Neyi aciyor</p>
+                        <p className="mt-1 text-sm text-slate-300">{presentation.usageModel}</p>
+                      </div>
+                      <div className="space-y-2">
+                        {presentation.highlights.map((item) => (
+                          <div key={`${entry.planCode}-${item}`} className="flex items-start gap-2 text-sm text-slate-200">
+                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+                            <span>{item}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {presentation.demoLabel ? (
+                        <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3">
+                          <p className="text-sm font-semibold text-amber-100">{presentation.demoLabel}</p>
+                          <p className="mt-1 text-sm leading-6 text-amber-50/90">{presentation.demoDescription}</p>
+                        </div>
+                      ) : null}
                     </div>
 
                     {premium || osgb ? (
@@ -490,7 +605,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                           <>
                             <Button
                               onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "monthly")}
-                              disabled={loadingAction !== null || !isOrganizationAdmin}
+                              disabled={loadingAction !== null || (osgb ? !canPurchaseOsgb : !canPurchasePremium)}
                               className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
                             >
                               {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-monthly`
@@ -502,7 +617,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                             <Button
                               variant="outline"
                               onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "yearly")}
-                              disabled={loadingAction !== null || !isOrganizationAdmin}
+                              disabled={loadingAction !== null || (osgb ? !canPurchaseOsgb : !canPurchasePremium)}
                               className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
                             >
                               {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-yearly`
@@ -531,6 +646,12 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               <h3 className="mt-2 text-xl font-semibold text-white">
                 {premiumOnlyOrExpanded.length} başlıkta fark var
               </h3>
+              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+                <p className="font-semibold text-amber-50">7 gunluk demo bilgisi</p>
+                <p className="mt-2 leading-6">
+                  Demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin sunulur. OSGB modulu demo kapsaminda degildir; OSGB icin organizasyon kaydi ve ilgili plan secimi gerekir.
+                </p>
+              </div>
               <div className="mt-4 space-y-3">
                 {premiumOnlyOrExpanded.slice(0, 6).map((feature) => {
                   const Icon = feature.icon;
@@ -572,7 +693,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                 {canStartTrial && (
                   <Button
                     onClick={() => void handleTrialStart()}
-                    disabled={loadingAction !== null || !isOrganizationAdmin}
+                    disabled={loadingAction !== null || !canPurchasePremium}
                     className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400"
                   >
                     {loadingAction === "trial" ? "Başlatılıyor..." : "7 günlük premium denemeyi başlat"}
@@ -583,7 +704,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   <Button
                     variant="outline"
                     onClick={() => void handlePortal()}
-                    disabled={loadingAction !== null || !isOrganizationAdmin}
+                    disabled={loadingAction !== null || !canManageOrganizationBilling}
                     className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
                   >
                     {loadingAction === "portal" ? "Portal açılıyor..." : hasStripeSubscription ? "Stripe portalında aboneliği yönet" : "Faturalama durumunu görüntüle"}
@@ -593,7 +714,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                 <Button
                   variant="outline"
                   onClick={() => void handleBackfill()}
-                  disabled={loadingAction !== null || !isOrganizationAdmin}
+                  disabled={loadingAction !== null || !canManageOrganizationBilling}
                   className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
                 >
                   {loadingAction === "backfill" ? "Senkronize ediliyor..." : "Mevcut kayıtları limit sayaçlarına eşitle"}
