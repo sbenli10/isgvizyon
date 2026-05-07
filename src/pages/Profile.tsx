@@ -256,6 +256,7 @@ export default function Profile() {
   const [noteSearch, setNoteSearch] = useState("");
   const [noteFilter, setNoteFilter] = useState<NoteStatusFilter>("all");
   const [workspaceAction, setWorkspaceAction] = useState<WorkspaceAction>(null);
+  const [workspaceNextPath, setWorkspaceNextPath] = useState<string | null>(null);
   const [workspaceSaving, setWorkspaceSaving] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [searchingOrganizations, setSearchingOrganizations] = useState(false);
@@ -284,6 +285,7 @@ export default function Profile() {
   useEffect(() => {
     const tabFromUrl = searchParams.get("tab");
     const actionFromUrl = searchParams.get("action");
+    const nextFromUrl = searchParams.get("next");
 
     if (tabFromUrl === "workspace") {
       setCurrentTab("workspace");
@@ -292,6 +294,8 @@ export default function Profile() {
     if (actionFromUrl === "create" || actionFromUrl === "invite" || actionFromUrl === "request") {
       setWorkspaceAction(actionFromUrl);
     }
+
+    setWorkspaceNextPath(nextFromUrl ? decodeURIComponent(nextFromUrl) : null);
 
     const inviteFromUrl = searchParams.get("invite");
     if (!inviteFromUrl) return;
@@ -467,6 +471,17 @@ export default function Profile() {
 
       if (error) throw error;
 
+      const { data: updatedProfile, error: profileLinkError } = await supabase
+        .from("profiles")
+        .select("organization_id")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileLinkError) throw profileLinkError;
+      if (!updatedProfile?.organization_id) {
+        throw new Error("Organizasyon oluşturuldu ancak profil bağlantısı güncellenemedi.");
+      }
+
       toast.success("Organizasyon oluşturuldu", {
         description: "Çalışma alanınız hazır. Kurumsal modüller artık aktif hale geliyor.",
       });
@@ -482,6 +497,10 @@ export default function Profile() {
 
       await refreshProfile();
       await fetchProfileData();
+
+      if (workspaceNextPath) {
+        navigate(workspaceNextPath);
+      }
     } catch (err: any) {
       toast.error("Organizasyon oluşturulamadı", {
         description: err.message,
@@ -513,6 +532,10 @@ export default function Profile() {
       setWorkspaceAction(null);
       await refreshProfile();
       await fetchProfileData();
+
+      if (workspaceNextPath) {
+        navigate(workspaceNextPath);
+      }
     } catch (err: any) {
       toast.error("Katılım başarısız", {
         description: err.message,

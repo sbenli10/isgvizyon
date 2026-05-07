@@ -340,9 +340,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
   const handleOpenOrganizationSetup = () => {
     onOpenChange(false);
-    navigate("/profile?tab=workspace&action=create");
-    toast.info("OSGB üyeliği için önce organizasyon oluşturun.", {
-      description: "Çalışma Alanı sekmesinden organizasyonunuzu kurup ardından OSGB paketini başlatabilirsiniz.",
+    navigate(`/profile?tab=workspace&action=create&next=${encodeURIComponent("/settings?tab=billing&upgrade=1")}`);
+    toast.info("Organizasyon kaydı gerekli.", {
+      description: "OSGB modülünü kullanmak veya satın almak için önce organizasyon oluşturmanız gerekir.",
     });
   };
 
@@ -407,7 +407,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
         {!hasOrganization && (
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
-            OSGB üyeliği, firma havuzu ve çoklu operasyon yapısı nedeniyle önce bir organizasyon kurulmasını gerektirir. Çalışma alanınızı oluşturduktan sonra OSGB paketini başlatabilirsiniz.
+            OSGB modülünü aktifleştirmek için bir kurum kaydı oluşturmanız gerekmektedir.
           </div>
         )}
 
@@ -484,7 +484,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                             disabled={loadingAction !== null}
                             className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
                           >
-                            Önce organizasyon oluştur
+                            Şimdi Organizasyon Oluştur
                           </Button>
                         ) : (
                           <>

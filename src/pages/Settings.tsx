@@ -38,7 +38,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/hooks/useSubscription";
 import { UpgradeModal } from "@/components/UpgradeModal";
@@ -107,6 +107,7 @@ const getSettingsCacheKey = (userId: string) => `denetron:settings:${userId}`;
 export default function Settings() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     status,
     plan,
@@ -2803,3 +2804,13 @@ const handleForceReset2FA = async () => {
 
 
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    const openUpgrade = searchParams.get("upgrade");
+    if (tab === "general" || tab === "security" || tab === "billing" || tab === "notifications" || tab === "ai-health") {
+      setCurrentTab(tab);
+    }
+    if (openUpgrade === "1") {
+      setShowUpgradeModal(true);
+    }
+  }, [searchParams]);

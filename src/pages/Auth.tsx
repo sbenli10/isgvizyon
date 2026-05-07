@@ -6,7 +6,6 @@ import {
   Loader2,
   CheckCircle2,
   Shield,
-  Building2,
   Mail,
   Lock,
   User,
@@ -40,7 +39,6 @@ import {
 
 type AuthMode = "login" | "register" | "wait" | "mfa";
 type NoticeType = "info" | "success" | "warning" | "error";
-type AccountType = "individual" | "osgb";
 const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
 const APP_URL_FALLBACK = "https://www.isgvizyon.com";
 
@@ -49,8 +47,6 @@ interface FormData {
   password: string;
   passwordConfirm: string;
   fullName: string;
-  orgName: string;
-  accountType: AccountType;
   consentDataProcessing: boolean; // YENİ: KVKK Onayı
   consentMarketing: boolean;      // YENİ: Pazarlama Onayı
 }
@@ -303,8 +299,6 @@ export default function Auth() {
     password: "",
     passwordConfirm: "",
     fullName: "",
-    orgName: "",
-    accountType: "individual",
     consentDataProcessing: false, // Varsayılan olarak işaretlenmemiş
     consentMarketing: false,      // Varsayılan olarak işaretlenmemiş
   });
@@ -483,11 +477,6 @@ export default function Auth() {
       ok = false;
     }
 
-    if (formData.accountType === "osgb" && !formData.orgName.trim()) {
-      setFieldError("orgName", "Organizasyon adı gerekli.");
-      ok = false;
-    }
-
     // YENİ: KVKK Checkbox Kontrolü
     if (!formData.consentDataProcessing) {
       setFieldError("consentDataProcessing", "Kayıt olmak için Aydınlatma Metni ve Kullanıcı Sözleşmesini onaylamanız gerekmektedir.");
@@ -635,8 +624,6 @@ export default function Auth() {
     setNotice({ type: "info", title: "Hesap oluşturuluyor", description: "Bilgileriniz kaydediliyor..." });
 
     try {
-      const orgSlug = formData.orgName.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email.trim(),
         password: formData.password,
@@ -644,8 +631,7 @@ export default function Auth() {
           emailRedirectTo: authCallbackRedirect,
           data: {
             full_name: formData.fullName.trim(),
-            account_type: formData.accountType,
-            organization_name: formData.orgName.trim() || null,
+            account_type: "individual",
             // YENİ: KVKK verileri metadata içine yazılır
             consent_data_processing: formData.consentDataProcessing,
             consent_marketing: formData.consentMarketing,
@@ -657,19 +643,6 @@ export default function Auth() {
 
       if (authError) throw new Error(`Hesap oluşturulamadı: ${authError.message}`);
       if (!authData?.user?.id) throw new Error("Kullanıcı oluşturulamadı");
-
-      if (formData.accountType === "osgb") {
-        const { error: bootstrapError } = await supabase.rpc("bootstrap_signup_organization", {
-          p_user_id: authData.user.id,
-          p_full_name: formData.fullName.trim(),
-          p_email: formData.email.trim(),
-          p_org_name: formData.orgName.trim(),
-          p_org_slug: orgSlug,
-          p_country: "Türkiye",
-        });
-
-        if (bootstrapError) throw new Error(`Organizasyon oluşturulamadı: ${bootstrapError.message}`);
-      }
 
       setVerifyEmail(formData.email.trim());
       setMode("wait");
@@ -1070,61 +1043,15 @@ export default function Auth() {
               {mode === "register" && (
                 <AnimatedPanel activeKey="register">
                   <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-4 shadow-[0_30px_90px_-70px_rgba(59,130,246,0.75)]">
+                    <div className="rounded-2xl border border-blue-500/20 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 p-4 shadow-[0_30px_90px_-70px_rgba(59,130,246,0.75)]">
                       <div className="flex items-start gap-3">
-                        <Building2 className="h-5 w-5 text-blue-300 mt-0.5" />
+                        <User className="mt-0.5 h-5 w-5 text-blue-300" />
                         <div>
-                          <h3 className="text-white font-semibold text-sm">Kurumsal Kurulum</h3>
+                          <h3 className="text-sm font-semibold text-white">Bireysel kullanıcı kaydı</h3>
                           <p className="text-slate-200/90 text-xs mt-1 leading-5">
-                            Bireysel uzmanlar ISGBot ile hemen başlayabilir; ekipli OSGB/Kurum hesabı için organizasyon oluşturabilirsiniz.
+                            Hesabınızı ad, soyad, e-posta ve şifrenizle oluşturun. Organizasyon oluşturma adımı girişten sonra, ihtiyaç duyduğunuz anda ayrı olarak başlatılır.
                           </p>
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-white text-sm">Hesap Tipi</Label>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({ ...prev, accountType: "individual" }));
-                            setFieldError("orgName", undefined);
-                          }}
-                          className={cn(
-                            "rounded-2xl border p-4 text-left transition",
-                            formData.accountType === "individual"
-                              ? "border-cyan-400/40 bg-cyan-400/10 shadow-[0_20px_60px_-40px_rgba(34,211,238,0.65)]"
-                              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
-                          )}
-                        >
-                          <div className="flex items-center gap-2 text-white">
-                            <User className="h-4 w-4 text-cyan-300" />
-                            <span className="font-semibold">İSG Uzmanı</span>
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-300">
-                            Şirket alanı opsiyoneldir. Google ile direkt giriş bu akışa göre çalışır ve kullanıcı önce ISGBot deneyimine uygundur.
-                          </p>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setFormData((prev) => ({ ...prev, accountType: "osgb" }))}
-                          className={cn(
-                            "rounded-2xl border p-4 text-left transition",
-                            formData.accountType === "osgb"
-                              ? "border-violet-400/40 bg-violet-500/10 shadow-[0_20px_60px_-40px_rgba(139,92,246,0.65)]"
-                              : "border-white/10 bg-white/[0.03] hover:bg-white/[0.05]"
-                          )}
-                        >
-                          <div className="flex items-center gap-2 text-white">
-                            <Building2 className="h-4 w-4 text-violet-300" />
-                            <span className="font-semibold">OSGB / Kurum</span>
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-300">
-                            Organizasyon alanı zorunludur; ekip, saha, portal ve finans operasyonu bu kuruma bağlanır.
-                          </p>
-                        </button>
                       </div>
                     </div>
 
@@ -1144,29 +1071,6 @@ export default function Auth() {
                           disabled={isBusy}
                           required
                           autoComplete="name"
-                        />
-                      </FancyInput>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="text-white text-sm flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-cyan-300" />
-                        Şirket / Organizasyon
-                        <span className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
-                          {formData.accountType === "osgb" ? "Zorunlu" : "Opsiyonel"}
-                        </span>
-                      </Label>
-                      <FancyInput icon={<Building2 className="h-4 w-4" />} error={fieldErrors.orgName}>
-                        <Input
-                          type="text"
-                          name="orgName"
-                          value={formData.orgName}
-                          onChange={handleInputChange}
-                          placeholder={formData.accountType === "osgb" ? "Örn: İSGVizyon OSGB" : "Çalıştığınız kurum adı varsa yazın"}
-                          className="bg-transparent border-0 text-white h-11 focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-slate-500"
-                          disabled={isBusy}
-                          required={formData.accountType === "osgb"}
-                          autoComplete="organization"
                         />
                       </FancyInput>
                     </div>

@@ -36,8 +36,6 @@ async function ensureOAuthProfile(user: any) {
     throw profileError;
   }
 
-  const shouldRedirectToProfile = !existingProfile?.organization_id;
-
   const { error: upsertError } = await supabase
     .from("profiles")
     .upsert({
@@ -55,7 +53,7 @@ async function ensureOAuthProfile(user: any) {
   }
 
   window.localStorage.removeItem(OAUTH_INTENT_STORAGE_KEY);
-  return { shouldRedirectToProfile };
+  return {};
 }
 
 export default function AuthCallback() {
@@ -99,7 +97,7 @@ export default function AuthCallback() {
         }
 
         if (data.session) {
-          const oauthProfileState = await ensureOAuthProfile(data.session.user);
+          await ensureOAuthProfile(data.session.user);
 
           if (isExtension) {
             completeNamedFlow("login", {
@@ -127,7 +125,7 @@ export default function AuthCallback() {
 
           setStatus("Oturum hazır. Yönlendiriliyorsunuz...");
           const restoredRoute = resolvePostAuthRoute("/");
-          const targetRoute = oauthProfileState.shouldRedirectToProfile ? "/profile" : restoredRoute;
+          const targetRoute = restoredRoute;
           completeNamedFlow("login", {
             method: code ? "oauth-or-callback" : "password",
             target: targetRoute,
