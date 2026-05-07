@@ -3,14 +3,16 @@ import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Brain,
+  Building2,
   Check,
+  ChevronDown,
+  ChevronUp,
   Crown,
   Layers3,
   LockKeyhole,
   Rocket,
   ShieldCheck,
   Sparkles,
-  X,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -45,6 +47,83 @@ type PlanPresentation = {
   highlights: string[];
   demoLabel?: string;
   demoDescription?: string;
+};
+
+const PREMIUM_MONTHLY_PRICE = 250;
+
+const FEATURE_TEXT_MAP: Record<string, { label: string; description: string }> = {
+  "bulk_capa.access": {
+    label: "Toplu DÖF yönetimi",
+    description: "Toplu görsel analiz, seri DÖF üretimi ve yapay zeka destekli aksiyon akışı.",
+  },
+  "ai.risk_generation_monthly": {
+    label: "Yapay zeka ile risk üretimi",
+    description: "Risk editörü ve sektör bazlı yapay zeka önerileri için aylık kullanım kotası.",
+  },
+  "ai.bulk_capa_analysis_monthly": {
+    label: "Toplu DÖF AI analizi",
+    description: "Çoklu fotoğraf analizi ve toplu DÖF önerileri için aylık kullanım limiti.",
+  },
+  "ai.nace_analysis_monthly": {
+    label: "NACE yapay zeka analizi",
+    description: "NACE sorgularında yapay zeka yorumları ve risk önerileri için aylık limit.",
+  },
+  "ai.evacuation_plan_monthly": {
+    label: "Tahliye planı AI",
+    description: "Tahliye planı üretimi ve iyileştirme işlemleri için aylık kota.",
+  },
+  "ai.evacuation_image_monthly": {
+    label: "Tahliye görseli AI",
+    description: "Tahliye görseli üretimi için aylık kullanım limiti.",
+  },
+  "reports.export_monthly": {
+    label: "Rapor dışa aktarma",
+    description: "PDF ve diğer dışa aktarma işlemleri için aylık çıktı kapasitesi.",
+  },
+  "blueprint_analyzer.access": {
+    label: "Kroki ve plan analizi",
+    description: "Plan, kroki ve yerleşim görsellerini yorumlama ekranı.",
+  },
+  "certificates.monthly": {
+    label: "Sertifika üretimi",
+    description: "Aylık oluşturulabilecek sertifika sayısı.",
+  },
+  "form_builder.access": {
+    label: "Özel form tasarlayıcı",
+    description: "Özel kontrol formu ve kurumsal şablon tasarımı ekranı.",
+  },
+  "isg_bot.access": {
+    label: "İSG Bot",
+    description: "Operasyon komutları, danışman akışları ve hızlı yapay zeka yardımı.",
+  },
+  "osgb.access": {
+    label: "OSGB modülü",
+    description: "OSGB dashboard, finans, kapasite ve belge ekranları.",
+  },
+  "companies.count": {
+    label: "Firma limiti",
+    description: "Toplam yönetilebilir firma sayısı.",
+  },
+  "employees.count": {
+    label: "Çalışan limiti",
+    description: "Toplam çalışan kaydı kapasitesi.",
+  },
+  "risk_assessments.count": {
+    label: "Risk değerlendirme limiti",
+    description: "Toplam risk değerlendirme kapasitesi.",
+  },
+  "inspections.count_monthly": {
+    label: "Aylık denetim limiti",
+    description: "Her ay açılabilecek denetim sayısı.",
+  },
+  "storage.upload_mb_monthly": {
+    label: "Aylık yükleme alanı",
+    description: "Dosya ve görseller için depolama kapasitesi.",
+  },
+  "team.members": {
+    label: "Ekip üyesi limiti",
+    description: "Aynı organizasyonda aktif kullanıcı kapasitesi.",
+  },
 };
 
 const FEATURE_CATALOG: BillingFeatureMeta[] = [
@@ -194,42 +273,36 @@ const FEATURE_CATALOG: BillingFeatureMeta[] = [
   },
 ];
 
-const CATEGORY_ORDER = [
-  "AI ve Otomasyon",
-  "Raporlama ve Çıktı",
-  "Operasyon",
-  "Temel Limitler",
-] as const;
-
-const PREMIUM_MONTHLY_PRICE = 250;
+const CATEGORY_ORDER = ["AI ve Otomasyon", "Raporlama ve Çıktı", "Operasyon", "Temel Limitler"] as const;
 
 const PLAN_PRESENTATION: Record<SubscriptionPlan, PlanPresentation> = {
   free: {
-    audience: "Bireysel başlangıç yapan kullanıcılar",
-    eligibility: "Her kullanıcı anında kullanabilir",
-    usageModel: "Temel modüller ve kontrollü kullanım limitleri",
+    audience: "Platformu denemek isteyen bireysel kullanıcılar",
+    eligibility: "Herkes kullanabilir",
+    usageModel: "Temel kayıtlar ve sınırlı kullanım",
     highlights: [
-      "Temel İSG kayıtları ve standart operasyon ekranları",
+      "Temel İSG kayıtlarını oluşturma",
       "Sınırlı firma ve çalışan kapasitesi",
-      "Premium araçlar kapalı, çekirdek akışlar açık",
+      "Premium AI, raporlama ve gelişmiş üretim araçları kapalı",
     ],
   },
   premium: {
-    audience: "İSG uzmanları, danışmanlar ve profesyonel ekipler",
-    eligibility: "Bireysel veya organizasyonlu kullanıcılar kullanabilir",
-    usageModel: "AI, raporlama ve yüksek limitli profesyonel kullanım",
+    audience: "İSG uzmanları, danışmanlar ve aktif operasyon yürüten ekipler",
+    eligibility: "Bireysel kullanıcılar ve organizasyon yöneticileri satın alabilir",
+    usageModel: "AI, raporlama, analiz ve yüksek limitli profesyonel kullanım",
     highlights: [
-      "AI destekli analizler, gelişmiş raporlar ve üretim araçları",
-      "Daha yüksek operasyon limitleri ve premium ekranlar",
-      "Organizasyon olmadan bireysel olarak da satın alınabilir",
+      "AI destekli risk, DÖF ve NACE analizleri",
+      "PDF/rapor çıktıları, sertifika üretimi ve gelişmiş üretim araçları",
+      "Daha yüksek firma, çalışan, denetim ve dosya kullanım limitleri",
+      "7 günlük Premium deneme ile risksiz başlangıç",
     ],
-    demoLabel: "7 günlük demo mevcut",
-    demoDescription: "Demo Premium paket içindir. AI, analiz ve premium üretim araçlarını 7 gün deneyebilirsiniz.",
+    demoLabel: "7 günlük ücretsiz Premium deneme",
+    demoDescription: "Deneme yalnızca Premium paket içindir. OSGB modülü deneme kapsamına dahil değildir.",
   },
   osgb: {
     audience: "OSGB'ler, çoklu firma yöneten ekipler ve kurumsal operasyonlar",
-    eligibility: "Yalnızca organizasyon kaydı olan kullanıcılar",
-    usageModel: "Premium'un tüm yetenekleri + OSGB yönetim modülleri",
+    eligibility: "Organizasyon kaydı ve yönetici yetkisi gerekir",
+    usageModel: "Premium özellikler + OSGB yönetim ekranları",
     highlights: [
       "Premium'un tüm özellikleri dahildir",
       "OSGB dashboard, finans, kapasite ve belge akışları açılır",
@@ -237,6 +310,14 @@ const PLAN_PRESENTATION: Record<SubscriptionPlan, PlanPresentation> = {
     ],
   },
 };
+
+function getFeatureDisplayLabel(feature: BillingFeatureMeta) {
+  return FEATURE_TEXT_MAP[feature.key]?.label ?? feature.label;
+}
+
+function getFeatureDisplayDescription(feature: BillingFeatureMeta) {
+  return FEATURE_TEXT_MAP[feature.key]?.description ?? feature.description;
+}
 
 function formatPrice(price: number | null, currency: string, period: BillingPeriod) {
   if (!price || price <= 0) {
@@ -254,15 +335,15 @@ function formatPrice(price: number | null, currency: string, period: BillingPeri
 
 function formatFeatureValue(enabled: boolean, limitValue: number | null, kind: BillingFeatureMeta["kind"]) {
   if (!enabled) {
-    return "Kapalı";
+    return "Yok";
   }
 
   if (kind === "access") {
-    return "Açık";
+    return "Var";
   }
 
   if (limitValue === null || limitValue >= 999999) {
-    return "Sınırsız";
+    return "Limitsiz";
   }
 
   return `${limitValue}`;
@@ -276,12 +357,82 @@ function isOsgbPlan(planCode: string) {
   return planCode === "osgb";
 }
 
-function getPlanDisplayPrice(entry: BillingCatalogPlan) {
+function getPlanDisplayPrice(entry?: BillingCatalogPlan) {
+  if (!entry) {
+    return null;
+  }
+
   if (entry.planCode === "premium") {
     return PREMIUM_MONTHLY_PRICE;
   }
 
   return entry.price;
+}
+
+function getUpgradeReason(triggeredBy: UpgradeModalProps["triggeredBy"], plan: SubscriptionPlan, status: string) {
+  if (triggeredBy === "trial_expired") {
+    return {
+      title: "Deneme süreniz bitti",
+      description:
+        "Premium özellikleri kullanmaya devam etmek için ücretli plana geçebilirsiniz. Free planda temel özellikler açık kalır.",
+      tone: "amber" as const,
+    };
+  }
+
+  if (triggeredBy === "feature_locked") {
+    return {
+      title: "Açmak istediğiniz özellik mevcut planınızda yok",
+      description:
+        "Bu özellik Premium veya OSGB planıyla açılır. Aşağıda size en uygun planı, fiyatı ve kazanacağınız özellikleri görebilirsiniz.",
+      tone: "cyan" as const,
+    };
+  }
+
+  if (status === "trial") {
+    return {
+      title: "Premium denemeniz aktif",
+      description:
+        "Deneme süreniz bitmeden ücretli plana geçerek AI, raporlama ve gelişmiş analiz özelliklerini kesintisiz kullanabilirsiniz.",
+      tone: "cyan" as const,
+    };
+  }
+
+  if (plan === "premium" || plan === "osgb") {
+    return {
+      title: "Üyeliğiniz aktif",
+      description:
+        "Planınızın kapsadığı özellikleri ve daha üst paketlerde açılan ek modülleri bu ekrandan kontrol edebilirsiniz.",
+      tone: "emerald" as const,
+    };
+  }
+
+  return {
+    title: "Daha fazla analiz, rapor ve AI aracı için yükseltin",
+    description:
+      "Free plan temel kullanım içindir. Premium ile AI destekli üretim araçları, gelişmiş rapor çıktıları ve daha yüksek kullanım limitleri açılır.",
+    tone: "cyan" as const,
+  };
+}
+
+function getReasonClassName(tone: "amber" | "cyan" | "emerald") {
+  if (tone === "amber") {
+    return "border-amber-400/25 bg-amber-400/10 text-amber-50";
+  }
+
+  if (tone === "emerald") {
+    return "border-emerald-400/25 bg-emerald-400/10 text-emerald-50";
+  }
+
+  return "border-cyan-400/25 bg-cyan-400/10 text-cyan-50";
+}
+
+function MiniFeature({ children }: { children: string }) {
+  return (
+    <div className="flex items-start gap-2 text-sm leading-6 text-slate-200">
+      <Check className="mt-1 h-4 w-4 shrink-0 text-cyan-300" />
+      <span>{children}</span>
+    </div>
+  );
 }
 
 export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: UpgradeModalProps) {
@@ -299,32 +450,36 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     cancelAtPeriodEnd,
     refetch,
   } = useSubscription();
+
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
+
   const hasOrganization = Boolean(profile?.organization_id);
-  const canManageOrganizationBilling = hasOrganization && isOrganizationAdmin;
+  const canManageBilling = hasOrganization ? isOrganizationAdmin : true;
   const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
   const canPurchaseOsgb = hasOrganization && isOrganizationAdmin;
-  const canStartTrialCta = canStartTrial;
+  const hasActivePremiumAccess = status === "trial" || plan === "premium" || plan === "osgb";
+  const canStartTrialCta = canStartTrial && !hasActivePremiumAccess && canPurchasePremium;
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
   const osgbPlan = plans.find((entry) => entry.planCode === "osgb");
-  const planCards = useMemo(
-    () => [freePlan, premiumPlan, osgbPlan].filter(Boolean) as BillingCatalogPlan[],
-    [freePlan, premiumPlan, osgbPlan],
-  );
+
   const freeFeatureMap = useMemo(
     () => new Map((freePlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
     [freePlan],
   );
+
   const premiumFeatureMap = useMemo(
     () => new Map((premiumPlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
     [premiumPlan],
   );
+
   const osgbFeatureMap = useMemo(
     () => new Map((osgbPlan?.features ?? []).map((feature) => [feature.featureKey, feature])),
     [osgbPlan],
   );
+
   const entitlementMap = useMemo(
     () => new Map(entitlements.map((feature) => [feature.featureKey, feature])),
     [entitlements],
@@ -357,16 +512,20 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     })).filter((group) => group.items.length > 0);
   }, []);
 
+  const upgradeReason = getUpgradeReason(triggeredBy, plan, status);
+  const premiumPrice = formatPrice(getPlanDisplayPrice(premiumPlan), premiumPlan?.currency ?? "TRY", premiumPlan?.billingPeriod ?? "monthly");
+  const osgbPrice = osgbPlan && getPlanDisplayPrice(osgbPlan) && getPlanDisplayPrice(osgbPlan)! > 0
+    ? formatPrice(getPlanDisplayPrice(osgbPlan), osgbPlan.currency, osgbPlan.billingPeriod)
+    : "Özel fiyat";
+
   const runAction = async (key: string, task: () => Promise<void>) => {
     setLoadingAction(key);
+
     try {
       await task();
     } catch (error) {
       const details = getUserFacingError(error);
       toast.error(details.title, { description: getUserFacingErrorDescription(error) });
-      return;
-      const message = error instanceof Error ? error.message : "İşlem tamamlanamadı.";
-      toast.error("İşlem tamamlanamadı", { description: message });
     } finally {
       setLoadingAction(null);
     }
@@ -377,8 +536,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
       await startPremiumTrial();
       await refreshProfile();
       await refetch();
-      toast.success("7 günlük premium deneme başlatıldı", {
-        description: "Tüm premium özellikleri bu süre boyunca deneyebilirsiniz.",
+      toast.success("7 günlük Premium deneme başlatıldı", {
+        description: "Premium AI, analiz ve raporlama özelliklerini 7 gün boyunca deneyebilirsiniz.",
       });
     });
 
@@ -390,7 +549,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const handleOpenOrganizationSetup = () => {
     onOpenChange(false);
     navigate(`/profile?tab=workspace&action=create&next=${encodeURIComponent("/settings?tab=billing&upgrade=1")}`);
-    toast.info("Organizasyon kaydı gerekli.", {
+    toast.info("Organizasyon kaydı gerekli", {
       description: "OSGB modülünü kullanmak veya satın almak için önce organizasyon oluşturmanız gerekir.",
     });
   };
@@ -409,437 +568,373 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
       });
     });
 
-  const trialPackageLabel = "Premium Paket";
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto border border-cyan-400/20 bg-[linear-gradient(160deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] text-white shadow-[0_30px_90px_rgba(8,145,178,0.16)]">
-        <DialogHeader>
-          <DialogTitle className="flex items-start justify-between gap-4 text-left text-2xl font-semibold text-white">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white shadow-[0_14px_32px_rgba(34,211,238,0.18)]">
-                <Zap className="h-6 w-6" />
-              </div>
-              <div>
-                <p>Faturalama ve üyelik yönetimi</p>
-                <p className="mt-2 text-sm font-normal leading-6 text-slate-300">
-                  Free, Premium ve OSGB planlarını bütün modüller, limitler ve kilitli araçlar üzerinden karşılaştırın. Kullanıcı burada neyin açıldığını ve hangi pakette açıldığını net görür.
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              className="text-slate-300 hover:bg-white/10 hover:text-white"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
-
-        {triggeredBy === "trial_expired" && (
-          <div className="rounded-2xl border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-100">
-            Deneme süreniz sona erdi. Aynı ekrandan uygun ücretli plana geçebilir veya Free planda devam edebilirsiniz.
-          </div>
-        )}
-
-        {triggeredBy === "feature_locked" && (
-          <div className="rounded-2xl border border-cyan-400/25 bg-cyan-400/10 p-4 text-sm text-cyan-100">
-            Açmaya çalıştığınız özellik mevcut planınızda kapalı ya da limitiniz dolmuş. Aşağıdaki karşılaştırma tablosu tam olarak hangi modülde ne açıldığını gösterir.
-          </div>
-        )}
-
-        {hasOrganization && !isOrganizationAdmin && (
-          <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-4 text-sm text-rose-100">
-            Üyelik ve faturalama işlemlerini yalnızca organizasyon yöneticisi başlatabilir. Bilgileri görebilir, fakat satın alma ve iptal işlemleri için yönetici hesabına geçmeniz gerekir.
-          </div>
-        )}
-
-        {false && !hasOrganization && (
-          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-sm text-cyan-100">
-            OSGB modülünü aktifleştirmek için bir kurum kaydı oluşturmanız gerekmektedir.
-          </div>
-        )}
-
-        <div className="grid gap-4 xl:grid-cols-3">
-          <div className="rounded-[24px] border border-emerald-400/15 bg-emerald-400/10 p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-200/80">Free</p>
-            <p className="mt-2 text-lg font-semibold text-white">Temel bireysel baslangic</p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">
-              Standart ekranlara erismek, temel kayitlari tutmak ve platformu dusuk hacimde kullanmak isteyen kullanicilar icin uygundur.
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-fuchsia-400/15 bg-fuchsia-500/10 p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-fuchsia-200/80">Premium</p>
-            <p className="mt-2 text-lg font-semibold text-white">Profesyonel kullanim + 7 gunluk demo</p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">
-              Bireysel kullanicilar da Premium satin alabilir. 7 gunluk demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin gecerlidir.
-            </p>
-          </div>
-          <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-500/10 p-5">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-cyan-200/80">OSGB</p>
-            <p className="mt-2 text-lg font-semibold text-white">Kurumsal ve coklu firma yonetimi</p>
-            <p className="mt-2 text-sm leading-6 text-slate-200">
-              Premium'un tum yeteneklerine ek olarak OSGB dashboard, finans, kapasite ve belge akislarini acar. Bu plan icin organizasyon kaydi gereklidir.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-          <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-              {planCards.map((entry) => {
-                const premium = isPremiumPlan(entry.planCode);
-                const osgb = isOsgbPlan(entry.planCode);
-                const current = entry.isCurrent;
-                const displayPrice = getPlanDisplayPrice(entry);
-                const presentation =
-                  PLAN_PRESENTATION[(osgb ? "osgb" : premium ? "premium" : "free") as SubscriptionPlan];
-
-                return (
-                  <div
-                    key={entry.planCode}
-                    className={`rounded-[28px] border p-6 ${
-                      premium
-                        ? "border-fuchsia-400/25 bg-[linear-gradient(180deg,rgba(168,85,247,0.14),rgba(15,23,42,0.4))]"
-                        : "border-white/10 bg-white/5"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
-                            premium
-                              ? "bg-gradient-to-br from-fuchsia-600 to-cyan-500"
-                              : "bg-gradient-to-br from-slate-700 to-slate-900"
-                          }`}
-                        >
-                          {premium ? <Crown className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-                        </div>
-                        <div>
-                          <p className="text-xl font-semibold text-white">{entry.planName}</p>
-                          <p className="text-sm text-slate-300">
-                            {entry.description || (osgb ? "Çoklu firma ve OSGB operasyonları için." : premium ? "Kurumsal ekipler ve yüksek hacimli kullanım için." : "Temel kullanım ve kontrollü başlangıç için.")}
-                          </p>
-                        </div>
-                      </div>
-                      {current ? (
-                        <Badge className="border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-emerald-100">
-                          Aktif
+      <DialogContent className="max-h-[92vh] max-w-6xl overflow-y-auto border border-slate-800 bg-slate-950 p-0 text-white shadow-2xl [&>button]:right-5 [&>button]:top-5 [&>button]:rounded-full [&>button]:border [&>button]:border-white/10 [&>button]:bg-white/5 [&>button]:p-1.5 [&>button]:text-slate-300 [&>button]:opacity-100 [&>button:hover]:bg-white/10 [&>button:hover]:text-white">
+        <div className="p-5 md:p-7">
+          <DialogHeader>
+            <DialogTitle className="text-left">
+              <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-5 pr-14 md:p-6 md:pr-16">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-cyan-200 shadow-sm">
+                    <Zap className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Badge className="border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">
+                        Premium yükseltme
+                      </Badge>
+                      {status === "trial" ? (
+                        <Badge className="border border-amber-300/20 bg-amber-400/10 px-3 py-1 text-amber-100">
+                          {daysLeftInTrial} gün deneme kaldı
                         </Badge>
-                      ) : premium || osgb ? (
-                        <div className="flex items-center gap-2">
-                          {premium ? (
-                            <Badge className="bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
-                              Avantajlı fiyat
-                            </Badge>
-                          ) : null}
-                          <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
-                            {osgb ? "OSGB paketi" : "Önerilen"}
-                          </Badge>
-                          {osgb ? (
-                            <Badge className="border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">
-                              Premium'un tum ozelliklerini icerir
-                            </Badge>
-                          ) : null}
-                        </div>
                       ) : null}
                     </div>
+                    <p className="text-2xl font-semibold tracking-tight text-white md:text-3xl">
+                      {triggeredBy === "feature_locked"
+                        ? "Bu yetenek mevcut planınızda kapalı"
+                        : triggeredBy === "trial_expired"
+                          ? "Premium erişiminizi kesintisiz sürdürün"
+                          : "İSG süreçlerinizi profesyonel plana taşıyın"}
+                    </p>
+                    <p className="mt-3 max-w-3xl text-sm font-normal leading-6 text-slate-300 md:text-base">
+                      AI destekli analizler, gelişmiş rapor çıktıları ve daha yüksek kullanım limitleriyle operasyonunuzu tek ekrandan daha verimli yönetin.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
-                    <div className="mt-6">
-                      <p className="text-3xl font-semibold text-white">
-                        {osgb && (!displayPrice || displayPrice <= 0)
-                          ? "Özel fiyat"
-                          : formatPrice(displayPrice, entry.currency, entry.billingPeriod)}
-                      </p>
-                      <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-400">
-                        {entry.billingPeriod === "yearly" ? "yıllık plan" : "aylık plan"}
-                      </p>
+          <div className="mt-6 space-y-5">
+            <section className={`rounded-[24px] border p-5 ${getReasonClassName(upgradeReason.tone)}`}>
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-slate-950/40">
+                  <LockKeyhole className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] opacity-75">1. Neden upgrade gerekiyor?</p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">{upgradeReason.title}</h3>
+                  <p className="mt-1 text-sm leading-6 opacity-90">{upgradeReason.description}</p>
+                </div>
+              </div>
+            </section>
+
+            {hasOrganization && !isOrganizationAdmin && (
+              <section className="rounded-[24px] border border-rose-400/20 bg-rose-400/10 p-5 text-sm leading-6 text-rose-100">
+                Üyelik ve faturalama işlemlerini yalnızca organizasyon yöneticisi başlatabilir. Planları inceleyebilirsiniz, fakat satın alma için yönetici hesabı gerekir.
+              </section>
+            )}
+
+            <section className="grid gap-5 lg:grid-cols-[1.18fr_0.82fr]">
+              <div className="rounded-[30px] border border-fuchsia-400/25 bg-[radial-gradient(circle_at_top_left,rgba(217,70,239,0.22),transparent_38%),linear-gradient(180deg,rgba(168,85,247,0.14),rgba(15,23,42,0.62))] p-6 shadow-[0_24px_70px_rgba(168,85,247,0.14)]">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 text-white">
+                      <Crown className="h-6 w-6" />
                     </div>
-
-                    {osgb && !hasOrganization ? (
-                      <div className="mt-4 rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-sm text-cyan-100">
-                        Bu ozellik/plan icin organizasyon kaydi gereklidir.
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-2xl font-semibold text-white">Premium</h3>
+                        <Badge className="bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">Önerilen</Badge>
                       </div>
+                      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">{PLAN_PRESENTATION.premium.audience}</p>
+                    </div>
+                  </div>
+
+                  {premiumPlan?.isCurrent || plan === "premium" ? (
+                    <Badge className="border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-emerald-100">Aktif plan</Badge>
+                  ) : null}
+                </div>
+
+                <div className="mt-6 grid gap-5 md:grid-cols-[0.92fr_1.08fr]">
+                  <div className="rounded-[24px] border border-white/10 bg-slate-950/45 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-200/80">2. En iyi seçenek hangisi?</p>
+                    <p className="mt-3 text-lg font-semibold text-white">Çoğu kullanıcı için Premium</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      AI, raporlama ve yüksek limitler istiyorsanız en doğrudan seçenek Premium’dur. OSGB yalnızca kurumsal/organizasyonlu kullanımda gerekir.
+                    </p>
+
+                    <div className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4">
+                      <p className="text-sm font-semibold text-amber-50">{PLAN_PRESENTATION.premium.demoLabel}</p>
+                      <p className="mt-1 text-sm leading-6 text-amber-50/90">{PLAN_PRESENTATION.premium.demoDescription}</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[24px] border border-white/10 bg-slate-950/45 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">3. Ne kazanacağım?</p>
+                    <div className="mt-4 space-y-3">
+                      {PLAN_PRESENTATION.premium.highlights.map((item) => (
+                        <MiniFeature key={item}>{item}</MiniFeature>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-[0.62fr_1.38fr] md:items-center">
+                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">4. Fiyat ne?</p>
+                    <p className="mt-2 text-4xl font-semibold text-white">{premiumPrice}</p>
+                    <p className="mt-2 text-sm text-slate-400">Premium aylık plan</p>
+                  </div>
+
+                  <div className="rounded-[24px] border border-cyan-400/20 bg-cyan-400/10 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200/80">5. Hemen ne yapacağım?</p>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <Button
+                        onClick={() => void handleCheckout("premium", "monthly")}
+                        disabled={loadingAction !== null || !canPurchasePremium}
+                        className="h-12 bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
+                      >
+                        {loadingAction === "checkout-premium-monthly" ? "Hazırlanıyor..." : "Premium’a geç"}
+                      </Button>
+
+                      {canStartTrialCta ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleTrialStart()}
+                          disabled={loadingAction !== null}
+                          className="h-12 border-amber-300/30 bg-amber-400/10 text-amber-50 hover:bg-amber-400/20 hover:text-white"
+                        >
+                          {loadingAction === "trial" ? "Başlatılıyor..." : "7 gün ücretsiz dene"}
+                        </Button>
+                      ) : (
+                        <Button disabled className="h-12 bg-slate-800 text-slate-300 hover:bg-slate-800">
+                          {status === "trial"
+                            ? `${daysLeftInTrial} gün deneme kaldı`
+                            : plan === "premium" || plan === "osgb"
+                              ? "Premium erişim aktif"
+                              : "Deneme hakkı kullanılmış"}
+                        </Button>
+                      )}
+                    </div>
+                    {!canPurchasePremium ? (
+                      <p className="mt-3 text-xs leading-5 text-cyan-100/80">Satın alma işlemi için organizasyon yöneticisi hesabı gerekir.</p>
                     ) : null}
+                  </div>
+                </div>
+              </div>
 
-                    <div className="mt-5 space-y-3 rounded-[22px] border border-white/10 bg-slate-950/45 p-4">
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">En uygun kullanici tipi</p>
-                        <p className="mt-1 text-sm font-medium text-white">{presentation.audience}</p>
+              <div className="space-y-5">
+                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/60 text-slate-200">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-white">Free</h3>
+                        {freePlan?.isCurrent || plan === "free" ? (
+                          <Badge className="border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-emerald-100">Mevcut plan</Badge>
+                        ) : null}
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Kimler kullanabilir</p>
-                        <p className="mt-1 text-sm text-slate-300">{presentation.eligibility}</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">Temel kullanım için uygundur. AI, gelişmiş rapor ve yüksek limitler kapalıdır.</p>
+                      <p className="mt-4 text-2xl font-semibold text-white">Ücretsiz</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-[28px] border border-cyan-400/15 bg-cyan-500/10 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/60 text-cyan-200">
+                      <Building2 className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-lg font-semibold text-white">OSGB</h3>
+                        <Badge className="border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">Kurumsal</Badge>
                       </div>
-                      <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Acilan ana moduller</p>
-                        <p className="mt-1 text-sm text-slate-300">{presentation.usageModel}</p>
-                      </div>
-                      <div className="space-y-2">
-                        {presentation.highlights.map((item) => (
-                          <div key={`${entry.planCode}-${item}`} className="flex items-start gap-2 text-sm text-slate-200">
-                            <Check className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
-                            <span>{item}</span>
-                          </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">Premium özelliklerine ek olarak OSGB dashboard, finans, kapasite ve belge akışlarını açar.</p>
+                      <p className="mt-4 text-2xl font-semibold text-white">{osgbPrice}</p>
+                      <div className="mt-4 space-y-2">
+                        {PLAN_PRESENTATION.osgb.highlights.slice(0, 3).map((item) => (
+                          <MiniFeature key={item}>{item}</MiniFeature>
                         ))}
                       </div>
-                      {presentation.demoLabel ? (
-                        <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3">
-                          <p className="text-sm font-semibold text-amber-100">{presentation.demoLabel}</p>
-                          <p className="mt-1 text-sm leading-6 text-amber-50/90">{presentation.demoDescription}</p>
-                        </div>
-                      ) : null}
-                    </div>
 
-                    {premium || osgb ? (
-                      <div className="mt-6 space-y-3">
-                        {osgb && !hasOrganization ? (
+                      <div className="mt-5">
+                        {!hasOrganization ? (
                           <Button
                             onClick={handleOpenOrganizationSetup}
                             disabled={loadingAction !== null}
-                            className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
+                            className="w-full bg-gradient-to-r from-cyan-600 to-blue-500 text-white hover:from-cyan-500 hover:to-blue-400"
                           >
-                            Şimdi Organizasyon Oluştur
+                            Organizasyon oluştur
                           </Button>
                         ) : (
-                          <>
-                            <Button
-                              onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "monthly")}
-                              disabled={loadingAction !== null || (osgb ? !canPurchaseOsgb : !canPurchasePremium)}
-                              className="w-full bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
-                            >
-                              {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-monthly`
-                                ? "Hazırlanıyor..."
-                                : osgb
-                                  ? "OSGB paketini seç"
-                                  : "Premium aylık satın al"}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => void handleCheckout(osgb ? "osgb" : "premium", "yearly")}
-                              disabled={loadingAction !== null || (osgb ? !canPurchaseOsgb : !canPurchasePremium)}
-                              className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
-                            >
-                              {loadingAction === `checkout-${osgb ? "osgb" : "premium"}-yearly`
-                                ? "Hazırlanıyor..."
-                                : osgb
-                                  ? "OSGB yıllık planı seç"
-                                  : "Premium yıllık satın al"}
-                            </Button>
-                          </>
+                          <Button
+                            onClick={() => void handleCheckout("osgb", "monthly")}
+                            disabled={loadingAction !== null || !canPurchaseOsgb}
+                            className="w-full bg-gradient-to-r from-cyan-600 to-blue-500 text-white hover:from-cyan-500 hover:to-blue-400"
+                          >
+                            {loadingAction === "checkout-osgb-monthly" ? "Hazırlanıyor..." : "OSGB planını seç"}
+                          </Button>
                         )}
                       </div>
-                    ) : (
-                      <div className="mt-6">
-                        <Button variant="outline" disabled className="w-full border-white/10 bg-white/5 text-slate-300">
-                          Free plan çekirdek erişim
-                        </Button>
-                      </div>
-                    )}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Üst planlarla açılanlar</p>
-              <h3 className="mt-2 text-xl font-semibold text-white">
-                {premiumOnlyOrExpanded.length} başlıkta fark var
-              </h3>
-              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-                <p className="font-semibold text-amber-50">7 gunluk demo bilgisi</p>
-                <p className="mt-2 leading-6">
-                  Demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin sunulur. OSGB modulu demo kapsaminda degildir; OSGB icin organizasyon kaydi ve ilgili plan secimi gerekir.
-                </p>
+                <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950/60 text-cyan-300">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">Abonelik özeti</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300">
+                        {status === "trial"
+                          ? `${daysLeftInTrial} gün daha Premium özellikleri deneyebilirsiniz.`
+                          : plan === "premium" || plan === "osgb"
+                            ? cancelAtPeriodEnd
+                              ? "Aboneliğiniz dönem sonunda iptale ayarlı, ancak erişiminiz şu an aktif."
+                              : "Ücretli plan erişiminiz aktif."
+                            : "Şu anda Free plan kullanıyorsunuz."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
-                <p className="font-semibold text-amber-50">7 gunluk demo bilgisi</p>
-                <p className="mt-2 leading-6">
-                  Demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin sunulur. OSGB modulu demo kapsaminda degildir; OSGB icin organizasyon kaydi ve ilgili plan secimi gerekir.
-                </p>
+            </section>
+
+            <section className="rounded-[28px] border border-white/10 bg-white/5 p-5 md:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300/80">6. Detayları istersem nerede görürüm?</p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">Tüm özellikleri ve limitleri karşılaştırın</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    Karar vermek için önce Premium kartı yeterli olmalı. Daha teknik karşılaştırma gerektiğinde tabloyu buradan açabilirsiniz.
+                  </p>
+                </div>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowComparison((value) => !value)}
+                  className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                >
+                  {showComparison ? "Karşılaştırmayı gizle" : "Tüm özellikleri karşılaştır"}
+                  {showComparison ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
+                </Button>
               </div>
-              <div className="mt-4 space-y-3">
+
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
                 {premiumOnlyOrExpanded.slice(0, 6).map((feature) => {
                   const Icon = feature.icon;
-                  const freeFeature = freeFeatureMap.get(feature.key);
-                  const premiumFeature = premiumFeatureMap.get(feature.key);
-                  const osgbFeature = osgbFeatureMap.get(feature.key);
 
                   return (
-                    <div key={feature.key} className="rounded-2xl border border-fuchsia-400/10 bg-[linear-gradient(180deg,rgba(168,85,247,0.08),rgba(15,23,42,0.26))] p-4">
+                    <div key={feature.key} className="rounded-2xl border border-fuchsia-400/10 bg-slate-950/45 p-4">
                       <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-200">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-fuchsia-500/15 text-fuchsia-200">
                           <Icon className="h-5 w-5" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-white">{feature.label}</p>
-                            <Badge className="border border-white/10 bg-slate-950/60 px-3 py-1 text-slate-100">
-                              Free: {formatFeatureValue(Boolean(freeFeature?.isEnabled), freeFeature?.limitValue ?? null, feature.kind)}
-                            </Badge>
-                            <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-1 text-fuchsia-100">
-                              Premium: {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
-                            </Badge>
-                            <Badge className="border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-cyan-100">
-                              OSGB: {formatFeatureValue(Boolean(osgbFeature?.isEnabled), osgbFeature?.limitValue ?? null, feature.kind)}
-                            </Badge>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">{feature.description}</p>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{getFeatureDisplayLabel(feature)}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">{getFeatureDisplayDescription(feature)}</p>
                         </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
 
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-300/80">Hızlı işlemler</p>
-              <div className="mt-4 space-y-3">
-                {canStartTrialCta && (
-                  <Button
-                    onClick={() => void handleTrialStart()}
-                    disabled={loadingAction !== null || !canPurchasePremium}
-                    className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400"
-                  >
-                    {loadingAction === "trial" ? "Başlatılıyor..." : "7 günlük premium denemeyi başlat"}
-                  </Button>
-                )}
+              {showComparison ? (
+                <div className="mt-6 space-y-5">
+                  {groupedFeatures.map((group) => (
+                    <div key={group.category} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">{group.category}</p>
+                        <Badge className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">{group.items.length} kalem</Badge>
+                      </div>
 
-                {!canStartTrialCta && (
-                  <Button
-                    disabled
-                    className="w-full bg-slate-800 text-slate-300 hover:bg-slate-800"
-                  >
-                    {status === "trial"
-                      ? "Demo uyeligi zaten aktif"
-                      : plan === "premium" || plan === "osgb"
-                        ? "Mevcut uyelikte demo acilamaz"
-                        : "Demo hakki kullanilmis"}
-                  </Button>
-                )}
+                      <div className="space-y-3">
+                        {group.items.map((feature) => {
+                          const freeFeature = freeFeatureMap.get(feature.key);
+                          const premiumFeature = premiumFeatureMap.get(feature.key);
+                          const osgbFeature = osgbFeatureMap.get(feature.key);
+                          const currentFeature = entitlementMap.get(feature.key);
+                          const Icon = feature.icon;
 
-                {(hasStripeSubscription || plan === "premium" || plan === "osgb") && (
-                  <Button
-                    variant="outline"
-                    onClick={() => void handlePortal()}
-                    disabled={loadingAction !== null || !canManageOrganizationBilling}
-                    className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
-                  >
-                    {loadingAction === "portal" ? "Portal açılıyor..." : hasStripeSubscription ? "Stripe portalında aboneliği yönet" : "Faturalama durumunu görüntüle"}
-                  </Button>
-                )}
+                          return (
+                            <div
+                              key={feature.key}
+                              className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:grid-cols-[1.35fr_0.5fr_0.5fr_0.5fr_0.46fr] lg:items-center"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/5 text-slate-200">
+                                  <Icon className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-white">{getFeatureDisplayLabel(feature)}</p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-400">{getFeatureDisplayDescription(feature)}</p>
+                                </div>
+                              </div>
 
-                <Button
-                  variant="outline"
-                  onClick={() => void handleBackfill()}
-                  disabled={loadingAction !== null || !canManageOrganizationBilling}
-                  className="w-full border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
-                >
-                  {loadingAction === "backfill" ? "Senkronize ediliyor..." : "Mevcut kayıtları limit sayaçlarına eşitle"}
-                </Button>
-              </div>
-            </div>
+                              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Free</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-100">
+                                  {formatFeatureValue(Boolean(freeFeature?.isEnabled), freeFeature?.limitValue ?? null, feature.kind)}
+                                </p>
+                              </div>
 
-            <div className="rounded-[28px] border border-cyan-400/15 bg-cyan-400/10 p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950/60 text-cyan-300">
-                  <ShieldCheck className="h-5 w-5" />
+                              <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-3">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-200/70">Premium</p>
+                                <p className="mt-2 text-sm font-semibold text-white">
+                                  {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
+                                </p>
+                              </div>
+
+                              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/70">OSGB</p>
+                                <p className="mt-2 text-sm font-semibold text-white">
+                                  {formatFeatureValue(Boolean(osgbFeature?.isEnabled), osgbFeature?.limitValue ?? null, feature.kind)}
+                                </p>
+                              </div>
+
+                              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 px-3 py-3">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/70">Hesabınız</p>
+                                <p className="mt-2 text-sm font-semibold text-cyan-50">{currentFeature?.allowed ? "Aktif" : "Kilitli"}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">Abonelik özeti</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">
-                    {status === "trial"
-                      ? `${daysLeftInTrial} gün daha tüm premium modülleri deneyebilirsiniz.`
-                      : plan === "premium" || plan === "osgb"
-                        ? cancelAtPeriodEnd
-                          ? "Aboneliğiniz dönem sonunda iptale ayarlı, ancak şu an tüm premium modüller açık."
-                          : "Premium araçlar ve yüksek limitler hesabınızda aktif."
-                        : "Free plan ile temel modüller açık, detaylı farklar sağ taraftaki tabloda listeleniyor."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+              ) : null}
+            </section>
 
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-            <div className="mb-5">
-              <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Detaylı karşılaştırma</p>
-              <h2 className="mt-2 text-lg font-semibold text-white">Hangi ekranda ne açılıyor, hangi limit ne kadar artıyor?</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                Her satırda Free ve ücretli plan değerlerini birlikte görürsünüz. Son sütun, mevcut hesabınızda özelliğin açık mı kilitli mi olduğunu gösterir.
-              </p>
-            </div>
-
-            <div className="space-y-5">
-              {groupedFeatures.map((group) => (
-                <div key={group.category} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-200">{group.category}</p>
-                    <Badge className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200">
-                      {group.items.length} kalem
-                    </Badge>
+            {(hasStripeSubscription || plan === "premium" || plan === "osgb") || canManageBilling ? (
+              <section className="rounded-[28px] border border-white/10 bg-slate-950/40 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Faturalama ve teknik işlemler</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-400">Satın alma kararından bağımsız yönetim işlemleri burada tutulur.</p>
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(hasStripeSubscription || plan === "premium" || plan === "osgb") && (
+                      <Button
+                        variant="outline"
+                        onClick={() => void handlePortal()}
+                        disabled={loadingAction !== null || !canManageBilling}
+                        className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                      >
+                        {loadingAction === "portal" ? "Portal açılıyor..." : "Aboneliği yönet"}
+                      </Button>
+                    )}
 
-                  <div className="space-y-3">
-                    {group.items.map((feature) => {
-                      const freeFeature = freeFeatureMap.get(feature.key);
-                      const premiumFeature = premiumFeatureMap.get(feature.key);
-                      const osgbFeature = osgbFeatureMap.get(feature.key);
-                      const currentFeature = entitlementMap.get(feature.key);
-                      const Icon = feature.icon;
-
-                      return (
-                        <div
-                          key={feature.key}
-                          className="grid gap-3 rounded-2xl border border-white/10 bg-slate-950/70 p-4 lg:grid-cols-[1.35fr_0.5fr_0.5fr_0.5fr_0.46fr] lg:items-center"
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/5 text-slate-200">
-                              <Icon className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-white">{feature.label}</p>
-                              <p className="mt-1 text-xs leading-5 text-slate-400">{feature.description}</p>
-                            </div>
-                          </div>
-
-                          <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Free</p>
-                            <p className="mt-2 text-sm font-semibold text-slate-100">
-                              {formatFeatureValue(Boolean(freeFeature?.isEnabled), freeFeature?.limitValue ?? null, feature.kind)}
-                            </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 px-3 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-fuchsia-200/70">Premium</p>
-                            <p className="mt-2 text-sm font-semibold text-white">
-                              {formatFeatureValue(Boolean(premiumFeature?.isEnabled), premiumFeature?.limitValue ?? null, feature.kind)}
-                            </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-3 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/70">OSGB</p>
-                            <p className="mt-2 text-sm font-semibold text-white">
-                              {formatFeatureValue(Boolean(osgbFeature?.isEnabled), osgbFeature?.limitValue ?? null, feature.kind)}
-                            </p>
-                          </div>
-
-                          <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 px-3 py-3">
-                            <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-200/70">Hesabınız</p>
-                            <p className="mt-2 text-sm font-semibold text-cyan-50">
-                              {currentFeature?.allowed ? "Aktif" : "Kilitli"}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
+                    <Button
+                      variant="outline"
+                      onClick={() => void handleBackfill()}
+                      disabled={loadingAction !== null || !canManageBilling}
+                      className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10 hover:text-white"
+                    >
+                      {loadingAction === "backfill" ? "Senkronize ediliyor..." : "Limit sayaçlarını eşitle"}
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
+              </section>
+            ) : null}
           </div>
         </div>
       </DialogContent>
