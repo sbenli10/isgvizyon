@@ -324,14 +324,21 @@ export default function Dashboard() {
 
   if (user && profile && !profile.organization_id) {
     const trialButtonDisabled = startingTrial || !canStartTrial;
+    const hasPremiumAccess = status === "trial" || plan === "premium";
+    const heroTitle = hasPremiumAccess ? "Premium erişiminiz aktif" : "Bireysel hesabınız hazır";
+    const heroDescription = hasPremiumAccess
+      ? "Premium üyeliğiniz aktif. Organizasyon oluşturmadan bireysel premium özellikleri kullanabilirsiniz. Sadece OSGB modülü, ekip yönetimi ve finans operasyonları için organizasyon gerekir."
+      : "Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.";
+    const secondaryActionLabel = hasPremiumAccess ? "Premium özelliklerini incele" : "Premium'u incele";
+    const secondaryActionTarget = "/settings?tab=billing&upgrade=1";
 
     return (
       <div className="space-y-6">
         <section className="rounded-[28px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-6 text-white shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:p-8">
           <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Hoş geldiniz</Badge>
-          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">Bireysel hesabınız hazır</h1>
+          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{heroTitle}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.
+            {heroDescription}
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button
@@ -355,10 +362,10 @@ export default function Dashboard() {
             </Button>
             <Button
               variant="outline"
-              onClick={() => navigate("/isg-bot")}
+              onClick={() => navigate(secondaryActionTarget)}
               className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
             >
-              ISGBot ile Devam Et
+              {secondaryActionLabel}
             </Button>
           </div>
           <p className="mt-4 max-w-2xl text-xs leading-5 text-slate-400">

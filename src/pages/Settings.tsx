@@ -2354,7 +2354,15 @@ const handleForceReset2FA = async () => {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="rounded-[24px] border border-fuchsia-400/15 bg-fuchsia-400/10 p-5">
                       <p className={microCardEyebrowClassName}>Plan özeti</p>
-                      <p className={microCardTitleClassName}>{plan === "premium" ? "Premium plan aktif" : "Free plan aktif"}</p>
+                      <p className={microCardTitleClassName}>
+                        {status === "trial"
+                          ? "Premium demo aktif"
+                          : plan === "premium"
+                            ? "Premium plan aktif"
+                            : plan === "osgb"
+                              ? "OSGB plan aktif"
+                              : "Free plan aktif"}
+                      </p>
                       <p className={microCardBodyClassName}>
                         {status === "trial"
                           ? `${daysLeftInTrial} gün daha tüm premium modüller açık.`
