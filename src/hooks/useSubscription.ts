@@ -122,22 +122,95 @@ export function useSubscription() {
     void refetch();
   }, [refetch]);
 
-  const status = useMemo(() => normalizeStatus(overview), [overview]);
-  const plan = (
-    overview?.planCode === "osgb"
-      ? "osgb"
-      : overview?.planCode === "premium"
-        ? "premium"
-        : "free"
-  ) as SubscriptionPlan;
-  const entitlements = overview?.entitlements ?? [];
+  const personalTrialEndsAt = useMemo(
+    () => (!profile?.organization_id && profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null),
+    [profile?.organization_id, profile?.trial_ends_at],
+  );
+  const personalDaysLeftInTrial = useMemo(() => {
+    if (!personalTrialEndsAt) {
+      return 0;
+    }
+
+    return Math.max(0, Math.ceil((personalTrialEndsAt.getTime() - Date.now()) / 86_400_000));
+  }, [personalTrialEndsAt]);
+  const personalPlan = useMemo<SubscriptionPlan>(() => {
+    if (profile?.subscription_plan === "osgb") {
+      return "osgb";
+    }
+
+    if (profile?.subscription_plan === "premium") {
+      return "premium";
+    }
+
+    return "free";
+  }, [profile?.subscription_plan]);
+  const personalStatus = useMemo<SubscriptionStatus>(() => {
+    if (profile?.organization_id) {
+      return "free";
+    }
+
+    if (profile?.subscription_status === "past_due") {
+      return "past_due";
+    }
+
+    if (profile?.subscription_status === "trial") {
+      return "trial";
+    }
+
+    if (
+      (profile?.subscription_status === "active" || profile?.subscription_status === "premium") &&
+      (personalPlan === "premium" || personalPlan === "osgb")
+    ) {
+      return "premium";
+    }
+
+    if (profile?.subscription_status === "cancelled" || profile?.subscription_status === "canceled") {
+      return "cancelled";
+    }
+
+    return "free";
+  }, [personalPlan, profile?.organization_id, profile?.subscription_status]);
+
+  const status = useMemo(
+    () => (profile?.organization_id ? normalizeStatus(overview) : personalStatus),
+    [overview, personalStatus, profile?.organization_id],
+  );
+  const plan = useMemo<SubscriptionPlan>(() => {
+    if (!profile?.organization_id) {
+      return personalPlan;
+    }
+
+    if (overview?.planCode === "osgb") {
+      return "osgb";
+    }
+
+    if (overview?.planCode === "premium") {
+      return "premium";
+    }
+
+    return "free";
+  }, [overview?.planCode, personalPlan, profile?.organization_id]);
+  const entitlements = profile?.organization_id ? overview?.entitlements ?? [] : [];
   const featureMap = useMemo(() => entitlementMap(entitlements), [entitlements]);
   const features = useMemo(() => deriveLegacyFeatures(entitlements, plan), [entitlements, plan]);
-  const trialEndsAt = overview?.trialEndsAt ? new Date(overview.trialEndsAt) : null;
-  const isTrialExpired = status === "trial" && (overview?.daysLeftInTrial ?? 0) <= 0;
+  const trialEndsAt = profile?.organization_id
+    ? overview?.trialEndsAt
+      ? new Date(overview.trialEndsAt)
+      : null
+    : personalTrialEndsAt;
+  const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
+  const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
   const isPremiumPlan = plan === "premium";
   const isOsgbPlan = plan === "osgb";
   const isPaidPlan = plan === "premium" || plan === "osgb";
+  const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
+  const currentPlans = useMemo(() => {
+    const activePlanCode = plan;
+    return (overview?.plans ?? catalogPlans).map((entry) => ({
+      ...entry,
+      isCurrent: entry.planCode === activePlanCode,
+    }));
+  }, [catalogPlans, overview?.plans, plan]);
 
   const getFeatureEntitlement = useCallback(
     (featureKey: FeatureKey | string) => featureMap[featureKey] ?? null,
@@ -160,24 +233,24 @@ export function useSubscription() {
     loading,
     overview,
     status,
-    rawStatus: overview?.status ?? "active",
+    rawStatus: profile?.organization_id ? overview?.status ?? "active" : profile?.subscription_status ?? "free",
     plan,
     features,
-    plans: overview?.plans ?? catalogPlans,
+    plans: currentPlans,
     entitlements,
     featureMap,
     isOrganizationAdmin: overview?.isOrganizationAdmin ?? false,
-    canStartTrial: overview?.canStartTrial ?? false,
+    canStartTrial: profile?.organization_id ? overview?.canStartTrial ?? false : canStartPersonalTrial,
     hasStripeCustomer: overview?.hasStripeCustomer ?? false,
     hasStripeSubscription: overview?.hasStripeSubscription ?? false,
     cancelAtPeriodEnd: overview?.cancelAtPeriodEnd ?? false,
-    currentPeriodEnd: overview?.currentPeriodEnd ? new Date(overview.currentPeriodEnd) : null,
+    currentPeriodEnd: profile?.organization_id && overview?.currentPeriodEnd ? new Date(overview.currentPeriodEnd) : trialEndsAt,
     trialEndsAt,
     isTrialExpired,
     isPremiumPlan,
     isOsgbPlan,
     isPaidPlan,
-    daysLeftInTrial: overview?.daysLeftInTrial ?? 0,
+    daysLeftInTrial,
     getFeatureEntitlement,
     isFeatureAllowed,
     refetch,

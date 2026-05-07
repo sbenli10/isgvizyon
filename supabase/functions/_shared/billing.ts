@@ -8,6 +8,10 @@ type BillingUserProfile = {
   full_name: string | null;
   organization_id: string | null;
   role: string | null;
+  subscription_plan: string | null;
+  subscription_status: string | null;
+  subscription_started_at: string | null;
+  trial_ends_at: string | null;
 };
 
 type RequireBillingContextOptions = {
@@ -71,7 +75,7 @@ export async function requireBillingContext(req: Request, options: RequireBillin
 
   const { data: profile, error: profileError } = await adminClient
     .from("profiles")
-    .select("id, email, full_name, organization_id, role")
+    .select("id, email, full_name, organization_id, role, subscription_plan, subscription_status, subscription_started_at, trial_ends_at")
     .eq("id", data.user.id)
     .maybeSingle();
 

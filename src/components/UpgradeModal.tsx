@@ -17,7 +17,6 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { backfillMyFeatureUsage, openBillingPortal, startPlanCheckout, startPremiumTrial } from "@/lib/billing";
@@ -287,7 +286,7 @@ function getPlanDisplayPrice(entry: BillingCatalogPlan) {
 
 export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: UpgradeModalProps) {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const {
     plan,
     status,
@@ -376,36 +375,10 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const handleTrialStart = () =>
     runAction("trial", async () => {
       await startPremiumTrial();
+      await refreshProfile();
       await refetch();
       toast.success("7 günlük premium deneme başlatıldı", {
         description: "Tüm premium özellikleri bu süre boyunca deneyebilirsiniz.",
-      });
-    });
-
-  const handleRealTrialStart = () =>
-    runAction("trial", async () => {
-      if (!hasOrganization) {
-        const workspaceName = `${profile?.full_name?.trim() || user?.email?.split("@")[0] || "Kisisel"} Calisma Alani`;
-        const { error: bootstrapError } = await (supabase as any).rpc("create_workspace_organization", {
-          p_name: workspaceName,
-          p_industry: null,
-          p_city: null,
-          p_phone: null,
-          p_website: null,
-        });
-
-        if (bootstrapError) {
-          throw new Error(bootstrapError.message || "Demo uyeligi icin kisisel organizasyon olusturulamadi.");
-        }
-
-        await refreshProfile();
-      }
-
-      await startPremiumTrial();
-      await refreshProfile();
-      await refetch();
-      toast.success("7 gunluk premium deneme baslatildi", {
-        description: "Tum premium ozellikleri bu sure boyunca deneyebilirsiniz.",
       });
     });
 
@@ -727,7 +700,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               <div className="mt-4 space-y-3">
                 {canStartTrialCta && (
                   <Button
-                    onClick={() => void handleRealTrialStart()}
+                    onClick={() => void handleTrialStart()}
                     disabled={loadingAction !== null || !canPurchasePremium}
                     className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400"
                   >

@@ -153,13 +153,26 @@ export async function getBillingCatalog(): Promise<BillingCatalogPlan[]> {
 }
 
 export async function startPremiumTrial(): Promise<BillingOverview> {
-  const { data, error } = await (supabase as any).rpc("start_my_premium_trial");
+  const { data, error } = await supabase.functions.invoke("billing-start-trial", {
+    body: {},
+  });
+  const payload = (data ?? null) as
+    | {
+        success?: boolean;
+        overview?: BillingOverview | null;
+        error?: { message?: string };
+      }
+    | null;
 
   if (error) {
     throw new Error(error.message || "Deneme suresi baslatilamadi.");
   }
 
-  return assertBillingOverview(data);
+  if (!payload?.success) {
+    throw new Error(payload?.error?.message || "Deneme suresi baslatilamadi.");
+  }
+
+  return payload.overview ? assertBillingOverview(payload.overview) : ({} as BillingOverview);
 }
 
 export async function backfillMyFeatureUsage() {
