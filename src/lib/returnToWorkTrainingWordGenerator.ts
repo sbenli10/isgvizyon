@@ -269,5 +269,7 @@ export async function generateReturnToWorkTrainingWord(data: ReturnToWorkTrainin
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Ise-Donus-Ilave-Egitim-Katilim-Formu-${data.participantName || data.organizationName || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Ise-Donus-Ilave-Egitim-Katilim-Formu-${data.participantName || data.organizationName || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

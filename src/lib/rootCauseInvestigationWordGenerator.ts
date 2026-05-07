@@ -342,5 +342,7 @@ export async function generateRootCauseInvestigationWord(data: RootCauseInvestig
   });
 
   const blob = await Packer.toBlob(document);
-  saveAs(blob, `${sanitizeFileName(`Kok-Neden-Arastirma-Formu-${data.injuredName || data.unitName || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Kok-Neden-Arastirma-Formu-${data.injuredName || data.unitName || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

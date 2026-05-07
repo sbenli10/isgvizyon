@@ -385,5 +385,7 @@ export async function generateAssignmentWord(data: AssignmentLetterDocumentData)
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Atama-Yazisi-${data.employeeName}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Atama-Yazisi-${data.employeeName}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

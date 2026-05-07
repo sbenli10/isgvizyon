@@ -273,5 +273,7 @@ export async function generateWorkAccidentWord(data: WorkAccidentReportData) {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Is-Kazasi-Tutanagi-${data.injuredFullName || "Rapor"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Is-Kazasi-Tutanagi-${data.injuredFullName || "Rapor"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

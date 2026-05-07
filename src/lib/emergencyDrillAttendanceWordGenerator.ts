@@ -137,5 +137,7 @@ export async function generateEmergencyDrillAttendanceWord(data: EmergencyDrillA
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Acil-Durum-Tatbikati-Katilim-Kayit-Formu-${data.drillTopic || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Acil-Durum-Tatbikati-Katilim-Kayit-Formu-${data.drillTopic || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

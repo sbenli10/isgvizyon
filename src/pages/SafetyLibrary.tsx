@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
+  Building2,
   CircleHelp,
   Download,
   ExternalLink,
@@ -29,11 +30,28 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { uploadFileOptimized } from "@/lib/storageHelper";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  COMPANY_ARCHIVE_FOLDERS,
+  deleteCompanyArchiveFile,
+  downloadCompanyArchiveFile,
+  downloadCompanyArchiveFolderZip,
+  downloadCompanyArchiveZip,
+  ensureCompanyArchiveStructure,
+  listCompanyArchiveFiles,
+  listCompanyArchiveFolders,
+  type CompanyArchiveFileEntry,
+  type CompanyArchiveFolderName,
+  type CompanyArchiveFolderSummary,
+  uploadCompanyArchiveFile,
+} from "@/lib/companyArchive";
 
 type LibraryTab = "topics" | "official" | "archive";
 type CollectionRow = Database["public"]["Tables"]["library_collections"]["Row"];
 type ItemRow = Database["public"]["Tables"]["library_items"]["Row"];
 type HazardRow = Database["public"]["Tables"]["safety_library"]["Row"];
+
+const isArchiveTab = (tab: LibraryTab) => tab === "archive";
 
 interface ArchiveFile {
   name: string;
@@ -41,6 +59,14 @@ interface ArchiveFile {
   url: string;
   created_at: string;
   size: number;
+}
+
+interface ArchiveCompany {
+  id: string;
+  name: string;
+  taxNumber: string | null;
+  address: string | null;
+  city: string | null;
 }
 
 interface LibraryCollection {
@@ -239,6 +265,7 @@ const normalizeLegacyHazards = (rows: HazardRow[]): LibraryItem[] =>
   }));
 
 export default function SafetyLibrary() {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<LibraryTab>("topics");
@@ -247,22 +274,45 @@ export default function SafetyLibrary() {
   const [files, setFiles] = useState<ArchiveFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiveCompaniesLoading, setArchiveCompaniesLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [archiveDownloading, setArchiveDownloading] = useState<string | null>(null);
   const [catalogReady, setCatalogReady] = useState(false);
   const [search, setSearch] = useState("");
+  const [archiveCompanySearch, setArchiveCompanySearch] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [archiveCompanies, setArchiveCompanies] = useState<ArchiveCompany[]>([]);
+  const [selectedArchiveCompanyId, setSelectedArchiveCompanyId] = useState("");
+  const [selectedArchiveFolder, setSelectedArchiveFolder] = useState<CompanyArchiveFolderName>("Belgeler");
+  const [archiveFoldersByCompany, setArchiveFoldersByCompany] = useState<Record<string, CompanyArchiveFolderSummary[]>>({});
+  const [archiveFilesByFolder, setArchiveFilesByFolder] = useState<Record<string, CompanyArchiveFileEntry[]>>({});
+  const [archiveNextPageByFolder, setArchiveNextPageByFolder] = useState<Record<string, number | null>>({});
   const [newItem, setNewItem] = useState(emptyItemForm);
   const activeCompanyId = searchParams.get("companyId") || "";
   const activeCompanyName = searchParams.get("companyName") || "";
 
+  const buildArchiveFolderKey = (companyId: string, folder: CompanyArchiveFolderName) => `${companyId}::${folder}`;
+
   useEffect(() => {
     void fetchCatalog();
-    void fetchFiles();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void fetchArchiveCompanies();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!activeCompanyId) return;
+    const matched = archiveCompanies.find((company) => company.id === activeCompanyId);
+    if (matched) {
+      setSelectedArchiveCompanyId(matched.id);
+    }
+  }, [activeCompanyId, archiveCompanies]);
 
   const fetchCatalog = async () => {
     setLoading(true);
@@ -303,6 +353,84 @@ export default function SafetyLibrary() {
       setNewItem((prev) => ({ ...prev, collectionId: fallbackCollections[0].id }));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchArchiveCompanies = async () => {
+    if (!user?.id) return;
+
+    setArchiveCompaniesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("id, name, tax_number, address")
+        .eq("user_id", user.id)
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+
+      const rows = (data || []).map((row) => ({
+        id: row.id,
+        name: row.name,
+        taxNumber: row.tax_number,
+        address: row.address,
+        city: null,
+      }));
+
+      setArchiveCompanies(rows);
+      const preferredCompanyId =
+        rows.find((company) => company.id === activeCompanyId)?.id ||
+        rows[0]?.id ||
+        "";
+      setSelectedArchiveCompanyId((current) => current || preferredCompanyId);
+    } catch (error) {
+      console.error("Archive companies fetch failed:", error);
+      toast.error("Firma arşivi yüklenemedi.");
+    } finally {
+      setArchiveCompaniesLoading(false);
+    }
+  };
+
+  const fetchArchiveFolders = async (companyId: string) => {
+    setArchiveLoading(true);
+    try {
+      await ensureCompanyArchiveStructure(companyId);
+      const folders = await listCompanyArchiveFolders(companyId);
+      setArchiveFoldersByCompany((prev) => ({ ...prev, [companyId]: folders }));
+    } catch (error) {
+      console.error("Archive folders fetch failed:", error);
+      toast.error("Firma klasörleri yüklenemedi.");
+    } finally {
+      setArchiveLoading(false);
+    }
+  };
+
+  const fetchArchiveFolderPage = async (
+    companyId: string,
+    folder: CompanyArchiveFolderName,
+    page = 0,
+    append = false,
+  ) => {
+    setArchiveLoading(true);
+    try {
+      await ensureCompanyArchiveStructure(companyId);
+      const result = await listCompanyArchiveFiles(companyId, folder, page);
+      const folderKey = buildArchiveFolderKey(companyId, folder);
+
+      setArchiveFilesByFolder((prev) => ({
+        ...prev,
+        [folderKey]: append ? [...(prev[folderKey] || []), ...result.files] : result.files,
+      }));
+      setArchiveNextPageByFolder((prev) => ({
+        ...prev,
+        [folderKey]: result.nextPage,
+      }));
+    } catch (error) {
+      console.error("Archive folder page fetch failed:", error);
+      toast.error("Arşiv dosyaları yüklenemedi.");
+    } finally {
+      setArchiveLoading(false);
     }
   };
 
@@ -395,6 +523,82 @@ export default function SafetyLibrary() {
     }
   };
 
+  const handleArchiveUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedArchiveCompanyId) return;
+
+    setUploading(true);
+    try {
+      await uploadCompanyArchiveFile(selectedArchiveCompanyId, selectedArchiveFolder, file);
+      toast.success("Dosya firma arşivine yüklendi.");
+      await Promise.all([
+        fetchArchiveFolders(selectedArchiveCompanyId),
+        fetchArchiveFolderPage(selectedArchiveCompanyId, selectedArchiveFolder),
+      ]);
+    } catch (error) {
+      console.error("Company archive upload failed:", error);
+      toast.error("Dosya yüklenemedi.");
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleArchiveFileDelete = async (filePath: string) => {
+    if (!selectedArchiveCompanyId) return;
+    try {
+      await deleteCompanyArchiveFile(filePath);
+      toast.success("Dosya arşivden kaldırıldı.");
+      await Promise.all([
+        fetchArchiveFolders(selectedArchiveCompanyId),
+        fetchArchiveFolderPage(selectedArchiveCompanyId, selectedArchiveFolder),
+      ]);
+    } catch (error) {
+      console.error("Company archive delete failed:", error);
+      toast.error("Dosya silinemedi.");
+    }
+  };
+
+  const handleArchiveFileDownload = async (file: CompanyArchiveFileEntry) => {
+    setArchiveDownloading(file.path);
+    try {
+      await downloadCompanyArchiveFile(file);
+    } catch (error) {
+      console.error("Archive file download failed:", error);
+      toast.error("Dosya indirilemedi.");
+    } finally {
+      setArchiveDownloading(null);
+    }
+  };
+
+  const handleArchiveFolderZipDownload = async (
+    companyId: string,
+    companyName: string,
+    folder: CompanyArchiveFolderName,
+  ) => {
+    setArchiveDownloading(`${companyId}:${folder}:zip`);
+    try {
+      await downloadCompanyArchiveFolderZip(companyId, companyName, folder);
+    } catch (error) {
+      console.error("Archive folder zip download failed:", error);
+      toast.error("Klasör ZIP olarak indirilemedi.");
+    } finally {
+      setArchiveDownloading(null);
+    }
+  };
+
+  const handleArchiveCompanyZipDownload = async (companyId: string, companyName: string) => {
+    setArchiveDownloading(`${companyId}:company-zip`);
+    try {
+      await downloadCompanyArchiveZip(companyId, companyName);
+    } catch (error) {
+      console.error("Archive company zip download failed:", error);
+      toast.error("Firma arşivi ZIP olarak indirilemedi.");
+    } finally {
+      setArchiveDownloading(null);
+    }
+  };
+
   const handleStartInspection = (item: LibraryItem) => {
     const notes = [
       `Konu: ${item.title}`,
@@ -436,12 +640,377 @@ export default function SafetyLibrary() {
     [activeTab, collections],
   );
 
+  const filteredArchiveCompanies = useMemo(() => {
+    const normalized = archiveCompanySearch.trim().toLocaleLowerCase("tr-TR");
+    if (!normalized) return archiveCompanies;
+    return archiveCompanies.filter((company) =>
+      [company.name, company.taxNumber, company.city]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(normalized),
+    );
+  }, [archiveCompanies, archiveCompanySearch]);
+
+  const selectedArchiveCompany =
+    archiveCompanies.find((company) => company.id === selectedArchiveCompanyId) || null;
+
+  const selectedArchiveFolderFiles = selectedArchiveCompanyId
+    ? archiveFilesByFolder[buildArchiveFolderKey(selectedArchiveCompanyId, selectedArchiveFolder)] || []
+    : [];
+
+  const selectedArchiveFolderNextPage = selectedArchiveCompanyId
+    ? archiveNextPageByFolder[buildArchiveFolderKey(selectedArchiveCompanyId, selectedArchiveFolder)] ?? null
+    : null;
+
+  const selectedArchiveFolders =
+    (selectedArchiveCompanyId ? archiveFoldersByCompany[selectedArchiveCompanyId] : undefined) || [];
+
+  const archiveFileCount = useMemo(
+    () =>
+      Object.values(archiveFoldersByCompany).reduce(
+        (sum, folders) => sum + folders.reduce((folderSum, folder) => folderSum + folder.fileCount, 0),
+        0,
+      ),
+    [archiveFoldersByCompany],
+  );
+
+  useEffect(() => {
+    if (!selectedArchiveCompanyId || activeTab !== "archive") return;
+    if (!archiveFoldersByCompany[selectedArchiveCompanyId]) {
+      void fetchArchiveFolders(selectedArchiveCompanyId);
+    }
+  }, [activeTab, archiveFoldersByCompany, selectedArchiveCompanyId]);
+
+  useEffect(() => {
+    if (!selectedArchiveCompanyId || activeTab !== "archive") return;
+    const folderKey = buildArchiveFolderKey(selectedArchiveCompanyId, selectedArchiveFolder);
+    if (!archiveFilesByFolder[folderKey]) {
+      void fetchArchiveFolderPage(selectedArchiveCompanyId, selectedArchiveFolder);
+    }
+  }, [activeTab, archiveFilesByFolder, selectedArchiveCompanyId, selectedArchiveFolder]);
+
   if (loading) {
     return (
       <div className="space-y-6">
         <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-8">
           <div className="h-8 w-64 animate-pulse rounded bg-slate-800" />
           <div className="mt-3 h-4 w-[28rem] animate-pulse rounded bg-slate-900" />
+        </div>
+      </div>
+    );
+  }
+
+  if (isArchiveTab(activeTab)) {
+    return (
+      <div className="theme-page-readable space-y-6">
+        {activeCompanyId || activeCompanyName ? (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Firma bağlamı aktif</p>
+                <p className="text-sm text-muted-foreground">
+                  {activeCompanyName || "Seçili firma"} için firma arşivindesiniz. Buradaki klasörler hızlı doküman erişimi için aynı şirket bağlamında tutulur.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const next = new URLSearchParams(searchParams);
+                  next.delete("companyId");
+                  next.delete("companyName");
+                  setSearchParams(next);
+                }}
+              >
+                Bağlamı kaldır
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <section className="rounded-3xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(245,158,11,0.18),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(59,130,246,0.16),_transparent_30%),linear-gradient(135deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] p-8">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl space-y-3">
+              <Badge className="border-amber-500/30 bg-amber-500/15 text-amber-100">
+                Firma arşivi merkezi
+              </Badge>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-white">Firma Arşivi</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Her firma için otomatik oluşturulan Analizler, Belgeler, Fotoğraflar ve Bilgiler klasörlerini
+                  tek ekranda yönetin. Dosyaları sayfa sayfa yükleyin, tek tıkla indirin, gerekirse ZIP olarak topluca dışarı alın.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[420px]">
+              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Firma klasörü</p><p className="mt-2 text-2xl font-semibold text-white">{archiveCompanies.length}</p></CardContent></Card>
+              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Alt klasör</p><p className="mt-2 text-2xl font-semibold text-white">{archiveCompanies.length * COMPANY_ARCHIVE_FOLDERS.length}</p></CardContent></Card>
+              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><p className="text-xs uppercase tracking-[0.18em] text-slate-500">Arşiv dosyası</p><p className="mt-2 text-2xl font-semibold text-white">{archiveFileCount}</p></CardContent></Card>
+            </div>
+          </div>
+        </section>
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-950/80 p-1">
+            <button type="button" onClick={() => setActiveTab("topics")} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-400 transition">Konu kütüphanesi</button>
+            <button type="button" onClick={() => setActiveTab("official")} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-400 transition">Resmi yayınlar</button>
+            <button type="button" className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white transition">Firma Arşivi</button>
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => navigate("/safety-library/guide")} className="gap-2 border-slate-700 bg-slate-950 text-slate-200">
+              <CircleHelp className="h-4 w-4" />
+              Nasıl kullanılır?
+            </Button>
+            <label htmlFor="company-archive-upload">
+              <Button asChild disabled={!selectedArchiveCompanyId || uploading} className="gap-2 bg-amber-600 text-white hover:bg-amber-700">
+                <span>{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />} Arşive dosya yükle</span>
+              </Button>
+            </label>
+          </div>
+        </div>
+
+        <input
+          type="file"
+          id="company-archive-upload"
+          className="hidden"
+          onChange={handleArchiveUpload}
+          disabled={uploading || !selectedArchiveCompanyId}
+        />
+
+        <div className="grid gap-4 xl:grid-cols-2">
+          <Card className="border-amber-500/25 bg-amber-500/10">
+            <CardContent className="space-y-2 p-5 text-sm text-amber-100">
+              <div className="flex items-center gap-2 font-semibold text-amber-50">
+                <FolderArchive className="h-4 w-4" />
+                Otomatik klasör yapısı
+              </div>
+              <p>Yeni firma oluştuğunda arşiv klasörleri otomatik hazırlanır. Belgeler kronolojik adlandırmayla, fotoğraflar olay ve lokasyon bazlı, analizler ise versiyon numarasıyla tutulabilir.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-blue-500/25 bg-blue-500/10">
+            <CardContent className="space-y-2 p-5 text-sm text-blue-100">
+              <div className="flex items-center gap-2 font-semibold text-blue-50">
+                <Download className="h-4 w-4" />
+                Toplu indirme mantığı
+              </div>
+              <p>Seçilen alt klasörü veya tüm firma arşivini ZIP olarak indirebilirsiniz. Dosyalar lazy loading ile geldiği için büyük arşivlerde de arayüz akıcı kalır.</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[320px_280px_minmax(0,1fr)]">
+          <Card className="border-slate-800 bg-slate-950/70">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-white">
+                <Building2 className="h-5 w-5 text-amber-300" />
+                Firma klasörleri
+              </CardTitle>
+              <CardDescription>Kullanıcının firmaları arşiv klasörü olarak listelenir.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Input
+                value={archiveCompanySearch}
+                onChange={(event) => setArchiveCompanySearch(event.target.value)}
+                placeholder="Firma ara"
+                className="border-slate-800 bg-slate-900 text-white placeholder:text-slate-500"
+              />
+              <div className="space-y-3">
+                {archiveCompaniesLoading ? (
+                  Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="h-20 animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />
+                  ))
+                ) : filteredArchiveCompanies.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-10 text-center text-sm text-slate-400">
+                    Henüz firma bulunamadı.
+                  </div>
+                ) : (
+                  filteredArchiveCompanies.map((company) => (
+                    <button
+                      key={company.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedArchiveCompanyId(company.id);
+                        setSelectedArchiveFolder("Belgeler");
+                      }}
+                      className={`w-full rounded-2xl border p-4 text-left transition ${
+                        selectedArchiveCompanyId === company.id
+                          ? "border-amber-400/40 bg-amber-500/10"
+                          : "border-slate-800 bg-slate-900/70 hover:border-slate-700"
+                      }`}
+                    >
+                      <p className="font-semibold text-white">{company.name}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {company.city || "Şehir yok"} • {company.taxNumber || "Vergi/Sicil no yok"}
+                      </p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-950/70">
+            <CardHeader>
+              <CardTitle className="text-lg text-white">Alt klasörler</CardTitle>
+              <CardDescription>
+                {selectedArchiveCompany ? `${selectedArchiveCompany.name} için varsayılan arşiv bölümleri` : "Önce bir firma seçin"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {selectedArchiveCompany ? (
+                <>
+                  <Button
+                    className="w-full gap-2 bg-amber-600 text-white hover:bg-amber-700"
+                    onClick={() => void handleArchiveCompanyZipDownload(selectedArchiveCompany.id, selectedArchiveCompany.name)}
+                    disabled={archiveDownloading === `${selectedArchiveCompany.id}:company-zip`}
+                  >
+                    {archiveDownloading === `${selectedArchiveCompany.id}:company-zip` ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Tüm firma arşivini indir
+                  </Button>
+
+                  {selectedArchiveFolders.map((folder) => (
+                    <div
+                      key={folder.name}
+                      className={`rounded-2xl border p-4 transition ${
+                        selectedArchiveFolder === folder.name
+                          ? "border-blue-500/40 bg-blue-500/10"
+                          : "border-slate-800 bg-slate-900/70"
+                      }`}
+                    >
+                      <button type="button" className="w-full text-left" onClick={() => setSelectedArchiveFolder(folder.name)}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-semibold text-white">{folder.name}</p>
+                            <p className="mt-1 text-xs text-slate-400">{folder.fileCount} dosya</p>
+                          </div>
+                          <FolderArchive className="h-5 w-5 text-amber-300" />
+                        </div>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        className="mt-3 h-8 w-full justify-start gap-2 px-0 text-amber-200 hover:text-amber-100"
+                        onClick={() => void handleArchiveFolderZipDownload(selectedArchiveCompany.id, selectedArchiveCompany.name, folder.name)}
+                        disabled={archiveDownloading === `${selectedArchiveCompany.id}:${folder.name}:zip`}
+                      >
+                        {archiveDownloading === `${selectedArchiveCompany.id}:${folder.name}:zip` ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                        ZIP indir
+                      </Button>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-10 text-center text-sm text-slate-400">
+                  Klasörleri görmek için bir firma seçin.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-800 bg-slate-950/70">
+            <CardHeader>
+              <CardTitle className="text-lg text-white">
+                {selectedArchiveCompany ? `${selectedArchiveCompany.name} / ${selectedArchiveFolder}` : "Dosyalar"}
+              </CardTitle>
+              <CardDescription>Dosyalar asenkron ve sayfalı şekilde yüklenir.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!selectedArchiveCompany ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-14 text-center text-sm text-slate-400">
+                  Önce soldan bir firma seçin.
+                </div>
+              ) : archiveLoading && selectedArchiveFolderFiles.length === 0 ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 4 }).map((_, index) => (
+                    <div key={index} className="h-20 animate-pulse rounded-2xl border border-slate-800 bg-slate-900/70" />
+                  ))}
+                </div>
+              ) : selectedArchiveFolderFiles.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/60 px-4 py-14 text-center">
+                  <FolderArchive className="mx-auto h-10 w-10 text-slate-500" />
+                  <p className="mt-4 text-sm font-medium text-slate-200">Bu klasörde henüz dosya yok.</p>
+                  <p className="mt-1 text-xs text-slate-500">Üstteki yükleme butonuyla ilk dosyayı ekleyebilirsiniz.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3">
+                    {selectedArchiveFolderFiles.map((file) => (
+                      <div key={file.path} className="flex flex-col gap-4 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 md:flex-row md:items-center md:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate text-sm font-semibold text-white" title={file.displayName}>
+                              {file.displayName}
+                            </p>
+                            {file.sourceLabel ? (
+                              <span className="inline-flex items-center rounded-full border border-slate-700 bg-slate-800/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.14em] text-slate-200">
+                                {file.sourceLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatFileSize(file.size)} • {formatDate(file.createdAt)}
+                          </p>
+                          {file.description ? <p className="mt-1 text-xs text-slate-400">{file.description}</p> : null}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            className="gap-2 border-slate-700 bg-slate-950 text-slate-200"
+                            onClick={() => void handleArchiveFileDownload(file)}
+                            disabled={archiveDownloading === file.path}
+                          >
+                            {archiveDownloading === file.path ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Download className="h-4 w-4" />
+                            )}
+                            İndir
+                          </Button>
+                          {file.deletable ? (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 text-rose-300"
+                              onClick={() => void handleArchiveFileDelete(file.path)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedArchiveFolderNextPage !== null ? (
+                    <Button
+                      variant="outline"
+                      className="w-full border-slate-700 bg-slate-900 text-slate-200"
+                      onClick={() =>
+                        void fetchArchiveFolderPage(
+                          selectedArchiveCompany.id,
+                          selectedArchiveFolder,
+                          selectedArchiveFolderNextPage,
+                          true,
+                        )
+                      }
+                    >
+                      Daha fazla dosya yükle
+                    </Button>
+                  ) : null}
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -501,7 +1070,7 @@ export default function SafetyLibrary() {
         <div className="inline-flex rounded-2xl border border-slate-800 bg-slate-950/80 p-1">
           <button type="button" onClick={() => setActiveTab("topics")} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${activeTab === "topics" ? "bg-emerald-600 text-white" : "text-slate-400"}`}>Konu kütüphanesi</button>
           <button type="button" onClick={() => setActiveTab("official")} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${activeTab === "official" ? "bg-blue-600 text-white" : "text-slate-400"}`}>Resmi yayınlar</button>
-          <button type="button" onClick={() => setActiveTab("archive")} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${activeTab === "archive" ? "bg-amber-600 text-white" : "text-slate-400"}`}>Kurum içi arşiv</button>
+          <button type="button" onClick={() => setActiveTab("archive")} className={`rounded-xl px-4 py-2 text-sm font-medium transition ${isArchiveTab(activeTab) ? "bg-amber-600 text-white" : "text-slate-400"}`}>Firma arşiv</button>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -509,7 +1078,7 @@ export default function SafetyLibrary() {
             <CircleHelp className="h-4 w-4" />
             Nasıl kullanılır?
           </Button>
-          {activeTab === "archive" ? (
+          {isArchiveTab(activeTab) ? (
             <label htmlFor="safety-doc-upload">
               <Button asChild className="gap-2 bg-amber-600 text-white hover:bg-amber-700">
                 <span>{uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />} Doküman yükle</span>
@@ -600,7 +1169,7 @@ export default function SafetyLibrary() {
         </DialogContent>
       </Dialog>
 
-      {activeTab === "archive" ? (
+      {isArchiveTab(activeTab) ? (
         <div className="space-y-4">
           <input type="file" id="safety-doc-upload" className="hidden" onChange={handleFileUpload} disabled={uploading} />
 

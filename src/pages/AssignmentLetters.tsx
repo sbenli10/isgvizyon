@@ -59,6 +59,8 @@ import { generateOrientationOnboardingTrainingWord } from "@/lib/orientationOnbo
 import { generateEmployeeRepresentativeAppointmentWord } from "@/lib/employeeRepresentativeAppointmentWordGenerator";
 import { generateIncidentInvestigationReportWord } from "@/lib/incidentInvestigationReportWordGenerator";
 import type { Company, Employee } from "@/types/companies";
+import { uploadFileOptimized } from "@/lib/storageHelper";
+import { buildStorageObjectRef } from "@/lib/storageObject";
 
 interface CompanyRecord extends Company {
   logo_url?: string | null;
@@ -381,6 +383,13 @@ function buildDocumentNumber(row: AssignmentLetterRow) {
   return `ATM-${year}-${row.id.slice(0, 8).toUpperCase()}`;
 }
 
+function normalizeCompanyNameLookup(value?: string | null) {
+  return (value || "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function AssignmentLetters() {
   const { user, profile } = useAuth();
   const [companies, setCompanies] = useState<CompanyRecord[]>([]);
@@ -701,6 +710,79 @@ export default function AssignmentLetters() {
     };
   }
 
+  function resolveArchiveCompany(companyId?: string | null, companyName?: string | null) {
+    if (companyId) {
+      const matched = companies.find((item) => item.id === companyId);
+      if (matched) return matched;
+    }
+
+    const normalizedName = normalizeCompanyNameLookup(companyName);
+    if (!normalizedName) return null;
+
+    return (
+      companies.find((item) => normalizeCompanyNameLookup(item.company_name) === normalizedName) || null
+    );
+  }
+
+  async function archiveGeneratedDocument(input: {
+    companyId?: string | null;
+    companyName?: string | null;
+    title: string;
+    summary: string;
+    blob: Blob;
+    fileName: string;
+    sourceLabel: string;
+  }) {
+    if (!user?.id) return false;
+
+    const company = resolveArchiveCompany(input.companyId, input.companyName);
+    if (!company) return false;
+
+    const safeFileName = input.fileName.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_");
+    const storagePath = `firma-arsivi/${company.id}/belgeler/${Date.now()}__${safeFileName}`;
+    const file = new File([input.blob], safeFileName, {
+      type:
+        input.fileName.toLowerCase().endsWith(".docx")
+          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          : "application/octet-stream",
+    });
+
+    await uploadFileOptimized("safety_documents", storagePath, file);
+
+    try {
+      const { data: collection } = await (supabase as any)
+        .from("library_collections")
+        .select("id")
+        .eq("slug", "internal-archive")
+        .maybeSingle();
+
+      if (collection?.id) {
+        await (supabase as any).from("library_items").insert({
+          collection_id: collection.id,
+          title: input.title,
+          summary: input.summary,
+          body: input.summary,
+          item_type: "archive_document",
+          source_name: input.sourceLabel,
+          file_url: buildStorageObjectRef("safety_documents", storagePath),
+          tags: ["firma-arsivi", "assignment-letters"],
+          metadata: {
+            companyId: company.id,
+            companyName: company.company_name,
+            archiveSource: "assignment_letters",
+            sourceLabel: input.sourceLabel,
+            storedPath: storagePath,
+          },
+          created_by: user.id,
+        });
+      }
+    } catch (error) {
+      console.warn("Assignment archive metadata insert failed:", error);
+    }
+
+    return true;
+  }
+
   async function handleSaveLetterSettings() {
     if (!user?.id) {
       toast.error("Belge ayarlarını kaydetmek için giriş yapmalısınız.");
@@ -796,7 +878,16 @@ export default function AssignmentLetters() {
       if (!documentData) {
         toast.error("Belge kaydedildi ancak Word çıktısı için firma veya personel bilgisi bulunamadı.");
       } else {
-        await generateAssignmentWord(documentData);
+        const generated = await generateAssignmentWord(documentData);
+        await archiveGeneratedDocument({
+          companyId: savedRow.company_id,
+          companyName: documentData.companyName,
+          title: documentData.assignmentTitle,
+          summary: `${documentData.companyName} için oluşturulan atama yazısı`,
+          blob: generated.blob,
+          fileName: generated.fileName,
+          sourceLabel: "Atama Yazısı",
+        });
       }
 
       toast.success(editingId ? "Atama yazısı güncellendi." : "Atama yazısı oluşturuldu.");
@@ -879,7 +970,7 @@ export default function AssignmentLetters() {
 
     setWorkAccidentSaving(true);
     try {
-      await generateWorkAccidentWord({
+      const generated = await generateWorkAccidentWord({
         accidentDate: workAccidentForm.accident_date,
         accidentTime: workAccidentForm.accident_time,
         injuredFullName: workAccidentForm.injured_full_name,
@@ -893,6 +984,14 @@ export default function AssignmentLetters() {
         safetyExpertName: workAccidentForm.safety_expert_name,
         reportDate: workAccidentForm.report_date,
         photos: workAccidentForm.photos,
+      });
+      await archiveGeneratedDocument({
+        companyId: workAccidentForm.company_id,
+        title: "İş Kazası Tutanağı",
+        summary: `${workAccidentForm.injured_full_name} için iş kazası tutanağı`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "İş Kazası Tutanağı",
       });
 
       toast.success("İş kazası tutanağı Word çıktısı hazırlandı.");
@@ -922,7 +1021,7 @@ export default function AssignmentLetters() {
 
     setReturnTrainingSaving(true);
     try {
-      await generateReturnToWorkTrainingWord({
+      const generated = await generateReturnToWorkTrainingWord({
         organizationName: returnTrainingForm.organization_name,
         address: returnTrainingForm.address,
         sgkRegistrationNo: returnTrainingForm.sgk_registration_no,
@@ -937,6 +1036,15 @@ export default function AssignmentLetters() {
           tcNumber: item.tc_number,
           title: item.title,
         })),
+      });
+      await archiveGeneratedDocument({
+        companyId: returnTrainingForm.company_id,
+        companyName: returnTrainingForm.organization_name,
+        title: "İşe Dönüş İlave Eğitim Katılım Formu",
+        summary: `${returnTrainingForm.organization_name} için işe dönüş eğitim formu`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "İşe Dönüş Eğitimi",
       });
 
       toast.success("İşe dönüş ilave eğitim katılım formu Word çıktısı hazırlandı.");
@@ -965,7 +1073,7 @@ export default function AssignmentLetters() {
 
     setRootCauseSaving(true);
     try {
-      await generateRootCauseInvestigationWord({
+      const generated = await generateRootCauseInvestigationWord({
         unitName: rootCauseForm.unit_name,
         location: rootCauseForm.location,
         eventTypes: rootCauseForm.event_types,
@@ -988,6 +1096,15 @@ export default function AssignmentLetters() {
         boardMemberName: rootCauseForm.board_member_name,
         otherEvaluatorName: rootCauseForm.other_evaluator_name,
         recommendedMeasures: rootCauseForm.recommended_measures,
+      });
+      await archiveGeneratedDocument({
+        companyId: rootCauseForm.company_id,
+        companyName: rootCauseForm.manual_company_name || rootCauseForm.unit_name,
+        title: "Kök Neden Araştırma Formu",
+        summary: `${rootCauseForm.injured_name} için kök neden araştırma formu`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "Kök Neden Formu",
       });
 
       toast.success("Kök neden araştırma formu Word çıktısı hazırlandı.");
@@ -1014,7 +1131,7 @@ export default function AssignmentLetters() {
 
     setNearMissSaving(true);
     try {
-      await generateNearMissReportWord({
+      const generated = await generateNearMissReportWord({
         reportDate: nearMissForm.report_date,
         reportTime: nearMissForm.report_time,
         reporterName: nearMissForm.reporter_name,
@@ -1027,6 +1144,15 @@ export default function AssignmentLetters() {
         safetyOfficerName: nearMissForm.safety_officer_name,
         plannedActions: nearMissForm.planned_actions,
         signerName: nearMissForm.signer_name,
+      });
+      await archiveGeneratedDocument({
+        companyId: nearMissForm.company_id,
+        companyName: nearMissForm.manual_company_name,
+        title: "Ramak Kala Olay Bildirim Formu",
+        summary: `${nearMissForm.reporter_name} tarafından oluşturulan olay bildirimi`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "Ramak Kala Bildirimi",
       });
 
       toast.success("Ramak kala olay bildirim formu Word çıktısı hazırlandı.");
@@ -1046,7 +1172,7 @@ export default function AssignmentLetters() {
 
     setEmergencyDrillSaving(true);
     try {
-      await generateEmergencyDrillAttendanceWord({
+      const generated = await generateEmergencyDrillAttendanceWord({
         drillTopic: emergencyDrillForm.drill_topic,
         drillDate: emergencyDrillForm.drill_date,
         drillDuration: emergencyDrillForm.drill_duration,
@@ -1055,6 +1181,8 @@ export default function AssignmentLetters() {
           tcNumber: item.tc_number,
         })),
       });
+
+      void generated;
 
       toast.success("Acil durum tatbikatı katılım kayıt formu Word çıktısı hazırlandı.");
       resetEmergencyDrillModal();
@@ -1073,7 +1201,7 @@ export default function AssignmentLetters() {
 
     setDrillFormSaving(true);
     try {
-      await generateDrillFormWord({
+      const generated = await generateDrillFormWord({
         workplaceName: drillForm.workplace_name,
         drillName: drillForm.drill_name,
         drillDate: drillForm.drill_date,
@@ -1092,6 +1220,14 @@ export default function AssignmentLetters() {
         conductorName: drillForm.conductor_name,
         conductorTitle: drillForm.conductor_title,
         approverName: drillForm.approver_name,
+      });
+      await archiveGeneratedDocument({
+        companyName: drillForm.workplace_name,
+        title: "Tatbikat Formu",
+        summary: `${drillForm.workplace_name} için tatbikat formu`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "Tatbikat Formu",
       });
 
       toast.success("Tatbikat formu Word çıktısı hazırlandı.");
@@ -1117,7 +1253,7 @@ export default function AssignmentLetters() {
 
     setIncidentInvestigationSaving(true);
     try {
-      await generateIncidentInvestigationReportWord({
+      const generated = await generateIncidentInvestigationReportWord({
         causeActivity: incidentInvestigationForm.cause_activity,
         whereWhen: incidentInvestigationForm.where_when,
         incidentType: incidentInvestigationForm.incident_type,
@@ -1147,6 +1283,16 @@ export default function AssignmentLetters() {
         preparedBy: incidentInvestigationForm.prepared_by,
         approvedBy: incidentInvestigationForm.approved_by,
       });
+      if (incidentInvestigationForm.injured_department.trim()) {
+        await archiveGeneratedDocument({
+          companyName: incidentInvestigationForm.injured_department,
+          title: "Kaza / Olay Araştırma Raporu",
+          summary: `${incidentInvestigationForm.injured_full_name} için araştırma raporu`,
+          blob: generated.blob,
+          fileName: generated.fileName,
+          sourceLabel: "Araştırma Raporu",
+        });
+      }
 
       toast.success("Kaza / olay araştırma raporu Word çıktısı hazırlandı.");
       resetIncidentInvestigationModal();
@@ -1170,7 +1316,7 @@ export default function AssignmentLetters() {
 
     setEmployeeRepresentativeAppointmentSaving(true);
     try {
-      await generateEmployeeRepresentativeAppointmentWord({
+      const generated = await generateEmployeeRepresentativeAppointmentWord({
         workplaceTitle: employeeRepresentativeAppointmentForm.workplace_title,
         workplaceAddress: employeeRepresentativeAppointmentForm.workplace_address,
         sgkRegistrationNo: employeeRepresentativeAppointmentForm.sgk_registration_no,
@@ -1198,6 +1344,17 @@ export default function AssignmentLetters() {
         trainerTitle: employeeRepresentativeBundleSettings.trainer_title,
         additionalNotes: employeeRepresentativeAppointmentForm.additional_notes,
       });
+      await archiveGeneratedDocument({
+        companyId: employeeRepresentativeAppointmentForm.company_id,
+        companyName:
+          employeeRepresentativeAppointmentForm.manual_company_name ||
+          employeeRepresentativeAppointmentForm.workplace_title,
+        title: "İSG Çalışan Temsilcisi Ataması",
+        summary: `${employeeRepresentativeAppointmentForm.representative_name} için çalışan temsilcisi dosyası`,
+        blob: generated.blob,
+        fileName: generated.fileName,
+        sourceLabel: "Çalışan Temsilcisi",
+      });
 
       toast.success("Çalışan temsilcisi atama formu Word çıktısı hazırlandı.");
       resetEmployeeRepresentativeAppointmentModal();
@@ -1216,7 +1373,7 @@ export default function AssignmentLetters() {
 
     setOrientationOnboardingTrainingSaving(true);
     try {
-      await generateOrientationOnboardingTrainingWord({
+      const generated = await generateOrientationOnboardingTrainingWord({
         fullName: orientationOnboardingTrainingForm.full_name,
         birthPlaceYear: orientationOnboardingTrainingForm.birth_place_year,
         startDate: orientationOnboardingTrainingForm.start_date,
@@ -1232,6 +1389,8 @@ export default function AssignmentLetters() {
         traineeSignatureName: orientationOnboardingTrainingForm.trainee_signature_name,
         employerSignatureName: orientationOnboardingTrainingForm.employer_signature_name,
       });
+
+      void generated;
 
       toast.success("Oryantasyon ve işbaşı eğitimi formu Word çıktısı hazırlandı.");
       resetOrientationOnboardingTrainingModal();

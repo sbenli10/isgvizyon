@@ -562,5 +562,7 @@ export async function generateEmployeeRepresentativeAppointmentWord(data: Employ
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Calisan-Temsilcisi-Dosyasi-${data.representativeName || "Belge"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Calisan-Temsilcisi-Dosyasi-${data.representativeName || "Belge"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

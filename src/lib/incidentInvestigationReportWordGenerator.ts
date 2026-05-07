@@ -289,5 +289,7 @@ export async function generateIncidentInvestigationReportWord(data: IncidentInve
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Kaza-Olay-Arastirma-Raporu-${data.injuredFullName || "Rapor"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Kaza-Olay-Arastirma-Raporu-${data.injuredFullName || "Rapor"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

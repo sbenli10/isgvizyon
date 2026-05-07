@@ -1116,7 +1116,31 @@ export default function ADEPWizard() {
       const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
       await uploadFileOptimized("reports", storagePath, pdfFile);
 
-      setCurrentReportUrl(buildStorageObjectRef("reports", storagePath));
+      const reportUrl = buildStorageObjectRef("reports", storagePath);
+
+      if (user.id) {
+        const { error: reportInsertError } = await supabase.from("reports").insert({
+          org_id: profile?.organization_id || null,
+          user_id: user.id,
+          title: `ADEP Raporu - ${planRow.company_name || "Firma"}`,
+          report_type: "adep",
+          generated_at: new Date().toISOString(),
+          export_format: "pdf",
+          file_url: reportUrl,
+          content: {
+            report_kind: "adep",
+            company_id: planRow.company_id || null,
+            company_name: planRow.company_name || null,
+            plan_id: planId,
+          },
+        });
+
+        if (reportInsertError) {
+          console.warn("ADEP report archive insert failed:", reportInsertError);
+        }
+      }
+
+      setCurrentReportUrl(reportUrl);
       setCurrentReportFilename(fileName);
       setSendModalOpen(true);
       toast.success("Rapor e-posta gönderimi için hazır.");
@@ -2219,5 +2243,4 @@ export default function ADEPWizard() {
     </div>
   );
 }
-
 

@@ -224,5 +224,7 @@ export async function generateDrillFormWord(data: DrillFormData) {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Tatbikat-Formu-${data.drillName || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Tatbikat-Formu-${data.drillName || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

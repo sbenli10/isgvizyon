@@ -201,5 +201,7 @@ export async function generateOrientationOnboardingTrainingWord(data: Orientatio
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Oryantasyon-Isbasi-Egitimi-${data.fullName || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Oryantasyon-Isbasi-Egitimi-${data.fullName || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

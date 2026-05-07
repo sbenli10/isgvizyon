@@ -129,5 +129,7 @@ export async function generateNearMissReportWord(data: NearMissReportData) {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, `${sanitizeFileName(`Ramak-Kala-Olay-Bildirim-Formu-${data.reporterName || "Form"}`)}.docx`);
+  const fileName = `${sanitizeFileName(`Ramak-Kala-Olay-Bildirim-Formu-${data.reporterName || "Form"}`)}.docx`;
+  saveAs(blob, fileName);
+  return { blob, fileName };
 }

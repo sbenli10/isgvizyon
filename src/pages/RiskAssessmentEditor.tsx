@@ -4017,6 +4017,29 @@ const exportToPDFAndShare = async () => {
 
     const reportUrl = buildStorageObjectRef("reports", storagePath);
 
+    if (user?.id) {
+      const { error: reportInsertError } = await supabase.from("reports").insert({
+        org_id: profile?.organization_id || null,
+        user_id: user.id,
+        title: `Risk Değerlendirme Raporu - ${company?.name || assessment.assessment_name || "Firma"}`,
+        report_type: "risk_assessment",
+        generated_at: new Date().toISOString(),
+        export_format: "pdf",
+        file_url: reportUrl,
+        content: {
+          report_kind: "risk_assessment",
+          assessment_id: assessment.id,
+          company_id: assessment.company_id || null,
+          company_name: company?.name || null,
+          assessment_name: assessment.assessment_name,
+        },
+      });
+
+      if (reportInsertError) {
+        console.warn("Risk report archive insert failed:", reportInsertError);
+      }
+    }
+
     // 4. LOCAL İNDİR
     doc.save(fileName);
     toast.success("PDF indirildi");

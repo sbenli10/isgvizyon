@@ -71,6 +71,7 @@ import { getBulkCompanyPreviewKey, getParsedEmployeePreviewKey } from "@/lib/com
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { usePersistentDraft } from "@/hooks/usePersistentDraft";
 import { uploadFileOptimized } from "@/lib/storageHelper";
+import { ensureCompanyArchiveStructure } from "@/lib/companyArchive";
 
 interface NACEVirtualListProps {
   items: NACECode[];
@@ -1125,6 +1126,10 @@ export default function CompanyManager() {
           const result = data as { success: boolean; error?: string };
           if (!result?.success) throw new Error(result?.error || "Kayıt başarısız");
 
+          if (typeof result?.company_id === "string" && result.company_id) {
+            await ensureCompanyArchiveStructure(result.company_id);
+          }
+
           successCount += 1;
         } catch (error) {
           console.error("Bulk company import row failed:", row.company_name, error);
@@ -1376,6 +1381,15 @@ export default function CompanyManager() {
         if (extendedUpdateError) throw extendedUpdateError;
       }
 
+      if (result.company_id) {
+        try {
+          await ensureCompanyArchiveStructure(result.company_id);
+        } catch (archiveError) {
+          console.error("Company archive bootstrap failed:", archiveError);
+          toast.warning("Firma kaydedildi, ancak otomatik arşiv klasörleri oluşturulurken bir sorun oluştu.");
+        }
+      }
+
       let insertedEmployeesCount = result.inserted_employees || 0;
       if (result.company_id && employeesJson.length > 0) {
         const employeesToInsert = employeesJson.map((employee) => ({
@@ -1575,6 +1589,16 @@ export default function CompanyManager() {
               <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/80">1. Adım · Temel Bilgiler</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">
                 Firma ünvanı, NACE, tehlike sınıfı ve iletişim kanallarını girerek kurumsal kaydın temel omurgasını oluşturun.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-100/80">Otomatik Firma Arşivi</p>
+              <p className="mt-2 text-sm leading-6 text-slate-200">
+                Yeni firma kaydedildiğinde sistem bu firmaya özel bir arşiv klasörü oluşturur. Varsayılan olarak
+                <span className="font-medium text-emerald-100"> Analizler</span>,
+                <span className="font-medium text-emerald-100"> Belgeler</span>,
+                <span className="font-medium text-emerald-100"> Fotoğraflar</span> ve
+                <span className="font-medium text-emerald-100"> Bilgiler</span> klasörleri hazır gelir.
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-4">
