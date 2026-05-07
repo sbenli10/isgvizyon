@@ -214,7 +214,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
-  const { plan, status, isPaidPlan } = useSubscription();
+  const { plan, status, isPaidPlan, daysLeftInTrial } = useSubscription();
   const {
     canViewAnalytics,
     canViewAutomation,
@@ -423,7 +423,14 @@ export function AppSidebar() {
   const totalVisibleItems = filteredMenuGroups.reduce((sum, group) => {
     return sum + group.items.reduce((count, item) => count + 1 + (item.children?.length ?? 0), 0);
   }, 0);
-  const membershipLabel = plan === "osgb" ? "OSGB" : plan === "premium" ? "Premium" : null;
+  const membershipLabel =
+    status === "trial"
+      ? `Demo · ${daysLeftInTrial}g`
+      : plan === "osgb"
+        ? "OSGB"
+        : plan === "premium"
+          ? "Premium"
+          : null;
 
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -502,7 +509,7 @@ export function AppSidebar() {
           {!collapsed && (
             <>
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {isPaidPlan && status !== "past_due" && membershipLabel && (
+                {(isPaidPlan || status === "trial") && status !== "past_due" && membershipLabel && (
                   <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
                     <Sparkles className="h-3.5 w-3.5" />
                     {membershipLabel}

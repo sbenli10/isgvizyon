@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { backfillMyFeatureUsage, openBillingPortal, startPlanCheckout, startPremiumTrial } from "@/lib/billing";
@@ -286,7 +287,7 @@ function getPlanDisplayPrice(entry: BillingCatalogPlan) {
 
 export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: UpgradeModalProps) {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const {
     plan,
     status,
@@ -304,6 +305,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const canManageOrganizationBilling = hasOrganization && isOrganizationAdmin;
   const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
   const canPurchaseOsgb = hasOrganization && isOrganizationAdmin;
+  const canStartTrialCta = canStartTrial || (!hasOrganization && plan === "free" && status === "free");
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
@@ -377,6 +379,33 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
       await refetch();
       toast.success("7 günlük premium deneme başlatıldı", {
         description: "Tüm premium özellikleri bu süre boyunca deneyebilirsiniz.",
+      });
+    });
+
+  const handleRealTrialStart = () =>
+    runAction("trial", async () => {
+      if (!hasOrganization) {
+        const workspaceName = `${profile?.full_name?.trim() || user?.email?.split("@")[0] || "Kisisel"} Calisma Alani`;
+        const { error: bootstrapError } = await (supabase as any).rpc("create_workspace_organization", {
+          p_name: workspaceName,
+          p_industry: null,
+          p_city: null,
+          p_phone: null,
+          p_website: null,
+        });
+
+        if (bootstrapError) {
+          throw new Error(bootstrapError.message || "Demo uyeligi icin kisisel organizasyon olusturulamadi.");
+        }
+
+        await refreshProfile();
+      }
+
+      await startPremiumTrial();
+      await refreshProfile();
+      await refetch();
+      toast.success("7 gunluk premium deneme baslatildi", {
+        description: "Tum premium ozellikleri bu sure boyunca deneyebilirsiniz.",
       });
     });
 
@@ -564,7 +593,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
 
                     <div className="mt-5 space-y-3 rounded-[22px] border border-white/10 bg-slate-950/45 p-4">
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Kimler icin</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">En uygun kullanici tipi</p>
                         <p className="mt-1 text-sm font-medium text-white">{presentation.audience}</p>
                       </div>
                       <div>
@@ -572,7 +601,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                         <p className="mt-1 text-sm text-slate-300">{presentation.eligibility}</p>
                       </div>
                       <div>
-                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Neyi aciyor</p>
+                        <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Acilan ana moduller</p>
                         <p className="mt-1 text-sm text-slate-300">{presentation.usageModel}</p>
                       </div>
                       <div className="space-y-2">
@@ -652,6 +681,12 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                   Demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin sunulur. OSGB modulu demo kapsaminda degildir; OSGB icin organizasyon kaydi ve ilgili plan secimi gerekir.
                 </p>
               </div>
+              <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-100">
+                <p className="font-semibold text-amber-50">7 gunluk demo bilgisi</p>
+                <p className="mt-2 leading-6">
+                  Demo yalnizca <span className="font-semibold text-white">{trialPackageLabel}</span> icin sunulur. OSGB modulu demo kapsaminda degildir; OSGB icin organizasyon kaydi ve ilgili plan secimi gerekir.
+                </p>
+              </div>
               <div className="mt-4 space-y-3">
                 {premiumOnlyOrExpanded.slice(0, 6).map((feature) => {
                   const Icon = feature.icon;
@@ -690,13 +725,26 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
             <div className="rounded-[28px] border border-white/10 bg-white/5 p-5">
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-fuchsia-300/80">Hızlı işlemler</p>
               <div className="mt-4 space-y-3">
-                {canStartTrial && (
+                {canStartTrialCta && (
                   <Button
-                    onClick={() => void handleTrialStart()}
+                    onClick={() => void handleRealTrialStart()}
                     disabled={loadingAction !== null || !canPurchasePremium}
                     className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400"
                   >
                     {loadingAction === "trial" ? "Başlatılıyor..." : "7 günlük premium denemeyi başlat"}
+                  </Button>
+                )}
+
+                {!canStartTrialCta && (
+                  <Button
+                    disabled
+                    className="w-full bg-slate-800 text-slate-300 hover:bg-slate-800"
+                  >
+                    {status === "trial"
+                      ? "Demo uyeligi zaten aktif"
+                      : plan === "premium" || plan === "osgb"
+                        ? "Mevcut uyelikte demo acilamaz"
+                        : "Demo hakki kullanilmis"}
                   </Button>
                 )}
 
