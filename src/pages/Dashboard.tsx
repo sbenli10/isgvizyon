@@ -202,6 +202,8 @@ export default function Dashboard() {
   const hasHydratedFromCache = useRef(false);
   const isFetching = useRef(false);
   const hasPremiumAccess = status === "trial" || plan === "premium";
+  const isTrialActive = status === "trial";
+  const isPremiumMember = plan === "premium";
 
   const applySnapshot = useCallback((snapshot: DashboardSnapshot) => {
     setOrgId(snapshot.orgId);
@@ -500,11 +502,7 @@ export default function Dashboard() {
             >
               {startingTrial
                 ? "Premium deneme başlatılıyor..."
-                : status === "trial"
-                  ? `Premium demo aktif · ${daysLeftInTrial} gün`
-                  : plan === "premium"
-                    ? "Premium üyelik zaten aktif"
-                    : "7 günlük premium denemeyi başlat"}
+                : "7 günlük premium denemeyi başlat"}
             </Button>
             <Button
               onClick={() => navigate("/profile?tab=workspace&action=create")}
@@ -671,35 +669,55 @@ export default function Dashboard() {
     <div className="space-y-8 notranslate" translate="no">
       {!profile?.organization_id && hasPremiumAccess && (
         <RevealBlock disabled={reduceMotion}>
-          <section className="rounded-[24px] border border-emerald-400/20 bg-[linear-gradient(135deg,rgba(6,78,59,0.24),rgba(15,23,42,0.92))] p-4 shadow-[0_16px_48px_rgba(4,120,87,0.18)] md:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="space-y-2">
+          <section className="relative overflow-hidden rounded-[26px] border border-emerald-400/18 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_34%),radial-gradient(circle_at_82%_18%,_rgba(34,211,238,0.14),_transparent_28%),linear-gradient(145deg,rgba(5,10,22,0.98),rgba(12,20,36,0.94))] p-5 shadow-[0_20px_60px_rgba(6,95,70,0.22)] md:p-6">
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.05)_48%,transparent_100%)] opacity-70" />
+            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+              <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-100">
-                    {status === "trial" ? `Premium demo aktif · ${daysLeftInTrial} gün` : "Premium üyelik aktif"}
+                  <Badge className="border-emerald-400/20 bg-emerald-400/12 px-3 py-1 text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,0.14)]">
+                    {isTrialActive ? `Premium demo aktif · ${daysLeftInTrial} gün` : "Premium üyelik aktif"}
                   </Badge>
-                  <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
+                  <Badge variant="outline" className="border-white/10 bg-white/5 px-3 py-1 text-slate-200">
                     Bireysel kullanım modu
                   </Badge>
                 </div>
-                <h2 className="text-xl font-semibold tracking-[-0.03em] text-white">Premium araçlarınız hazır</h2>
-                <p className="max-w-3xl text-sm leading-6 text-slate-300">
-                  AI analiz, raporlama ve premium üretim ekranları bireysel hesabınızda aktif. Sadece OSGB, ekip yönetimi ve finans operasyonları için organizasyon kaydı gerekir.
+                <div className="space-y-2">
+                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-white md:text-2xl">Premium araç setiniz aktif</h2>
+                  <p className="max-w-3xl text-sm leading-6 text-slate-300">
+                    AI analiz, raporlama ve premium üretim ekranları bireysel hesabınızda açık. Organizasyon kurmadan kişisel premium akışlarını kullanabilirsiniz; sadece OSGB, ekip yönetimi ve finans operasyonları için organizasyon gerekir.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Erişim Türü</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{isTrialActive ? "Premium Demo" : "Premium Üyelik"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Kalan Süre</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{isTrialActive ? `${daysLeftInTrial} gün` : "Süre kısıtı yok"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Açık Modüller</p>
+                    <p className="mt-2 text-sm font-semibold text-white">{isPremiumMember ? "Premium üretim araçları" : "AI, raporlama ve premium akışlar"}</p>
+                  </div>
+                </div>
+                <p className="text-xs leading-5 text-slate-400">
+                  Trial sürecinde Premium üyeliğin açtığı tüm bireysel modüller kullanılabilir. OSGB modülü ve kurumsal finans ekranları bu kapsamın dışındadır.
                 </p>
               </div>
-              <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col gap-3 xl:min-w-[320px]">
                 <Button
                   onClick={() => navigate("/settings?tab=billing&upgrade=1")}
-                  className="bg-white text-slate-950 hover:bg-slate-100"
+                  className="h-11 bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 shadow-[0_14px_32px_rgba(34,211,238,0.22)] hover:from-emerald-300 hover:to-cyan-300"
                 >
                   Premium avantajlarını yönet
                 </Button>
                 <Button
                   variant="outline"
                   onClick={() => navigate("/profile?tab=workspace&action=create")}
-                  className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
+                  className="h-11 border-white/10 bg-white/5 text-slate-100 hover:border-emerald-300/30 hover:bg-white/10"
                 >
-                  Organizasyon Oluştur
+                  OSGB için organizasyon oluştur
                 </Button>
               </div>
             </div>

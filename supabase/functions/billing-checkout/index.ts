@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
@@ -55,7 +56,7 @@ function slugifyValue(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
-async function ensurePersonalBillingOrganization(adminClient: any, profile: CheckoutProfile) {
+async function ensurePersonalBillingOrganization(adminClient: SupabaseClient, profile: CheckoutProfile) {
   if (profile.organization_id) {
     return profile;
   }
