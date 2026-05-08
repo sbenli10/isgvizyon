@@ -30,13 +30,11 @@ import {
   HeartPulse,
   Search,
   CircleHelp,
-  Sparkles,
-  Activity,
-  Command,
   PanelLeftClose,
   PanelLeftOpen,
   Link2,
   Globe2,
+  Star,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -47,7 +45,6 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
-import { useSubscription } from "@/hooks/useSubscription";
 import {
   Sidebar,
   SidebarContent,
@@ -60,10 +57,6 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-
-// ====================================================
-// TYPES
-// ====================================================
 
 interface MenuItem {
   title: string;
@@ -79,94 +72,83 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-// ====================================================
-// PREMIUM CARD SIDEBAR STYLES (theme-safe)
-// ====================================================
-
-const badgeClassNames = (badge: MenuItem["badge"]) => {
-  if (badge === "AI")
-    return "border-fuchsia-500/35 bg-fuchsia-500/16 text-fuchsia-900 dark:text-fuchsia-100";
-  if (badge === "Pro")
-    return "border-amber-500/30 bg-amber-500/12 text-amber-900 dark:text-amber-200";
-  if (badge === "Beta")
-    return "border-sky-500/30 bg-sky-500/12 text-sky-900 dark:text-sky-200";
-  if (badge === "NEW")
-    return "border-emerald-500/30 bg-emerald-500/12 text-emerald-900 dark:text-emerald-200";
-  if (typeof badge === "number")
-    return "border-yellow-500/30 bg-yellow-500/12 text-yellow-950 dark:text-yellow-200";
-  return "border-border/60 bg-muted/35 text-muted-foreground";
-};
-
-const cardShell = cn(
-  "rounded-[28px] border border-sidebar-border/80 bg-sidebar/95 text-sidebar-foreground backdrop-blur-xl",
-  "ring-1 ring-black/5 dark:ring-white/5",
-  "shadow-[0_18px_54px_-40px_rgba(15,23,42,0.18)] dark:shadow-[0_20px_64px_-42px_rgba(0,0,0,0.52)]",
+const sidebarShell = cn(
+  "rounded-[28px] border border-slate-200/80 bg-white/95 text-slate-900 backdrop-blur-2xl",
+  "shadow-[0_20px_60px_-40px_rgba(15,23,42,0.32)]",
+  "dark:border-white/10 dark:bg-[#071426]/95 dark:text-slate-100",
+  "dark:shadow-[0_20px_60px_-36px_rgba(2,12,27,0.95)]",
 );
 
-const cardInnerGlow = cn(
-  // light
-  "bg-[radial-gradient(700px_circle_at_10%_0%,_hsl(var(--primary)/0.05),_transparent_34%),radial-gradient(520px_circle_at_82%_8%,_hsl(var(--primary)/0.04),_transparent_30%)]",
-  // dark
-  "dark:bg-[radial-gradient(700px_circle_at_10%_0%,_hsl(var(--primary)/0.10),_transparent_34%),radial-gradient(520px_circle_at_82%_8%,_hsl(var(--primary)/0.06),_transparent_30%)]",
+const sidebarGlow = cn(
+  "bg-[radial-gradient(760px_circle_at_0%_0%,rgba(14,165,233,0.12),transparent_34%),radial-gradient(560px_circle_at_100%_8%,rgba(20,184,166,0.10),transparent_30%)]",
+  "dark:bg-[radial-gradient(700px_circle_at_0%_0%,rgba(34,211,238,0.10),transparent_34%),radial-gradient(540px_circle_at_100%_8%,rgba(45,212,191,0.08),transparent_28%)]",
 );
 
 const sectionLabel =
-  "mb-1 flex items-center justify-between px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/90";
+  "mb-1 mt-2 flex w-full items-center justify-between px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500/80 transition-colors hover:text-slate-700 dark:text-slate-400/75 dark:hover:text-slate-300";
 
-// ✅ items-start: 2 satıra kırılınca ikon yukarı hizalı kalsın
 const menuItemBase =
-  "group relative flex h-auto min-h-[3.5rem] w-full items-center gap-3 overflow-visible rounded-[18px] px-3 py-2.5 text-[13px] font-medium transition-all duration-200";
+  "group relative flex min-h-10 w-full items-center gap-2.5 rounded-xl px-3 py-1.5 text-[12.75px] font-medium leading-tight transition-all duration-150";
 
-const menuItemIdle = cn(
-  "text-foreground hover:bg-muted/55 hover:text-foreground",
-  "hover:shadow-[0_8px_20px_-18px_rgba(15,23,42,0.20)]",
-  "dark:text-white dark:hover:bg-muted/34 dark:hover:shadow-[0_10px_24px_-20px_rgba(0,0,0,0.34)]",
-);
+const menuItemIdle =
+  "text-slate-700 hover:bg-slate-100/80 hover:text-slate-950 active:bg-slate-100 dark:text-slate-100/88 dark:hover:bg-white/5 dark:hover:text-white dark:active:bg-white/8";
 
 const menuItemActive = cn(
-  "border border-primary/18 bg-[linear-gradient(90deg,hsl(var(--primary)/0.94),hsl(var(--primary)/0.76))]",
-  "text-primary-foreground shadow-[0_10px_24px_-18px_hsl(var(--primary)/0.42)]",
-  "dark:border-primary/18 dark:bg-[linear-gradient(90deg,hsl(var(--primary)/0.94),hsl(var(--primary)/0.76))]",
+  "bg-gradient-to-r from-cyan-500/10 via-teal-500/8 to-blue-500/10 text-[#067f7f] ring-1 ring-cyan-500/20",
+  "shadow-[inset_3px_0_0_rgba(6,182,212,0.78)]",
+  "dark:from-cyan-400/10 dark:via-teal-400/8 dark:to-blue-400/10 dark:text-cyan-100 dark:ring-cyan-300/15",
 );
 
-// İKON KUTUSU: daha büyük + daha görünür (renk ikona verilecek)
-const iconWrapBase = 
-  "relative flex h-9 w-9 min-w-9 basis-9 shrink-0 items-center justify-center overflow-visible rounded-[12px] border transition-all duration-200";
+const submenuItemBase =
+  "group relative flex min-h-9 w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-[12.5px] font-medium leading-tight transition-all duration-150";
 
-const iconWrapIdle = cn(
-  "border-sidebar-border/75 bg-background/72",
-  "shadow-none group-hover:border-primary/40 group-hover:bg-background/92",
-  "dark:border-white/12 dark:bg-white/8"
-);
+const subtleLine =
+  "absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-gradient-to-b from-cyan-400 via-teal-400 to-blue-500 opacity-0 transition-opacity duration-150";
 
-const iconWrapActive = cn(
-  "border-white/15 bg-white/10",
-  "shadow-none",
-  "dark:bg-white/10",
-);
+const subtleLineActive = "opacity-100";
 
-const leftAccent =
-  "absolute right-2 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-white/80 opacity-0 transition-opacity";
-const leftAccentActive = "opacity-100";
-
-const surfacePanel = cn(
-  "rounded-[18px] border border-sidebar-border/70 bg-background/60 backdrop-blur-xl",
-  "shadow-[0_6px_16px_-14px_rgba(15,23,42,0.10)] dark:shadow-[0_8px_18px_-16px_rgba(0,0,0,0.24)]",
+const actionButton = cn(
+  "flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-all duration-150",
+  "hover:bg-slate-100 hover:text-slate-900",
+  "dark:text-slate-400 dark:hover:bg-white/6 dark:hover:text-white",
 );
 
 const collapsedUtilityButton = cn(
-  "flex h-11 w-11 items-center justify-center rounded-[18px] border border-sidebar-border/80 bg-background/70",
-  "text-foreground/80 shadow-[0_12px_24px_-20px_rgba(15,23,42,0.28)] backdrop-blur-xl transition",
-  "hover:border-primary/30 hover:bg-background hover:text-foreground",
-  "dark:text-foreground/85 dark:shadow-[0_12px_24px_-18px_rgba(0,0,0,0.58)]",
+  "flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/70 text-slate-600 transition",
+  "hover:bg-slate-100 hover:text-slate-950",
+  "dark:border-white/10 dark:bg-white/[0.04] dark:text-slate-300 dark:hover:bg-white/[0.08] dark:hover:text-white",
 );
 
-function PillBadge({ value, active }: { value: string | number; active: boolean }) {
+const badgeClassNames = (badge: MenuItem["badge"]) => {
+  if (badge === "AI") {
+    return "border border-fuchsia-500/20 bg-fuchsia-500/10 text-fuchsia-700 dark:border-fuchsia-400/25 dark:bg-fuchsia-500/14 dark:text-fuchsia-200";
+  }
+
+  if (badge === "NEW") {
+    return "border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-500/12 dark:text-emerald-200";
+  }
+
+  if (badge === "Beta") {
+    return "border border-sky-500/20 bg-sky-500/10 text-sky-700 dark:border-sky-400/25 dark:bg-sky-500/14 dark:text-sky-200";
+  }
+
+  if (badge === "Pro") {
+    return "border border-amber-500/25 bg-amber-500/10 text-amber-700 dark:border-amber-400/25 dark:bg-amber-500/14 dark:text-amber-200";
+  }
+
+  if (typeof badge === "number") {
+    return "border border-indigo-500/20 bg-indigo-500/10 text-indigo-700 dark:border-indigo-400/20 dark:bg-indigo-500/12 dark:text-indigo-100";
+  }
+
+  return "border border-slate-200/80 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/8 dark:text-slate-200";
+};
+
+function PillBadge({ value }: { value: string | number }) {
   return (
     <span
       className={cn(
-        "ml-auto mt-0.5 rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none",
-        active ? "border-primary/30 bg-primary/12 text-primary" : badgeClassNames(value),
+        "ml-auto rounded-md px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.06em]",
+        badgeClassNames(value),
       )}
     >
       {value}
@@ -174,52 +156,56 @@ function PillBadge({ value, active }: { value: string | number; active: boolean 
   );
 }
 
-// İkonları görünür yapmak için TEK kaynak: ikonun kendi class’ı
-function MenuIcon({ Icon, active }: { Icon: React.ComponentType<{ className?: string }>; active: boolean }) {
+const getItemAccent = (item: MenuItem) => {
+  const map: Array<[RegExp, string]> = [
+    [/(bot|otomasyon|yapay zeka|ai|analizi|sorgulama)/i, "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-400 dark:group-hover:text-cyan-300"],
+    [/(risk|kkd|iş kazası|güvenlik)/i, "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400 dark:group-hover:text-emerald-300"],
+    [/(döf|kurul|doküman|belge|sertifika|form|talimat|muayene)/i, "text-violet-600 group-hover:text-violet-700 dark:text-violet-400 dark:group-hover:text-violet-300"],
+    [/(acil|tahliye|kroki|plan)/i, "text-amber-600 group-hover:text-amber-700 dark:text-amber-400 dark:group-hover:text-amber-300"],
+    [/(osgb|firma|çalışan|ziyaret|programı|atama|arşiv|iş ilan)/i, "text-teal-600 group-hover:text-teal-700 dark:text-teal-400 dark:group-hover:text-teal-300"],
+    [/(profil|panel|dashboard)/i, "text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300"],
+    [/(nace|rapor|raporları)/i, "text-fuchsia-600 group-hover:text-fuchsia-700 dark:text-fuchsia-400 dark:group-hover:text-fuchsia-300"],
+  ];
+
+  const match = map.find(([regex]) => regex.test(item.title) || regex.test(item.url));
+  return match?.[1] ?? "text-slate-500 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-white";
+};
+
+function MenuIcon({ item, active }: { item: MenuItem; active: boolean }) {
+  const Icon = item.icon;
+
   return (
     <Icon
       className={cn(
-        "relative z-20 h-6 w-6 stroke-[2.5] transition-all duration-200",
-        active
-          ? "scale-110 text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)] dark:text-white"
-          : "text-foreground dark:text-white"
+        "h-[17px] w-[17px] shrink-0 stroke-[1.9] transition-colors duration-150",
+        active ? "text-[#067f7f] dark:text-cyan-100" : getItemAccent(item),
       )}
     />
   );
 }
 
-function SubMenuIcon({
-  Icon,
-  active,
-}: {
-  Icon: React.ComponentType<{ className?: string }>;
-  active: boolean;
-}) {
+function SubMenuIcon({ item, active }: { item: MenuItem; active: boolean }) {
+  const Icon = item.icon;
+
   return (
     <Icon
       className={cn(
-        "mt-0.5 h-[18px] w-[18px] stroke-[2.25]",
-        active ? "text-primary" : "text-foreground/80 dark:text-white/90",
+        "h-4 w-4 shrink-0 stroke-[1.85] transition-colors duration-150",
+        active ? "text-[#067f7f] dark:text-cyan-100" : getItemAccent(item),
       )}
     />
   );
 }
-
-// ====================================================
-// COMPONENT
-// ====================================================
 
 export function AppSidebar() {
   const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
-  const { plan, status, isPaidPlan, daysLeftInTrial } = useSubscription();
   const {
     canViewAnalytics,
     canViewAutomation,
     canViewCompanyHub,
-    canViewDashboard,
     canViewDocuments,
     canViewFinance,
     canViewKatip,
@@ -232,11 +218,27 @@ export function AppSidebar() {
   const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>(["OSGB Modülü"]);
   const [draftMeetingsCount, setDraftMeetingsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [favoriteUrls, setFavoriteUrls] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+
+    try {
+      const stored = window.localStorage.getItem("app-sidebar-favorites");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   useEffect(() => {
     if (user) void fetchDraftMeetingsCount();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("app-sidebar-favorites", JSON.stringify(favoriteUrls));
+  }, [favoriteUrls]);
 
   const fetchDraftMeetingsCount = async () => {
     if (!user) return;
@@ -257,7 +259,7 @@ export function AppSidebar() {
     () => [
       {
         label: "Sık Kullanılanlar",
-        icon: Sparkles,
+        icon: Star,
         items: [
           { title: "Risk Sihirbazı", url: "/risk-wizard", icon: TrendingUp, badge: "AI" },
           { title: "Acil Durum Planı", url: "/adep-wizard", icon: Flame, badge: null },
@@ -294,30 +296,50 @@ export function AppSidebar() {
         items: [
           { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
           { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
-              { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
-              { title: "Sağlık Gözetimi", url: "/health-surveillance", icon: HeartPulse, badge: "NEW" },
-              {
-                title: "OSGB Modülü",
-                url: "/osgb",
-                icon: Briefcase,
-                badge: "NEW",
-                children: [
-                  { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
-                  { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null },
-                  canViewCompanyHub ? { title: "Firma Havuzu", url: "/osgb/company-tracking", icon: Building2, badge: null } : null,
-                  canViewPeople ? { title: "Personel ve Atamalar", url: "/osgb/assignments", icon: Briefcase, badge: null } : null,
-                  canViewPeople ? { title: "Dakika ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null } : null,
-                  canViewPeople ? { title: "Saha Operasyonu", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" } : null,
-                  canViewDocuments ? { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null } : null,
-                  canViewFinance ? { title: "Finans ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null } : null,
-                  canViewAutomation ? { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" } : null,
-                  canViewKatip ? { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" } : null,
-                  canViewPortal ? { title: "Müşteri Portalı", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" } : null,
-                  canViewAnalytics ? { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null } : null,
-                ].filter((item): item is NonNullable<typeof item> => item !== null),
-              },
-            ],
+          { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
+          { title: "Sağlık Gözetimi", url: "/health-surveillance", icon: HeartPulse, badge: "NEW" },
+          {
+            title: "OSGB Modülü",
+            url: "/osgb",
+            icon: Briefcase,
+            badge: "NEW",
+            children: [
+              { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
+              { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null },
+              canViewCompanyHub
+                ? { title: "Firma Havuzu", url: "/osgb/company-tracking", icon: Building2, badge: null }
+                : null,
+              canViewPeople
+                ? { title: "Personel ve Atamalar", url: "/osgb/assignments", icon: Briefcase, badge: null }
+                : null,
+              canViewPeople
+                ? { title: "Dakika ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null }
+                : null,
+              canViewPeople
+                ? { title: "Saha Operasyonu", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" }
+                : null,
+              canViewDocuments
+                ? { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null }
+                : null,
+              canViewFinance
+                ? { title: "Finans ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null }
+                : null,
+              canViewAutomation
+                ? { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" }
+                : null,
+              canViewKatip
+                ? { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" }
+                : null,
+              canViewPortal
+                ? { title: "Müşteri Portalı", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" }
+                : null,
+              canViewAnalytics
+                ? { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null }
+                : null,
+            ].filter((item): item is NonNullable<typeof item> => item !== null),
           },
+        ],
+      },
       {
         label: "Belge Yönetimi",
         icon: Award,
@@ -380,7 +402,9 @@ export function AppSidebar() {
 
   const toggleSubmenu = (label: string) => {
     if (collapsed) return;
-    setExpandedSubmenus((prev) => (prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label]));
+    setExpandedSubmenus((prev) =>
+      prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
+    );
   };
 
   const isSubmenuOpen = (item: MenuItem) => {
@@ -395,10 +419,34 @@ export function AppSidebar() {
 
   const normalizedSearch = searchQuery.trim().toLocaleLowerCase("tr-TR");
 
-  const filteredMenuGroups = useMemo(() => {
-    if (!normalizedSearch) return menuGroups;
+  const flatMenuItems = useMemo(() => {
+    return menuGroups.flatMap((group) =>
+      group.items.flatMap((item) => (item.children?.length ? [item, ...item.children] : [item])),
+    );
+  }, [menuGroups]);
 
-    return menuGroups
+  const favoriteItems = useMemo(() => {
+    return favoriteUrls
+      .map((url) => flatMenuItems.find((item) => item.url === url))
+      .filter((item): item is MenuItem => Boolean(item));
+  }, [favoriteUrls, flatMenuItems]);
+
+  const menuGroupsWithFavorites = useMemo(() => {
+    return menuGroups.map((group) => {
+      if (group.label !== "Sık Kullanılanlar") return group;
+
+      const defaultItems = group.items.filter((item) => !favoriteUrls.includes(item.url));
+      return {
+        ...group,
+        items: [...favoriteItems, ...defaultItems],
+      };
+    });
+  }, [favoriteItems, favoriteUrls, menuGroups]);
+
+  const filteredMenuGroups = useMemo(() => {
+    if (!normalizedSearch) return menuGroupsWithFavorites;
+
+    return menuGroupsWithFavorites
       .map((group) => {
         const matchesGroup = group.label.toLocaleLowerCase("tr-TR").includes(normalizedSearch);
 
@@ -418,19 +466,27 @@ export function AppSidebar() {
         return items.length ? { ...group, items } : null;
       })
       .filter((g): g is MenuGroup => g !== null);
-  }, [menuGroups, normalizedSearch]);
+  }, [menuGroupsWithFavorites, normalizedSearch]);
 
-  const totalVisibleItems = filteredMenuGroups.reduce((sum, group) => {
-    return sum + group.items.reduce((count, item) => count + 1 + (item.children?.length ?? 0), 0);
-  }, 0);
-  const membershipLabel =
-    status === "trial"
-      ? `Demo · ${daysLeftInTrial}g`
-      : plan === "osgb"
-        ? "OSGB"
-        : plan === "premium"
-          ? "Premium"
-          : null;
+  const displayGroups = filteredMenuGroups;
+
+  const isFavorite = (url: string) => favoriteUrls.includes(url);
+
+  const toggleFavorite = (event: React.MouseEvent, item: MenuItem) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setFavoriteUrls((prev) =>
+      prev.includes(item.url) ? prev.filter((url) => url !== item.url) : [item.url, ...prev].slice(0, 8),
+    );
+  };
+
+  const toggleGroup = (label: string) => {
+    if (collapsed || normalizedSearch) return;
+    setCollapsedGroups((prev) =>
+      prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
+    );
+  };
 
   const closeMobileSidebar = () => {
     if (isMobile) {
@@ -445,274 +501,265 @@ export function AppSidebar() {
       style={
         {
           "--sidebar-width": "18rem",
-          "--sidebar-width-icon": "5.5rem",
+          "--sidebar-width-icon": "4.65rem",
         } as React.CSSProperties
       }
       className={cn("top-0 z-[60] h-screen bg-transparent p-0 md:p-4")}
     >
       <div
         className={cn(
-          cardShell,
-          cardInnerGlow,
+          sidebarShell,
+          sidebarGlow,
           "flex h-full min-h-0 flex-col overflow-hidden",
           isMobile &&
-            "rounded-none border-0 bg-sidebar text-sidebar-foreground ring-0 shadow-none backdrop-blur-none dark:bg-sidebar",
+            "rounded-none border-0 bg-white ring-0 shadow-none backdrop-blur-none dark:bg-[#071426]",
         )}
       >
         {collapsed && (
-          <div className="flex items-center justify-center border-b border-sidebar-border/80 px-2 py-3">
-            <button onClick={toggleSidebar} className={collapsedUtilityButton} title="Menüyü genişlet" type="button">
-              <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" />
-            </button>
+          <div className="border-b border-slate-200/80 px-2.5 py-3 dark:border-white/8">
+            <div className="flex items-center justify-center">
+              <button
+                onClick={toggleSidebar}
+                className={collapsedUtilityButton}
+                title="Menüyü genişlet"
+                type="button"
+              >
+                <PanelLeftOpen className="h-4 w-4 stroke-[1.9]" />
+              </button>
+            </div>
           </div>
         )}
 
-        {/* HEADER */}
-        <SidebarHeader className={cn("border-b border-sidebar-border/70 px-3 py-3", collapsed && "hidden")}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <div className={cn(surfacePanel, "flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] p-1")}>
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 text-white">
-                  <Shield className="h-3.5 w-3.5 stroke-[2.2]" />
-                </div>
-              </div>
-
-              {!collapsed && (
-                <div className="min-w-0">
-                  <div className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-                    İSGVİZYON
-                  </div>
-                  <div className="text-sm font-semibold text-sidebar-foreground">Operasyon Merkezi</div>
-                  <div className="text-[11px] text-muted-foreground">Hızlı erişim ve görev takibi</div>
-                </div>
-              )}
+        <SidebarHeader className={cn("border-b border-slate-200/80 px-3 py-3 dark:border-white/8", collapsed && "hidden")}>
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 stroke-[1.9] text-slate-400 dark:text-slate-500" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Menüde ara..."
+                className={cn(
+                  "h-9 rounded-xl border border-slate-200/80 bg-white/75 pl-8 pr-3 text-[12.5px] text-slate-900 shadow-none",
+                  "placeholder:text-slate-400 hover:bg-slate-50 focus-visible:border-cyan-500/25 focus-visible:ring-1 focus-visible:ring-cyan-500/20",
+                  "dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:bg-white/[0.05] dark:focus-visible:border-cyan-400/20 dark:focus-visible:ring-cyan-400/20",
+                )}
+              />
             </div>
 
             <button
               onClick={toggleSidebar}
-              className={cn(
-                surfacePanel,
-                "flex h-10 w-10 items-center justify-center rounded-2xl text-muted-foreground transition",
-                "hover:bg-muted/55 hover:text-sidebar-foreground",
-              )}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/70 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400 dark:hover:bg-white/[0.06] dark:hover:text-white"
               title={collapsed ? "Menüyü aç" : "Menüyü daralt"}
               type="button"
             >
               {collapsed ? (
-                <PanelLeftOpen className="h-5 w-5 stroke-[2.2]" />
+                <PanelLeftOpen className="h-4 w-4 stroke-[1.9]" />
               ) : (
-                <PanelLeftClose className="h-5 w-5 stroke-[2.2]" />
+                <PanelLeftClose className="h-4 w-4 stroke-[1.9]" />
               )}
             </button>
           </div>
-
-          {!collapsed && (
-            <>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {(isPaidPlan || status === "trial") && status !== "past_due" && membershipLabel && (
-                  <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-200">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    {membershipLabel}
-                  </div>
-                )}
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Hazır
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <div className={cn(surfacePanel, "p-3")}>
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    <Activity className="h-3.5 w-3.5" />
-                    Görünen
-                  </div>
-                  <div className="mt-1.5 text-2xl font-semibold text-sidebar-foreground">{totalVisibleItems}</div>
-                  <div className="text-[11px] text-muted-foreground">aktif menü</div>
-                </div>
-                <div className={cn(surfacePanel, "p-3")}>
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    <Command className="h-3.5 w-3.5" />
-                    Durum
-                  </div>
-                  <div className="mt-1.5 text-sm font-semibold text-sidebar-foreground">Hazır</div>
-                  <div className="text-[11px] text-muted-foreground">hızlı erişim</div>
-                </div>
-              </div>
-
-              <div className="relative mt-3">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Menüde ara..."
-                  className={cn(
-                    "h-10 rounded-[16px] border border-sidebar-border/70 bg-background/65 pl-9 text-sm text-sidebar-foreground shadow-none backdrop-blur-xl",
-                    "placeholder:text-muted-foreground",
-                    "hover:border-sidebar-border hover:bg-background/65",
-                    "focus-visible:border-primary/35 focus-visible:ring-2 focus-visible:ring-cyan-400/15 dark:focus-visible:ring-primary/20",
-                  )}
-                />
-              </div>
-            </>
-          )}
         </SidebarHeader>
 
-        {/* CONTENT */}
-        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-1 overscroll-contain [scrollbar-color:hsl(var(--sidebar-border))_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-sidebar-border/70 hover:[&::-webkit-scrollbar-thumb]:bg-sidebar-border">
-          {filteredMenuGroups.map((group) => (
-            <SidebarGroup key={group.label} className="px-1">
-              {!collapsed ? (
-                <div className={sectionLabel}>
-                  <div className="flex items-center gap-2">
-                    <group.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span>{group.label}</span>
-                  </div>
-                  <span className="rounded-full border border-sidebar-border/70 bg-background/65 px-2 py-0.5 text-[10px] font-semibold tracking-normal text-foreground/75 dark:text-white/75">
-                    {group.items.length}
-                  </span>
-                </div>
-              ) : (
-                <div className="my-3 flex justify-center">
-                  <div className="h-8 w-px rounded-full bg-gradient-to-b from-transparent via-sidebar-border to-transparent" />
-                </div>
-              )}
-
-              <SidebarGroupContent>
-                <SidebarMenu className="gap-1.5">
-                  {group.items.map((item) => {
-                    const hasChildren = Boolean(item.children?.length);
-                    const active = isItemActive(item);
-                    const submenuOpen = isSubmenuOpen(item);
-
-                    if (hasChildren) {
-                      return (
-                        <SidebarMenuItem key={item.url}>
-                          <button
-                            type="button"
-                            onClick={() => toggleSubmenu(item.title)}
-                            className={cn(
-                              menuItemBase,
-                              "border border-transparent",
-                              menuItemIdle,
-                              active && menuItemActive,
-                            )}
-                          >
-                            <span className={cn(leftAccent, active && leftAccentActive)} />
-                            <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <MenuIcon Icon={item.icon} active={active} />
-                            </span>
-
-                            {!collapsed && (
-                              <>
-                                <span className="min-w-0 flex-1 whitespace-normal leading-5">{item.title}</span>
-                                {item.badge && <PillBadge value={item.badge} active={active} />}
-
-                                <ChevronDown
-                                  className={cn(
-                                    "ml-1 mt-1 h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ease-out",
-                                    submenuOpen && "rotate-180",
-                                  )}
-                                />
-                              </>
-                            )}
-                          </button>
-
-                          {!collapsed && submenuOpen && (
-                            <div className="ml-6 mt-2 space-y-1 border-l border-sidebar-border/80 pl-4">
-                              {item.children?.map((child) => {
-                                const childActive = isItemActive(child);
-
-                                return (
-                                  <SidebarMenuButton key={child.url} asChild tooltip={child.title}>
-                                    <NavLink
-                                      to={child.url}
-                                      onClick={closeMobileSidebar}
-                                      className={cn(
-                                        "flex h-auto min-h-[3rem] items-start gap-3 overflow-visible rounded-2xl px-3 py-2.5 text-[13px] font-medium transition-colors",
-                                        "text-foreground/80 hover:bg-muted/45 hover:text-foreground",
-                                        "dark:text-foreground/80 dark:hover:bg-muted/30",
-                                        childActive && "bg-primary/10 text-foreground",
-                                      )}
-                                      activeClassName=""
-                                    >
-                                      <SubMenuIcon Icon={child.icon} active={childActive} />
-                                      <span className="min-w-0 flex-1 whitespace-normal leading-5">{child.title}</span>
-                                      {child.badge && <PillBadge value={child.badge} active={childActive} />}
-                                    </NavLink>
-                                  </SidebarMenuButton>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </SidebarMenuItem>
-                      );
-                    }
-
-                    return (
-                      <SidebarMenuItem key={item.url}>
-                        <SidebarMenuButton asChild tooltip={item.title}>
-                          <NavLink
-                            to={item.url}
-                            end={item.url === "/"}
-                            onClick={closeMobileSidebar}
-                            className={cn(
-                              menuItemBase,
-                              "border border-transparent",
-                              menuItemIdle,
-                              active && menuItemActive,
-                            )}
-                            activeClassName=""
-                          >
-                            <span className={cn(leftAccent, active && leftAccentActive)} />
-                            <span className={cn(iconWrapBase, iconWrapIdle, active && iconWrapActive)}>
-                              <MenuIcon Icon={item.icon} active={active} />
-                            </span>
-
-                            {!collapsed && (
-                              <>
-                                <span className="min-w-0 flex-1 whitespace-normal leading-5">{item.title}</span>
-                                {item.badge && <PillBadge value={item.badge} active={active} />}
-                                <ChevronRight className="ml-auto mt-1 h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 group-hover:translate-x-0.5" />
-                              </>
-                            )}
-                          </NavLink>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ))}
-        </SidebarContent>
-
-        {/* FOOTER */}
-        <SidebarFooter className="border-t border-sidebar-border/80 p-3">
-          {!collapsed && user && (
-            <div className={cn("rounded-[18px] border border-sidebar-border/70 bg-background/80 shadow-[0_6px_16px_-14px_rgba(15,23,42,0.12)] dark:bg-background/55 dark:shadow-[0_8px_18px_-16px_rgba(0,0,0,0.24)]", "p-3")}>
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 via-fuchsia-600 to-sky-500 text-sm font-bold text-white">
-                  {user.email ? user.email.charAt(0).toUpperCase() : "U"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-sidebar-foreground">{user.email?.split("@")[0]}</div>
-                  <div className="truncate text-[10px] font-medium text-muted-foreground">{user.email}</div>
-                </div>
-                <div className="h-2 w-2 rounded-full bg-emerald-500" />
-              </div>
+        <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-2 overscroll-contain [scrollbar-color:rgba(148,163,184,0.38)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400/60 dark:[scrollbar-color:rgba(255,255,255,0.14)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-white/10 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+          {!collapsed && normalizedSearch && displayGroups.length === 0 && (
+            <div className="m-2 rounded-xl border border-slate-200/80 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
+              “{searchQuery}” için menü bulunamadı.
             </div>
           )}
 
-          <div className={cn(surfacePanel, "mt-2 flex items-center justify-between gap-1.5 p-2")}>
+          {displayGroups.map((group) => {
+            const groupCollapsed = collapsedGroups.includes(group.label) && !normalizedSearch;
+
+            return (
+              <SidebarGroup key={`${group.label}-${group.items.length}`} className="px-1">
+                {!collapsed ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.label)}
+                    className={sectionLabel}
+                    title={groupCollapsed ? `${group.label} grubunu aç` : `${group.label} grubunu kapat`}
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 stroke-[1.9] transition-transform duration-150",
+                        groupCollapsed && "-rotate-90",
+                      )}
+                    />
+                  </button>
+                ) : (
+                  <div className="my-2 flex justify-center">
+                    <div className="h-5 w-px rounded-full bg-slate-200 dark:bg-white/12" />
+                  </div>
+                )}
+
+                {!groupCollapsed && (
+                  <SidebarGroupContent>
+                    <SidebarMenu className="gap-0.5">
+                      {group.items.map((item) => {
+                        const hasChildren = Boolean(item.children?.length);
+                        const active = isItemActive(item);
+                        const submenuOpen = isSubmenuOpen(item);
+                        const favorite = isFavorite(item.url);
+
+                        if (hasChildren) {
+                          return (
+                            <SidebarMenuItem key={item.url}>
+                              <button
+                                type="button"
+                                onClick={() => toggleSubmenu(item.title)}
+                                className={cn(
+                                  menuItemBase,
+                                  menuItemIdle,
+                                  active && menuItemActive,
+                                  collapsed && "justify-center px-0",
+                                )}
+                              >
+                                <span className={cn(subtleLine, active && subtleLineActive)} />
+                                <MenuIcon item={item} active={active} />
+
+                                {!collapsed && (
+                                  <>
+                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
+                                    <button
+                                      type="button"
+                                      onClick={(event) => toggleFavorite(event, item)}
+                                      className={cn(
+                                        "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
+                                        "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
+                                        favorite && "opacity-100 text-amber-500 dark:text-amber-300",
+                                      )}
+                                      title={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                                    >
+                                      <Star
+                                        className={cn(
+                                          "h-3.5 w-3.5 stroke-[1.9]",
+                                          favorite && "fill-amber-400 dark:fill-amber-300",
+                                        )}
+                                      />
+                                    </button>
+                                    {item.badge && <PillBadge value={item.badge} />}
+                                    <ChevronDown
+                                      className={cn(
+                                        "h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-400 transition-transform duration-150 dark:text-slate-500",
+                                        submenuOpen && "rotate-180 text-slate-600 dark:text-slate-300",
+                                      )}
+                                    />
+                                  </>
+                                )}
+                              </button>
+
+                              {!collapsed && submenuOpen && (
+                                <div className="ml-5 mt-0.5 space-y-0.5 border-l border-slate-200/80 pl-3 dark:border-white/8">
+                                  {item.children?.map((child) => {
+                                    const childActive = isItemActive(child);
+                                    const childFavorite = isFavorite(child.url);
+
+                                    return (
+                                      <SidebarMenuButton key={child.url} asChild tooltip={child.title}>
+                                        <NavLink
+                                          to={child.url}
+                                          onClick={closeMobileSidebar}
+                                          className={cn(
+                                            submenuItemBase,
+                                            "text-slate-600 hover:bg-slate-100/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
+                                            childActive && "bg-cyan-500/10 text-[#067f7f] ring-1 ring-cyan-500/15 dark:bg-white/6 dark:text-cyan-100",
+                                          )}
+                                          activeClassName=""
+                                        >
+                                          <span className={cn(subtleLine, childActive && subtleLineActive)} />
+                                          <SubMenuIcon item={child} active={childActive} />
+                                          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{child.title}</span>
+                                          <button
+                                            type="button"
+                                            onClick={(event) => toggleFavorite(event, child)}
+                                            className={cn(
+                                              "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
+                                              "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
+                                              childFavorite && "opacity-100 text-amber-500 dark:text-amber-300",
+                                            )}
+                                            title={childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                                          >
+                                            <Star
+                                              className={cn(
+                                                "h-3.5 w-3.5 stroke-[1.9]",
+                                                childFavorite && "fill-amber-400 dark:fill-amber-300",
+                                              )}
+                                            />
+                                          </button>
+                                          {child.badge && <PillBadge value={child.badge} />}
+                                        </NavLink>
+                                      </SidebarMenuButton>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </SidebarMenuItem>
+                          );
+                        }
+
+                        return (
+                          <SidebarMenuItem key={item.url}>
+                            <SidebarMenuButton asChild tooltip={item.title}>
+                              <NavLink
+                                to={item.url}
+                                end={item.url === "/"}
+                                onClick={closeMobileSidebar}
+                                className={cn(
+                                  menuItemBase,
+                                  menuItemIdle,
+                                  active && menuItemActive,
+                                  collapsed && "justify-center px-0",
+                                )}
+                                activeClassName=""
+                              >
+                                <span className={cn(subtleLine, active && subtleLineActive)} />
+                                <MenuIcon item={item} active={active} />
+
+                                {!collapsed && (
+                                  <>
+                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
+                                    <button
+                                      type="button"
+                                      onClick={(event) => toggleFavorite(event, item)}
+                                      className={cn(
+                                        "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
+                                        "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
+                                        favorite && "opacity-100 text-amber-500 dark:text-amber-300",
+                                      )}
+                                      title={favorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                                    >
+                                      <Star
+                                        className={cn(
+                                          "h-3.5 w-3.5 stroke-[1.9]",
+                                          favorite && "fill-amber-400 dark:fill-amber-300",
+                                        )}
+                                      />
+                                    </button>
+                                    {item.badge && <PillBadge value={item.badge} />}
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-400 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
+                                  </>
+                                )}
+                              </NavLink>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                )}
+              </SidebarGroup>
+            );
+          })}
+        </SidebarContent>
+
+        <SidebarFooter className="border-t border-slate-200/80 px-3 py-2.5 dark:border-white/8">
+          <div className="flex items-center justify-between gap-1.5">
             <ThemeToggle />
 
-            <button
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
-              title="Yardım"
-              type="button"
-            >
-              <CircleHelp className="h-4 w-4" />
+            <button className={actionButton} title="Yardım" type="button">
+              <CircleHelp className="h-4 w-4 stroke-[1.9]" />
             </button>
 
             <button
@@ -720,11 +767,11 @@ export function AppSidebar() {
                 closeMobileSidebar();
                 navigate("/settings");
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-muted/45 hover:text-foreground dark:hover:bg-muted/30"
+              className={actionButton}
               title="Ayarlar"
               type="button"
             >
-              <Settings className="h-4 w-4" />
+              <Settings className="h-4 w-4 stroke-[1.9]" />
             </button>
 
             <button
@@ -732,11 +779,11 @@ export function AppSidebar() {
                 closeMobileSidebar();
                 void handleSignOut();
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+              className={cn(actionButton, "hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-300")}
               title="Çıkış yap"
               type="button"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-4 w-4 stroke-[1.9]" />
             </button>
           </div>
         </SidebarFooter>
