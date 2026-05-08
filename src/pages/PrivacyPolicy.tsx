@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Shield, Lock, Eye, Trash2, FileText, Scale, Users, ExternalLink } from "lucide-react";
+import { ArrowLeft, Eye, FileText, Lock, Scale, Shield, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -9,7 +10,7 @@ const sections = [
     id: "sorumlu",
     title: "1. Veri Sorumlusu",
     icon: Users,
-    content: `İSGVİZYON İSG Platformu ("Platform") veri sorumlusu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verilerinizi aşağıda açıklanan şekilde işlemektedir.
+    content: `ISGVizyon İSG Platformu ("Platform") veri sorumlusu olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu ("KVKK") kapsamında kişisel verilerinizi aşağıda açıklanan şekilde işlemektedir.
 
 İletişim:
 • E-posta: kvkk@isgvizyon.com
@@ -19,15 +20,15 @@ const sections = [
     id: "islenen",
     title: "2. İşlenen Kişisel Veriler",
     icon: FileText,
-    content: `Platform kapsamında aşağıdaki kişisel verileriniz işlenmektedir:
+    content: `Platform kapsamında aşağıdaki kişisel verileriniz işlenebilir:
 
 a) Kimlik Bilgileri: Ad, soyad, T.C. kimlik numarası (sertifika oluşturma amacıyla)
 b) İletişim Bilgileri: E-posta adresi, telefon numarası
 c) İş Bilgileri: Görev unvanı, çalıştığı kurum, iş güvenliği uzmanlığı belge bilgileri
 d) İşlem Güvenliği Bilgileri: IP adresi, tarayıcı bilgileri, oturum kayıtları
-e) Görsel Veriler: Saha fotoğrafları (risk değerlendirmesi amacıyla yüklenen görseller)
+e) Görsel Veriler: Saha fotoğrafları ve risk değerlendirmesi amacıyla yüklenen görseller
 
-T.C. kimlik numarası KVKK Madde 6 kapsamında "özel nitelikli kişisel veri" olarak değerlendirilmekte ve ek güvenlik önlemleriyle şifrelenerek saklanmaktadır.`,
+T.C. kimlik numarası KVKK kapsamında hassasiyetle ele alınmakta ve ek güvenlik önlemleriyle saklanmaktadır.`,
   },
   {
     id: "amac",
@@ -58,14 +59,14 @@ T.C. kimlik numarası KVKK Madde 6 kapsamında "özel nitelikli kişisel veri" o
     id: "guvenlik",
     title: "5. Veri Güvenliği",
     icon: Lock,
-    content: `Kişisel verilerinizin güvenliğini sağlamak için aşağıdaki teknik ve idari önlemler alınmaktadır:
+    content: `Kişisel verilerinizin güvenliğini sağlamak için aşağıdaki teknik ve idari önlemler uygulanır:
 
-• Veri şifreleme: T.C. kimlik numaraları veritabanında şifreli olarak saklanır
-• Erişim kontrolü: Yetkisiz erişime karşı rol tabanlı erişim kontrolü (RLS) uygulanır
-• HTTPS: Tüm veri iletişimi şifreli bağlantı üzerinden yapılır
-• Supabase altyapısı: Veriler SOC 2 uyumlu veri merkezlerinde saklanır
-• Oturum güvenliği: JWT tabanlı kimlik doğrulama ve otomatik oturum sonlandırma
-• Güvenlik denetimi: Düzenli güvenlik taramaları ve penetrasyon testleri`,
+• Veri şifreleme ve erişim kontrolü
+• Rol tabanlı erişim kontrolü ve yetki sınırlandırmaları
+• HTTPS üzerinden şifreli veri iletimi
+• Supabase ve yetkili altyapı hizmetleri üzerinde güvenli barındırma
+• JWT tabanlı kimlik doğrulama ve oturum güvenliği
+• Güvenlik logları, izleme ve teknik denetimler`,
   },
   {
     id: "haklar",
@@ -79,8 +80,8 @@ T.C. kimlik numarası KVKK Madde 6 kapsamında "özel nitelikli kişisel veri" o
 • Yurt içinde veya yurt dışında aktarıldığı üçüncü kişileri bilme
 • Eksik veya yanlış işlenmiş verilerin düzeltilmesini isteme
 • KVKK'nın 7. maddesinde öngörülen şartlar çerçevesinde silinmesini isteme
-• İşlenen verilerin münhasıran otomatik sistemler vasıtasıyla analiz edilmesi suretiyle kişinin kendisi aleyhine bir sonucun ortaya çıkmasına itiraz etme
-• Verilerin kanuna aykırı olarak işlenmesi sebebiyle zarara uğraması hâlinde zararın giderilmesini talep etme
+• Otomatik sistemlerle analiz sonucunda aleyhinize bir sonuç ortaya çıkmasına itiraz etme
+• Kanuna aykırı işleme sebebiyle zarara uğramanız halinde zararın giderilmesini talep etme
 
 Bu haklarınızı kullanmak için "Veri Haklarım" sayfasını kullanabilir veya kvkk@isgvizyon.com adresine başvurabilirsiniz.`,
   },
@@ -88,31 +89,73 @@ Bu haklarınızı kullanmak için "Veri Haklarım" sayfasını kullanabilir veya
     id: "saklama",
     title: "7. Veri Saklama ve Silme",
     icon: Trash2,
-    content: `Kişisel verileriniz, işleme amacının gerçekleşmesine kadar saklanır. Yasal yükümlülükler kapsamında (İSG mevzuatı gereği) belirli veriler yasal süre boyunca muhafaza edilir.
+    content: `Kişisel verileriniz, işleme amacının gerçekleşmesine kadar saklanır. Yasal yükümlülükler kapsamında bazı İSG kayıtları ilgili mevzuatın öngördüğü süre boyunca muhafaza edilebilir.
 
 Saklama süreleri:
-• Kullanıcı hesabı verileri: Hesap aktif olduğu sürece + silme talebinden sonra 30 gün
-• İş sağlığı ve güvenliği kayıtları: İlgili mevzuatın öngördüğü süre (genellikle 10 yıl)
-• Oturum ve log kayıtları: 1 yıl
-• Silme talebiniz doğrultusunda verileriniz kalıcı olarak silinir`,
+• Kullanıcı hesabı verileri: Hesap aktif olduğu sürece ve silme talebinden sonra teknik/yasal gereklilikler ölçüsünde
+• İş sağlığı ve güvenliği kayıtları: İlgili mevzuatın öngördüğü süre boyunca
+• Oturum ve log kayıtları: Güvenlik ve yasal yükümlülükler için gerekli süre boyunca
+• Silme talebiniz doğrultusunda, yasal saklama yükümlülükleri dışındaki veriler silinir veya anonimleştirilir`,
   },
   {
     id: "guncelleme",
     title: "8. Politika Güncellemeleri",
     icon: FileText,
-    content: `Bu gizlilik politikası, yasal düzenleme değişiklikleri veya hizmet güncellemeleri doğrultusunda güncellenebilir. Güncellemeler platform üzerinden duyurulur.
+    content: `Bu gizlilik politikası, yasal düzenleme değişiklikleri veya hizmet güncellemeleri doğrultusunda güncellenebilir. Güncellemeler platform üzerinden veya ilgili iletişim kanallarından duyurulabilir.
 
 Son güncelleme: ${new Date().toLocaleDateString("tr-TR")}`,
   },
+  {
+    id: "isgbot",
+    title: "9. ISGBot Chrome Uzantısı Hakkında",
+    icon: Shield,
+    content: `ISGBot Chrome uzantısı, ISGVizyon kullanıcılarının Chrome tarayıcısı üzerinden İSG-KATİP senkron durumunu, bağlı organizasyon/firma özetlerini, uyum göstergelerini ve öncelikli aksiyonlarını hızlıca görüntülemesini sağlayan yardımcı bir uzantıdır.
+
+ISGBot'un tek amacı, ISGVizyon hesabına bağlı iş sağlığı ve güvenliği süreçlerine hızlı erişim sağlamak ve kullanıcıya ilgili durum bilgilerini göstermektir.
+
+ISGBot kapsamında aşağıdaki veriler işlenebilir:
+
+• Kullanıcı hesap bilgileri: ad, soyad, e-posta adresi
+• Oturum bilgileri: giriş durumu, erişim belirteçleri ve temel kimlik doğrulama bilgileri
+• Organizasyon/firma bilgileri: kullanıcının bağlı olduğu organizasyon, firma özetleri ve yetkili olduğu kayıtlar
+• İSG-KATİP senkron bilgileri: senkron durumu, son senkron zamanı ve işlem sonuçları
+• Uyum ve aksiyon bilgileri: toplam firma sayısı, uyumlu/uyarı/kritik durum özetleri ve öncelikli aksiyon bilgileri
+• Uzantı kullanım tercihleri: oturum durumu, temel görünüm/ayar tercihleri ve uzantının çalışması için gerekli yerel kayıtlar
+
+Bu veriler yalnızca ISGBot'un temel işlevlerini sunmak, kullanıcının ISGVizyon hesabına bağlı bilgileri uzantı panelinde göstermek, oturum durumunu yönetmek, İSG-KATİP senkron bilgilerini görüntülemek ve kullanıcıya ilgili durum/aksiyon bildirimlerini sunmak amacıyla kullanılır.
+
+ISGBot, kullanıcının genel web tarama geçmişini toplamaz, ziyaret edilen web sitelerinin içeriklerini izleme amacıyla işlemez ve kişisel verileri reklam, yeniden pazarlama, kredi değerlendirmesi veya borç verme amacıyla kullanmaz.
+
+ISGBot tarafından işlenen kullanıcı verileri satılmaz. Veriler yalnızca ISGVizyon hizmetinin çalışması, güvenliği, kimlik doğrulama, altyapı barındırma, teknik destek, yasal yükümlülüklerin yerine getirilmesi ve hizmetin tek amacının sağlanması için gerekli olduğu ölçüde işlenir veya yetkili hizmet sağlayıcılarla paylaşılabilir.
+
+ISGBot, Chrome Web Store Kullanıcı Verileri Politikası kapsamındaki sınırlı kullanım ilkelerine uygun şekilde, kullanıcı verilerini yalnızca uzantının açıklanan tek amacını sağlamak veya iyileştirmek için kullanır.`,
+  },
 ];
+
+function setMetaTag(name: string, content: string) {
+  let tag = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.name = name;
+    document.head.appendChild(tag);
+  }
+  tag.content = content;
+}
 
 export default function PrivacyPolicy() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    document.title = "ISGVizyon Gizlilik Politikası";
+    setMetaTag(
+      "description",
+      "ISGVizyon Gizlilik Politikası, KVKK aydınlatma bilgileri ve ISGBot Chrome uzantısı veri kullanım açıklamaları.",
+    );
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <Button
             variant="ghost"
@@ -128,9 +171,7 @@ export default function PrivacyPolicy() {
               <Shield className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">
-                Gizlilik Politikası
-              </h1>
+              <h1 className="text-2xl font-bold text-foreground">Gizlilik Politikası</h1>
               <p className="text-sm text-muted-foreground">
                 6698 sayılı KVKK kapsamında kişisel verilerinizin korunması
               </p>
@@ -138,18 +179,16 @@ export default function PrivacyPolicy() {
           </div>
         </div>
 
-        {/* Summary Card */}
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <CardContent className="p-6">
             <p className="text-sm leading-relaxed text-foreground/90">
-              İSGVİZYON İSG Platformu olarak, kişisel verilerinizin güvenliği en yüksek önceliğimizdir.
-              Bu politika, hangi verilerin toplandığını, nasıl kullanıldığını ve haklarınızı açıklamaktadır.
-              KVKK Madde 10 uyarınca, verilerinizin işlenmesi hakkında açık bilgilendirme yapılmaktadır.
+              ISGVizyon İSG Platformu olarak, kişisel verilerinizin güvenliği en yüksek önceliklerimizden biridir.
+              Bu politika, hangi verilerin toplandığını, nasıl kullanıldığını, ISGBot Chrome uzantısının hangi
+              sınırlı amaçla veri işlediğini ve KVKK kapsamındaki haklarınızı açıklar.
             </p>
           </CardContent>
         </Card>
 
-        {/* Sections */}
         <div className="space-y-6">
           {sections.map((section) => {
             const Icon = section.icon;
@@ -173,33 +212,24 @@ export default function PrivacyPolicy() {
           })}
         </div>
 
-        {/* YENİ: Kurumsal Müşteriler İçin Yönlendirme Notu */}
         <div className="my-8 rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-6 text-center">
-          <h4 className="text-base font-semibold text-foreground mb-2">
+          <h4 className="mb-2 text-base font-semibold text-foreground">
             Kurumsal Müşterilerimiz İçin Bilgilendirme
           </h4>
-          <p className="text-sm text-muted-foreground mb-4 max-w-2xl mx-auto">
-            Bu sayfa, platformun genel kullanımına yönelik özet aydınlatma metnidir. Kurumsal müşterilerimiz (OSGB ve İşverenler) için hazırlanan kapsamlı <strong>Veri İşleyen Sözleşmesi (DPA)</strong> ve detaylı KVKK Politikası dokümanlarına kurumsal web sitemiz üzerinden ulaşabilirsiniz.
+          <p className="mx-auto max-w-2xl text-sm text-muted-foreground">
+            Kurumsal müşterilerimiz, Veri İşleyen Sözleşmesi (DPA) ve detaylı KVKK dokümanları için
+            kvkk@isgvizyon.com adresinden bizimle iletişime geçebilir.
           </p>
-          <a 
-            href="https://www.isgvizyon.com/legal/dpa" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="inline-flex items-center text-sm font-medium text-cyan-400 hover:text-cyan-300 hover:underline transition-colors"
-          >
-            Detaylı Kurumsal KVKK ve DPA Metnini İnceleyin <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-          </a>
         </div>
 
         <Separator className="my-8" />
 
-        {/* Footer */}
-        <div className="text-center pb-8">
+        <div className="pb-8 text-center">
           <Button variant="outline" onClick={() => navigate("/data-privacy")} className="mb-6">
             Veri Haklarım Sayfasına Git
           </Button>
           <p className="text-xs text-muted-foreground">
-            Bu gizlilik politikası, İSGVİZYON İSG Platformu kullanıcılarını bilgilendirmek amacıyla
+            Bu gizlilik politikası, ISGVizyon İSG Platformu kullanıcılarını bilgilendirmek amacıyla
             6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında hazırlanmıştır.
           </p>
         </div>

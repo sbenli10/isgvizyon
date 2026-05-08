@@ -358,7 +358,6 @@ const ProtectedShell = () => {
             {/* ============================================ */}
             {/* KVKK & PRIVACY */}
             {/* ============================================ */}
-            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
             <Route path="/data-privacy" element={<DataPrivacy />} />
 
             {/* ============================================ */}
@@ -494,6 +493,14 @@ const App = () => {
                 element={
                   <Suspense fallback={<PageLoader />}>
                     <AuthCallback />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/privacy-policy"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <PrivacyPolicy />
                   </Suspense>
                 }
               />
