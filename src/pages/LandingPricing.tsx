@@ -313,7 +313,6 @@ export default function LandingPricing() {
             </h2>
           </div>
           <p className="max-w-2xl text-sm leading-7 text-slate-300">
-            Bu tablo, veritabanındaki `plan_features` matrisiyle aynı iş kuralını takip eder: Free sınırlı,
             Premium gelişmiş bireysel kullanım, OSGB ise Premium + OSGB operasyonlarıdır.
           </p>
         </div>
