@@ -2,12 +2,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { createUserSupabaseClient, requireBillingContext } from "../_shared/billing.ts";
 
-function addDaysIso(days: number) {
-  const next = new Date();
-  next.setUTCDate(next.getUTCDate() + days);
-  return next.toISOString();
-}
-
 function createRequestId() {
   return crypto.randomUUID();
 }
@@ -145,24 +139,12 @@ serve(async (req): Promise<Response> => {
       });
     }
 
-    const nowIso = new Date().toISOString();
-    const trialEndsAt = addDaysIso(7);
-
     logTrialEvent(requestId, "personal_trial_update_start", {
       userId: context.user.id,
-      trialEndsAt,
     });
 
-    const { error: updateError } = await context.adminClient
-      .from("profiles")
-      .update({
-        subscription_plan: "premium",
-        subscription_status: "trial",
-        subscription_started_at: nowIso,
-        trial_ends_at: trialEndsAt,
-        updated_at: nowIso,
-      })
-      .eq("id", context.user.id);
+    const userClient = createUserSupabaseClient(req);
+    const { data: personalTrial, error: updateError } = await userClient.rpc("start_my_personal_premium_trial");
 
     if (updateError) {
       logTrialError(requestId, "personal_trial_update_failed", updateError, {
@@ -177,14 +159,14 @@ serve(async (req): Promise<Response> => {
 
     logTrialEvent(requestId, "personal_trial_started", {
       userId: context.user.id,
-      trialEndsAt,
+      trialEndsAt: personalTrial?.trialEndsAt ?? null,
     });
 
     return jsonResponse(200, {
       success: true,
       requestId,
       overview: null,
-      trialEndsAt,
+      trialEndsAt: personalTrial?.trialEndsAt ?? null,
       mode: "personal",
     });
   } catch (error) {

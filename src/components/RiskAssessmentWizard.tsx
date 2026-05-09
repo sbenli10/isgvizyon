@@ -1020,10 +1020,6 @@ export default function RiskAssessmentWizard() {
                     <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Geçerlilik ve Yenileme</p>
                     <p className="mt-2">Tehlike sınıfına göre yenileme süresi otomatik hesaplanır; kaza, yeni makine veya proses değişikliğinde revizyon notu ayrıca yazdırılır.</p>
                   </div>
-                  <div className="rounded-2xl border border-slate-200/10 bg-white/[0.03] p-4">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">Kayıt ve Belge Akışı</p>
-                    <p className="mt-2">Kullanıcı kaydettiğinde kayıt risk_assessments tablosuna yazılır ve aynı veri yapısı editör ekranına köprülenir.</p>
-                  </div>
                 </div>
               </CardContent>
             </Card>

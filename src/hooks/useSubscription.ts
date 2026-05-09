@@ -131,7 +131,7 @@ export function useSubscription() {
       return 0;
     }
 
-    return Math.max(0, Math.ceil((personalTrialEndsAt.getTime() - Date.now()) / 86_400_000));
+    return Math.min(7, Math.max(0, Math.ceil((personalTrialEndsAt.getTime() - Date.now()) / 86_400_000)));
   }, [personalTrialEndsAt]);
   const personalPlan = useMemo<SubscriptionPlan>(() => {
     if (profile?.subscription_plan === "osgb") {
