@@ -480,9 +480,9 @@ export default function Dashboard() {
 
   if (user && profile && !profile.organization_id && !hasPremiumAccess) {
     const trialButtonDisabled = startingTrial || !canStartTrial;
-    const heroTitle = "Bireysel hesabınız hazır";
-    const heroDescription =
-      "Platforma kişisel hesabınızla giriş yaptınız. OSGB modülü, ekip yönetimi ve finans operasyonlarını başlatmak için önce bir organizasyon oluşturmanız gerekir.";
+  const heroTitle = "İSGVizyon Dünyasına Hoş Geldiniz";
+  const heroDescription =
+  "Platformumuzu kişisel hesabınızla hemen keşfetmeye başlayabilirsiniz. Yapay zeka analiz araçlarımız ve akıllı asistanımız kullanımınıza hazırdır. Çoklu ekip yönetimi, firma koordinasyonu ve kurumsal finans süreçlerini de aktif hale getirmek isterseniz, kendinize saniyeler içinde şık bir çalışma alanı (organizasyon) tanımlayabilirsiniz.";
     const secondaryActionLabel = "Premium'u incele";
     const secondaryActionTarget = "/settings?tab=billing&upgrade=1";
 

@@ -95,7 +95,36 @@ async function upsertFromStripeSubscription(
   const stripeCustomerId = typeof subscription.customer === "string"
     ? subscription.customer
     : subscription.customer?.id ?? null;
-  const orgIdFromMetadata = subscription.metadata?.org_id ?? null;
+  const orgIdFromMetadata = subscription.metadata?.org_id || null;
+  const userIdFromMetadata = subscription.metadata?.user_id || null;
+  const billingScope = subscription.metadata?.billing_scope ?? null;
+  const resolvedPlanCode = inferPlanCodeFromSubscription(subscription);
+  const normalizedStatus = normalizeSubscriptionStatus(subscription.status);
+  const nextPlanCode = normalizedStatus === "canceled" ? "free" : resolvedPlanCode;
+
+  if (!orgIdFromMetadata && billingScope === "personal" && userIdFromMetadata) {
+    await adminClient
+      .from("profiles")
+      .update({
+        plan_type: nextPlanCode,
+        subscription_plan: nextPlanCode,
+        subscription_status:
+          normalizedStatus === "canceled"
+            ? "free"
+            : normalizedStatus === "past_due"
+              ? "past_due"
+              : normalizedStatus === "trialing"
+                ? "trial"
+                : "active",
+        subscription_started_at: unixToIso(subscription.current_period_start) ?? new Date().toISOString(),
+        trial_ends_at: unixToIso(subscription.trial_end),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userIdFromMetadata);
+
+    return null;
+  }
+
   const existing = await findOrganizationSubscription(adminClient, {
     orgId: orgIdFromMetadata,
     stripeSubscriptionId: subscription.id,
@@ -107,15 +136,12 @@ async function upsertFromStripeSubscription(
     throw new Error("Stripe aboneligini esleyecek organization id bulunamadi.");
   }
 
-  const resolvedPlanCode = inferPlanCodeFromSubscription(subscription);
-  const nextPlanCode = normalizeSubscriptionStatus(subscription.status) === "canceled" ? "free" : resolvedPlanCode;
-
   await adminClient
     .from("organization_subscriptions")
     .upsert({
       org_id: orgId,
       plan_code: nextPlanCode,
-      status: normalizeSubscriptionStatus(subscription.status),
+      status: normalizedStatus,
       starts_at: unixToIso(subscription.current_period_start) ?? new Date().toISOString(),
       current_period_start: unixToIso(subscription.current_period_start),
       current_period_end: unixToIso(subscription.current_period_end),
@@ -129,6 +155,25 @@ async function upsertFromStripeSubscription(
       billing_provider: "stripe",
       updated_at: new Date().toISOString(),
     }, { onConflict: "org_id" });
+
+  await adminClient
+    .from("profiles")
+    .update({
+      plan_type: nextPlanCode,
+      subscription_plan: nextPlanCode,
+      subscription_status:
+        normalizedStatus === "canceled"
+          ? "free"
+          : normalizedStatus === "past_due"
+            ? "past_due"
+            : normalizedStatus === "trialing"
+              ? "trial"
+              : "active",
+      subscription_started_at: unixToIso(subscription.current_period_start) ?? new Date().toISOString(),
+      trial_ends_at: unixToIso(subscription.trial_end),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("organization_id", orgId);
 
   return orgId;
 }

@@ -3,7 +3,7 @@ import { Crown, LockKeyhole, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UpgradeModal } from "@/components/UpgradeModal";
-import { useSubscription } from "@/hooks/useSubscription";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import type { FeatureKey } from "@/types/subscription";
 
 type FeatureAccessGateProps = {
@@ -24,12 +24,12 @@ export function FeatureAccessGate({
     plan,
     status,
     isTrialExpired,
-    getFeatureEntitlement,
-  } = useSubscription();
+    hasAccess,
+  } = usePlanLimits();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const isOsgbFeature = featureKey === "osgb.access";
-  const entitlement = getFeatureEntitlement(featureKey);
+  const access = hasAccess(featureKey);
 
   const isLocked = useMemo(() => {
     if (loading) {
@@ -40,8 +40,8 @@ export function FeatureAccessGate({
       return true;
     }
 
-    return entitlement ? !entitlement.allowed : plan === "free";
-  }, [entitlement, isTrialExpired, loading, plan, status]);
+    return !access.allowed;
+  }, [access.allowed, isTrialExpired, loading, status]);
 
   if (loading) {
     return (

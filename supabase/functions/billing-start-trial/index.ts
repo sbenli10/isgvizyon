@@ -37,13 +37,11 @@ serve(async (req): Promise<Response> => {
       origin: req.headers.get("origin"),
     });
 
-    const contextOptions = {
-      allowNoOrganization: true,
-    } as Parameters<typeof requireBillingContext>[1] & { requireStripe?: boolean };
-    contextOptions.requireStripe = false;
-
     logTrialEvent(requestId, "context_start");
-    const context = await requireBillingContext(req, contextOptions);
+    const context = await requireBillingContext(req, {
+      allowNoOrganization: true,
+      requireStripe: false,
+    });
     if ("errorResponse" in context) {
       logTrialEvent(requestId, "context_failed");
       return context.errorResponse as Response;
@@ -120,11 +118,11 @@ serve(async (req): Promise<Response> => {
       return jsonResponse(400, {
         success: false,
         requestId,
-        error: { message: "Aktif bir Premium uyeliginiz veya denemeniz zaten bulunuyor." },
+        error: { message: "Aktif bir uyeliginiz veya denemeniz zaten bulunuyor." },
       });
     }
 
-    if (existingPlan === "premium" && hasUsedTrialBefore) {
+    if (hasUsedTrialBefore) {
       logTrialEvent(requestId, "personal_trial_blocked_used_before", {
         userId: context.user.id,
         existingStatus,
@@ -135,7 +133,7 @@ serve(async (req): Promise<Response> => {
       return jsonResponse(400, {
         success: false,
         requestId,
-        error: { message: "7 gunluk Premium demo hakkinizi daha once kullandiniz." },
+        error: { message: "7 gunluk demo hakkinizi daha once kullandiniz." },
       });
     }
 

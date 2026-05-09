@@ -64,6 +64,18 @@ function deriveLegacyFeatures(entitlements: SubscriptionFeatureEntitlement[], pl
   };
 }
 
+function catalogFeaturesToEntitlements(plan: BillingCatalogPlan | undefined): SubscriptionFeatureEntitlement[] {
+  return (plan?.features ?? []).map((feature) => ({
+    featureKey: feature.featureKey,
+    isEnabled: feature.isEnabled,
+    limitValue: feature.limitValue,
+    period: feature.period,
+    currentUsage: 0,
+    currentValue: 0,
+    allowed: feature.isEnabled,
+  }));
+}
+
 export function useSubscription() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -177,7 +189,15 @@ export function useSubscription() {
   );
   const plan = useMemo<SubscriptionPlan>(() => {
     if (!profile?.organization_id) {
+      if (personalStatus === "trial") {
+        return personalDaysLeftInTrial > 0 ? "osgb" : "free";
+      }
+
       return personalPlan;
+    }
+
+    if (status === "trial" && (overview?.daysLeftInTrial ?? 0) > 0) {
+      return "osgb";
     }
 
     if (overview?.planCode === "osgb") {
@@ -189,8 +209,12 @@ export function useSubscription() {
     }
 
     return "free";
-  }, [overview?.planCode, personalPlan, profile?.organization_id]);
-  const entitlements = profile?.organization_id ? overview?.entitlements ?? [] : [];
+  }, [overview?.daysLeftInTrial, overview?.planCode, personalDaysLeftInTrial, personalPlan, personalStatus, profile?.organization_id, status]);
+  const personalEntitlements = useMemo(
+    () => catalogFeaturesToEntitlements(catalogPlans.find((entry) => entry.planCode === plan)),
+    [catalogPlans, plan],
+  );
+  const entitlements = profile?.organization_id ? overview?.entitlements ?? [] : personalEntitlements;
   const featureMap = useMemo(() => entitlementMap(entitlements), [entitlements]);
   const features = useMemo(() => deriveLegacyFeatures(entitlements, plan), [entitlements, plan]);
   const trialEndsAt = profile?.organization_id
