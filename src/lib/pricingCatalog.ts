@@ -20,19 +20,19 @@ export type PricingComparisonRow = {
 };
 
 export const pricingPlans: PricingPlan[] = [
-  {
+    {
     title: "Ücretsiz",
     badge: "Başlangıç",
     price: "₺0",
     period: "/ sınırsız süre",
     audience: "Platformu tanımak isteyen bireysel kullanıcılar",
     description:
-      "Temel İSG süreçlerini başlatmak ve platformu kontrollü şekilde denemek isteyen kullanıcılar için.",
+      "Temel İSG süreçlerini başlatmak, platformu keşfetmek ve ihtiyaçlarını risksiz şekilde denemek isteyen kullanıcılar için.",
     bullets: [
-      "1 firma ve 50 çalışan limiti",
-      "Sınırlı risk, denetim, DÖF, ADEP ve kurul kayıtları",
-      "Ayda 3 rapor çıktısı ve 100 MB dosya yükleme",
-      "Premium AI, ISGBot, sertifika ve OSGB modülleri kapalı",
+      "1 firmaya kadar kullanım ve 50 çalışan kaydı desteği sunar",
+      "Risk değerlendirmesi, denetim, DÖF, acil durum planı ve kurul kayıtları sınırlı olarak kullanılabilir",
+      "Ayda 3 rapor çıktısı alma ve 100 MB dosya yükleme hakkı sağlar",
+      "Premium yapay zeka araçları, İSGBot, sertifika ve OSGB modülleri bu pakete dahil değildir",
     ],
     cta: "Ücretsiz Başla",
     recommended: false,
@@ -44,11 +44,11 @@ export const pricingPlans: PricingPlan[] = [
     period: "/ ay",
     audience: "Aktif operasyon yürüten İSG profesyonelleri",
     description:
-      "Yapay zeka destekli analizleri, gelişmiş raporlama ve premium üretim araçlarını aktif kullanan profesyoneller için.",
+      "Yapay zeka destekli analizleri, gelişmiş raporlama araçlarını ve profesyonel doküman üretim özelliklerini aktif kullanan İSG profesyonelleri için.",
     bullets: [
-      "Premium AI araçları, ISGBot, Bulk CAPA ve Blueprint açık",
-      "Sertifika, özel form oluşturucu ve gelişmiş çıktı araçları",
-      "3 firma, sınırsız çalışan ve 3 ekip üyesi limiti",
+      "Premium yapay zeka araçları, İSGBot, DÖF oluşturma ve kroki/plan analiz araçları dahildir",
+      "Sertifika oluşturma, özel form hazırlama ve gelişmiş çıktı alma araçları kullanılabilir",
+      "3 firmaya kadar kullanım, sınırsız çalışan kaydı ve 3 ekip üyesi desteği sunar",
       "OSGB operasyon modülü bu pakete dahil değildir",
     ],
     cta: "Premium'a Başla",
