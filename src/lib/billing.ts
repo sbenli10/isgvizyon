@@ -165,7 +165,26 @@ export async function startPremiumTrial(): Promise<BillingOverview> {
     | null;
 
   if (error) {
-    throw new Error(error.message || "Deneme suresi baslatilamadi.");
+    let serverMessage = "";
+    let requestId = "";
+
+    const maybeContext = (error as { context?: unknown }).context;
+    if (maybeContext instanceof Response) {
+      try {
+        const responsePayload = (await maybeContext.clone().json()) as {
+          requestId?: string;
+          error?: { message?: string };
+          message?: string;
+        };
+        serverMessage = responsePayload.error?.message || responsePayload.message || "";
+        requestId = responsePayload.requestId || "";
+      } catch (parseError) {
+        console.warn("billing-start-trial error response parse failed", parseError);
+      }
+    }
+
+    const suffix = requestId ? ` (Log ID: ${requestId})` : "";
+    throw new Error(`${serverMessage || error.message || "Deneme suresi baslatilamadi."}${suffix}`);
   }
 
   if (!payload?.success) {

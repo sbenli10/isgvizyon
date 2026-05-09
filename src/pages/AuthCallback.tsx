@@ -45,6 +45,10 @@ async function ensureOAuthProfile(user: any) {
       avatar_url: existingProfile?.avatar_url || avatarUrl,
       role: existingProfile?.role || (oauthIntent?.accountType === "individual" ? "staff" : "viewer"),
       organization_id: existingProfile?.organization_id || null,
+      subscription_plan: existingProfile ? undefined : "free",
+      subscription_status: existingProfile ? undefined : "free",
+      subscription_started_at: existingProfile ? undefined : null,
+      trial_ends_at: existingProfile ? undefined : null,
       is_active: true,
     });
 
