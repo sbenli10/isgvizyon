@@ -545,6 +545,33 @@ export default function Profile() {
     }
   };
 
+  const handleLeaveOrganization = async () => {
+    if (!profile?.organization_id) return;
+
+    const confirmed = window.confirm("Bu organizasyondan ayrılmak istediğinize emin misiniz? Kurumsal verilere erişiminiz hemen kesilir.");
+    if (!confirmed) return;
+
+    setWorkspaceSaving(true);
+    try {
+      const { error } = await (supabase as any).rpc("leave_current_organization");
+      if (error) throw error;
+
+      toast.success("Organizasyondan ayrıldınız", {
+        description: "Kişisel hesabınıza geçildi.",
+      });
+      setOrganizationSummary(null);
+      await refreshProfile();
+      await fetchProfileData();
+      await loadWorkspaceData(null);
+    } catch (err: any) {
+      toast.error("Organizasyondan ayrılma işlemi tamamlanamadı", {
+        description: err.message,
+      });
+    } finally {
+      setWorkspaceSaving(false);
+    }
+  };
+
   const handleSearchOrganizations = async () => {
     setSearchingOrganizations(true);
     try {
@@ -1223,46 +1250,69 @@ export default function Profile() {
 
         <TabsContent value="workspace" className="mt-4 space-y-4">
           {!profile?.organization_id ? (
-            <Card className="border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card">
-              <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
-                    <Badge variant="secondary" className="w-fit border-primary/20 bg-primary/10 text-primary">
-                      Çalışma Alanını Tamamla
+            <Card className="overflow-hidden border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_34%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--card)))] shadow-[0_24px_80px_-48px_rgba(8,145,178,0.55)]">
+              <CardHeader className="space-y-6 border-b border-border/60 p-5 md:p-7">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="max-w-3xl space-y-3">
+                    <Badge variant="secondary" className="w-fit border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-700 dark:text-cyan-200">
+                      Çalışma Alanı Kurulumu
                     </Badge>
-                    <CardTitle className="text-2xl">Henüz bir organizasyona bağlı değilsiniz</CardTitle>
-                  <CardDescription className="max-w-2xl text-sm leading-6">
-                      Google ile hızlı giriş yapan uzmanlar burada akışı tamamlayabilir. İsterseniz yeni bir organizasyon oluşturun,
-                      isterseniz davet koduyla veya liste seçerek mevcut bir kuruma katılın.
-                    </CardDescription>
-                    <div className="grid gap-3 pt-2 md:grid-cols-2">
-                      <div className="rounded-2xl border bg-background/60 p-4">
-                        <p className="text-sm font-semibold">Organizasyon yoksa</p>
-                        <p className="mt-1 text-sm text-muted-foreground">ISGBot ile bireysel uzman akışında devam edebilir, extension üzerinden İSG-KATİP verisini kullanabilirsiniz.</p>
+                    <div className="space-y-2">
+                      <CardTitle className="text-2xl tracking-[-0.03em] md:text-3xl">Kurumsal çalışma alanınızı seçin</CardTitle>
+                      <CardDescription className="text-sm leading-6 md:text-base">
+                        Bireysel hesabınız hazır. OSGB, ekip yönetimi ve kurumsal veri izolasyonu için kendi dijital ofisinizi kurabilir ya da mevcut bir organizasyona katılabilirsiniz.
+                      </CardDescription>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl border border-cyan-500/15 bg-cyan-500/10 p-4">
+                        <Building2 className="mb-3 h-5 w-5 text-cyan-600 dark:text-cyan-300" />
+                        <p className="text-sm font-semibold">Kendi ofisini kur</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">İlk organizasyon ücretsiz açılır, OSGB özellikleri yükseltme sonrası açılır.</p>
                       </div>
-                      <div className="rounded-2xl border bg-background/60 p-4">
-                        <p className="text-sm font-semibold">Organizasyon kurarsanız</p>
-                        <p className="mt-1 text-sm text-muted-foreground">OSGB modülü; ekip, saha, evrak, finans ve müşteri portalı operasyonlarını açar.</p>
+                      <div className="rounded-2xl border border-emerald-500/15 bg-emerald-500/10 p-4">
+                        <KeyRound className="mb-3 h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+                        <p className="text-sm font-semibold">Davetle katıl</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Yöneticinizin paylaştığı kodla onay beklemeden ekibe dahil olun.</p>
+                      </div>
+                      <div className="rounded-2xl border border-violet-500/15 bg-violet-500/10 p-4">
+                        <UserPlus className="mb-3 h-5 w-5 text-violet-600 dark:text-violet-300" />
+                        <p className="text-sm font-semibold">İstek gönder</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">Organizasyonu arayın, yöneticiden katılım onayı isteyin.</p>
                       </div>
                     </div>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-2 lg:w-[24rem]">
-                    <Button className="justify-start" onClick={() => setWorkspaceAction("create")}>
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Yeni organizasyon oluştur
+                  <div className="grid gap-3 rounded-[24px] border border-border/70 bg-background/70 p-3 shadow-sm backdrop-blur xl:w-[25rem]">
+                    <Button
+                      size="lg"
+                      className="h-auto justify-start gap-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-4 text-left text-white shadow-[0_14px_34px_-20px_rgba(37,99,235,0.9)] hover:from-cyan-500 hover:to-blue-500"
+                      onClick={() => setWorkspaceAction("create")}
+                    >
+                      <PlusCircle className="h-5 w-5 shrink-0" />
+                      <span>
+                        <span className="block font-semibold">Yeni organizasyon oluştur</span>
+                        <span className="block text-xs font-normal text-white/80">Ücretsiz çalışma alanınızı hemen açın</span>
+                      </span>
                     </Button>
-                    <Button variant="outline" className="justify-start" onClick={() => setWorkspaceAction("invite")}>
-                      <KeyRound className="mr-2 h-4 w-4" />
-                      Davet kodu kullan
-                    </Button>
-                    <Button variant="outline" className="justify-start sm:col-span-2" onClick={() => setWorkspaceAction("request")}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Mevcut organizasyona katıl
-                    </Button>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Button variant="outline" className="h-auto justify-start gap-3 rounded-2xl px-4 py-4 text-left" onClick={() => setWorkspaceAction("invite")}>
+                        <KeyRound className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-300" />
+                        <span>
+                          <span className="block font-semibold">Davet kodu</span>
+                          <span className="block text-xs font-normal text-muted-foreground">Anında katılım</span>
+                        </span>
+                      </Button>
+                      <Button variant="outline" className="h-auto justify-start gap-3 rounded-2xl px-4 py-4 text-left" onClick={() => setWorkspaceAction("request")}>
+                        <UserPlus className="h-5 w-5 shrink-0 text-violet-600 dark:text-violet-300" />
+                        <span>
+                          <span className="block font-semibold">İstek gönder</span>
+                          <span className="block text-xs font-normal text-muted-foreground">Yönetici onayı</span>
+                        </span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 p-5 md:p-7">
                 {workspaceAction === "create" ? (
                   <div className="rounded-2xl border bg-card/80 p-5">
                     <div className="mb-4">
@@ -1380,10 +1430,23 @@ export default function Profile() {
                       .join(" · ")}
                   </CardDescription>
                 </div>
-                <Button variant="outline" onClick={() => navigate("/settings")}>
-                  Kurumsal ayarları aç
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => navigate("/settings")}>
+                    Kurumsal ayarları aç
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                  {profile?.role?.toLowerCase() !== "admin" ? (
+                    <Button
+                      variant="outline"
+                      onClick={handleLeaveOrganization}
+                      disabled={workspaceSaving}
+                      className="border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
+                    >
+                      {workspaceSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
+                      Organizasyondan Ayrıl
+                    </Button>
+                  ) : null}
+                </div>
               </CardHeader>
             </Card>
           )}

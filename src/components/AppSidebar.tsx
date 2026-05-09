@@ -44,6 +44,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import {
@@ -575,6 +576,8 @@ export function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent className="min-h-0 flex-1 overflow-y-auto px-2 pb-2 pt-2 overscroll-contain [scrollbar-color:rgba(148,163,184,0.38)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/60 hover:[&::-webkit-scrollbar-thumb]:bg-slate-400/60 dark:[scrollbar-color:rgba(255,255,255,0.14)_transparent] dark:[&::-webkit-scrollbar-thumb]:bg-white/10 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+          {!collapsed ? <WorkspaceSwitcher className="mx-1 mb-2" /> : null}
+
           {!collapsed && normalizedSearch && displayGroups.length === 0 && (
             <div className="m-2 rounded-xl border border-slate-200/80 bg-white/70 p-4 text-center text-sm text-slate-500 dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-400">
               “{searchQuery}” için menü bulunamadı.

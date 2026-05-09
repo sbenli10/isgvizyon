@@ -26,6 +26,7 @@ import {
   Activity,
   KeyRound,
   UserPlus,
+  UserMinus,
   Copy,
   Link as LinkIcon,
   MessageCircle,
@@ -100,6 +101,18 @@ interface PendingJoinRequestSummary {
   status: string;
   message: string | null;
   created_at: string;
+}
+
+interface OrganizationMemberSummary {
+  member_id: string;
+  organization_id: string;
+  user_id: string;
+  full_name: string | null;
+  email: string | null;
+  role: string;
+  status: string;
+  created_at: string;
+  is_owner: boolean;
 }
 
 const getSettingsCacheKey = (userId: string) => `denetron:settings:${userId}`;
@@ -178,8 +191,10 @@ export default function Settings() {
   const [animatedSecurityScore, setAnimatedSecurityScore] = useState(0);
   const [organizationInvites, setOrganizationInvites] = useState<OrganizationInviteSummary[]>([]);
   const [pendingJoinRequests, setPendingJoinRequests] = useState<PendingJoinRequestSummary[]>([]);
+  const [organizationMembers, setOrganizationMembers] = useState<OrganizationMemberSummary[]>([]);
   const [creatingInvite, setCreatingInvite] = useState(false);
   const [reviewingJoinRequestId, setReviewingJoinRequestId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [deactivatingInviteId, setDeactivatingInviteId] = useState<string | null>(null);
   const [regeneratingInviteId, setRegeneratingInviteId] = useState<string | null>(null);
   const activePlanLabel = plan === "osgb" ? "OSGB Paket" : plan === "premium" ? "Premium Paket" : "Free Paket";
@@ -319,9 +334,14 @@ useEffect(() => {
       }
 
       if (profileData.organization_id && profileData.role?.toLowerCase() === "admin") {
-        const [{ data: inviteData, error: inviteError }, { data: joinRequestData, error: joinRequestError }] = await Promise.all([
+        const [
+          { data: inviteData, error: inviteError },
+          { data: joinRequestData, error: joinRequestError },
+          { data: memberData, error: memberError },
+        ] = await Promise.all([
           (supabase as any).rpc("list_my_organization_invites"),
           (supabase as any).rpc("list_organization_join_requests"),
+          (supabase as any).rpc("list_organization_members"),
         ]);
 
         if (!inviteError) {
@@ -331,9 +351,14 @@ useEffect(() => {
         if (!joinRequestError) {
           setPendingJoinRequests((joinRequestData || []) as PendingJoinRequestSummary[]);
         }
+
+        if (!memberError) {
+          setOrganizationMembers((memberData || []) as OrganizationMemberSummary[]);
+        }
       } else {
         setOrganizationInvites([]);
         setPendingJoinRequests([]);
+        setOrganizationMembers([]);
       }
 
       // Oturum kayıtlarını çek
@@ -1141,6 +1166,9 @@ const handleForceReset2FA = async () => {
       if (error) throw error;
 
       setPendingJoinRequests((prev) => prev.filter((item) => item.request_id !== requestId));
+      if (decision === "approved") {
+        void fetchSettingsData(true);
+      }
       toast.success(decision === "approved" ? "Katılım isteği onaylandı" : "Katılım isteği reddedildi");
     } catch (err: any) {
       toast.error("İstek işlenemedi", {
@@ -1148,6 +1176,29 @@ const handleForceReset2FA = async () => {
       });
     } finally {
       setReviewingJoinRequestId(null);
+    }
+  };
+
+  const handleRemoveOrganizationMember = async (member: OrganizationMemberSummary) => {
+    const label = member.full_name || member.email || "Bu kullanıcı";
+    const confirmed = window.confirm(`${label} ekipten çıkarılsın mı? Bu kullanıcının kurumsal verilere erişimi hemen kesilir.`);
+    if (!confirmed) return;
+
+    setRemovingMemberId(member.member_id);
+    try {
+      const { error } = await (supabase as any).rpc("remove_organization_member", {
+        p_member_id: member.member_id,
+      });
+      if (error) throw error;
+
+      setOrganizationMembers((prev) => prev.filter((item) => item.member_id !== member.member_id));
+      toast.success("Üye ekipten çıkarıldı");
+    } catch (err: any) {
+      toast.error("Üye çıkarılamadı", {
+        description: err.message,
+      });
+    } finally {
+      setRemovingMemberId(null);
     }
   };
 
@@ -1785,6 +1836,55 @@ const handleForceReset2FA = async () => {
                                 ) : (
                                   <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-4 text-sm text-slate-400">
                                     Henüz oluşturulmuş davet kodu yok. İlk kodu üretip ekibinizle paylaşabilirsiniz.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                              <p className="text-xs font-medium uppercase tracking-[0.22em] text-emerald-300/80">Ekip üyeleri</p>
+                              <div className="mt-2 flex items-center gap-3">
+                                <h3 className="text-lg font-semibold text-white">Aktif çalışma alanı üyeleri</h3>
+                                <Badge className="border-emerald-400/20 bg-emerald-500/15 text-emerald-100">
+                                  {organizationMembers.length} kişi
+                                </Badge>
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-slate-400">
+                                OSGB planında sahip hariç en fazla 3 dış üye bulunabilir. Üye çıkarıldığında kurumsal verilere erişimi anında kapanır.
+                              </p>
+                              <div className="mt-4 space-y-3">
+                                {organizationMembers.length > 0 ? (
+                                  organizationMembers.map((member) => (
+                                    <div key={member.member_id} className="rounded-2xl border border-white/10 bg-slate-950/40 p-4">
+                                      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                        <div>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <p className="text-base font-semibold text-white">{member.full_name || member.email || "İsimsiz kullanıcı"}</p>
+                                            <Badge className={member.is_owner ? "border-cyan-400/20 bg-cyan-500/15 text-cyan-100" : "border-white/10 bg-white/5 text-slate-300"}>
+                                              {member.is_owner ? "Sahip" : member.role}
+                                            </Badge>
+                                          </div>
+                                          <p className="mt-1 text-sm text-slate-300">{member.email || "E-posta yok"}</p>
+                                          <p className="text-xs text-slate-500">{new Date(member.created_at).toLocaleString("tr-TR")}</p>
+                                        </div>
+                                        {!member.is_owner ? (
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => handleRemoveOrganizationMember(member)}
+                                            disabled={removingMemberId === member.member_id}
+                                            className="border-rose-400/20 bg-rose-500/10 text-rose-100 hover:bg-rose-500/15"
+                                          >
+                                            {removingMemberId === member.member_id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserMinus className="mr-2 h-4 w-4" />}
+                                            Ekipten Çıkar
+                                          </Button>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/20 p-4 text-sm text-slate-400">
+                                    Henüz ekip üyesi görünmüyor.
                                   </div>
                                 )}
                               </div>
