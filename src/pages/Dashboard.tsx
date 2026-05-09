@@ -525,7 +525,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
   const getRiskColor = (level: RiskLevel) => {
     const colors: Record<RiskLevel, string> = {
       low: "bg-success/10 text-success border-success/30",
@@ -545,7 +544,7 @@ export default function Dashboard() {
     };
     return labels[level] || level;
   };
-
+   
   const getStatusLabel = (status: InspectionStatus) => {
     const labels: Record<InspectionStatus, string> = {
       in_progress: "Devam Ediyor",
