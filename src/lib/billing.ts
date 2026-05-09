@@ -54,7 +54,7 @@ function getStaticBillingCatalog(): BillingCatalogPlan[] {
       planCode: "premium",
       planName: "Premium",
       description: getFallbackPlanDescription("premium"),
-      price: 250,
+      price: null,
       currency: "TRY",
       billingPeriod: "monthly",
       isCurrent: false,

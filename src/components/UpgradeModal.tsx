@@ -49,8 +49,6 @@ type PlanPresentation = {
   demoDescription?: string;
 };
 
-const PREMIUM_MONTHLY_PRICE = 250;
-
 const FEATURE_TEXT_MAP: Record<string, { label: string; description: string }> = {
   "bulk_capa.access": {
     label: "Toplu DÖF yönetimi",
@@ -320,7 +318,11 @@ function getFeatureDisplayDescription(feature: BillingFeatureMeta) {
 }
 
 function formatPrice(price: number | null, currency: string, period: BillingPeriod) {
-  if (!price || price <= 0) {
+  if (price === null) {
+    return "Fiyat bilgisi yükleniyor";
+  }
+
+  if (price <= 0) {
     return "Ücretsiz";
   }
 
@@ -358,15 +360,7 @@ function isOsgbPlan(planCode: string) {
 }
 
 function getPlanDisplayPrice(entry?: BillingCatalogPlan) {
-  if (!entry) {
-    return null;
-  }
-
-  if (entry.planCode === "premium") {
-    return PREMIUM_MONTHLY_PRICE;
-  }
-
-  return entry.price;
+  return entry?.price ?? null;
 }
 
 function getUpgradeReason(triggeredBy: UpgradeModalProps["triggeredBy"], plan: SubscriptionPlan, status: string) {

@@ -1249,10 +1249,14 @@ const handleForceReset2FA = async () => {
 
   const enabledFeatureCount = entitlements.filter((item) => item.isEnabled).length;
   const premiumPlan = plans.find((item) => item.planCode === "premium");
-  const monthlyPlanPrice = premiumPlan?.price ?? 250;
+  const activeCatalogPlan = plans.find((item) => item.planCode === plan);
+  const monthlyPlanPrice = premiumPlan?.price ?? 0;
   const yearlyPlanPrice = Math.round(monthlyPlanPrice * 10);
   const yearlyEquivalent = monthlyPlanPrice * 12;
-  const yearlySavingsPercent = Math.round(((yearlyEquivalent - yearlyPlanPrice) / yearlyEquivalent) * 100);
+  const yearlySavingsPercent = yearlyEquivalent > 0
+    ? Math.round(((yearlyEquivalent - yearlyPlanPrice) / yearlyEquivalent) * 100)
+    : 0;
+  const activeMonthlyPlanPrice = activeCatalogPlan?.price ?? null;
 
   const securityScore = Math.max(
     24,
@@ -2492,8 +2496,8 @@ const handleForceReset2FA = async () => {
                                 : `${activePlanShortLabel} üyelik aktif`
                               : 'Temel özellikler'}
                           </p>
-                          {plan === 'premium' && (
-                            <p className="text-2xl font-bold mt-2">₺{monthlyPlanPrice.toLocaleString("tr-TR")}/ay</p>
+                          {(plan === 'premium' || plan === 'osgb') && activeMonthlyPlanPrice !== null && (
+                            <p className="text-2xl font-bold mt-2">₺{activeMonthlyPlanPrice.toLocaleString("tr-TR")}/ay</p>
                           )}
                         </div>
                         <div className="flex flex-wrap justify-end gap-2">
