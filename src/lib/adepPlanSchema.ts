@@ -101,6 +101,7 @@ export interface ADEPPlanRow {
   id?: string;
   user_id: string;
   company_id?: string | null;
+  org_id?: string | null;
   plan_name: string;
   company_name: string;
   sector?: string | null;

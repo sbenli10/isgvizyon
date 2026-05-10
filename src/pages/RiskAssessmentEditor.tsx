@@ -6,6 +6,7 @@ import { debounce } from "lodash";
 import { supabase } from "@/integrations/supabase/client";
 import { generateRisksWithGemini } from "@/services/geminiService";
 import type { GeminiRiskResult } from "@/services/geminiService";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   Building2,
@@ -2813,176 +2814,214 @@ useEffect(() => {
       </Dialog>
     );
   };
-  // ========================
-  // AI RESULTS DIALOG
-  // ========================
+const AIResultsDialog = () => {
+  const categoryOptions = Array.from(new Set(aiRisks.map((r) => r.category))).sort();
+  const filteredRisks =
+    aiCategoryFilter === "all"
+      ? aiRisks
+      : aiRisks.filter((r) => r.category === aiCategoryFilter);
+  const selectedCount = aiRisks.filter((r) => r.selected).length;
+  const aiRiskSummary = {
+    critical: aiRisks.filter((r) => r.riskClass === "Çok Yüksek").length,
+    high: aiRisks.filter((r) => r.riskClass === "Yüksek").length,
+    notable: aiRisks.filter((r) => r.riskClass === "Önemli" || r.riskClass === "Olası").length,
+  };
 
-  const AIResultsDialog = () => {
-    const categoryOptions = Array.from(new Set(aiRisks.map((r) => r.category))).sort();
-    const filteredRisks = aiCategoryFilter === "all" ? aiRisks : aiRisks.filter((r) => r.category === aiCategoryFilter);
-    const selectedCount = aiRisks.filter((r) => r.selected).length;
-    const aiRiskSummary = {
-      critical: aiRisks.filter((r) => r.riskClass === "Çok Yüksek").length,
-      high: aiRisks.filter((r) => r.riskClass === "Yüksek").length,
-      notable: aiRisks.filter((r) => r.riskClass === "Önemli" || r.riskClass === "Olası").length,
-    };
-
-    return (
-      <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
-        <DialogContent className="flex max-h-[90vh] max-w-6xl flex-col overflow-hidden border border-fuchsia-400/20 bg-slate-950/95 p-0 shadow-[0_30px_80px_rgba(15,23,42,0.55)] backdrop-blur-xl">
-          <DialogHeader className="shrink-0 border-b border-white/10 px-6 pb-4 pt-6">
-            <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-100">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-500 via-violet-500 to-indigo-500 shadow-[0_18px_35px_rgba(168,85,247,0.28)]">
-                <Sparkles className="h-6 w-6 text-foreground" />
-              </div>
-              <div>
-                <span>AI Tarafından Üretilen Riskler · {aiSector}</span>
-                <p className="mt-1 text-sm font-normal text-muted-foreground">{aiRisks.length} risk maddesi • {selectedCount} seçili</p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-5">
-          <div className="shrink-0 flex flex-col gap-3">
-          <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={selectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
-                <CheckCircle2 className="h-4 w-4 text-green-400" />
-                Tümünü Seç
-              </Button>
-              <Button size="sm" variant="outline" onClick={deselectAllAIRisks} className="gap-2 border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
-                <X className="h-4 w-4 text-red-400" />
-                Seçimi Temizle
-              </Button>
+  return (
+    <Dialog open={showAiDialog} onOpenChange={setShowAiDialog}>
+      <DialogContent
+        className={cn(
+          "w-full max-w-6xl mx-auto flex flex-col overflow-hidden rounded-2xl",
+          "border border-slate-200 dark:border-slate-800",
+          "bg-white/90 dark:bg-slate-950/95 shadow-xl backdrop-blur-md",
+          "h-full sm:h-[90vh] sm:max-h-[90vh]"
+        )}
+      >
+        {/* HEADER (Sabit) */}
+        <DialogHeader className="shrink-0 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-8 py-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-fuchsia-600 to-cyan-500 shadow-sm">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <Badge className="border border-fuchsia-400/20 bg-fuchsia-500/10 text-fuchsia-100">{selectedCount} / {aiRisks.length} seçili</Badge>
+            <div className="flex-1">
+              <DialogTitle className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">
+                AI Risk Analizi · {aiSector}
+              </DialogTitle>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {aiRisks.length} riskten seçim yapıp tabloya ekleyin.
+              </p>
+            </div>
+            <Button
+              onClick={() => setShowAiDialog(false)}
+              size="icon"
+              variant="ghost"
+              aria-label="Kapat"
+              className="rounded-full"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          <DialogDescription className="sr-only">
+            Yapay zeka tarafından üretilen risk maddelerini filtreleyip seçerek tabloya ekleyebilirsiniz.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* ÜST KONTROLLER (Sabit) */}
+        <div className="shrink-0 border-b border-slate-100 dark:border-slate-800 px-6 sm:px-8 py-4 space-y-3">
+          {/* Özet Kartları (mobil kompakt) */}
+          <div className="grid grid-cols-3 gap-2 text-xs sm:text-sm">
+            <div className="rounded-lg border border-red-200/60 dark:border-red-900/30 bg-red-50/70 dark:bg-red-900/20 p-2 sm:p-3">
+              <p className="text-[10px] uppercase tracking-wide text-red-600/80">Kritik</p>
+              <p className="mt-1 font-bold text-slate-900 dark:text-white">{aiRiskSummary.critical}</p>
+            </div>
+            <div className="rounded-lg border border-orange-200/60 dark:border-orange-900/30 bg-orange-50/70 dark:bg-orange-900/20 p-2 sm:p-3">
+              <p className="text-[10px] uppercase tracking-wide text-orange-600/80">Yüksek</p>
+              <p className="mt-1 font-bold text-slate-900 dark:text-white">{aiRiskSummary.high}</p>
+            </div>
+            <div className="rounded-lg border border-cyan-200/60 dark:border-cyan-900/30 bg-cyan-50/70 dark:bg-cyan-900/20 p-2 sm:p-3">
+              <p className="text-[10px] uppercase tracking-wide text-cyan-600/80">İzleme</p>
+              <p className="mt-1 font-bold text-slate-900 dark:text-white">{aiRiskSummary.notable}</p>
+            </div>
           </div>
 
-          <div className="grid shrink-0 gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/75">Kritik Risk</p>
-              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.critical}</p>
-              <p className="mt-1 text-xs text-red-100/70">Acil değerlendirme gerektiren maddeler</p>
-            </div>
-            <div className="rounded-2xl border border-orange-400/20 bg-orange-500/10 p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-orange-200/75">Yüksek Risk</p>
-              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.high}</p>
-              <p className="mt-1 text-xs text-orange-100/70">Önlem planı öncelikli maddeler</p>
-            </div>
-            <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
-              <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/75">İzleme Havuzu</p>
-              <p className="mt-2 text-2xl font-black text-foreground">{aiRiskSummary.notable}</p>
-              <p className="mt-1 text-xs text-cyan-100/70">Kontrolle kabul edilebilir seviyeye indirilebilecek maddeler</p>
-            </div>
-          </div>
-
-          <div className="shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Kategori Filtreleri</p>
-                <p className="mt-1 text-xs text-muted-foreground">İlgili risk grubuna odaklanmak için filtreleyin.</p>
-              </div>
-              <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">
-                {filteredRisks.length} görünür kayıt
-              </Badge>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          {/* Filtreler (yatay kaydırılabilir) */}
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-none pb-1">
+            <Button
+              variant={aiCategoryFilter === "all" ? "default" : "outline"}
+              size="sm"
+              className={
+                aiCategoryFilter === "all"
+                  ? "bg-slate-900 text-white border-none shadow-sm"
+                  : "border-slate-200 dark:border-slate-700"
+              }
+              onClick={() => setAiCategoryFilter("all")}
+            >
+              Tümü <span className="ml-2">{aiRisks.length}</span>
+            </Button>
+            {categoryOptions.map((cat) => (
               <Button
+                key={cat}
+                variant={aiCategoryFilter === cat ? "default" : "outline"}
                 size="sm"
-                variant={aiCategoryFilter === "all" ? "default" : "outline"}
-                onClick={() => setAiCategoryFilter("all")}
-                className={aiCategoryFilter === "all" ? "bg-fuchsia-500 text-foreground hover:bg-fuchsia-400" : "border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"}
+                className={
+                  aiCategoryFilter === cat
+                    ? "bg-cyan-700 text-white border-none shadow-sm"
+                    : "border-slate-200 dark:border-slate-700"
+                }
+                onClick={() => setAiCategoryFilter(cat)}
               >
-                <Sparkles className="mr-1 h-3.5 w-3.5" />
-                Tümü
-                <span className="ml-1 rounded-full bg-black/20 px-1.5 py-0.5 text-[10px]">
-                  {aiRisks.length}
-                </span>
+                {cat} <span className="ml-2">{aiRisks.filter(r => r.category === cat).length}</span>
               </Button>
-              {categoryOptions.map((category) => (
-                <Button
-                  key={category}
-                  size="sm"
-                  variant={aiCategoryFilter === category ? "default" : "outline"}
-                  onClick={() => setAiCategoryFilter(category)}
-                  className={aiCategoryFilter === category ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400" : "border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]"}
-                >
-                  <Library className="mr-1 h-3.5 w-3.5" />
-                  {category}
-                  <span className="ml-1 rounded-full bg-black/15 px-1.5 py-0.5 text-[10px]">
-                    {aiRisks.filter((risk) => risk.category === category).length}
-                  </span>
-                </Button>
-              ))}
+            ))}
+            <div className="ml-auto text-xs text-slate-500 dark:text-slate-400">
+              {selectedCount} / {aiRisks.length} seçili
             </div>
           </div>
+        </div>
 
-          </div>
+        {/* ORTA GÖVDE (Scroll Area) */}
+        <div className="flex-1 overflow-y-auto px-5 sm:px-7 py-4">
+          {!filteredRisks.length && (
+            <div className="text-center text-muted-foreground text-base py-14">
+              Bu kategoriye ait risk yok.
+            </div>
+          )}
 
-          <ScrollArea className="mt-4 min-h-0 flex-1 rounded-2xl border border-white/10 bg-slate-950/40 pr-2">
-            <div className="space-y-3 p-4 pr-5">
-              {filteredRisks.map((risk) => (
-                <div
-                  key={risk.id}
-                  onClick={() => toggleAIRiskSelection(risk.id)}
-                  className={`cursor-pointer rounded-2xl border p-4 transition-all ${risk.selected ? "border-fuchsia-400/30 bg-fuchsia-500/10 shadow-[0_18px_35px_rgba(168,85,247,0.14)]" : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]"}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1">
-                      <div className={`flex h-5 w-5 items-center justify-center rounded border-2 ${risk.selected ? "border-fuchsia-500 bg-fuchsia-500" : "border-slate-600"}`}>
-                        {risk.selected && <Check className="h-3 w-3 text-foreground" />}
+          <div className="space-y-4">
+            {filteredRisks.map((risk) => (
+              <div
+                key={risk.id}
+                onClick={() => toggleAIRiskSelection(risk.id)}
+                tabIndex={0}
+                role="button"
+                aria-pressed={risk.selected}
+                className={cn(
+                  "rounded-2xl border p-4 sm:p-5 transition shadow-sm cursor-pointer",
+                  risk.selected
+                    ? "border-fuchsia-500 bg-fuchsia-100/40 dark:bg-fuchsia-950/20 shadow-md"
+                    : "border-slate-200 dark:border-slate-700 hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-900/30"
+                )}
+                onKeyDown={e => (e.key === "Enter" || e.key === " ") && toggleAIRiskSelection(risk.id)}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={cn(
+                    "mt-1 w-5 h-5 rounded border-2 flex items-center justify-center",
+                    risk.selected
+                      ? "border-fuchsia-600 bg-fuchsia-500"
+                      : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800"
+                  )}>
+                    {risk.selected && <Check className="h-3 w-3 text-white" />}
+                  </span>
+
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold">
+                          {risk.category}
+                        </span>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-200 font-bold",
+                          getRiskClassColor(risk.riskClass)
+                        )}>
+                          {risk.score}
+                        </span>
+                        <span className="text-slate-400">O:{risk.probability} F:{risk.frequency} Ş:{risk.severity}</span>
                       </div>
+
+                      <h3 className="mt-2 text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100">
+                        {risk.hazard}
+                      </h3>
+                      <p className="mt-1 text-xs sm:text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                        {risk.risk}
+                      </p>
                     </div>
 
-                    <div className="flex-1 space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <Badge variant="outline" className="mb-2 border-fuchsia-400/20 text-fuchsia-200 text-xs">{risk.category}</Badge>
-                          <h4 className="text-sm font-semibold text-slate-100">{risk.hazard}</h4>
-                          <p className="mt-2 text-xs leading-5 text-muted-foreground">{risk.risk}</p>
-                        </div>
-                        <Badge className={`${getRiskClassColor(risk.riskClass)} shrink-0`}>{risk.score}</Badge>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">O: {risk.probability}</Badge>
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">F: {risk.frequency}</Badge>
-                        <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-foreground">Ş: {risk.severity}</Badge>
-                      </div>
-
-                      <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-                        <p className="mb-2 text-xs uppercase tracking-[0.18em] text-muted-foreground">Önerilen Önlemler</p>
-                        <ul className="space-y-1.5">
-                          {risk.controls.map((control, idx) => (
-                            <li key={idx} className="flex items-start gap-2 text-xs text-foreground">
-                              <span className="text-fuchsia-300">→</span>
-                              <span>{control}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    {/* Önlemler */}
+                    <div className="rounded-xl bg-slate-900/5 dark:bg-slate-950/60 p-3 sm:p-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                        Önerilen Önlemler
+                      </p>
+                      <ul className="space-y-1.5 text-xs sm:text-sm text-slate-700 dark:text-slate-200">
+                        {risk.controls.map((c, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="text-fuchsia-500">→</span>
+                            <span>{c}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
-
-          <div className="mt-4 flex shrink-0 flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="outline" onClick={() => setShowAiDialog(false)} className="border-white/10 bg-white/[0.04] text-foreground hover:bg-white/[0.08]">
-              İptal
-            </Button>
-
-            <Button onClick={addSelectedAIRisks} disabled={selectedCount === 0} className="gap-2 rounded-xl bg-gradient-to-r from-fuchsia-500 via-violet-500 to-indigo-500 hover:from-fuchsia-400 hover:via-violet-400 hover:to-indigo-400">
-              <Plus className="h-4 w-4" />
-              {selectedCount} maddeyi tabloya ekle
-            </Button>
+              </div>
+            ))}
           </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
+        </div>
+
+        {/* FOOTER (Sabit) */}
+        <footer className="shrink-0 border-t border-slate-100 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 px-6 sm:px-8 py-4 flex items-center justify-between gap-3">
+          <Button
+            onClick={() => setShowAiDialog(false)}
+            variant="outline"
+            className="rounded-lg font-medium px-6 py-2"
+          >
+            Vazgeç
+          </Button>
+          <Button
+            onClick={addSelectedAIRisks}
+            disabled={selectedCount === 0}
+            className={cn(
+              "rounded-lg font-semibold bg-gradient-to-r from-fuchsia-600 to-cyan-600 text-white px-6 py-2 shadow-md",
+              selectedCount === 0 && "opacity-60 shadow-none"
+            )}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Tabloya Ekle ({selectedCount})
+          </Button>
+        </footer>
+      </DialogContent>
+    </Dialog>
+  );
+};
   // ========================
   // LEFT PANEL COMPONENT
   // ========================

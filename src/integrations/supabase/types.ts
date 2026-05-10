@@ -284,6 +284,7 @@ export type Database = {
         Row: {
           approved_at: string | null
           approved_by: string | null
+          company_id: string | null
           company_name: string
           completion_percentage: number | null
           created_at: string | null
@@ -309,6 +310,7 @@ export type Database = {
         Insert: {
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           company_name: string
           completion_percentage?: number | null
           created_at?: string | null
@@ -334,6 +336,7 @@ export type Database = {
         Update: {
           approved_at?: string | null
           approved_by?: string | null
+          company_id?: string | null
           company_name?: string
           completion_percentage?: number | null
           created_at?: string | null

@@ -174,7 +174,11 @@ export default function ADEPWizard() {
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string>("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string>("");
   const routeDraftId = searchParams.get("id") || "new";
+  const routeCompanyId = searchParams.get("companyId");
   const draftId = routeDraftId;
+  const activeWorkspaceId = ((profile as any)?.active_workspace_id ||
+    profile?.organization_id ||
+    null) as string | null;
   const restoreToastSessionKey = useMemo(
     () =>
       user?.id
@@ -259,6 +263,19 @@ export default function ADEPWizard() {
 
   const safeMergePlanData = (incoming: any): ADEPPlanData => mergeADEPPlanData(incoming);
 
+  const syncPlanRouteParams = (id: string, companyId?: string | null) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("id", id);
+
+    if (companyId) {
+      nextParams.set("companyId", companyId);
+    } else {
+      nextParams.delete("companyId");
+    }
+
+    setSearchParams(nextParams, { replace: true });
+  };
+
   // ------------------------------------
   // Load existing plan
   // ------------------------------------
@@ -272,7 +289,8 @@ export default function ADEPWizard() {
     } else {
       const draft: ADEPPlanRow = {
         user_id: user!.id,
-        company_id: null,
+        company_id: routeCompanyId || null,
+        org_id: activeWorkspaceId,
         plan_name: "",
         company_name: "",
         sector: null,
@@ -353,7 +371,6 @@ export default function ADEPWizard() {
         .from("adep_plans")
         .select("*")
         .eq("id", id)
-        .eq("user_id", user!.id)
         .single();
 
       if (error) throw error;
@@ -409,8 +426,11 @@ export default function ADEPWizard() {
       toast.info(markCompleted ? "ADEP tamamlanıyor..." : "Kaydediliyor...");
 
     try {
+      const selectedCompanyId = planRow.company_id || routeCompanyId || null;
       const payload: any = {
         user_id: user!.id,
+        company_id: selectedCompanyId,
+        org_id: activeWorkspaceId,
         plan_name: planRow.plan_name,
         company_name: planRow.company_name,
         sector: planRow.sector ?? null,
@@ -441,15 +461,18 @@ export default function ADEPWizard() {
           .single();
         if (error) throw error;
         saved = data;
-
-        setPlanId(saved.id);
-        setSearchParams({ id: saved.id }, { replace: true });
       }
 
       const merged: ADEPPlanRow = {
         ...(saved as any),
+        company_id: saved.company_id ?? selectedCompanyId,
+        org_id: saved.org_id ?? activeWorkspaceId,
         plan_data: safeMergePlanData(saved.plan_data),
       };
+      if (saved?.id) {
+        setPlanId(saved.id);
+        syncPlanRouteParams(saved.id, merged.company_id);
+      }
       setPlanRow(merged);
       if (!silent) toast.success("Kaydedildi");
       if (markCompleted) {
@@ -2243,4 +2266,3 @@ export default function ADEPWizard() {
     </div>
   );
 }
-
