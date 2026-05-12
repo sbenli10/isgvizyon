@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Building2, Download, FileSpreadsheet, Plus, Save, Trash2 } from "lucide-react";
+import { Building2, Download, FileSpreadsheet, FileText, Plus, Save, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
 
@@ -31,6 +31,7 @@ import {
   type AnnualWorkPlanCompanyInfo,
   type AnnualWorkPlanRow,
 } from "@/lib/annualWorkPlanOfficialDocx";
+import { downloadAnnualWorkPlanPdf } from "@/lib/annualWorkPlanPdf";
 
 const MONTH_HEADERS = [
   "OCAK",
@@ -339,6 +340,7 @@ export default function AnnualPlans() {
   const [saving, setSaving] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   useEffect(() => {
     setCompanyForm((previous) => ({ ...previous, year: selectedYear }));
@@ -455,6 +457,14 @@ export default function AnnualPlans() {
 
   const removeRow = (rowId: string) => {
     setRows((previous) => previous.filter((row) => row.id !== rowId));
+  };
+
+  const loadOfficialTemplate = () => {
+    setRows(createInitialRows());
+    toast.success("Hazır resmi şablon yüklendi", {
+      description:
+        "Periyodik faaliyetler, periyot, sorumlu ve ilgili mevzuat alanları resmi matrise otomatik dolduruldu.",
+    });
   };
 
   const activeMonthCount = useMemo(
@@ -619,6 +629,26 @@ export default function AnnualPlans() {
     }
   };
 
+  const exportPdf = async () => {
+    if (!ensureCompanySelected()) return;
+
+    setExportingPdf(true);
+    try {
+      await downloadAnnualWorkPlanPdf({
+        company: companyForm,
+        rows,
+      });
+      toast.success("PDF çıktısı indirildi");
+    } catch (error: any) {
+      console.error("Annual work plan pdf export failed:", error);
+      toast.error("PDF çıktısı oluşturulamadı", {
+        description: error?.message || "Beklenmeyen hata",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="theme-page-readable min-h-screen bg-background px-4 py-6 md:px-8">
@@ -646,7 +676,7 @@ export default function AnnualPlans() {
                 <CardTitle className="text-3xl tracking-tight">Yıllık çalışma planı</CardTitle>
                 <CardDescription className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
                   Bakanlık formatındaki yıllık çalışma planını firma bazında yönetin, ayları kırmızı işaretleme ile
-                  planlayın ve resmi Word veya Excel çıktısı alın.
+                  planlayın ve resmi Word, Excel veya PDF çıktısı alın.
                 </CardDescription>
               </div>
             </div>
@@ -782,12 +812,16 @@ export default function AnnualPlans() {
               <div>
                 <CardTitle>Resmi yıllık plan matrisi</CardTitle>
                 <CardDescription className="mt-2 text-sm text-muted-foreground">
-                  Ay hücrelerine tıklayarak resmi planlama işaretlerini kırmızı <span className="font-medium text-foreground">X</span> ile
-                  oluşturun. Tüm alanlar light ve dark temada yüksek okunabilirlik için semantic tokenlarla düzenlendi.
+                  Ay hücrelerine tıklayarak resmi planlama işaretlerini kırmızı dolgu ile oluşturun. Tüm alanlar light ve
+                  dark temada yüksek okunabilirlik için semantic tokenlarla düzenlendi.
                 </CardDescription>
               </div>
 
               <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Hazır Şablonu Yükle
+                </Button>
                 <Button type="button" variant="outline" onClick={addRow} className="gap-2">
                   <Plus className="h-4 w-4" />
                   Yeni Satır
@@ -800,6 +834,10 @@ export default function AnnualPlans() {
                   <FileSpreadsheet className="h-4 w-4" />
                   {exportingExcel ? "Hazırlanıyor..." : "Excel Aktar"}
                 </Button>
+                <Button variant="outline" onClick={() => void exportPdf()} disabled={exportingPdf} className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  {exportingPdf ? "Hazırlanıyor..." : "PDF Çıktısı"}
+                </Button>
                 <Button variant="secondary" onClick={() => void exportWord()} disabled={exportingWord} className="gap-2">
                   <Download className="h-4 w-4" />
                   {exportingWord ? "Hazırlanıyor..." : "Word Çıktısı"}
@@ -808,6 +846,23 @@ export default function AnnualPlans() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1">
+                  <div className="text-sm font-semibold text-foreground">Hazır resmi şablon yükleme alanı</div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Tıkladığınızda resmi yıllık çalışma planındaki tüm satırlar `PERİYODİK FAALİYETLER`, `PERİYOT`,
+                    `SORUMLU` ve `İLGİLİ MEVZUAT` alanlarına otomatik dolar. Sonrasında kullanıcı satırları düzenleyebilir,
+                    kaldırabilir veya yeni satır ekleyebilir.
+                  </p>
+                </div>
+                <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Şablonu Yeniden Doldur
+                </Button>
+              </div>
+            </div>
+
             <div className="overflow-x-auto rounded-2xl border border-border">
               <Table className="min-w-[1680px]">
                 <TableHeader>
