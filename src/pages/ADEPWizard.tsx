@@ -1,2268 +1,892 @@
-﻿// src/pages/ADEPWizard.tsx
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { buildStorageObjectRef } from "@/lib/storageObject";
-import { uploadFileOptimized } from "@/lib/storageHelper";
-import { useAuth } from "@/contexts/AuthContext";
-import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { toast } from "sonner";
-
 import {
   Building2,
-  BookOpen,
-  Users,
-  AlertTriangle,
-  Phone,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  Save,
+  ClipboardList,
   Download,
-  Share2,
-  Loader2,
-  CheckCircle2,
-  Shield,
-  Package,
-  Activity,
-  ClipboardCheck,
-  Network,
-  Scale,
-  MapPin,
-  Sparkles,
-  Eye,
-  Clock3,
-  Target,
-  ShieldAlert,
-  MailCheck,
+  ExternalLink,
   FileCheck2,
+  Loader2,
+  MapPinned,
+  PackagePlus,
+  Plus,
+  Save,
+  ShieldCheck,
+  Trash2,
+  Users,
 } from "lucide-react";
 
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  type ADEPPlanData,
-  type ADEPPlanRow,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   DEFAULT_ADEP_PLAN_DATA,
+  HAZARD_CLASSES,
   mergeADEPPlanData,
+  toCoreADEPPlanData,
+  type ADEPPlanData,
+  type ADEPTeamKey,
+  type ADEPPerson,
+  type ADEPMaterial,
+  type HazardClass,
 } from "@/lib/adepPlanSchema";
+import {
+  loadSavedEvacuationProjects,
+  type SavedEvacuationProject,
+} from "@/lib/evacuationProjectStorage";
 
-const ADEPGeneralInfo = lazy(() => import("@/components/adep/ADEPGeneralInfo"));
-const ADEPLegislationTab = lazy(() => import("@/components/adep/ADEPLegislationTab"));
-const ADEPTeamsTab = lazy(() => import("@/components/adep/ADEPTeamsTab"));
-const ADEPScenariosTab = lazy(() => import("@/components/adep/ADEPScenariosTab"));
-const ADEPContactsTab = lazy(() => import("@/components/adep/ADEPContactsTab"));
-const ADEPPreventiveMeasuresTab = lazy(() => import("@/components/adep/ADEPPreventiveMeasuresTab"));
-const ADEPEquipmentTab = lazy(() => import("@/components/adep/ADEPEquipmentTab"));
-const ADEPDrillsTab = lazy(() => import("@/components/adep/ADEPDrillsTab"));
-const ADEPChecklistsTab = lazy(() => import("@/components/adep/ADEPChecklistsTab"));
-const ADEPRACITab = lazy(() => import("@/components/adep/ADEPRACITab"));
-const ADEPLegalReferencesTab = lazy(() => import("@/components/adep/ADEPLegalReferencesTab"));
-const ADEPRiskSourcesTab = lazy(() => import("@/components/adep/ADEPRiskSourcesTab"));
-const SendReportModal = lazy(() =>
-  import("@/components/SendReportModal").then((module) => ({ default: module.SendReportModal }))
-);
-const loadAdeppdfGenerator = () => import("@/components/adep/ADEPPDFGenerator");
-const loadAdepWordGenerator = () => import("@/lib/adepOfficialDocx");
+type WizardTab = "company" | "professionals" | "teams" | "inventory";
 
-const DEFAULT_PLAN_DATA: ADEPPlanData = DEFAULT_ADEP_PLAN_DATA;
+interface CompanyOption {
+  id: string;
+  name: string;
+  address?: string | null;
+  employee_count?: number | null;
+  industry?: string | null;
+  hazard_class?: string | null;
+  tax_number?: string | null;
+  phone?: string | null;
+}
 
-const ADEP_COVER_STYLES = [
+const inputClassName =
+  "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus-visible:border-cyan-400 focus-visible:ring-cyan-400/20";
+
+const mutedInputClassName =
+  "border-white/10 bg-slate-950/70 text-white placeholder:text-slate-500 focus-visible:border-amber-400 focus-visible:ring-amber-400/20";
+
+const createPerson = (): ADEPPerson => ({ ad_soyad: "", tc_no: "", telefon: "" });
+const createMaterial = (): ADEPMaterial => ({ equipment_name: "", quantity: "", location: "" });
+
+const teamMeta: Array<{ key: ADEPTeamKey; title: string; description: string }> = [
   {
-    value: "classic",
-    title: "Klasik",
-    description: "Sade ve resmi çerçeve düzeni",
-    accent: "border-slate-400",
+    key: "sondurme",
+    title: "Söndürme Ekibi",
+    description: "Yangın ve ilk müdahale organizasyonundan sorumlu ekip.",
   },
   {
-    value: "gold",
-    title: "Altın",
-    description: "Kurumsal ve prestijli altın çerçeve",
-    accent: "border-amber-400",
+    key: "kurtarma",
+    title: "Kurtarma Ekibi",
+    description: "Tahliye, arama ve kurtarma adımlarında görevli ekip.",
   },
   {
-    value: "blueprint",
-    title: "Mavi Zarif",
-    description: "Kurumsal mavi çizgiler ve net başlık hiyerarşisi",
-    accent: "border-blue-400",
+    key: "koruma",
+    title: "Koruma Ekibi",
+    description: "Alan güvenliği ve yönlendirme süreçlerinde görevli ekip.",
   },
   {
-    value: "minimal",
-    title: "Minimalist",
-    description: "Düşük mürekkep ve temiz baskı görünümü",
-    accent: "border-slate-300",
+    key: "ilkyardim",
+    title: "İlkyardım Ekibi",
+    description: "İlk yardım desteği ve sağlık yönlendirmesi için görevli ekip.",
   },
-  {
-    value: "nature",
-    title: "Yeşil Doğa",
-    description: "Çevre ve saha operasyonlarına uyumlu görünüm",
-    accent: "border-emerald-400",
-  },
-  {
-    value: "official-red",
-    title: "Kırmızı Resmi",
-    description: "Mevzuat ve acil durum vurgusu yüksek kapak",
-    accent: "border-red-400",
-  },
-  {
-    value: "shadow",
-    title: "Gölgeli",
-    description: "3D gölge etkili güçlü kapak görünümü",
-    accent: "border-orange-400",
-  },
-] as const;
-
-// ✅ UPDATED: 13 Steps (6 basic + 7 AI modules)
-const STEPS = [
-  // === Core ADEP ===
-  { id: 1, label: "İşyeri", icon: Building2, category: "core" },
-  { id: 2, label: "Mevzuat", icon: BookOpen, category: "core" },
-  { id: 3, label: "Ekipler", icon: Users, category: "core" },
-  { id: 4, label: "Senaryolar", icon: AlertTriangle, category: "core" },
-  { id: 5, label: "İletişim", icon: Phone, category: "core" },
-
-  // === AI Modules ===
-  { id: 6, label: "Önleyici Tedbir", icon: Shield, category: "ai" },
-  { id: 7, label: "Ekipman", icon: Package, category: "ai" },
-  { id: 8, label: "Tatbikatlar", icon: Activity, category: "ai" },
-  { id: 9, label: "Checklist", icon: ClipboardCheck, category: "ai" },
-  { id: 10, label: "RACI", icon: Network, category: "ai" },
-  { id: 11, label: "Mevzuat Ref.", icon: Scale, category: "ai" },
-  { id: 12, label: "Risk Kaynakları", icon: MapPin, category: "ai" },
-
-  // === Final ===
-  { id: 13, label: "PDF", icon: FileText, category: "final" },
-] as const;
-
-const AdepStepFallback = () => (
-  <div className="flex min-h-[280px] items-center justify-center rounded-[24px] border border-white/10 bg-slate-950/45">
-    <div className="flex items-center gap-3 text-sm text-slate-300">
-      <Loader2 className="h-4 w-4 animate-spin" />
-      Adım yükleniyor...
-    </div>
-  </div>
-);
+];
 
 export default function ADEPWizard() {
   const navigate = useNavigate();
   const { user, profile, loading: authLoading } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<WizardTab>("company");
+  const [planId, setPlanId] = useState<string | null>(searchParams.get("id"));
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(searchParams.get("companyId"));
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [savedSketches, setSavedSketches] = useState<SavedEvacuationProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [planData, setPlanData] = useState<ADEPPlanData>(DEFAULT_ADEP_PLAN_DATA);
 
-  const [currentStep, setCurrentStep] = useState<number>(1);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [progressLoading, setProgressLoading] = useState<boolean>(false);
-  const [sendModalOpen, setSendModalOpen] = useState(false);
-  const [currentReportUrl, setCurrentReportUrl] = useState("");
-  const [currentReportFilename, setCurrentReportFilename] = useState("");
+  const activeWorkspaceId = ((profile as any)?.active_workspace_id || profile?.organization_id || null) as string | null;
 
-  const [planId, setPlanId] = useState<string | null>(null);
-  const [planRow, setPlanRow] = useState<ADEPPlanRow | null>(null);
-  const [progress, setProgress] = useState<number>(0);
-  const [moduleCounts, setModuleCounts] = useState<Record<string, number>>({});
-  const [moduleCountsLoading, setModuleCountsLoading] = useState<boolean>(false);
-  const [companyLogoUrl, setCompanyLogoUrl] = useState<string>("");
-  const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string>("");
-  const routeDraftId = searchParams.get("id") || "new";
-  const routeCompanyId = searchParams.get("companyId");
-  const draftId = routeDraftId;
-  const activeWorkspaceId = ((profile as any)?.active_workspace_id ||
-    profile?.organization_id ||
-    null) as string | null;
-  const restoreToastSessionKey = useMemo(
-    () =>
-      user?.id
-        ? `adep-draft-restored-toast:${user.id}:${profile?.organization_id ?? "no-org"}:${draftId}`
-        : null,
-    [draftId, profile?.organization_id, user?.id],
-  );
-  const hasShownRestoreToastRef = useRef(false);
-  const {
-    hasRestoredDraftRef,
-    shouldProtectFromDefaults,
-    mergeDefaults,
-    markSubmitted,
-    draftLoaded, // YENİ: Taslağın yüklenip yüklenmediğini kontrol edeceğiz
-  } = usePersistentFormDraft({
-    formId: `adep-wizard:${draftId}`,
-    enabled: Boolean(user?.id),
-    userId: user?.id,
-    organizationId: profile?.organization_id ?? null,
-    storage: "indexedDb",
-    value: {
-      currentStep,
-      planRow,
-    },
-    initialValue: {
-      currentStep: 1,
-      planRow: null,
-    },
-    isDirty:
-      Boolean(planRow?.plan_name?.trim()) ||
-      Boolean(planRow?.company_name?.trim()) ||
-      Boolean(planRow?.employee_count) ||
-      Boolean(planRow?.plan_data),
-    shouldPersist: (draft) => Boolean(draft.planRow),
-    onRestore: (draft) => {
-      setCurrentStep(
-        typeof draft.currentStep === "number" ? draft.currentStep : 1,
-      );
-      if (draft.planRow) {
-        setPlanRow({
-          ...draft.planRow,
-          plan_data: safeMergePlanData(draft.planRow.plan_data),
-        });
-      }
+  const planName = useMemo(() => {
+    const company = planData.firma_bilgileri.unvan || "Firma";
+    return `${company} Acil Durum Eylem Planı`;
+  }, [planData.firma_bilgileri.unvan]);
 
-      if (hasShownRestoreToastRef.current) return;
+  useEffect(() => {
+    setSavedSketches(loadSavedEvacuationProjects());
+  }, []);
 
-      let shouldShowToast = true;
-      if (typeof window !== "undefined" && restoreToastSessionKey) {
-        shouldShowToast = sessionStorage.getItem(restoreToastSessionKey) !== "1";
-      }
-
-      if (shouldShowToast) {
-        toast.info("Kaydedilmemiş ADEP taslağı geri yüklendi.");
-        if (typeof window !== "undefined" && restoreToastSessionKey) {
-          sessionStorage.setItem(restoreToastSessionKey, "1");
-        }
-      }
-
-      hasShownRestoreToastRef.current = true;
-    },
-    debugLabel: "ADEPWizard",
-  });
-
-  const canUseWizard = !!user;
-
-  // ------------------------------------
-  // Helpers
-  // ------------------------------------
-  const ensureAuth = () => {
-    if (authLoading) {
-      return false;
-    }
-
-    if (!user) {
-      toast.error("Oturum bulunamadı. Lütfen giriş yapın.");
-      navigate("/auth");
-      return false;
-    }
-    return true;
-  };
-
-  const safeMergePlanData = (incoming: any): ADEPPlanData => mergeADEPPlanData(incoming);
-
-  const syncPlanRouteParams = (id: string, companyId?: string | null) => {
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set("id", id);
-
-    if (companyId) {
-      nextParams.set("companyId", companyId);
-    } else {
-      nextParams.delete("companyId");
-    }
-
-    setSearchParams(nextParams, { replace: true });
-  };
-
-  // ------------------------------------
-  // Load existing plan
-  // ------------------------------------
   useEffect(() => {
     if (authLoading) return;
-    if (!ensureAuth()) return;
-
-    const id = searchParams.get("id");
-    if (id) {
-      void loadPlan(id);
-    } else {
-      const draft: ADEPPlanRow = {
-        user_id: user!.id,
-        company_id: routeCompanyId || null,
-        org_id: activeWorkspaceId,
-        plan_name: "",
-        company_name: "",
-        sector: null,
-        hazard_class: "Tehlikeli",
-        employee_count: 0,
-        status: "draft",
-        completion_percentage: 0,
-        plan_data: DEFAULT_PLAN_DATA,
-        next_review_date: null,
-        pdf_url: null,
-      };
-      setPlanRow(draft);
-      setPlanId(null);
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user]);
-
-  useEffect(() => {
-    if (!user?.id) {
-      setOrganizationLogoUrl("");
+    if (!user) {
+      toast.error("ADEP hazırlamak için giriş yapmanız gerekiyor.");
+      navigate("/auth");
       return;
     }
 
-    let active = true;
-
-    const loadOrganizationLogo = async () => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.organization_id || !active) {
-        if (active) setOrganizationLogoUrl("");
-        return;
-      }
-
-      const { data: organization } = await supabase
-        .from("organizations")
-        .select("logo_url")
-        .eq("id", profile.organization_id)
-        .single();
-
-      if (!active) return;
-
-      const logo = organization?.logo_url;
-      if (!logo) {
-        setOrganizationLogoUrl("");
-        return;
-      }
-
-      if (logo.startsWith("http") || logo.startsWith("data:")) {
-        setOrganizationLogoUrl(logo);
-        return;
-      }
-
-      const signed = await supabase.storage
-        .from("company-logos")
-        .createSignedUrl(logo, 3600);
-
-      setOrganizationLogoUrl(signed.data?.signedUrl || "");
-    };
-
-    void loadOrganizationLogo();
-
-    return () => {
-      active = false;
-    };
-  }, [user?.id]);
-
-  const loadPlan = async (id: string) => {
-    if (!ensureAuth()) return;
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("adep_plans")
-        .select("*")
-        .eq("id", id)
-        .single();
-
-      if (error) throw error;
-      if (!data) throw new Error("Plan bulunamadı");
-
-      const merged: ADEPPlanRow = {
-        ...(data as any),
-        plan_data: safeMergePlanData((data as any).plan_data),
-      };
-
-      setPlanRow((prev) => {
-        if (hasRestoredDraftRef.current || shouldProtectFromDefaults) {
-          return mergeDefaults({
-            planRow: merged,
-          }).planRow;
-        }
-
-        return merged;
-      });
-      setPlanId((data as any).id);
-      toast.success("Plan yüklendi");
-    } catch (e: any) {
-      console.error(e);
-      toast.error("Plan yüklenemedi", {
-        description: e.message || "Bilinmeyen hata",
-      });
-      navigate("/adep-plans");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ------------------------------------
-  // Save plan
-  // ------------------------------------
-  const savePlan = async (opts?: {
-    markCompleted?: boolean;
-    silent?: boolean;
-  }) => {
-    if (!ensureAuth()) return null;
-    if (!planRow) return null;
-
-    const silent = !!opts?.silent;
-    const markCompleted = !!opts?.markCompleted;
-
-    if (!planRow.plan_name?.trim() || !planRow.company_name?.trim()) {
-      if (!silent) toast.error("Plan adı ve firma adı zorunludur.");
-      return null;
-    }
-
-    setSaving(true);
-    if (!silent)
-      toast.info(markCompleted ? "ADEP tamamlanıyor..." : "Kaydediliyor...");
-
-    try {
-      const selectedCompanyId = planRow.company_id || routeCompanyId || null;
-      const payload: any = {
-        user_id: user!.id,
-        company_id: selectedCompanyId,
-        org_id: activeWorkspaceId,
-        plan_name: planRow.plan_name,
-        company_name: planRow.company_name,
-        sector: planRow.sector ?? null,
-        hazard_class: planRow.hazard_class,
-        employee_count: planRow.employee_count,
-        status: markCompleted ? "completed" : "draft",
-        completion_percentage: planRow.completion_percentage ?? 0,
-        plan_data: planRow.plan_data as any,
-        next_review_date: planRow.next_review_date ?? null,
-      };
-
-      let saved: any;
-
-      if (planId) {
-        const { data, error } = await supabase
-          .from("adep_plans")
-          .update(payload)
-          .eq("id", planId)
-          .select()
-          .single();
-        if (error) throw error;
-        saved = data;
-      } else {
-        const { data, error } = await supabase
-          .from("adep_plans")
-          .insert(payload)
-          .select()
-          .single();
-        if (error) throw error;
-        saved = data;
-      }
-
-      const merged: ADEPPlanRow = {
-        ...(saved as any),
-        company_id: saved.company_id ?? selectedCompanyId,
-        org_id: saved.org_id ?? activeWorkspaceId,
-        plan_data: safeMergePlanData(saved.plan_data),
-      };
-      if (saved?.id) {
-        setPlanId(saved.id);
-        syncPlanRouteParams(saved.id, merged.company_id);
-      }
-      setPlanRow(merged);
-      if (!silent) toast.success("Kaydedildi");
-      if (markCompleted) {
-        await markSubmitted();
-      }
-      return saved as ADEPPlanRow;
-    } catch (e: any) {
-      console.error(e);
-      if (!silent)
-        toast.error("Kaydetme hatası", {
-          description: e.message || "Bilinmeyen hata",
-        });
-      return null;
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // ------------------------------------
-  // Progress calculation
-  // ------------------------------------
-  const refreshProgress = async (id: string, row: ADEPPlanRow) => {
-    setProgressLoading(true);
-    try {
-      const baseMetaScore = (() => {
-        let p = 0;
-        if (row.plan_name?.trim()) p += 5;
-        if (row.company_name?.trim()) p += 5;
-        if (row.employee_count > 0) p += 3;
-        if (row.hazard_class) p += 2;
-
-        const pd = row.plan_data;
-        if (pd?.isyeri_bilgileri?.adres?.trim()) p += 5;
-        if (pd?.genel_bilgiler?.hazirlayanlar?.[0]?.ad_soyad?.trim()) p += 3;
-        if (pd?.toplanma_yeri?.aciklama?.trim()) p += 2;
-
-        const mevzuatFilled =
-          !!pd?.mevzuat?.amac?.trim() &&
-          !!pd?.mevzuat?.kapsam?.trim() &&
-          !!pd?.mevzuat?.dayanak?.trim() &&
-          !!pd?.mevzuat?.tanimlar?.trim();
-        if (mevzuatFilled) p += 5;
-
-        return Math.min(p, 30);
-      })();
-
-      // DB counts
-      const [
-        teamsRes,
-        contactsRes,
-        scenariosRes,
-        preventiveRes,
-        equipmentRes,
-        drillsRes,
-        checklistsRes,
-        raciRes,
-        legalRes,
-        riskRes,
-      ] = await Promise.all([
-        supabase
-          .from("adep_teams")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_emergency_contacts")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_scenarios")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_preventive_measures")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_equipment_inventory")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_drills")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_checklists")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_raci_matrix")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_legal_references")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-        supabase
-          .from("adep_risk_sources")
-          .select("id", { count: "exact", head: true })
-          .eq("plan_id", id),
-      ]);
-
-      let p = baseMetaScore;
-
-      // Core modules (40%)
-      if ((teamsRes.count || 0) > 0) p += 10;
-      if ((scenariosRes.count || 0) > 0) p += 15;
-      if ((contactsRes.count || 0) > 0) p += 15;
-
-      // AI modules (30%)
-      if ((preventiveRes.count || 0) > 0) p += 5;
-      if ((equipmentRes.count || 0) > 0) p += 5;
-      if ((drillsRes.count || 0) > 0) p += 5;
-      if ((checklistsRes.count || 0) > 0) p += 5;
-      if ((raciRes.count || 0) > 0) p += 5;
-      if ((legalRes.count || 0) > 0) p += 3;
-      if ((riskRes.count || 0) > 0) p += 2;
-
-      p = Math.max(0, Math.min(100, p));
-      setProgress(p);
-
-      if (row.id || id) {
-        const targetId = (row.id as string) || id;
-        await supabase
-          .from("adep_plans")
-          .update({ completion_percentage: p })
-          .eq("id", targetId);
-      }
-    } catch (e) {
-      console.error("refreshProgress error:", e);
-    } finally {
-      setProgressLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!planId || !planRow) {
-      setProgress(0);
-      return;
-    }
-    void refreshProgress(planId, planRow);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [planId, currentStep]);
-
-  // ------------------------------------
-  // Navigation
-  // ------------------------------------
-  const goToStep = async (next: number) => {
-    if (next < 1 || next > 13) return;
-    if (!ensureAuth()) return;
-    if (!planRow) return;
-
-    if (next > currentStep) {
-      const needsInitialSave = !planId;
-      const missingCritical =
-        !planRow.plan_name?.trim() || !planRow.company_name?.trim();
-
-      if (needsInitialSave && missingCritical) {
-        toast.error(
-          "Devam etmek için Plan Adı ve Firma bilgilerini girip kaydedin."
-        );
-        return;
-      }
-
-      if (needsInitialSave) {
-        const saved = await savePlan({ silent: false });
-        if (!saved?.id) return;
-      } else {
-        await savePlan({ silent: true });
-      }
-    }
-
-    setCurrentStep(next);
-  };
-
-  const stepMeta = useMemo(() => {
-    const item = STEPS.find((s) => s.id === currentStep);
-    return item ?? STEPS[0];
-  }, [currentStep]);
-
-  const companyRiskSummary = useMemo(() => {
-    const hazardScore =
-      planRow?.hazard_class === "Çok Tehlikeli"
-        ? 92
-        : planRow?.hazard_class === "Tehlikeli"
-        ? 74
-        : 48;
-    const employeeImpact =
-      (planRow?.employee_count || 0) >= 250
-        ? 10
-        : (planRow?.employee_count || 0) >= 100
-        ? 6
-        : (planRow?.employee_count || 0) >= 50
-        ? 4
-        : 0;
-    const score = Math.min(100, hazardScore + employeeImpact);
-    const level =
-      score >= 85 ? "Yüksek Risk" : score >= 65 ? "Kontrollü Risk" : "Düşük Risk";
-    const recommendation =
-      score >= 85
-        ? "Senaryolar, ekipler ve iletişim adımları aynı turda tamamlanmalı."
-        : score >= 65
-        ? "Temel modüller tamamlandıktan sonra AI modülleriyle planı güçlendirin."
-        : "Plan iskeleti sakin ilerleyebilir; final adımında PDF ve paylaşım akışı öne çıkar."
-    return { score, level, recommendation };
-  }, [planRow?.employee_count, planRow?.hazard_class]);
-
-  const exportPreferences =
-    planRow?.plan_data.export_preferences ||
-    DEFAULT_PLAN_DATA.export_preferences!;
-
-  useEffect(() => {
-    if (!planId) {
-      setModuleCounts({});
-      setModuleCountsLoading(false);
-      return;
-    }
-
-    let active = true;
-
-    const loadCounts = async () => {
-      setModuleCountsLoading(true);
+    const loadInitialData = async () => {
+      setLoading(true);
       try {
-        const tables = [
-          { key: "teams", table: "adep_teams" },
-          { key: "scenarios", table: "adep_scenarios" },
-          { key: "contacts", table: "adep_emergency_contacts" },
-          { key: "preventive", table: "adep_preventive_measures" },
-          { key: "equipment", table: "adep_equipment_inventory" },
-          { key: "drills", table: "adep_drills" },
-          { key: "checklists", table: "adep_checklists" },
-          { key: "raci", table: "adep_raci_matrix" },
-          { key: "legal", table: "adep_legal_references" },
-          { key: "riskSources", table: "adep_risk_sources" },
-        ] as const;
+        const [companiesRes, planRes] = await Promise.all([
+          (supabase as any)
+            .from("companies")
+            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone")
+            .eq("is_active", true)
+            .order("name"),
+          planId
+            ? supabase.from("adep_plans").select("*").eq("id", planId).single()
+            : Promise.resolve({ data: null, error: null }),
+        ]);
 
-        const results = await Promise.all(
-          tables.map(async ({ key, table }) => {
-            const { count } = await supabase
-              .from(table)
-              .select("*", { count: "exact", head: true })
-              .eq("plan_id", planId);
-            return [key, count || 0] as const;
-          })
-        );
+        if (companiesRes.error) throw companiesRes.error;
+        const companyRows = (companiesRes.data || []) as CompanyOption[];
+        setCompanies(companyRows);
 
-        if (!active) return;
-        setModuleCounts(Object.fromEntries(results));
-      } finally {
-        if (active) setModuleCountsLoading(false);
-      }
-    };
-
-    void loadCounts();
-
-    return () => {
-      active = false;
-    };
-  }, [planId]);
-
-  useEffect(() => {
-    if (!user?.id || !planRow?.company_name?.trim()) {
-      setCompanyLogoUrl("");
-      return;
-    }
-
-    let active = true;
-
-    const loadCompanyLogo = async () => {
-      const { data } = await supabase
-        .from("companies")
-        .select("logo_url")
-        .eq("user_id", user.id)
-        .ilike("name", planRow.company_name.trim())
-        .maybeSingle();
-
-      if (!active) return;
-
-      const logo = data?.logo_url;
-      if (!logo) {
-        setCompanyLogoUrl(organizationLogoUrl || "");
-        return;
-      }
-
-      if (logo.startsWith("http") || logo.startsWith("data:")) {
-        setCompanyLogoUrl(logo);
-        return;
-      }
-
-      const signed = await supabase.storage
-        .from("company-logos")
-        .createSignedUrl(logo, 3600);
-
-      setCompanyLogoUrl(signed.data?.signedUrl || organizationLogoUrl || "");
-    };
-
-    void loadCompanyLogo();
-
-    return () => {
-      active = false;
-    };
-  }, [organizationLogoUrl, planRow?.company_name, user?.id]);
-
-  const stepInsight = useMemo(() => {
-    const base = {
-      title: stepMeta.label,
-      eyebrow: "Adım rehberi",
-      accent:
-        stepMeta.category === "core"
-          ? "from-cyan-500/20 to-blue-500/10 border-cyan-400/15"
-          : stepMeta.category === "ai"
-          ? "from-fuchsia-500/20 to-violet-500/10 border-fuchsia-400/15"
-          : "from-emerald-500/20 to-teal-500/10 border-emerald-400/15",
-    };
-
-    switch (currentStep) {
-      case 1:
-        return {
-          ...base,
-          icon: Building2,
-          summary: "Planın resmi üst kimliği burada kurulur. Sonraki tüm modüller bu bilgilerle anlam kazanır.",
-          bullets: [
-            "Plan adı ve firma bilgisi net olmalı.",
-            "Tehlike sınıfı ve çalışan sayısı risk tonunu belirler.",
-            "Adres ve SGK bilgisi PDF kapağında kurumsal görünür.",
-          ],
-          metricLabel: "Temel kurulum",
-          metricValue: planRow?.company_name?.trim() ? "Hazır" : "Eksik",
-          stats: [
-            {
-              label: "Plan adı",
-              value: planRow?.plan_name?.trim() ? "Girildi" : "Bekliyor",
-            },
-            {
-              label: "Firma",
-              value: planRow?.company_name?.trim() ? "Hazır" : "Eksik",
-            },
-            {
-              label: "Çalışan",
-              value: `${planRow?.employee_count || 0}`,
-            },
-            {
-              label: "Adres",
-              value: planRow?.plan_data?.isyeri_bilgileri?.adres?.trim()
-                ? "Hazır"
-                : "Eksik",
-            },
-          ],
-        };
-      case 2:
-        return {
-          ...base,
-          icon: Scale,
-          summary: "Mevzuat dili burada netleşir. Bu bölüm planın resmi ve denetime uygun tonunu belirler.",
-          bullets: [
-            "Amaç, kapsam ve dayanak metni kısa ama net olmalı.",
-            "Tanımlar bölümü ekipler için ortak dil oluşturur.",
-            "Revizyon bilgileri güncellik hissi verir.",
-          ],
-          metricLabel: "Resmi yeterlilik",
-          metricValue:
-            planRow?.plan_data?.mevzuat?.amac?.trim() &&
-            planRow?.plan_data?.mevzuat?.kapsam?.trim()
-              ? "Hazır"
-              : "Gözden geçir",
-          stats: [
-            {
-              label: "Amaç",
-              value: planRow?.plan_data?.mevzuat?.amac?.trim() ? "Var" : "Eksik",
-            },
-            {
-              label: "Kapsam",
-              value: planRow?.plan_data?.mevzuat?.kapsam?.trim() ? "Var" : "Eksik",
-            },
-            {
-              label: "Revizyon",
-              value:
-                planRow?.plan_data?.genel_bilgiler?.revizyon_no || "Rev. 0",
-            },
-          ],
-        };
-      case 3:
-        return {
-          ...base,
-          icon: Users,
-          summary: "Ekipler ne kadar net tanımlanırsa acil durumda müdahale o kadar hızlı olur.",
-          bullets: [
-            "Ekip liderlerini görünür ve gerçek kişilerden seçin.",
-            "Üye dağılımı vardiya mantığına uygun olmalı.",
-            "Eksik ekip varsa final aşamada risk artar.",
-          ],
-          metricLabel: "Ekip seviyesi",
-          metricValue: planId ? "Koordinasyon" : "Önce kaydet",
-          stats: [
-            {
-              label: "Plan ID",
-              value: planId ? "Hazır" : "Bekliyor",
-            },
-            {
-              label: "Risk",
-              value: companyRiskSummary.level,
-            },
-            {
-              label: "Takip",
-              value: planId ? "Aktif" : "Pasif",
-            },
-            {
-              label: "Kayıt",
-              value: `${moduleCounts.teams || 0} ekip`,
-            },
-          ],
-        };
-      case 4:
-        return {
-          ...base,
-          icon: AlertTriangle,
-          summary: "Senaryolar planın en kritik operasyon katmanıdır. En olası olaylar açık dille tanımlanmalı.",
-          bullets: [
-            "Yangın, deprem ve tahliye adımları net olsun.",
-            "İlk 3 dakikada ne yapılacağı açık yazılsın.",
-            "Toplanma alanı ve ekip sorumluluğu bağlansın.",
-          ],
-          metricLabel: "Müdahale netliği",
-          metricValue: "Yüksek öncelik",
-          stats: [
-            {
-              label: "Risk tonu",
-              value: planRow?.hazard_class || "Tanımsız",
-            },
-            {
-              label: "Toplanma",
-              value: planRow?.plan_data?.toplanma_yeri?.aciklama?.trim()
-                ? "Tanımlı"
-                : "Eksik",
-            },
-            {
-              label: "Hazırlık",
-              value: progress >= 35 ? "İlerliyor" : "Başlangıç",
-            },
-            {
-              label: "Kayıt",
-              value: `${moduleCounts.scenarios || 0} senaryo`,
-            },
-          ],
-        };
-      case 5:
-        return {
-          ...base,
-          icon: Phone,
-          summary: "İletişim rehberi, planın kriz anındaki hızını belirler. Eksik numara en büyük operasyon açığıdır.",
-          bullets: [
-            "Dahili ve harici numaraları çift kontrol edin.",
-            "Kurum dışı acil numaraları güncel tutun.",
-            "Ekip lideri erişimi öne çıkarılsın.",
-          ],
-          metricLabel: "İletişim hazırlığı",
-          metricValue: "Hız odaklı",
-          stats: [
-            {
-              label: "Telefon",
-              value: planRow?.plan_data?.isyeri_bilgileri?.telefon?.trim()
-                ? "Hazır"
-                : "Eksik",
-            },
-            {
-              label: "Erişim",
-              value: planId ? "Kayıtlı" : "Taslak",
-            },
-            {
-              label: "Senaryo",
-              value: progress >= 45 ? "Destekli" : "Bekliyor",
-            },
-            {
-              label: "Kayıt",
-              value: `${moduleCounts.contacts || 0} rehber`,
-            },
-          ],
-        };
-      case 13:
-        return {
-          ...base,
-          icon: FileCheck2,
-          summary: "Final adımı artık gerçek belge hazırlığıdır. Kullanıcı bu aşamada kurumsal PDF'yi kontrol eder ve paylaşır.",
-          bullets: [
-            "Kapak stili seçimi belge algısını doğrudan etkiler.",
-            "Firma adı ve üst bilgiler PDF'de görünür.",
-            "Paylaşım öncesi plan doluluk oranı son kez gözden geçirilir.",
-          ],
-          metricLabel: "Çıktı hazırlığı",
-          metricValue: `%${progress}`,
-          stats: [
-            {
-              label: "Kapak",
-              value:
-                ADEP_COVER_STYLES.find(
-                  (style) => style.value === exportPreferences.cover_style
-                )?.title || "Gölgeli",
-            },
-            {
-              label: "PDF",
-              value: planId ? "Üretilebilir" : "Kaydet gerekli",
-            },
-            {
-              label: "Paylaşım",
-              value: currentReportUrl ? "Hazır" : "Bekliyor",
-            },
-            {
-              label: "AI kayıtları",
-              value: `${(moduleCounts.preventive || 0) + (moduleCounts.equipment || 0) + (moduleCounts.drills || 0) + (moduleCounts.checklists || 0) + (moduleCounts.raci || 0) + (moduleCounts.legal || 0) + (moduleCounts.riskSources || 0)}`,
-            },
-          ],
-        };
-      default:
-        return {
-          ...base,
-          icon: Sparkles,
-          summary: "Bu adım planı operasyonel açıdan güçlendirir. AI modülleri final çıktının kalitesini belirgin şekilde yükseltir.",
-          bullets: [
-            "Önerileri gerçek saha düzenine göre doğrulayın.",
-            "Kayıtlar ileride denetim çıktısına dönüşür.",
-            "Eksik alanlar final PDF görünümünü doğrudan etkiler.",
-          ],
-          metricLabel: "AI katkısı",
-          metricValue: "Aktif",
-          stats: [
-            {
-              label: "AI modülü",
-              value: `#${currentStep - 5}`,
-            },
-            {
-              label: "Firma riski",
-              value: companyRiskSummary.level,
-            },
-            {
-              label: "İlerleme",
-              value: progress >= 60 ? "Güçlü" : "Gelişiyor",
-            },
-            {
-              label: "Kayıt",
-              value:
-                currentStep === 6
-                  ? `${moduleCounts.preventive || 0} tedbir`
-                  : currentStep === 7
-                  ? `${moduleCounts.equipment || 0} ekipman`
-                  : currentStep === 8
-                  ? `${moduleCounts.drills || 0} tatbikat`
-                  : currentStep === 9
-                  ? `${moduleCounts.checklists || 0} checklist`
-                  : currentStep === 10
-                  ? `${moduleCounts.raci || 0} görev`
-                  : currentStep === 11
-                  ? `${moduleCounts.legal || 0} referans`
-                  : `${moduleCounts.riskSources || 0} kaynak`,
-            },
-          ],
-        };
-    }
-  }, [
-    companyRiskSummary.level,
-    currentReportUrl,
-    currentStep,
-    exportPreferences.cover_style,
-    moduleCounts.checklists,
-    moduleCounts.contacts,
-    moduleCounts.drills,
-    moduleCounts.equipment,
-    moduleCounts.legal,
-    moduleCounts.preventive,
-    moduleCounts.raci,
-    moduleCounts.riskSources,
-    moduleCounts.scenarios,
-    moduleCounts.teams,
-    planId,
-    planRow?.company_name,
-    planRow?.employee_count,
-    planRow?.hazard_class,
-    planRow?.plan_data?.genel_bilgiler?.revizyon_no,
-    planRow?.plan_data?.isyeri_bilgileri?.adres,
-    planRow?.plan_data?.isyeri_bilgileri?.telefon,
-    planRow?.plan_data?.mevzuat?.amac,
-    planRow?.plan_data?.mevzuat?.kapsam,
-    planRow?.plan_data?.toplanma_yeri?.aciklama,
-    planRow?.plan_name,
-    progress,
-    stepMeta,
-  ]);
-
-  const pdfPreviewBlocks = useMemo(
-    () => [
-      {
-        label: "Kapak",
-        value: planRow?.company_name || "Firma adı",
-        icon: Building2,
-      },
-      {
-        label: "Revizyon",
-        value: planRow?.plan_data?.genel_bilgiler?.revizyon_no || "Rev. 0",
-        icon: Clock3,
-      },
-      {
-        label: "Risk tonu",
-        value: planRow?.hazard_class || "Tehlike sınıfı",
-        icon: ShieldAlert,
-      },
-      {
-        label: "Paylaşım",
-        value: currentReportUrl ? "Rapor hazır" : "Hazırlanacak",
-        icon: MailCheck,
-      },
-    ],
-    [
-      currentReportUrl,
-      planRow?.company_name,
-      planRow?.hazard_class,
-      planRow?.plan_data?.genel_bilgiler?.revizyon_no,
-    ]
-  );
-
-  const coverPreviewClass = useMemo(() => {
-    const style = exportPreferences.cover_style || "shadow";
-    switch (style) {
-      case "classic":
-        return "border-slate-300 bg-[linear-gradient(180deg,#ffffff,#f5f5f5)]";
-      case "gold":
-        return "border-amber-300 bg-[linear-gradient(180deg,#fff7db,#fff1b8)]";
-      case "blueprint":
-        return "border-blue-300 bg-[linear-gradient(180deg,#eff6ff,#dbeafe)]";
-      case "minimal":
-        return "border-slate-200 bg-[linear-gradient(180deg,#ffffff,#fafafa)]";
-      case "nature":
-        return "border-emerald-300 bg-[linear-gradient(180deg,#ecfdf5,#d1fae5)]";
-      case "official-red":
-        return "border-red-300 bg-[linear-gradient(180deg,#fef2f2,#fee2e2)]";
-      default:
-        return "border-orange-300 bg-[linear-gradient(180deg,#fff7ed,#ffedd5)]";
-    }
-  }, [exportPreferences.cover_style]);
-
-  const generateADEPReportAndOpenEmail = async () => {
-    if (!planId || !planRow || !user?.id) {
-      toast.error("Rapor oluşturmak için plan kaydedilmiş olmalı.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await savePlan({
-        silent: true,
-        markCompleted: progress >= 100,
-      });
-
-      toast.info("PDF hazırlanıyor...");
-      const { generateADEPPDF } = await loadAdeppdfGenerator();
-      const pdfDoc = await generateADEPPDF(planId);
-      const pdfBlob = pdfDoc.output("blob");
-
-      const safeCompanyName = (planRow.company_name || "Firma").replace(
-        /[^a-z0-9]/gi,
-        "_"
-      );
-      const fileName = `ADEP_${safeCompanyName}_${new Date()
-        .toISOString()
-        .split("T")[0]}.pdf`;
-      const storagePath = `adep-reports/${user.id}/${fileName}`;
-      const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
-      await uploadFileOptimized("reports", storagePath, pdfFile);
-
-      const reportUrl = buildStorageObjectRef("reports", storagePath);
-
-      if (user.id) {
-        const { error: reportInsertError } = await supabase.from("reports").insert({
-          org_id: profile?.organization_id || null,
-          user_id: user.id,
-          title: `ADEP Raporu - ${planRow.company_name || "Firma"}`,
-          report_type: "adep",
-          generated_at: new Date().toISOString(),
-          export_format: "pdf",
-          file_url: reportUrl,
-          content: {
-            report_kind: "adep",
-            company_id: planRow.company_id || null,
-            company_name: planRow.company_name || null,
-            plan_id: planId,
-          },
-        });
-
-        if (reportInsertError) {
-          console.warn("ADEP report archive insert failed:", reportInsertError);
+        if (planRes.error) throw planRes.error;
+        if (planRes.data) {
+          const row = planRes.data as any;
+          const nextData = mergeADEPPlanData(row.plan_data);
+          setPlanData(nextData);
+          setSelectedCompanyId(row.company_id || selectedCompanyId);
+          return;
         }
-      }
 
-      setCurrentReportUrl(reportUrl);
-      setCurrentReportFilename(fileName);
-      setSendModalOpen(true);
-      toast.success("Rapor e-posta gönderimi için hazır.");
-    } catch (e: any) {
-      console.error("ADEP report prepare error:", e);
-      toast.error("Rapor e-posta için hazırlanamadı", {
-        description: e.message || "Bilinmeyen hata",
-      });
-    } finally {
-      setSaving(false);
-    }
+        const routeCompany = selectedCompanyId
+          ? companyRows.find((company) => company.id === selectedCompanyId)
+          : null;
+        if (routeCompany) {
+          applyCompany(routeCompany, false);
+        }
+      } catch (error: any) {
+        console.error("ADEP load failed:", error);
+        toast.error("ADEP verisi yüklenemedi", {
+          description: error?.message || "Beklenmeyen hata",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, user?.id, planId]);
+
+  const updatePlanData = (updater: (previous: ADEPPlanData) => ADEPPlanData) => {
+    setPlanData((previous) => mergeADEPPlanData(updater(previous)));
   };
 
-  const updateExportPreferences = (
-    patch: Partial<NonNullable<ADEPPlanData["export_preferences"]>>
+  const applyCompany = (company: CompanyOption, showToast = true) => {
+    setSelectedCompanyId(company.id);
+    updatePlanData((previous) => ({
+      ...previous,
+      firma_bilgileri: {
+        ...previous.firma_bilgileri,
+        unvan: company.name || "",
+        adres: company.address || "",
+        sgk_sicil_no: company.tax_number || previous.firma_bilgileri.sgk_sicil_no,
+        tehlike_sinifi:
+          HAZARD_CLASSES.find((hazardClass) => hazardClass === company.hazard_class) ||
+          previous.firma_bilgileri.tehlike_sinifi,
+        calisan_sayisi: company.employee_count || 0,
+      },
+    }));
+
+    const nextParams = new URLSearchParams(searchParams);
+    if (planId) nextParams.set("id", planId);
+    nextParams.set("companyId", company.id);
+    setSearchParams(nextParams, { replace: true });
+
+    if (showToast) toast.success("Firma bilgileri forma aktarıldı");
+  };
+
+  const updateCompanyField = <K extends keyof ADEPPlanData["firma_bilgileri"]>(
+    field: K,
+    value: ADEPPlanData["firma_bilgileri"][K],
   ) => {
-    setPlanRow((prev) => {
-      if (!prev) return prev;
+    updatePlanData((previous) => ({
+      ...previous,
+      firma_bilgileri: {
+        ...previous.firma_bilgileri,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateOsgbField = <K extends keyof ADEPPlanData["osgb_bilgileri"]>(
+    field: K,
+    value: ADEPPlanData["osgb_bilgileri"][K],
+  ) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      osgb_bilgileri: {
+        ...previous.osgb_bilgileri,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateGeneralField = <K extends keyof ADEPPlanData["genel_bilgiler"]>(
+    field: K,
+    value: ADEPPlanData["genel_bilgiler"][K],
+  ) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      genel_bilgiler: {
+        ...previous.genel_bilgiler,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updatePerson = (
+    group: "yetkililer",
+    role: keyof ADEPPlanData["yetkililer"],
+    field: string,
+    value: string,
+  ) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      [group]: {
+        ...previous[group],
+        [role]: {
+          ...previous[group][role],
+          [field]: value,
+        },
+      },
+    }));
+  };
+
+  const updateTeamLeader = (teamKey: ADEPTeamKey, field: keyof ADEPPerson, value: string) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      ekipler: {
+        ...previous.ekipler,
+        [teamKey]: {
+          ...previous.ekipler[teamKey],
+          ekip_baskani: {
+            ...previous.ekipler[teamKey].ekip_baskani,
+            [field]: value,
+          },
+        },
+      },
+    }));
+  };
+
+  const updateTeamMember = (teamKey: ADEPTeamKey, index: number, field: keyof ADEPPerson, value: string) => {
+    updatePlanData((previous) => {
+      const nextMembers = [...previous.ekipler[teamKey].uyeler];
+      nextMembers[index] = { ...nextMembers[index], [field]: value };
       return {
-        ...prev,
-        plan_data: {
-          ...prev.plan_data,
-          export_preferences: {
-            ...DEFAULT_PLAN_DATA.export_preferences!,
-            ...(prev.plan_data.export_preferences || {}),
-            ...patch,
+        ...previous,
+        ekipler: {
+          ...previous.ekipler,
+          [teamKey]: {
+            ...previous.ekipler[teamKey],
+            uyeler: nextMembers,
           },
         },
       };
     });
   };
 
-  // ------------------------------------
-  // Render step content
-  // ------------------------------------
-  const renderStep = () => {
-    if (!planRow) return null;
+  const addTeamMember = (teamKey: ADEPTeamKey) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      ekipler: {
+        ...previous.ekipler,
+        [teamKey]: {
+          ...previous.ekipler[teamKey],
+          uyeler: [...previous.ekipler[teamKey].uyeler, createPerson()],
+        },
+      },
+    }));
+  };
 
-    switch (currentStep) {
-      case 1:
-        return (
-          <ADEPGeneralInfo
-            data={{
-              company_id: planRow.company_id || "",
-              plan_name: planRow.plan_name,
-              company_name: planRow.company_name,
-              hazard_class: planRow.hazard_class,
-              employee_count: planRow.employee_count,
-              sector: planRow.sector || "",
-            }}
-            planData={planRow.plan_data}
-            onChange={(field: string, value: any) => {
-              setPlanRow((prev) => {
-                if (!prev) return prev;
-                const next = { ...prev } as ADEPPlanRow;
-                (next as any)[field] = value;
-                return next;
-              });
-            }}
-            onPlanDataChange={(section: string, data: any) => {
-              setPlanRow((prev) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  plan_data: {
-                    ...prev.plan_data,
-                    [section]: data,
-                  },
-                };
-              });
-            }}
-          />
-        );
+  const removeTeamMember = (teamKey: ADEPTeamKey, index: number) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      ekipler: {
+        ...previous.ekipler,
+        [teamKey]: {
+          ...previous.ekipler[teamKey],
+          uyeler: previous.ekipler[teamKey].uyeler.filter((_, memberIndex) => memberIndex !== index),
+        },
+      },
+    }));
+  };
 
-      case 2:
-        return (
-          <ADEPLegislationTab
-            data={planRow.plan_data.mevzuat}
-            onChange={(newMevzuat) => {
-              setPlanRow((prev) => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  plan_data: {
-                    ...prev.plan_data,
-                    mevzuat: newMevzuat,
-                  },
-                };
-              });
-            }}
-          />
-        );
+  const updateMaterial = (index: number, field: keyof ADEPMaterial, value: string) => {
+    updatePlanData((previous) => {
+      const materials = [...previous.malzeme_envanteri];
+      materials[index] = { ...materials[index], [field]: value };
+      return { ...previous, malzeme_envanteri: materials };
+    });
+  };
 
-      case 3:
-        return <ADEPTeamsTab planId={planId || undefined} />;
+  const addMaterial = () => {
+    updatePlanData((previous) => ({
+      ...previous,
+      malzeme_envanteri: [...previous.malzeme_envanteri, createMaterial()],
+    }));
+  };
 
-      case 4:
-        return <ADEPScenariosTab planId={planId || undefined} />;
+  const removeMaterial = (index: number) => {
+    updatePlanData((previous) => ({
+      ...previous,
+      malzeme_envanteri: previous.malzeme_envanteri.filter((_, materialIndex) => materialIndex !== index),
+    }));
+  };
 
-      case 5:
-        return <ADEPContactsTab planId={planId || undefined} />;
+  const handleSketchSelection = (projectId: string) => {
+    updatePlanData((previous) => {
+      if (projectId === "__none__") {
+        return {
+          ...previous,
+          ekler: {
+            ...previous.ekler,
+            secili_kroki: null,
+          },
+        };
+      }
 
-      // ✅ AI Modules
-      case 6:
-        return <ADEPPreventiveMeasuresTab planId={planId || undefined} />;
+      const selectedProject = savedSketches.find((project) => project.id === projectId);
+      if (!selectedProject) {
+        return previous;
+      }
 
-      case 7:
-        return <ADEPEquipmentTab planId={planId || undefined} />;
+      return {
+        ...previous,
+        ekler: {
+          ...previous.ekler,
+          secili_kroki: {
+            id: selectedProject.id,
+            project_name: selectedProject.project_name,
+            thumbnail_data_url: selectedProject.thumbnail_data_url || "",
+            created_at: selectedProject.created_at,
+          },
+        },
+      };
+    });
+  };
 
-      case 8:
-        return <ADEPDrillsTab planId={planId || undefined} />;
+  const savePlan = async () => {
+    if (!user) return null;
+    if (!planData.firma_bilgileri.unvan.trim()) {
+      toast.error("Firma ünvanı zorunludur.");
+      setActiveTab("company");
+      return null;
+    }
 
-      case 9:
-        return <ADEPChecklistsTab planId={planId || undefined} />;
+    setSaving(true);
+    try {
+      const normalizedData = mergeADEPPlanData(planData);
+      const payload = {
+        user_id: user.id,
+        company_id: selectedCompanyId,
+        org_id: activeWorkspaceId,
+        plan_name: planName,
+        company_name: normalizedData.firma_bilgileri.unvan,
+        sector: null,
+        hazard_class: normalizedData.firma_bilgileri.tehlike_sinifi,
+        employee_count: normalizedData.firma_bilgileri.calisan_sayisi,
+        status: "draft",
+        completion_percentage: 100,
+        plan_data: toCoreADEPPlanData(normalizedData) as any,
+        next_review_date: normalizedData.genel_bilgiler.gecerlilik_tarihi || null,
+      };
 
-      case 10:
-        return <ADEPRACITab planId={planId || undefined} />;
+      const query = planId
+        ? supabase.from("adep_plans").update(payload).eq("id", planId).select().single()
+        : supabase.from("adep_plans").insert(payload).select().single();
 
-      case 11:
-        return <ADEPLegalReferencesTab planId={planId || undefined} />;
+      const { data, error } = await query;
+      if (error) throw error;
 
-      case 12:
-        return <ADEPRiskSourcesTab planId={planId || undefined} />;
-
-      // ✅ PDF Step
-      case 13:
-        return (
-          <div className="space-y-6">
-            {/* AI Banner */}
-            <Card className="overflow-hidden rounded-[24px] border-purple-400/20 bg-[linear-gradient(135deg,rgba(168,85,247,0.16),rgba(59,130,246,0.12))] shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
-              <CardContent className="pt-6">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20">
-                    <Sparkles className="h-6 w-6 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="mb-1 text-lg font-semibold text-white">
-                      AI Destekli Kurumsal ADEP
-                    </h3>
-                    <p className="text-sm leading-6 text-slate-200">
-                      7 AI modülü ile zenginleştirilmiş, ISO 45001 uyumlu, denetim
-                      hazır Acil Durum Eylem Planı. Tüm veriler veritabanında
-                      tutulur ve PDF her zaman güncel veriden üretilir.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Progress Summary */}
-            <Card className="rounded-[24px] border-white/10 bg-slate-950/55 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="h-5 w-5" />
-                  Plan Durumu
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <div className="text-sm text-slate-400">Plan Adı</div>
-                    <div className="font-semibold text-white">
-                      {planRow.plan_name || "—"}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-slate-400">Firma</div>
-                    <div className="font-semibold text-white">
-                      {planRow.company_name || "—"}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-sm text-slate-400">
-                      Tamamlanma
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Progress value={progress} className="h-2 flex-1" />
-                      <Badge
-                        variant={progress >= 100 ? "default" : "secondary"}
-                      >
-                        {progressLoading ? "..." : `%${progress}`}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-green-500" />
-                    <span className="text-slate-200">Core Modules</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-purple-500" />
-                    <span className="text-slate-200">AI Modules</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-blue-500" />
-                    <span className="text-slate-200">DB-First</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="h-2 w-2 rounded-full bg-orange-500" />
-                    <span className="text-slate-200">ISO 45001</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="rounded-[24px] border-white/10 bg-slate-950/55 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <FileText className="h-5 w-5 text-orange-500" />
-                  Kapak Çerçevesi
-                </CardTitle>
-                <CardDescription className="text-slate-400">
-                  Kurumsal PDF kapağında kullanılacak çerçeve stilini seçin.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {ADEP_COVER_STYLES.map((style) => {
-                    const active = exportPreferences.cover_style === style.value;
-                    return (
-                      <button
-                        key={style.value}
-                        type="button"
-                        onClick={() => updateExportPreferences({ cover_style: style.value })}
-                        className={[
-                          "rounded-2xl border p-4 text-left transition-all",
-                          active
-                            ? `bg-orange-500/5 shadow-lg shadow-orange-500/10 ${style.accent}`
-                            : "border-white/10 bg-white/[0.03] hover:border-orange-300/40 hover:bg-white/[0.06]",
-                        ].join(" ")}
-                      >
-                        <div className="mb-4 flex h-28 items-center justify-center rounded-xl bg-gradient-to-b from-slate-900 to-slate-800/70">
-                          <div
-                            className={[
-                              "h-20 w-14 rounded-md border bg-white shadow-sm",
-                              style.accent,
-                            ].join(" ")}
-                          />
-                        </div>
-                        <div className="text-sm font-semibold text-white">{style.title}</div>
-                        <div className="mt-1 text-xs text-slate-400">
-                          {style.description}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="text-sm text-slate-400">
-                  Seçilen stil:{" "}
-                  <span className="font-medium text-white">
-                    {ADEP_COVER_STYLES.find(
-                      (style) => style.value === exportPreferences.cover_style
-                    )?.title || "Gölgeli"}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="overflow-hidden rounded-[24px] border-white/10 bg-slate-950/55 shadow-[0_18px_40px_rgba(2,6,23,0.18)]">
-              <CardHeader className="border-b border-white/10 bg-white/[0.03]">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="flex items-center gap-2 text-white">
-                      <Eye className="h-5 w-5 text-cyan-300" />
-                      Belge Önizleme Kartı
-                    </CardTitle>
-                    <CardDescription className="text-slate-400">
-                      PDF'ye gitmeden önce kapak ve üst bilgi dilini hızlıca kontrol edin.
-                    </CardDescription>
-                  </div>
-                  <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
-                    Önizleme
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4 p-6">
-                <div className="rounded-[28px] border border-slate-200/70 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,42,0.16)]">
-                  <div className="flex items-start justify-between gap-6 border-b border-slate-300 pb-5">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-                        Acil Durum Eylem Planı
-                      </div>
-                      <h3 className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
-                        {planRow.plan_name || "Kurumsal ADEP Planı"}
-                      </h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
-                        {planRow.company_name || "Firma adı"} • {planRow.hazard_class} •{" "}
-                        {planRow.employee_count} çalışan
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-right">
-                      <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Belge Durumu</div>
-                      <div className="mt-2 text-base font-semibold text-slate-900">
-                        {progress >= 100 ? "Hazır" : "Taslak"}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    {pdfPreviewBlocks.map((block) => {
-                      const Icon = block.icon;
-                      return (
-                        <div
-                          key={block.label}
-                          className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
-                        >
-                          <div className="flex items-center gap-2 text-slate-500">
-                            <Icon className="h-4 w-4" />
-                            <span className="text-[11px] uppercase tracking-[0.18em]">
-                              {block.label}
-                            </span>
-                          </div>
-                          <div className="mt-3 text-sm font-semibold text-slate-900">
-                            {block.value}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="mt-6 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
-                    <div className={`rounded-[24px] border p-4 shadow-sm ${coverPreviewClass}`}>
-                      <div className="flex h-full min-h-[250px] flex-col justify-between rounded-[18px] border border-black/5 bg-white/85 p-4">
-                        <div>
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500">
-                                Kapak Önizleme
-                              </div>
-                              <div className="mt-3 h-1.5 w-16 rounded-full bg-slate-900/70" />
-                            </div>
-                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
-                              {companyLogoUrl ? (
-                                <img
-                                  src={companyLogoUrl}
-                                  alt="Firma logosu"
-                                  className="max-h-8 max-w-8 object-contain"
-                                />
-                              ) : (
-                                <Building2 className="h-5 w-5 text-slate-400" />
-                              )}
-                            </div>
-                          </div>
-                          <div className="mt-3 inline-flex rounded-full border border-slate-300 bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600 shadow-sm">
-                            {planRow.plan_data.genel_bilgiler.revizyon_no || "Rev. 0"}
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">
-                            ADEP
-                          </div>
-                          <div className="mt-3 text-lg font-bold leading-tight text-slate-900">
-                            {planRow.company_name || "Firma Adı"}
-                          </div>
-                          <div className="mt-2 text-xs text-slate-600">
-                            {ADEP_COVER_STYLES.find(
-                              (style) => style.value === exportPreferences.cover_style
-                            )?.title || "Gölgeli"} kapak stili
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="h-2 rounded-full bg-slate-900/15" />
-                          <div className="h-2 rounded-full bg-slate-900/10" />
-                          <div className="h-2 w-2/3 rounded-full bg-slate-900/10" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid gap-4 lg:grid-cols-[1.25fr_0.9fr]">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                        <div className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                          Bölüm Önizlemesi
-                        </div>
-                        <div className="mt-4 space-y-3">
-                          {[
-                            "Kapak ve revizyon alanı",
-                            "Ekipler ve sorumluluk dağılımı",
-                            "Senaryolar ve iletişim akışı",
-                            "Tatbikat, checklist ve risk kaynakları",
-                          ].map((item, index) => (
-                            <div
-                              key={item}
-                              className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
-                            >
-                              <span className="text-sm text-slate-700">{item}</span>
-                              <span className="text-xs font-semibold text-slate-500">
-                                Bölüm {index + 1}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5">
-                        <div className="flex items-center gap-2 text-cyan-700">
-                          <Target className="h-4 w-4" />
-                          <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-                            Son kontrol
-                          </span>
-                        </div>
-                        <div className="mt-4 space-y-3 text-sm text-slate-700">
-                          <p>Firma adı, plan adı ve revizyon bilgisi belge kapağında görünür.</p>
-                          <p>Kapak çerçevesi seçimi çıktı tonunu doğrudan etkiler.</p>
-                          <p>E-posta akışı başlatıldığında bu PDF aynı görünümle paylaşılır.</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Actions */}
-            <Card className="overflow-hidden rounded-[26px] border-cyan-400/15 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_24px_60px_rgba(2,6,23,0.26)]">
-              <CardHeader className="border-b border-white/10 bg-white/[0.03]">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
-                    Final Çıktı Merkezi
-                  </Badge>
-                  <Badge className="border-white/10 bg-white/10 text-slate-200 hover:bg-white/10">
-                    PDF • E-posta • Arşiv
-                  </Badge>
-                </div>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <FileText className="h-5 w-5" />
-                  PDF Oluşturma
-                </CardTitle>
-                <CardDescription className="text-slate-400">
-                  Tüm modüller veritabanından çekilir. PDF her zaman güncel
-                  veriden üretilir.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Çıktı Hazırlığı</div>
-                    <div className="mt-2 text-lg font-semibold text-white">%{progress}</div>
-                    <div className="mt-1 text-xs text-slate-400">Tamamlanan modül oranı</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Firma</div>
-                    <div className="mt-2 text-lg font-semibold text-white">{planRow.company_name || "—"}</div>
-                    <div className="mt-1 text-xs text-slate-400">PDF üst bilgisinde kullanılacak</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                    <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Paylaşım</div>
-                    <div className="mt-2 text-lg font-semibold text-white">Hazır</div>
-                    <div className="mt-1 text-xs text-slate-400">Mail akışı ve arşiv senaryosu</div>
-                  </div>
-                </div>
-                {!planId && (
-                  <div className="rounded-2xl border border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
-                    PDF için önce planın kaydedilmesi gerekir.
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-3 md:flex-row">
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-                    disabled={
-                      saving ||
-                      !planRow.plan_name?.trim() ||
-                      !planRow.company_name?.trim()
-                    }
-                    onClick={async () => {
-                      const saved = await savePlan({
-                        silent: false,
-                        markCompleted: progress >= 100,
-                      });
-                      if (saved?.id) {
-                        await refreshProgress(saved.id, {
-                          ...planRow,
-                          id: saved.id,
-                        });
-                      }
-                    }}
-                  >
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4" />
-                    )}
-                    {progress >= 100 ? "Tamamla ve Kaydet" : "Kaydet"}
-                  </Button>
-
-                  <Button
-                    size="lg"
-                    className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                    disabled={saving || !planId}
-                    onClick={async () => {
-                      if (!planId) return;
-                      await savePlan({
-                        silent: true,
-                        markCompleted: progress >= 100,
-                      });
-
-                      toast.info("PDF hazırlanıyor...");
-                      try {
-                        const { generateADEPPDF } = await loadAdeppdfGenerator();
-                        await generateADEPPDF(planId);
-                        toast.success("PDF indirildi");
-                      } catch (e: any) {
-                        console.error(e);
-                        toast.error("PDF oluşturma hatası", {
-                          description: e.message || "Bilinmeyen hata",
-                        });
-                      }
-                    }}
-                  >
-                    <Download className="h-4 w-4" />
-                    PDF İndir
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-                    disabled={saving || !planId}
-                    onClick={async () => {
-                      if (!planId) return;
-                      await savePlan({
-                        silent: true,
-                        markCompleted: progress >= 100,
-                      });
-
-                      toast.info("Word belgesi hazırlanıyor...");
-                      try {
-                        const { downloadADEPWordDocument } = await loadAdepWordGenerator();
-                        await downloadADEPWordDocument(planId);
-                        toast.success("Word indirildi");
-                      } catch (e: any) {
-                        console.error(e);
-                        toast.error("Word oluşturma hatası", {
-                          description: e.message || "Bilinmeyen hata",
-                        });
-                      }
-                    }}
-                  >
-                    <Download className="h-4 w-4" />
-                    Word İndir
-                  </Button>
-                  <Button
-                    size="lg"
-                    variant="secondary"
-                    className="gap-2 border border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15"
-                    disabled={saving || !planId}
-                    onClick={generateADEPReportAndOpenEmail}
-                  >
-                    <Share2 className="h-4 w-4" />
-                    PDF Oluştur ve Gönder
-                  </Button>
-                </div>
-
-                <div className="space-y-1 text-xs text-slate-400">
-                  <div>
-                    ✓ 13 modül • DB-first architecture • Türkçe Inter font
-                  </div>
-                  <div>
-                    ✓ Ekipler, senaryolar, iletişim, AI modülleri ilgili
-                    tablolardan çekilir
-                  </div>
-                  <div>✓ PDF her zaman güncel veritabanı verisiyle üretilir</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      default:
-        return null;
+      const savedId = (data as any).id as string;
+      setPlanId(savedId);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.set("id", savedId);
+      if (selectedCompanyId) nextParams.set("companyId", selectedCompanyId);
+      setSearchParams(nextParams, { replace: true });
+      toast.success("ADEP taslağı kaydedildi");
+      return savedId;
+    } catch (error: any) {
+      console.error("ADEP save failed:", error);
+      toast.error("ADEP kaydedilemedi", {
+        description: error?.message || "Beklenmeyen hata",
+      });
+      return null;
+    } finally {
+      setSaving(false);
     }
   };
 
-  // ------------------------------------
-  // Main Render
-  // ------------------------------------
-  if (!canUseWizard) {
+  const downloadWordReport = async () => {
+    const savedId = await savePlan();
+    if (!savedId) return;
+
+    try {
+      toast.info("Resmi Word raporu hazırlanıyor...");
+      const { downloadADEPWordDocument } = await import("@/lib/adepOfficialDocx");
+      await downloadADEPWordDocument(savedId);
+      toast.success("Word raporu indirildi");
+    } catch (error: any) {
+      console.error("ADEP Word export failed:", error);
+      toast.error("Word raporu oluşturulamadı", {
+        description: error?.message || "Beklenmeyen hata",
+      });
+    }
+  };
+
+  const teamMemberCount = teamMeta.reduce((total, team) => total + planData.ekipler[team.key].uyeler.length + 1, 0);
+  const materialCount = planData.malzeme_envanteri.filter((item) => item.equipment_name.trim()).length;
+
+  if (loading || authLoading) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          Devam etmek için giriş yapmalısınız.
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // EKLENDİ: !draftLoaded kontrolü. IndexedDB'den taslak okunana kadar form render olmaz.
-  if (loading || !planRow || !draftLoaded) {
-    return (
-      <Card>
-        <CardContent className="py-12 flex items-center justify-center gap-3 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Yükleniyor...
-        </CardContent>
-      </Card>
-    );
-  }
-
-  const StepIcon = stepMeta.icon;
-  const coreSteps = STEPS.filter((s) => s.category === "core");
-  const aiSteps = STEPS.filter((s) => s.category === "ai");
-  const finalSteps = STEPS.filter((s) => s.category === "final");
-
-  return (
-    <div className="theme-page-readable space-y-8 pb-10">
-      {/* ✅ Premium Header */}
-      <div className="relative overflow-hidden rounded-[28px] border border-border bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.12),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.12),_transparent_32%),linear-gradient(135deg,hsl(var(--card)),hsl(var(--muted)))] p-6 shadow-[0_20px_55px_rgba(15,23,42,0.12)] dark:border-white/10 dark:bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.18),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.18),_transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] dark:shadow-[0_28px_80px_rgba(2,6,23,0.45)] md:p-8">
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.06),transparent_30%,transparent_70%,rgba(255,255,255,0.04))]" />
-        <div className="absolute -top-14 right-10 h-40 w-40 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-16 left-8 h-40 w-40 rounded-full bg-fuchsia-500/10 blur-3xl" />
-
-        <div className="relative grid gap-6 xl:grid-cols-[1.4fr_0.85fr] xl:items-end">
-          <div className="space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-background/80 shadow-sm backdrop-blur dark:border-white/15 dark:bg-white/10 dark:shadow-[0_12px_30px_rgba(15,23,42,0.35)]">
-                <StepIcon className="h-7 w-7 text-cyan-200" />
-              </div>
-              <div>
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge className="border-cyan-400/30 bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-100">
-                    ADEP Operasyon Merkezi
-                  </Badge>
-                  <Badge className="border-border bg-muted text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
-                    Kurumsal plan sihirbazı
-                  </Badge>
-                </div>
-                <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl">
-                  Acil Durum Eylem Planı
-                </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  AI Destekli Kurumsal ADEP Sihirbazı •{" "}
-                  <span className="font-semibold text-foreground">
-                    {planRow.plan_name?.trim() ? planRow.plan_name : "Yeni Plan"}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="gap-1.5 border-border bg-background/80 text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/10">
-                <Building2 className="h-3 w-3 text-cyan-200" />
-                {planRow.company_name || "Firma Adı"}
-              </Badge>
-              <Badge className="gap-1.5 border-orange-400/25 bg-orange-400/10 text-orange-700 hover:bg-orange-400/10 dark:text-orange-100">
-                <AlertTriangle className="h-3 w-3" />
-                {planRow.hazard_class}
-              </Badge>
-              <Badge className="gap-1.5 border-emerald-400/25 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/10 dark:text-emerald-100">
-                <Users className="h-3 w-3" />
-                {planRow.employee_count} Çalışan
-              </Badge>
-              {planId && (
-                <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-700 hover:bg-fuchsia-400/10 dark:text-fuchsia-100">
-                  <FileText className="h-3 w-3" />
-                  {planId.slice(0, 8)}...
-                </Badge>
-              )}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Aktif Adım</div>
-                <div className="mt-2 text-lg font-semibold text-foreground">{stepMeta.label}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Kurumsal akışta şu an işlenen modül</div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Tamamlanma</div>
-                <div className="mt-2 text-lg font-semibold text-foreground">%{progress}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Plan genel doluluk seviyesi</div>
-              </div>
-              <div className="rounded-2xl border border-border bg-card/90 p-4 backdrop-blur dark:border-white/10 dark:bg-white/10">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Durum</div>
-                <div className="mt-2 text-lg font-semibold text-foreground">
-                  {progress >= 100 ? "Tamamlandı" : "Çalışma sürüyor"}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">PDF ve paylaşım öncesi operasyon görünümü</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-border bg-card/95 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/65 dark:shadow-[0_20px_50px_rgba(2,6,23,0.35)]">
-            <div className="min-w-[260px]">
-              <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-                <span className="font-medium uppercase tracking-[0.18em]">Tamamlanma Durumu</span>
-                <span className="font-semibold text-foreground">
-                  {progressLoading ? "Hesaplanıyor..." : `%${progress}`}
-                </span>
-              </div>
-              <Progress value={progress} className="h-2.5 bg-muted dark:bg-white/10" />
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Badge
-                className={[
-                  "gap-1.5 border px-3 py-1",
-                  progress >= 100
-                    ? "border-emerald-400/25 bg-emerald-400/15 text-emerald-700 dark:text-emerald-100"
-                    : "border-amber-400/25 bg-amber-400/15 text-amber-700 dark:text-amber-100",
-                ].join(" ")}
-              >
-                {progress >= 100 ? (
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                ) : (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                )}
-                {progress >= 100 ? "Tamamlandı" : "Devam Ediyor"}
-              </Badge>
-              <Badge className="gap-1.5 border-fuchsia-400/25 bg-fuchsia-400/10 text-fuchsia-700 dark:text-fuchsia-100">
-                <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                AI Destekli
-              </Badge>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-400/10 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-amber-700 dark:text-amber-200">Firma Risk Özeti</div>
-                    <div className="mt-2 text-lg font-semibold text-foreground dark:text-white">{companyRiskSummary.level}</div>
-                  </div>
-                  <div className="rounded-full border border-amber-300/30 bg-background/70 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-300/20 dark:bg-white/5 dark:text-amber-100">
-                    {companyRiskSummary.score}/100
-                  </div>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-muted-foreground dark:text-slate-200">
-                  {companyRiskSummary.recommendation}
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/5">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Operasyon Özeti</div>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground dark:text-slate-200">
-                  Temel modüller ve AI modülleri tek akışta ilerliyor. Her adım kaydedilebilir ve PDF aşamasına kontrollü geçiş yapılıyor.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/10 p-4">
-                <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-200">Kullanıcı Etkisi</div>
-                <p className="mt-2 text-sm leading-6 text-cyan-800 dark:text-cyan-50">
-                  Kullanıcı önce planı kurar, sonra ekipler, senaryolar ve risk kaynakları üzerinden çıktıya hazır kurumsal bir ADEP üretir.
-                </p>
-              </div>
-            </div>
-          </div>
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/80 px-5 py-4 text-slate-200">
+          <Loader2 className="h-5 w-5 animate-spin text-cyan-300" />
+          ADEP formu hazırlanıyor...
         </div>
       </div>
+    );
+  }
 
-      {/* ✅ Modern Stepper */}
-      <Card className="overflow-hidden rounded-[24px] border-border bg-card/95 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/70 dark:shadow-[0_22px_55px_rgba(2,6,23,0.28)]">
-        <CardContent className="pt-6">
-          <div className="space-y-4">
-            {/* Core Steps */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Temel Modüller
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {coreSteps.map((s) => {
-                  const Icon = s.icon;
-                  const active = s.id === currentStep;
-                  const done = s.id < currentStep;
-
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => void goToStep(s.id)}
-                      className={[
-                        "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
-                        active
-                          ? "border-cyan-400/40 bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20"
-                          : done
-                          ? "border-emerald-400/35 bg-emerald-400/10 text-emerald-200 hover:border-emerald-400"
-                          : "border-border bg-background text-foreground hover:border-cyan-400/35 hover:bg-cyan-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
-                      ].join(" ")}
-                    >
-                      <span
-                        className={[
-                          "h-6 w-6 rounded-md flex items-center justify-center",
-                          active ? "bg-primary-foreground/20" : "",
-                        ].join(" ")}
-                      >
-                        {done ? (
-                          <CheckCircle2 className="h-4 w-4" />
-                        ) : (
-                          <Icon className="h-4 w-4" />
-                        )}
-                      </span>
-                      <span>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* AI Steps */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-purple-500" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  AI Modülleri
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {aiSteps.map((s) => {
-                  const Icon = s.icon;
-                  const active = s.id === currentStep;
-                  const done = s.id < currentStep;
-
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => void goToStep(s.id)}
-                      className={[
-                        "flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-medium transition-all",
-                        active
-                          ? "border-fuchsia-400 bg-gradient-to-r from-fuchsia-500 to-violet-500 text-white shadow-lg shadow-fuchsia-500/20"
-                          : done
-                          ? "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-200 hover:border-fuchsia-400"
-                          : "border-border bg-background text-foreground hover:border-fuchsia-400/35 hover:bg-fuchsia-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
-                      ].join(" ")}
-                    >
-                      <span
-                        className={[
-                          "h-5 w-5 rounded flex items-center justify-center",
-                          active ? "bg-white/20 dark:bg-white/20" : "",
-                        ].join(" ")}
-                      >
-                        {done ? (
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        ) : (
-                          <Icon className="h-3.5 w-3.5" />
-                        )}
-                      </span>
-                      <span>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Final Step */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Tamamlama
-                </span>
-              </div>
-              <div className="flex gap-2">
-                {finalSteps.map((s) => {
-                  const Icon = s.icon;
-                  const active = s.id === currentStep;
-
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => void goToStep(s.id)}
-                      className={[
-                        "flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all",
-                        active
-                          ? "border-blue-400 bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-                          : "border-border bg-background text-foreground hover:border-blue-400/35 hover:bg-blue-400/5 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300",
-                      ].join(" ")}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{s.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ✅ Content Card */}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <Card className="overflow-hidden rounded-[26px] border-border bg-card shadow-sm dark:border-white/10 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] dark:shadow-[0_24px_65px_rgba(2,6,23,0.32)]">
-        <CardHeader className="border-b border-border bg-muted/30 dark:border-white/10 dark:bg-white/[0.03]">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <Badge className="border-border bg-muted text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/10 dark:text-slate-200 dark:hover:bg-white/10">
-                  Adım {currentStep}
+  return (
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(8,145,178,0.22),transparent_34%),linear-gradient(135deg,#020617,#0f172a_52%,#111827)] px-4 py-6 text-white md:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/80 shadow-[0_24px_80px_rgba(8,47,73,0.35)]">
+          <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-3">
+                <Badge className="w-fit border-cyan-400/20 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
+                  Resmi Word Şablonu
                 </Badge>
-                <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-700 hover:bg-cyan-400/10 dark:text-cyan-100">
-                  {stepMeta.category === "core" ? "Temel Modül" : stepMeta.category === "ai" ? "AI Modülü" : "Final Adımı"}
-                </Badge>
-              </div>
-              <CardTitle className="text-xl text-foreground dark:text-white">
-                Adım {currentStep}/13: {stepMeta.label}
-              </CardTitle>
-              <CardDescription className="mt-1.5 text-muted-foreground dark:text-slate-400">
-                {currentStep === 1 && "Plan meta ve işyeri bilgileri"}
-                {currentStep === 2 &&
-                  "Standart mevzuat metinleri (düzenlenebilir)"}
-                {currentStep === 3 && "Acil durum ekipleri"}
-                {currentStep === 4 &&
-                  "Senaryolar ve talimatlar"}
-                {currentStep === 5 &&
-                  "İletişim rehberi "}
-                {currentStep === 6 &&
-                  "Önleyici tedbir matrisi"}
-                {currentStep === 7 &&
-                  "Ekipman envanteri (AI: adep_equipment_inventory)"}
-                {currentStep === 8 && "Tatbikat kayıtları"}
-                {currentStep === 9 &&
-                  "Periyodik kontrol listeleri"}
-                {currentStep === 10 &&
-                  "Sorumluluk matrisi"}
-                {currentStep === 11 &&
-                  "Mevzuat referansları"}
-                {currentStep === 12 &&
-                  "Risk kaynakları haritası"}
-                {currentStep === 13 && "Kaydet ve PDF oluştur"}
-              </CardDescription>
-            </div>
-
-            <Button
-              variant="outline"
-              className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-white"
-              disabled={
-                saving ||
-                !planRow.plan_name?.trim() ||
-                !planRow.company_name?.trim()
-              }
-              onClick={async () => {
-                const saved = await savePlan({ silent: false });
-                if (saved?.id)
-                  await refreshProgress(saved.id, { ...planRow, id: saved.id });
-              }}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Kaydet
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="bg-transparent pt-6">
-          <div className="space-y-6 [&_.rounded-lg]:rounded-2xl [&_.rounded-xl]:rounded-2xl [&_.border]:border-border [&_.bg-card]:bg-card [&_.shadow-sm]:shadow-sm [&_.text-card-foreground]:text-foreground [&_h3]:text-foreground [&_p.text-muted-foreground]:text-muted-foreground [&_label]:text-foreground [&_input]:border-border [&_input]:bg-background/50 [&_input]:!text-foreground [&_input]:placeholder:text-muted-foreground [&_textarea]:border-border [&_textarea]:bg-background/50 [&_textarea]:!text-foreground [&_textarea]:placeholder:text-muted-foreground [&_[role='combobox']]:border-border [&_[role='combobox']]:bg-background/50 [&_[role='combobox']]:!text-foreground [&_[role='combobox']_[data-slot='select-value']]:!text-foreground [&_[role='combobox']]:data-[placeholder]:text-muted-foreground [&_button.variant-outline]:border-border [&_button.variant-outline]:bg-background">
-            <Suspense fallback={<AdepStepFallback />}>{renderStep()}</Suspense>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-        <Card className={`overflow-hidden rounded-[24px] border border-border bg-card shadow-sm backdrop-blur dark:border-white/10 dark:bg-gradient-to-br ${stepInsight.accent} dark:bg-slate-950/80 dark:shadow-[0_20px_48px_rgba(2,6,23,0.26)]`}>
-          <CardHeader className="border-b border-border bg-muted/30 dark:border-white/10 dark:bg-white/[0.03]">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground dark:text-slate-400">
-                  {stepInsight.eyebrow}
+                <div>
+                  <h1 className="text-3xl font-bold tracking-[-0.04em] md:text-4xl">
+                    Acil Durum Eylem Planı
+                  </h1>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                    Sadece resmi şablonda gerekli olan firma, OSGB, yetkili, ekip ve malzeme bilgilerini doldurun;
+                    sistem Word raporunu hazır formatta oluştursun.
+                  </p>
                 </div>
-                <CardTitle className="mt-2 text-foreground dark:text-white">{stepInsight.title}</CardTitle>
               </div>
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border bg-background dark:border-white/10 dark:bg-white/10">
-                <stepInsight.icon className="h-5 w-5 text-foreground dark:text-white" />
+              <div className="grid gap-3 sm:grid-cols-3 lg:min-w-[430px]">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Firma</div>
+                  <div className="mt-2 truncate text-sm font-semibold">{planData.firma_bilgileri.unvan || "Seçilmedi"}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Ekip Kişisi</div>
+                  <div className="mt-2 text-sm font-semibold">{teamMemberCount}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Malzeme</div>
+                  <div className="mt-2 text-sm font-semibold">{materialCount}</div>
+                </div>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4 p-6">
-            <p className="text-sm leading-6 text-muted-foreground dark:text-slate-200">{stepInsight.summary}</p>
-            <div className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/10 dark:bg-white/[0.04]">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-400">
-                {stepInsight.metricLabel}
-              </div>
-              <div className="mt-2 text-lg font-semibold text-foreground dark:text-white">{stepInsight.metricValue}</div>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-              {moduleCountsLoading
-                ? Array.from({ length: 3 }).map((_, index) => (
-                    <div
-                      key={`skeleton-${index}`}
-                      className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/[0.03]"
+          </CardContent>
+        </Card>
+
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as WizardTab)} className="space-y-5">
+          <TabsList className="grid h-auto grid-cols-1 gap-2 rounded-[24px] border border-white/10 bg-slate-950/70 p-2 md:grid-cols-4">
+            <TabsTrigger value="company" className="gap-2 rounded-2xl py-3 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <Building2 className="h-4 w-4" />
+              Firma & OSGB
+            </TabsTrigger>
+            <TabsTrigger value="professionals" className="gap-2 rounded-2xl py-3 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <ShieldCheck className="h-4 w-4" />
+              Yetkililer
+            </TabsTrigger>
+            <TabsTrigger value="teams" className="gap-2 rounded-2xl py-3 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <Users className="h-4 w-4" />
+              Ekipler
+            </TabsTrigger>
+            <TabsTrigger value="inventory" className="gap-2 rounded-2xl py-3 data-[state=active]:bg-cyan-500 data-[state=active]:text-white">
+              <ClipboardList className="h-4 w-4" />
+              Envanter & İndir
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="company" className="space-y-5">
+            <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <Card className="border-white/10 bg-slate-950/75 text-white">
+                <CardHeader>
+                  <CardTitle>Firma Bilgileri</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Kayıtlı firmadan otomatik doldurabilir veya alanları manuel düzenleyebilirsiniz.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Kayıtlı Firma Seç</Label>
+                    <Select
+                      value={selectedCompanyId || ""}
+                      onValueChange={(companyId) => {
+                        const company = companies.find((item) => item.id === companyId);
+                        if (company) applyCompany(company);
+                      }}
                     >
-                      <div className="h-3 w-20 animate-pulse rounded bg-muted-foreground/20 dark:bg-white/10" />
-                      <div className="mt-3 h-5 w-24 animate-pulse rounded bg-muted-foreground/20 dark:bg-white/15" />
+                      <SelectTrigger className={inputClassName}>
+                        <SelectValue placeholder="Sistemdeki aktif firmalardan seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Firma Ünvanı">
+                      <Input className={inputClassName} value={planData.firma_bilgileri.unvan} onChange={(event) => updateCompanyField("unvan", event.target.value)} />
+                    </Field>
+                    <Field label="SGK Sicil No">
+                      <Input className={inputClassName} value={planData.firma_bilgileri.sgk_sicil_no} onChange={(event) => updateCompanyField("sgk_sicil_no", event.target.value)} />
+                    </Field>
+                  </div>
+
+                  <Field label="Firma Adresi">
+                    <Textarea className={`${inputClassName} min-h-[96px]`} value={planData.firma_bilgileri.adres} onChange={(event) => updateCompanyField("adres", event.target.value)} />
+                  </Field>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Tehlike Sınıfı">
+                      <Select value={planData.firma_bilgileri.tehlike_sinifi} onValueChange={(value) => updateCompanyField("tehlike_sinifi", value as HazardClass)}>
+                        <SelectTrigger className={inputClassName}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {HAZARD_CLASSES.map((hazardClass) => (
+                            <SelectItem key={hazardClass} value={hazardClass}>
+                              {hazardClass}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Çalışan Sayısı">
+                      <Input type="number" min={0} className={inputClassName} value={planData.firma_bilgileri.calisan_sayisi} onChange={(event) => updateCompanyField("calisan_sayisi", Number(event.target.value || 0))} />
+                    </Field>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-white/10 bg-slate-950/75 text-white">
+                <CardHeader>
+                  <CardTitle>OSGB ve Belge Bilgileri</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Word şablonundaki kapak ve OSGB bilgi tabloları bu alanlardan dolar.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Plan Başlığı">
+                      <Input className={inputClassName} value={planData.genel_bilgiler.plan_basligi} onChange={(event) => updateGeneralField("plan_basligi", event.target.value)} />
+                    </Field>
+                    <Field label="Alt Başlık">
+                      <Input className={inputClassName} value={planData.genel_bilgiler.plan_alt_basligi} onChange={(event) => updateGeneralField("plan_alt_basligi", event.target.value)} />
+                    </Field>
+                    <Field label="Hazırlanma Tarihi">
+                      <Input type="date" className={inputClassName} value={planData.genel_bilgiler.hazirlanma_tarihi} onChange={(event) => updateGeneralField("hazirlanma_tarihi", event.target.value)} />
+                    </Field>
+                    <Field label="Geçerlilik Tarihi">
+                      <Input type="date" className={inputClassName} value={planData.genel_bilgiler.gecerlilik_tarihi} onChange={(event) => updateGeneralField("gecerlilik_tarihi", event.target.value)} />
+                    </Field>
+                  </div>
+
+                  <Field label="OSGB Ünvanı">
+                    <Input className={mutedInputClassName} value={planData.osgb_bilgileri.unvan} onChange={(event) => updateOsgbField("unvan", event.target.value)} />
+                  </Field>
+                  <Field label="OSGB Adresi">
+                    <Textarea className={`${mutedInputClassName} min-h-[82px]`} value={planData.osgb_bilgileri.adres} onChange={(event) => updateOsgbField("adres", event.target.value)} />
+                  </Field>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="OSGB Telefon">
+                      <Input className={mutedInputClassName} value={planData.osgb_bilgileri.telefon} onChange={(event) => updateOsgbField("telefon", event.target.value)} />
+                    </Field>
+                    <Field label="İletişim Bilgisi">
+                      <Input className={mutedInputClassName} placeholder="web sitesi / e-posta" value={planData.osgb_bilgileri.iletisim_bilgisi} onChange={(event) => updateOsgbField("iletisim_bilgisi", event.target.value)} />
+                    </Field>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-cyan-400/20 bg-slate-950/75 text-white">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPinned className="h-5 w-5 text-cyan-300" />
+                  Ek-9 İşyeri Krokisi
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  Tahliye Kroki Editörü&apos;nde kaydettiğiniz krokilerden birini seçin. Seçilen kroki Word çıktısında
+                  otomatik olarak <span className="font-medium text-cyan-200">Ek-9 : İşyeri Krokisi</span> bölümüne eklenir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+                <div className="space-y-4">
+                  <Field label="Kaydedilmiş Kroki Seç">
+                    <Select
+                      value={planData.ekler.secili_kroki?.id || "__none__"}
+                      onValueChange={handleSketchSelection}
+                    >
+                      <SelectTrigger className={inputClassName}>
+                        <SelectValue placeholder="Sistemden bir kroki seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Kroki bağlı değil</SelectItem>
+                        {savedSketches.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.project_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  {savedSketches.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-amber-400/20 bg-amber-500/5 p-4 text-sm text-amber-100">
+                      Henüz kayıtlı kroki bulunamadı. Önce Tahliye Kroki Editörü&apos;nde bir kroki oluşturup kaydedin.
                     </div>
-                  ))
-                : stepInsight.stats.map((stat) => (
-                    <div
-                      key={stat.label}
-                      className="rounded-2xl border border-border bg-muted/40 p-4 dark:border-white/8 dark:bg-white/[0.03]"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground dark:text-slate-400">
-                          {stat.label}
-                        </div>
-                        <Badge
-                          className={[
-                            "border px-2.5 py-1 text-[11px] font-semibold shadow-sm",
-                            stepMeta.category === "core"
-                              ? "border-cyan-400/25 bg-cyan-400/12 text-cyan-100"
-                              : stepMeta.category === "ai"
-                              ? "border-fuchsia-400/25 bg-fuchsia-400/12 text-fuchsia-100"
-                              : "border-emerald-400/25 bg-emerald-400/12 text-emerald-100",
-                          ].join(" ")}
-                        >
-                          {stat.value}
-                        </Badge>
+                  ) : (
+                    <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4 text-sm text-slate-300">
+                      Seçilen kroki bu plan kaydıyla birlikte saklanır ve Word çıktısında otomatik kullanılır.
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="gap-2 border-cyan-400/30 bg-cyan-500/5 text-cyan-100 hover:bg-cyan-500/10"
+                    onClick={() => navigate("/evacuation-editor/history")}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Kroki Geçmişlerini Aç
+                  </Button>
+                </div>
+
+                <div className="rounded-3xl border border-white/10 bg-slate-950/80 p-4">
+                  {planData.ekler.secili_kroki?.thumbnail_data_url ? (
+                    <div className="space-y-3">
+                      <img
+                        src={planData.ekler.secili_kroki.thumbnail_data_url}
+                        alt={planData.ekler.secili_kroki.project_name}
+                        className="h-52 w-full rounded-2xl object-cover"
+                      />
+                      <div className="space-y-1">
+                        <p className="truncate text-sm font-semibold text-white">
+                          {planData.ekler.secili_kroki.project_name}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          Kaydedildi: {new Date(planData.ekler.secili_kroki.created_at).toLocaleString("tr-TR")}
+                        </p>
                       </div>
                     </div>
-                  ))}
-            </div>
-            <div className="space-y-2">
-              {stepInsight.bullets.map((bullet) => (
-                <div
-                  key={bullet}
-                  className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm leading-6 text-muted-foreground dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-300"
-                >
-                  {bullet}
+                  ) : (
+                    <div className="flex min-h-[208px] items-center justify-center rounded-2xl border border-dashed border-white/10 text-center text-sm text-slate-400">
+                      Seçilen krokinin önizlemesi burada gösterilir.
+                    </div>
+                  )}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="professionals">
+            <div className="grid gap-5 lg:grid-cols-3">
+              <PersonCard title="İşveren / İşveren Vekili" description="İmza ve detaylı kimlik kartında kullanılacak kişi.">
+                <PersonFields person={planData.yetkililer.isveren_vekil} onChange={(field, value) => updatePerson("yetkililer", "isveren_vekil", field, value)} />
+              </PersonCard>
+              <PersonCard title="İş Güvenliği Uzmanı" description="Sertifika numarası Word şablonunda ayrıca basılır.">
+                <PersonFields person={planData.yetkililer.isg_uzmani} showCertificate onChange={(field, value) => updatePerson("yetkililer", "isg_uzmani", field, value)} />
+              </PersonCard>
+              <PersonCard title="İşyeri Hekimi" description="Sertifika numarası Word şablonunda ayrıca basılır.">
+                <PersonFields person={planData.yetkililer.isyeri_hekimi} showCertificate onChange={(field, value) => updatePerson("yetkililer", "isyeri_hekimi", field, value)} />
+              </PersonCard>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="teams">
+            <div className="grid gap-5 xl:grid-cols-2">
+              {teamMeta.map((team) => (
+                <Card key={team.key} className="border-white/10 bg-slate-950/75 text-white">
+                  <CardHeader>
+                    <CardTitle>{team.title}</CardTitle>
+                    <CardDescription className="text-slate-400">{team.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    <div className="rounded-2xl border border-cyan-400/15 bg-cyan-400/5 p-4">
+                      <div className="mb-3 text-sm font-semibold text-cyan-100">Ekip Başkanı</div>
+                      <PersonFields person={planData.ekipler[team.key].ekip_baskani} compact onChange={(field, value) => updateTeamLeader(team.key, field as keyof ADEPPerson, value)} />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold">Ekip Üyeleri</div>
+                          <div className="text-xs text-slate-500">Gerektiği kadar üye ekleyebilirsiniz.</div>
+                        </div>
+                        <Button type="button" size="sm" onClick={() => addTeamMember(team.key)} className="gap-2 bg-cyan-500 text-white hover:bg-cyan-600">
+                          <Plus className="h-4 w-4" />
+                          Üye Ekle
+                        </Button>
+                      </div>
+
+                      {planData.ekipler[team.key].uyeler.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-5 text-center text-sm text-slate-400">
+                          Henüz üye eklenmedi.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {planData.ekipler[team.key].uyeler.map((member, index) => (
+                            <div key={`${team.key}-${index}`} className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 md:grid-cols-[1fr_150px_150px_auto]">
+                              <Input className={inputClassName} placeholder="Ad Soyad" value={member.ad_soyad} onChange={(event) => updateTeamMember(team.key, index, "ad_soyad", event.target.value)} />
+                              <Input className={inputClassName} placeholder="T.C. Kimlik No" value={member.tc_no} onChange={(event) => updateTeamMember(team.key, index, "tc_no", event.target.value)} />
+                              <Input className={inputClassName} placeholder="Telefon" value={member.telefon} onChange={(event) => updateTeamMember(team.key, index, "telefon", event.target.value)} />
+                              <Button type="button" variant="outline" size="icon" onClick={() => removeTeamMember(team.key, index)} className="border-rose-400/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        <Card className="rounded-[24px] border-border bg-card shadow-sm dark:border-white/10 dark:bg-slate-950/75 dark:shadow-[0_20px_48px_rgba(2,6,23,0.22)]">
-          <CardHeader>
-            <CardTitle className="text-foreground dark:text-white">Hızlı kontrol listesi</CardTitle>
-            <CardDescription className="text-muted-foreground dark:text-slate-400">
-              Final PDF kalitesini yükselten küçük ama kritik kontroller.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {[
-              planRow.plan_name?.trim() ? "Plan adı hazır" : "Plan adı kontrol edilmeli",
-              planRow.company_name?.trim() ? "Firma bilgisi girildi" : "Firma bilgisi eksik",
-              progress >= 100 ? "Plan tamamlanmış görünüyor" : "Tamamlanma oranı final öncesi gözden geçirilmeli",
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground dark:border-white/8 dark:bg-white/[0.03] dark:text-slate-300"
-              >
-                {item}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+          <TabsContent value="inventory" className="space-y-5">
+            <Card className="border-white/10 bg-slate-950/75 text-white">
+              <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <CardTitle>Malzeme Envanteri</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    Şablondaki Malzeme | Miktar/Yer | Malzeme | Miktar/Yer tablosuna ikili düzenle basılır.
+                  </CardDescription>
+                </div>
+                <Button type="button" onClick={addMaterial} className="gap-2 bg-cyan-500 text-white hover:bg-cyan-600">
+                  <PackagePlus className="h-4 w-4" />
+                  Yeni Malzeme Ekle
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {planData.malzeme_envanteri.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-slate-400">
+                    Henüz malzeme eklenmedi. Envanter tablosu boş olarak hazırlanır.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {planData.malzeme_envanteri.map((material, index) => (
+                      <div key={index} className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3 md:grid-cols-[1fr_170px_220px_auto]">
+                        <Input className={inputClassName} placeholder="Malzeme adı" value={material.equipment_name} onChange={(event) => updateMaterial(index, "equipment_name", event.target.value)} />
+                        <Input className={inputClassName} placeholder="Miktar" value={material.quantity} onChange={(event) => updateMaterial(index, "quantity", event.target.value)} />
+                        <Input className={inputClassName} placeholder="Konum / yer" value={material.location || ""} onChange={(event) => updateMaterial(index, "location", event.target.value)} />
+                        <Button type="button" variant="outline" size="icon" onClick={() => removeMaterial(index)} className="border-rose-400/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Field label="Acil Toplanma Alanı Açıklaması">
+                  <Textarea
+                    className={`${inputClassName} min-h-[92px]`}
+                    value={planData.toplanma_alani}
+                    onChange={(event) => updatePlanData((previous) => ({ ...previous, toplanma_alani: event.target.value }))}
+                  />
+                </Field>
+
+                <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-400/5 p-5">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 text-cyan-100">
+                        <FileCheck2 className="h-5 w-5" />
+                        <span className="font-semibold">Rapor Hazır mı?</span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-300">
+                        Firma, yetkililer, ekip başkanları ve envanter bilgileri resmi Word şablonundaki ilgili tablolara basılır.
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Button type="button" variant="outline" disabled={saving} onClick={savePlan} className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                        Kaydet
+                      </Button>
+                      <Button type="button" disabled={saving} onClick={downloadWordReport} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700">
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        Word Olarak Raporu İndir
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-      </div>
+    </div>
+  );
+}
 
-      {/* ✅ Navigation */}
-      <div className="sticky bottom-4 z-20 flex justify-between rounded-2xl border border-border bg-card/95 p-3 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/80 dark:shadow-[0_20px_50px_rgba(2,6,23,0.28)]">
-        <Button
-          variant="outline"
-          size="lg"
-          className="gap-2 border-border bg-background text-foreground hover:bg-muted dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10 dark:hover:text-white"
-          onClick={() => void goToStep(currentStep - 1)}
-          disabled={currentStep === 1}
-        >
-          <ChevronLeft className="h-5 w-5" />
-          Geri
-        </Button>
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label className="text-slate-200">{label}</Label>
+      {children}
+    </div>
+  );
+}
 
-        {currentStep < 13 ? (
-          <Button
-            size="lg"
-            className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:from-cyan-600 hover:to-blue-600"
-            onClick={() => void goToStep(currentStep + 1)}
-          >
-            İleri
-            <ChevronRight className="h-5 w-5" />
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            className="gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600"
-            disabled={!planId}
-            onClick={() => navigate("/adep-plans")}
-          >
-            <CheckCircle2 className="h-5 w-5" />
-            Listeye Dön
-          </Button>
-        )}
-      </div>
+function PersonCard({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="border-white/10 bg-slate-950/75 text-white">
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription className="text-slate-400">{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
 
-      <Suspense fallback={null}>
-        <SendReportModal
-          open={sendModalOpen}
-          onOpenChange={setSendModalOpen}
-          reportType="adep"
-          reportUrl={currentReportUrl}
-          reportFilename={currentReportFilename}
-          companyName={planRow.company_name || "Firma"}
-        />
-      </Suspense>
+function PersonFields({
+  person,
+  showCertificate = false,
+  compact = false,
+  onChange,
+}: {
+  person: ADEPPerson & { belge_no?: string };
+  showCertificate?: boolean;
+  compact?: boolean;
+  onChange: (field: string, value: string) => void;
+}) {
+  return (
+    <div className={`grid gap-3 ${compact ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
+      <Input className={inputClassName} placeholder="Ad Soyad" value={person.ad_soyad} onChange={(event) => onChange("ad_soyad", event.target.value)} />
+      <Input className={inputClassName} placeholder="T.C. Kimlik No" value={person.tc_no} onChange={(event) => onChange("tc_no", event.target.value)} />
+      <Input className={inputClassName} placeholder="Telefon" value={person.telefon} onChange={(event) => onChange("telefon", event.target.value)} />
+      {showCertificate && (
+        <Input className={inputClassName} placeholder="Sertifika / Belge No" value={person.belge_no || ""} onChange={(event) => onChange("belge_no", event.target.value)} />
+      )}
     </div>
   );
 }

@@ -486,13 +486,24 @@ export function AppSidebar() {
 
   const isFavorite = (url: string) => favoriteUrls.includes(url);
 
+  const toggleFavoriteItem = (item: MenuItem) => {
+    setFavoriteUrls((prev) =>
+      prev.includes(item.url) ? prev.filter((url) => url !== item.url) : [item.url, ...prev].slice(0, 8),
+    );
+  };
+
   const toggleFavorite = (event: React.MouseEvent, item: MenuItem) => {
     event.preventDefault();
     event.stopPropagation();
 
-    setFavoriteUrls((prev) =>
-      prev.includes(item.url) ? prev.filter((url) => url !== item.url) : [item.url, ...prev].slice(0, 8),
-    );
+    toggleFavoriteItem(item);
+  };
+
+  const handleFavoriteKeyDown = (event: React.KeyboardEvent, item: MenuItem) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    toggleFavoriteItem(item);
   };
 
   const toggleGroup = (label: string) => {
@@ -638,9 +649,11 @@ export function AppSidebar() {
                                 {!collapsed && (
                                   <>
                                     <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
-                                    <button
-                                      type="button"
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
                                       onClick={(event) => toggleFavorite(event, item)}
+                                      onKeyDown={(event) => handleFavoriteKeyDown(event, item)}
                                       className={cn(
                                         "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
                                         "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
@@ -654,7 +667,7 @@ export function AppSidebar() {
                                           favorite && "fill-amber-400 dark:fill-amber-300",
                                         )}
                                       />
-                                    </button>
+                                    </span>
                                     {item.badge && <PillBadge value={item.badge} />}
                                     <ChevronDown
                                       className={cn(
@@ -687,9 +700,11 @@ export function AppSidebar() {
                                           <span className={cn(subtleLine, childActive && subtleLineActive)} />
                                           <SubMenuIcon item={child} active={childActive} />
                                           <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{child.title}</span>
-                                          <button
-                                            type="button"
+                                          <span
+                                            role="button"
+                                            tabIndex={0}
                                             onClick={(event) => toggleFavorite(event, child)}
+                                            onKeyDown={(event) => handleFavoriteKeyDown(event, child)}
                                             className={cn(
                                               "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
                                               "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
@@ -703,7 +718,7 @@ export function AppSidebar() {
                                                 childFavorite && "fill-amber-400 dark:fill-amber-300",
                                               )}
                                             />
-                                          </button>
+                                          </span>
                                           {child.badge && <PillBadge value={child.badge} />}
                                         </NavLink>
                                       </SidebarMenuButton>
@@ -736,9 +751,11 @@ export function AppSidebar() {
                                 {!collapsed && (
                                   <>
                                     <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
-                                    <button
-                                      type="button"
+                                    <span
+                                      role="button"
+                                      tabIndex={0}
                                       onClick={(event) => toggleFavorite(event, item)}
+                                      onKeyDown={(event) => handleFavoriteKeyDown(event, item)}
                                       className={cn(
                                         "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
                                         "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
@@ -752,7 +769,7 @@ export function AppSidebar() {
                                           favorite && "fill-amber-400 dark:fill-amber-300",
                                         )}
                                       />
-                                    </button>
+                                    </span>
                                     {item.badge && <PillBadge value={item.badge} />}
                                     <ChevronRight className="h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-400 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
                                   </>

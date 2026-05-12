@@ -166,10 +166,11 @@ export default function ADEPGeneralInfo({
   };
 
   const updateNestedSection = <K extends keyof ADEPPlanData>(section: K, patch: Partial<ADEPPlanData[K]>) => {
+    const currentSection = (planData[section] ?? {}) as Record<string, unknown>;
     onPlanDataChange(section, {
-      ...planData[section],
+      ...currentSection,
       ...patch,
-    });
+    } as ADEPPlanData[K]);
   };
 
   const handleSketchSelection = (projectId: string) => {
@@ -242,6 +243,81 @@ export default function ADEPGeneralInfo({
       hazirlayanlar: nextPreparers,
     });
   };
+
+  const sketchSelectionPanel = (
+    <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <MapPinned className="h-4 w-4 text-cyan-300" />
+            Ek-9 İşyeri Krokisi
+          </div>
+          <p className="text-xs leading-5 text-slate-300">
+            Tahliye Kroki Editörü&apos;nde kaydettiğiniz krokilerden birini seçin. Seçilen kroki Word çıktısında
+            otomatik olarak <span className="font-medium text-cyan-100">Ek-9 : İşyeri Krokisi</span> bölümüne eklenir.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-2 border-cyan-400/30 text-cyan-100 hover:bg-cyan-500/10"
+          onClick={() => navigate("/evacuation-editor/history")}
+        >
+          <ExternalLink className="h-4 w-4" />
+          Kroki Geçmişlerini Aç
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+        <div className="space-y-2">
+          <Label>Kaydedilmiş Kroki Seç</Label>
+          <Select value={planData.ekler.secili_kroki?.id || "__none__"} onValueChange={handleSketchSelection}>
+            <SelectTrigger className={readableInputClassName}>
+              <SelectValue placeholder="Sistemden bir kroki seçin" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Kroki bağlı değil</SelectItem>
+              {savedSketches.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.project_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {savedSketches.length === 0 ? (
+            <p className="text-xs text-amber-200/90">
+              Henüz kayıtlı kroki bulunamadı. Önce Tahliye Kroki Editörü&apos;nde bir kroki oluşturup kaydedin.
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
+          {planData.ekler.secili_kroki?.thumbnail_data_url ? (
+            <div className="space-y-3">
+              <img
+                src={planData.ekler.secili_kroki.thumbnail_data_url}
+                alt={planData.ekler.secili_kroki.project_name}
+                className="h-36 w-full rounded-xl object-cover"
+              />
+              <div className="space-y-1">
+                <p className="truncate text-sm font-semibold text-white">
+                  {planData.ekler.secili_kroki.project_name}
+                </p>
+                <p className="text-xs text-slate-400">
+                  Kaydedildi: {new Date(planData.ekler.secili_kroki.created_at).toLocaleString("tr-TR")}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex min-h-[144px] items-center justify-center rounded-xl border border-dashed border-white/10 text-center text-xs text-slate-400">
+              Seçilen krokinin küçük önizlemesi burada gösterilir.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -472,6 +548,8 @@ export default function ADEPGeneralInfo({
               />
             </div>
           </div>
+
+          {sketchSelectionPanel}
         </CardContent>
       </Card>
 
