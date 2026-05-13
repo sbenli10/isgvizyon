@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Building2, Download, FileSpreadsheet, FileText, Plus, Save, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -32,6 +32,7 @@ import {
   type AnnualWorkPlanRow,
 } from "@/lib/annualWorkPlanOfficialDocx";
 import { downloadAnnualWorkPlanPdf } from "@/lib/annualWorkPlanPdf";
+import { downloadAnnualEvaluationOfficialDocx } from "@/lib/annualEvaluationOfficialDocx";
 
 const MONTH_HEADERS = [
   "OCAK",
@@ -62,7 +63,40 @@ type StoredAnnualPlanData = {
   rows: AnnualWorkPlanRow[];
 };
 
+type AnnualPlansSection = "work-plan" | "annual-evaluation";
+
+type AnnualEvaluationWorkItem = {
+  yapilanCalismalar: string;
+  tarih: string;
+  yapanKisiUnvani: string;
+  tekrarSayisi: string;
+  kullanilanYontem: string;
+  sonucYorum: string;
+};
+
+type AnnualEvaluationCompanyFormState = {
+  isyeriUnvani: string;
+  sgkSicilNo: string;
+  adres: string;
+  telFax: string;
+  eposta: string;
+  iskolu: string;
+  calisanErkek: string;
+  calisanKadin: string;
+  calisanGenc: string;
+  calisanCocuk: string;
+  calisanToplam: string;
+};
+
 const currentYear = new Date().getFullYear();
+const createEmptyAnnualEvaluationWork = (): AnnualEvaluationWorkItem => ({
+  yapilanCalismalar: "",
+  tarih: "",
+  yapanKisiUnvani: "",
+  tekrarSayisi: "",
+  kullanilanYontem: "",
+  sonucYorum: "",
+});
 
 const baseRows = [
   {
@@ -328,6 +362,7 @@ export default function AnnualPlans() {
   const [searchParams] = useSearchParams();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("companyId") || "");
+  const [activeSection, setActiveSection] = useState<AnnualPlansSection>("work-plan");
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [companyForm, setCompanyForm] = useState<AnnualWorkPlanCompanyInfo>({
     companyName: "",
@@ -341,10 +376,37 @@ export default function AnnualPlans() {
   const [exportingWord, setExportingWord] = useState(false);
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [generatingAnnualEvaluationReport, setGeneratingAnnualEvaluationReport] = useState(false);
+  const [annualEvaluationWorks, setAnnualEvaluationWorks] = useState<AnnualEvaluationWorkItem[]>([
+    createEmptyAnnualEvaluationWork(),
+  ]);
+  const [annualEvaluationCompanyForm, setAnnualEvaluationCompanyForm] =
+    useState<AnnualEvaluationCompanyFormState>({
+    isyeriUnvani: "",
+    sgkSicilNo: "",
+    adres: "",
+    telFax: "",
+    eposta: "",
+    iskolu: "",
+    calisanErkek: "",
+    calisanKadin: "",
+    calisanGenc: "",
+    calisanCocuk: "",
+    calisanToplam: "",
+  });
 
   useEffect(() => {
     setCompanyForm((previous) => ({ ...previous, year: selectedYear }));
   }, [selectedYear]);
+
+  useEffect(() => {
+    setAnnualEvaluationCompanyForm((previous) => ({
+      ...previous,
+      isyeriUnvani: companyForm.companyName,
+      sgkSicilNo: companyForm.registrationNumber,
+      adres: companyForm.address,
+    }));
+  }, [companyForm.address, companyForm.companyName, companyForm.registrationNumber]);
 
   useEffect(() => {
     if (!user) return;
@@ -464,6 +526,41 @@ export default function AnnualPlans() {
     toast.success("Hazır resmi şablon yüklendi", {
       description:
         "Periyodik faaliyetler, periyot, sorumlu ve ilgili mevzuat alanları resmi matrise otomatik dolduruldu.",
+    });
+  };
+
+  const handleAnnualEvaluationCompanyChange = (
+    field: keyof AnnualEvaluationCompanyFormState,
+    value: string,
+  ) => {
+    setAnnualEvaluationCompanyForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const handleAnnualEvaluationWorkChange = (
+    index: number,
+    field: keyof AnnualEvaluationWorkItem,
+    value: string,
+  ) => {
+    setAnnualEvaluationWorks((previous) =>
+      previous.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const handleAddAnnualEvaluationWork = () => {
+    setAnnualEvaluationWorks((previous) => [...previous, createEmptyAnnualEvaluationWork()]);
+  };
+
+  const handleRemoveAnnualEvaluationWork = (index: number) => {
+    setAnnualEvaluationWorks((previous) => {
+      if (previous.length <= 1) {
+        return previous;
+      }
+      return previous.filter((_, itemIndex) => itemIndex !== index);
     });
   };
 
@@ -649,6 +746,24 @@ export default function AnnualPlans() {
     }
   };
 
+  const handleGenerateAnnualEvaluationReport = async () => {
+    setGeneratingAnnualEvaluationReport(true);
+
+    try {
+      await downloadAnnualEvaluationOfficialDocx({
+        company: annualEvaluationCompanyForm,
+        works: annualEvaluationWorks,
+        year: selectedYear,
+      });
+      toast.success("Yıllık değerlendirme raporu oluşturuldu");
+    } catch (error) {
+      console.error("Annual evaluation report generation failed:", error);
+      alert("Yıllık değerlendirme raporu oluşturulurken bir hata oluştu.");
+    } finally {
+      setGeneratingAnnualEvaluationReport(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="theme-page-readable min-h-screen bg-background px-4 py-6 md:px-8">
@@ -711,290 +826,615 @@ export default function AnnualPlans() {
         </Card>
 
         <Card className="border-border bg-card shadow-sm">
-          <CardHeader>
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-primary" />
-                  Firma bilgileri
-                </CardTitle>
-                <CardDescription className="mt-2 text-sm text-muted-foreground">
-                  Resmi şablondaki firma alanları bu bilgilerle doldurulur. Firma seçince alanlar otomatik gelir, isterseniz
-                  manuel olarak güncelleyebilirsiniz.
-                </CardDescription>
-              </div>
-
-              <div className="w-full xl:w-44">
-                <Label className="mb-2 block text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                  Plan yılı
-                </Label>
-                <Select
-                  value={String(selectedYear)}
-                  onValueChange={(value) => setSelectedYear(Number(value))}
-                >
-                  <SelectTrigger className="bg-background">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 5 }, (_, index) => currentYear - 1 + index).map((year) => (
-                      <SelectItem key={year} value={String(year)}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
-            <div className="space-y-2 lg:col-span-2">
-              <Label>Firma seç</Label>
-              <Select
-                value={selectedCompanyId}
-                onValueChange={(value) => {
-                  const company = companies.find((item) => item.id === value);
-                  if (company) {
-                    applyCompany(company);
-                  }
-                }}
+          <CardContent className="pt-6">
+            <div className="grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setActiveSection("work-plan")}
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  activeSection === "work-plan"
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border bg-background hover:bg-muted/60"
+                }`}
               >
-                <SelectTrigger className="bg-background">
-                  <SelectValue placeholder="Sistemdeki aktif firmalardan seçim yapın" />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <div className="text-sm font-semibold text-foreground">Yıllık Çalışma Planı</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Resmi matrisi yönetin, ayları işaretleyin ve Word, Excel, PDF çıktısı alın.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveSection("annual-evaluation")}
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  activeSection === "annual-evaluation"
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border bg-background hover:bg-muted/60"
+                }`}
+              >
+                <div className="text-sm font-semibold text-foreground">YILLIK DEĞERLENDİRME RAPORU</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Değerlendirme alanlarını doldurun ve hazır şablondan `.docx` rapor üretin.
+                </p>
+              </button>
             </div>
-
-            <Field label="Firma unvanı">
-              <Input
-                value={companyForm.companyName}
-                onChange={(event) =>
-                  setCompanyForm((previous) => ({ ...previous, companyName: event.target.value }))
-                }
-                className="bg-background"
-              />
-            </Field>
-
-            <Field label="İş yeri sicil / vergi no">
-              <Input
-                value={companyForm.registrationNumber}
-                onChange={(event) =>
-                  setCompanyForm((previous) => ({
-                    ...previous,
-                    registrationNumber: event.target.value,
-                  }))
-                }
-                className="bg-background"
-              />
-            </Field>
-
-            <Field label="Firma adresi" className="lg:col-span-2">
-              <Input
-                value={companyForm.address}
-                onChange={(event) =>
-                  setCompanyForm((previous) => ({ ...previous, address: event.target.value }))
-                }
-                className="bg-background"
-              />
-            </Field>
           </CardContent>
         </Card>
 
+        {activeSection === "work-plan" ? (
+          <>
+            <Card className="border-border bg-card shadow-sm">
+              <CardHeader>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      Firma bilgileri
+                    </CardTitle>
+                    <CardDescription className="mt-2 text-sm text-muted-foreground">
+                      Resmi şablondaki firma alanları bu bilgilerle doldurulur. Firma seçince alanlar otomatik gelir, isterseniz
+                      manuel olarak güncelleyebilirsiniz.
+                    </CardDescription>
+                  </div>
+
+                  <div className="w-full xl:w-44">
+                    <Label className="mb-2 block text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                      Plan yılı
+                    </Label>
+                    <Select
+                      value={String(selectedYear)}
+                      onValueChange={(value) => setSelectedYear(Number(value))}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 5 }, (_, index) => currentYear - 1 + index).map((year) => (
+                          <SelectItem key={year} value={String(year)}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2 lg:col-span-2">
+                  <Label>Firma seç</Label>
+                  <Select
+                    value={selectedCompanyId}
+                    onValueChange={(value) => {
+                      const company = companies.find((item) => item.id === value);
+                      if (company) {
+                        applyCompany(company);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Sistemdeki aktif firmalardan seçim yapın" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Field label="Firma unvanı">
+                  <Input
+                    value={companyForm.companyName}
+                    onChange={(event) =>
+                      setCompanyForm((previous) => ({ ...previous, companyName: event.target.value }))
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İş yeri sicil / vergi no">
+                  <Input
+                    value={companyForm.registrationNumber}
+                    onChange={(event) =>
+                      setCompanyForm((previous) => ({
+                        ...previous,
+                        registrationNumber: event.target.value,
+                      }))
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Firma adresi" className="lg:col-span-2">
+                  <Input
+                    value={companyForm.address}
+                    onChange={(event) =>
+                      setCompanyForm((previous) => ({ ...previous, address: event.target.value }))
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-sm">
+              <CardHeader>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div>
+                    <CardTitle>Resmi yıllık plan matrisi</CardTitle>
+                    <CardDescription className="mt-2 text-sm text-muted-foreground">
+                      Ay hücrelerine tıklayarak resmi planlama işaretlerini kırmızı dolgu ile oluşturun. Tüm alanlar light ve
+                      dark temada yüksek okunabilirlik için semantic tokenlarla düzenlendi.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Hazır Şablonu Yükle
+                    </Button>
+                    <Button type="button" variant="outline" onClick={addRow} className="gap-2">
+                      <Plus className="h-4 w-4" />
+                      Yeni Satır
+                    </Button>
+                    <Button onClick={() => void savePlan()} disabled={saving} className="gap-2">
+                      <Save className="h-4 w-4" />
+                      {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+                    </Button>
+                    <Button variant="outline" onClick={() => void exportExcel()} disabled={exportingExcel} className="gap-2">
+                      <FileSpreadsheet className="h-4 w-4" />
+                      {exportingExcel ? "Hazırlanıyor..." : "Excel Aktar"}
+                    </Button>
+                    <Button variant="outline" onClick={() => void exportPdf()} disabled={exportingPdf} className="gap-2">
+                      <FileText className="h-4 w-4" />
+                      {exportingPdf ? "Hazırlanıyor..." : "PDF Çıktısı"}
+                    </Button>
+                    <Button variant="secondary" onClick={() => void exportWord()} disabled={exportingWord} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      {exportingWord ? "Hazırlanıyor..." : "Word Çıktısı"}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm font-semibold text-foreground">Hazır resmi şablon yükleme alanı</div>
+                    </div>
+                    <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
+                      <Download className="h-4 w-4" />
+                      Şablonu Yeniden Doldur
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-2xl border border-border">
+                  <Table className="min-w-[1680px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableHead className="min-w-[420px] align-middle text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          PERİYODİK FAALİYETLER
+                        </TableHead>
+                        <TableHead className="min-w-[150px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          PERİYOT
+                        </TableHead>
+                        <TableHead className="min-w-[240px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          SORUMLU
+                        </TableHead>
+                        <TableHead className="min-w-[320px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          İLGİLİ MEVZUAT
+                        </TableHead>
+                        <TableHead className="min-w-[160px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                          MEVCUT DURUM
+                        </TableHead>
+                        {MONTH_HEADERS.map((month) => (
+                          <TableHead
+                            key={month}
+                            className="w-[70px] min-w-[70px] text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+                          >
+                            {month}
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={row.id} className="align-top">
+                          <TableCell className="bg-card">
+                            <div className="space-y-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                                  Faaliyet
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
+                                  onClick={() => removeRow(row.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                value={row.activity}
+                                onChange={(event) => updateRowField(row.id, "activity", event.target.value)}
+                                className="min-h-[112px] resize-none border-0 bg-transparent px-0 text-sm font-medium text-foreground shadow-none focus-visible:ring-0"
+                              />
+                            </div>
+                          </TableCell>
+                          <TableCell className="bg-card">
+                            <Textarea
+                              value={row.period}
+                              onChange={(event) => updateRowField(row.id, "period", event.target.value)}
+                              className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-foreground shadow-none focus-visible:ring-0"
+                            />
+                          </TableCell>
+                          <TableCell className="bg-card">
+                            <Textarea
+                              value={row.responsible}
+                              onChange={(event) => updateRowField(row.id, "responsible", event.target.value)}
+                              className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-foreground shadow-none focus-visible:ring-0"
+                            />
+                          </TableCell>
+                          <TableCell className="bg-card">
+                            <Textarea
+                              value={row.regulation}
+                              onChange={(event) => updateRowField(row.id, "regulation", event.target.value)}
+                              className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-muted-foreground shadow-none focus-visible:ring-0"
+                            />
+                          </TableCell>
+                          <TableCell className="bg-card">
+                            <Input
+                              value={row.currentStatus}
+                              onChange={(event) => updateRowField(row.id, "currentStatus", event.target.value)}
+                              placeholder="Örn. Hazır / Muaf"
+                              className="bg-muted"
+                            />
+                          </TableCell>
+
+                          {row.months.map((active, monthIndex) => (
+                            <TableCell
+                              key={`${row.id}-${MONTH_HEADERS[monthIndex]}`}
+                              className={`cursor-pointer px-0 text-center transition-colors ${
+                                active
+                                  ? "bg-red-500/90 hover:bg-red-500/90 dark:bg-red-600/80 dark:hover:bg-red-600/80"
+                                  : "bg-card hover:bg-muted/60"
+                              }`}
+                              onClick={() => toggleMonth(row.id, monthIndex)}
+                            >
+                              <div className="flex min-h-[88px] items-center justify-center">
+                                {active ? (
+                                  <div className="h-9 w-9 rounded-md bg-red-600/95 shadow-sm dark:bg-red-500/90" />
+                                ) : (
+                                  <span className="text-sm font-medium text-muted-foreground">-</span>
+                                )}
+                              </div>
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Kullanım notu</p>
+                    <p className="mt-2 text-sm text-foreground">
+                      Ay hücresine her tıklamada ilgili faaliyet için plan işareti açılır veya kapanır.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Resmi çıktı</p>
+                    <p className="mt-2 text-sm text-foreground">
+                      Word çıktısı doğrudan <span className="font-medium">İŞ SAĞLIĞI ve GÜVENLİĞİ YILLIK ÇALIŞMA PLANI.docx</span> şablonuna yazılır.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border bg-muted/40 p-4">
+                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Firma verisi</p>
+                    <p className="mt-2 text-sm text-foreground">
+                      Üstteki firma kartında seçilen unvan, adres ve sicil/vergi numarası resmi şablonun başlık alanına taşınır.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
+
+        {activeSection === "annual-evaluation" ? (
         <Card className="border-border bg-card shadow-sm">
           <CardHeader>
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div>
-                <CardTitle>Resmi yıllık plan matrisi</CardTitle>
-                <CardDescription className="mt-2 text-sm text-muted-foreground">
-                  Ay hücrelerine tıklayarak resmi planlama işaretlerini kırmızı dolgu ile oluşturun. Tüm alanlar light ve
-                  dark temada yüksek okunabilirlik için semantic tokenlarla düzenlendi.
-                </CardDescription>
-              </div>
+            <CardTitle>YILLIK DEĞERLENDİRME RAPORU</CardTitle>
+            <CardDescription className="mt-2 text-sm text-muted-foreground">
+              Hazır Word şablonundaki değerlendirme raporu alanlarını doldurun ve tek tıkla
+              `.docx` çıktısı alın.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 text-sm font-semibold text-foreground">İş Yeri Bilgileri</div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="İş Yerinin Unvanı Seç">
+                  <Select
+                    value={selectedCompanyId}
+                    onValueChange={(value) => {
+                      const company = companies.find((item) => item.id === value);
+                      if (company) {
+                        applyCompany(company);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Sistemdeki firmalarınızdan seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Hazır Şablonu Yükle
-                </Button>
-                <Button type="button" variant="outline" onClick={addRow} className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Yeni Satır
-                </Button>
-                <Button onClick={() => void savePlan()} disabled={saving} className="gap-2">
-                  <Save className="h-4 w-4" />
-                  {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-                </Button>
-                <Button variant="outline" onClick={() => void exportExcel()} disabled={exportingExcel} className="gap-2">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  {exportingExcel ? "Hazırlanıyor..." : "Excel Aktar"}
-                </Button>
-                <Button variant="outline" onClick={() => void exportPdf()} disabled={exportingPdf} className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  {exportingPdf ? "Hazırlanıyor..." : "PDF Çıktısı"}
-                </Button>
-                <Button variant="secondary" onClick={() => void exportWord()} disabled={exportingWord} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  {exportingWord ? "Hazırlanıyor..." : "Word Çıktısı"}
-                </Button>
+                <Field label="İş Yerinin Unvanı">
+                  <Input
+                    value={annualEvaluationCompanyForm.isyeriUnvani}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("isyeriUnvani", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="SGK / Bölge Müdürlüğü Sicil No">
+                  <Input
+                    value={annualEvaluationCompanyForm.sgkSicilNo}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("sgkSicilNo", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Adres" className="lg:col-span-2">
+                  <Textarea
+                    value={annualEvaluationCompanyForm.adres}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("adres", event.target.value)
+                    }
+                    className="min-h-[100px] bg-background"
+                  />
+                </Field>
+
+                <Field label="Tel ve Fax">
+                  <Input
+                    value={annualEvaluationCompanyForm.telFax}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("telFax", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="E-posta">
+                  <Input
+                    value={annualEvaluationCompanyForm.eposta}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("eposta", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İşkolu" className="lg:col-span-2">
+                  <Input
+                    value={annualEvaluationCompanyForm.iskolu}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("iskolu", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-2xl border border-dashed border-sky-200 bg-sky-50/70 p-4 dark:border-sky-500/20 dark:bg-sky-500/10">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-1">
-                  <div className="text-sm font-semibold text-foreground">Hazır resmi şablon yükleme alanı</div>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    Tıkladığınızda resmi yıllık çalışma planındaki tüm satırlar `PERİYODİK FAALİYETLER`, `PERİYOT`,
-                    `SORUMLU` ve `İLGİLİ MEVZUAT` alanlarına otomatik dolar. Sonrasında kullanıcı satırları düzenleyebilir,
-                    kaldırabilir veya yeni satır ekleyebilir.
+
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 text-sm font-semibold text-foreground">Çalışan Sayısı</div>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <Field label="Çalışan Sayısı Erkek">
+                  <Input
+                    type="number"
+                    value={annualEvaluationCompanyForm.calisanErkek}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("calisanErkek", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Çalışan Sayısı Kadın">
+                  <Input
+                    type="number"
+                    value={annualEvaluationCompanyForm.calisanKadin}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("calisanKadin", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Çalışan Sayısı Genç">
+                  <Input
+                    type="number"
+                    value={annualEvaluationCompanyForm.calisanGenc}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("calisanGenc", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Çalışan Sayısı Çocuk">
+                  <Input
+                    type="number"
+                    value={annualEvaluationCompanyForm.calisanCocuk}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("calisanCocuk", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="Çalışan Sayısı Toplam">
+                  <Input
+                    type="number"
+                    value={annualEvaluationCompanyForm.calisanToplam}
+                    onChange={(event) =>
+                      handleAnnualEvaluationCompanyChange("calisanToplam", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Yapılan Çalışmalar</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Word şablonundaki tablo satırları bu listedeki çalışmalarla çoğaltılır.
                   </p>
                 </div>
-                <Button type="button" variant="outline" onClick={loadOfficialTemplate} className="gap-2">
-                  <Download className="h-4 w-4" />
-                  Şablonu Yeniden Doldur
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddAnnualEvaluationWork}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Yeni Çalışma Ekle
                 </Button>
               </div>
-            </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-border">
-              <Table className="min-w-[1680px]">
-                <TableHeader>
-                  <TableRow className="bg-muted/60 hover:bg-muted/60">
-                    <TableHead className="min-w-[420px] align-middle text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      PERİYODİK FAALİYETLER
-                    </TableHead>
-                    <TableHead className="min-w-[150px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      PERİYOT
-                    </TableHead>
-                    <TableHead className="min-w-[240px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      SORUMLU
-                    </TableHead>
-                    <TableHead className="min-w-[320px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      İLGİLİ MEVZUAT
-                    </TableHead>
-                    <TableHead className="min-w-[160px] text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                      MEVCUT DURUM
-                    </TableHead>
-                    {MONTH_HEADERS.map((month) => (
-                      <TableHead
-                        key={month}
-                        className="w-[70px] min-w-[70px] text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
-                      >
-                        {month}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id} className="align-top">
-                      <TableCell className="bg-card">
-                        <div className="space-y-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                              Faaliyet
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400"
-                              onClick={() => removeRow(row.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <Textarea
-                            value={row.activity}
-                            onChange={(event) => updateRowField(row.id, "activity", event.target.value)}
-                            className="min-h-[112px] resize-none border-0 bg-transparent px-0 text-sm font-medium text-foreground shadow-none focus-visible:ring-0"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="bg-card">
-                        <Textarea
-                          value={row.period}
-                          onChange={(event) => updateRowField(row.id, "period", event.target.value)}
-                          className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-foreground shadow-none focus-visible:ring-0"
-                        />
-                      </TableCell>
-                      <TableCell className="bg-card">
-                        <Textarea
-                          value={row.responsible}
-                          onChange={(event) => updateRowField(row.id, "responsible", event.target.value)}
-                          className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-foreground shadow-none focus-visible:ring-0"
-                        />
-                      </TableCell>
-                      <TableCell className="bg-card">
-                        <Textarea
-                          value={row.regulation}
-                          onChange={(event) => updateRowField(row.id, "regulation", event.target.value)}
-                          className="min-h-[88px] resize-none border-0 bg-transparent px-0 text-sm text-muted-foreground shadow-none focus-visible:ring-0"
-                        />
-                      </TableCell>
-                      <TableCell className="bg-card">
-                        <Input
-                          value={row.currentStatus}
-                          onChange={(event) => updateRowField(row.id, "currentStatus", event.target.value)}
-                          placeholder="Örn. Hazır / Muaf"
-                          className="bg-muted"
-                        />
-                      </TableCell>
-
-                      {row.months.map((active, monthIndex) => (
-                        <TableCell
-                          key={`${row.id}-${MONTH_HEADERS[monthIndex]}`}
-                          className={`cursor-pointer px-0 text-center transition-colors ${
-                            active
-                              ? "bg-red-500/90 hover:bg-red-500/90 dark:bg-red-600/80 dark:hover:bg-red-600/80"
-                              : "bg-card hover:bg-muted/60"
-                          }`}
-                          onClick={() => toggleMonth(row.id, monthIndex)}
-                        >
-                          <div className="flex min-h-[88px] items-center justify-center">
-                            {active ? (
-                              <div className="h-9 w-9 rounded-md bg-red-600/95 shadow-sm dark:bg-red-500/90" />
-                            ) : (
-                              <span className="text-sm font-medium text-muted-foreground">-</span>
-                            )}
-                          </div>
-                        </TableCell>
-                      ))}
+              <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+                <Table className="min-w-[1320px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-16 text-center">Sıra No</TableHead>
+                      <TableHead className="min-w-[220px]">Yapılan Çalışmalar</TableHead>
+                      <TableHead className="min-w-[150px]">Tarih</TableHead>
+                      <TableHead className="min-w-[220px]">Yapan Kişi ve Unvanı</TableHead>
+                      <TableHead className="min-w-[140px]">Tekrar Sayısı</TableHead>
+                      <TableHead className="min-w-[200px]">Kullanılan Yöntem</TableHead>
+                      <TableHead className="min-w-[240px]">Sonuç ve Yorum</TableHead>
+                      <TableHead className="w-28 text-center">İşlem</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {annualEvaluationWorks.map((item, index) => (
+                      <TableRow key={`annual-evaluation-work-${index}`} className="align-top">
+                        <TableCell className="pt-4 text-center text-sm font-semibold text-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <Textarea
+                            value={item.yapilanCalismalar}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "yapilanCalismalar", event.target.value)
+                            }
+                            className="min-h-[110px] bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={item.tarih}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "tarih", event.target.value)
+                            }
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.yapanKisiUnvani}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "yapanKisiUnvani", event.target.value)
+                            }
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={item.tekrarSayisi}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "tekrarSayisi", event.target.value)
+                            }
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.kullanilanYontem}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "kullanilanYontem", event.target.value)
+                            }
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Textarea
+                            value={item.sonucYorum}
+                            onChange={(event) =>
+                              handleAnnualEvaluationWorkChange(index, "sonucYorum", event.target.value)
+                            }
+                            className="min-h-[110px] bg-background"
+                          />
+                        </TableCell>
+                        <TableCell className="pt-4 text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveAnnualEvaluationWork(index)}
+                            disabled={annualEvaluationWorks.length <= 1}
+                            className="gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Sil
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Kullanım notu</p>
-                <p className="mt-2 text-sm text-foreground">
-                  Ay hücresine her tıklamada ilgili faaliyet için plan işareti açılır veya kapanır.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Resmi çıktı</p>
-                <p className="mt-2 text-sm text-foreground">
-                  Word çıktısı doğrudan <span className="font-medium">İŞ SAĞLIĞI ve GÜVENLİĞİ YILLIK ÇALIŞMA PLANI.docx</span> şablonuna yazılır.
-                </p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/40 p-4">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Firma verisi</p>
-                <p className="mt-2 text-sm text-foreground">
-                  Üstteki firma kartında seçilen unvan, adres ve sicil/vergi numarası resmi şablonun başlık alanına taşınır.
-                </p>
-              </div>
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                onClick={() => void handleGenerateAnnualEvaluationReport()}
+                disabled={generatingAnnualEvaluationReport}
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                {generatingAnnualEvaluationReport
+                  ? "Rapor Oluşturuluyor..."
+                  : "Yıllık Değerlendirme Raporu Oluştur"}
+              </Button>
             </div>
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </div>
   );

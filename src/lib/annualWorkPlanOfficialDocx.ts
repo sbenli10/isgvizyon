@@ -50,6 +50,26 @@ const getCells = (row: Element | undefined) => (row ? getChildElements(row, "tc"
 const getTextNodes = (parent: Element) =>
   Array.from(parent.getElementsByTagNameNS(WORD_NS, "t")) as Element[];
 
+const getRunNodes = (parent: Element) =>
+  Array.from(parent.getElementsByTagNameNS(WORD_NS, "r")) as Element[];
+
+const getOrCreateRunProperties = (run: Element) => {
+  const existing = getChildElements(run, "rPr")[0];
+  if (existing) return existing;
+
+  const created = createElement(run.ownerDocument, WORD_NS, "w:rPr");
+  run.insertBefore(created, run.firstChild);
+  return created;
+};
+
+const clearRunFormatting = (run: Element) => {
+  const runProperties = getChildElements(run, "rPr")[0];
+  if (!runProperties) return;
+
+  getChildElements(runProperties, "color").forEach((node) => runProperties.removeChild(node));
+  getChildElements(runProperties, "b").forEach((node) => runProperties.removeChild(node));
+};
+
 const getOrCreateTextNode = (cell: Element) => {
   const textNodes = getTextNodes(cell);
   if (textNodes.length > 0) return textNodes[0];
@@ -76,56 +96,22 @@ const setCellText = (cell: Element | undefined, value: string) => {
     });
 };
 
-const setCellRedFill = (cell: Element | undefined, active: boolean) => {
+const setMonthCellMarker = (cell: Element | undefined, active: boolean) => {
   if (!cell) return;
 
-  const xml = cell.ownerDocument;
-  const tcPr =
-    getChildElements(cell, "tcPr")[0] ??
-    (() => {
-      const created = createElement(xml, WORD_NS, "w:tcPr");
-      cell.insertBefore(created, cell.firstChild);
-      return created;
-    })();
+  setCellText(cell, active ? "X" : "");
 
-  const existingShading = getChildElements(tcPr, "shd")[0];
+  const runs = getRunNodes(cell);
+  runs.forEach((run) => clearRunFormatting(run));
 
-  if (!active) {
-    if (existingShading) {
-      tcPr.removeChild(existingShading);
-    }
-    return;
-  }
+  if (!active || runs.length === 0) return;
 
-  const shading = existingShading ?? createElement(xml, WORD_NS, "w:shd");
-  shading.setAttribute("w:val", "clear");
-  shading.setAttribute("w:color", "auto");
-  shading.setAttribute("w:fill", "FF4D4F");
-
-  if (!existingShading) {
-    tcPr.appendChild(shading);
-  }
-};
-
-const cloneRow = (table: Element, sourceRowIndex: number) => {
-  const rows = getRows(table);
-  const sourceRow = rows[sourceRowIndex] ?? rows[rows.length - 1];
-  if (!sourceRow) {
-    throw new Error("Word şablonunda çoğaltılacak satır bulunamadı.");
-  }
-
-  const clone = sourceRow.cloneNode(true) as Element;
-  table.appendChild(clone);
-  return clone;
-};
-
-const ensureRowCount = (table: Element, minimumCount: number, templateRowIndex: number) => {
-  let rows = getRows(table);
-  while (rows.length < minimumCount) {
-    cloneRow(table, templateRowIndex);
-    rows = getRows(table);
-  }
-  return rows;
+  const runProperties = getOrCreateRunProperties(runs[0]);
+  const bold = createElement(cell.ownerDocument, WORD_NS, "w:b");
+  const color = createElement(cell.ownerDocument, WORD_NS, "w:color");
+  color.setAttribute("w:val", "C00000");
+  runProperties.appendChild(bold);
+  runProperties.appendChild(color);
 };
 
 const sanitizeFileName = (value: string) =>
@@ -144,24 +130,20 @@ const normalizeRows = (rows: AnnualWorkPlanRow[]) =>
 const PRIMARY_TABLE_START_INDEX = 6;
 const PRIMARY_TABLE_TEMPLATE_ROWS = 14;
 const SECONDARY_TABLE_START_INDEX = 2;
+const SECONDARY_TABLE_TEMPLATE_ROWS = 11;
 
 const clearMatrixRow = (row: Element | undefined) => {
   const cells = getCells(row);
   cells.forEach((cell, cellIndex) => {
     setCellText(cell, "");
     if (cellIndex >= 5) {
-      setCellRedFill(cell, false);
+      setMonthCellMarker(cell, false);
     }
   });
 };
 
-const writeMatrixRows = (
-  table: Element,
-  rows: AnnualWorkPlanRow[],
-  startIndex: number,
-  templateRowIndex: number,
-) => {
-  const tableRows = ensureRowCount(table, startIndex + rows.length, templateRowIndex);
+const writeMatrixRows = (table: Element, rows: AnnualWorkPlanRow[], startIndex: number) => {
+  const tableRows = getRows(table);
 
   rows.forEach((row, index) => {
     const tableRow = tableRows[startIndex + index];
@@ -173,12 +155,12 @@ const writeMatrixRows = (
     setCellText(cells[4], row.currentStatus);
 
     row.months.forEach((active, monthIndex) => {
-      setCellText(cells[monthIndex + 5], "");
-      setCellRedFill(cells[monthIndex + 5], active);
+      setMonthCellMarker(cells[monthIndex + 5], active);
     });
   });
 
-  for (let rowIndex = startIndex + rows.length; rowIndex < tableRows.length; rowIndex += 1) {
+  const maxWritableRowIndex = startIndex + rows.length;
+  for (let rowIndex = maxWritableRowIndex; rowIndex < tableRows.length; rowIndex += 1) {
     clearMatrixRow(tableRows[rowIndex]);
   }
 };
@@ -211,27 +193,22 @@ const writeOfficialTables = (tables: Element[], payload: AnnualWorkPlanDocumentD
   const secondaryRows = normalizedRows.slice(PRIMARY_TABLE_TEMPLATE_ROWS);
 
   writeMainTableHeader(mainTable, payload);
-  writeMatrixRows(mainTable, primaryRows, PRIMARY_TABLE_START_INDEX, PRIMARY_TABLE_START_INDEX);
+  writeMatrixRows(mainTable, primaryRows, PRIMARY_TABLE_START_INDEX);
 
   if (secondaryTable) {
     writeSecondaryTableHeader(secondaryTable, payload);
-    writeMatrixRows(
-      secondaryTable,
-      secondaryRows,
-      SECONDARY_TABLE_START_INDEX,
-      SECONDARY_TABLE_START_INDEX,
-    );
-  } else if (secondaryRows.length > 0) {
-    writeMatrixRows(
-      mainTable,
-      normalizedRows,
-      PRIMARY_TABLE_START_INDEX,
-      PRIMARY_TABLE_START_INDEX,
-    );
+    writeMatrixRows(secondaryTable, secondaryRows, SECONDARY_TABLE_START_INDEX);
   }
 };
 
 const buildDocumentBlob = async (payload: AnnualWorkPlanDocumentData) => {
+  const templateCapacity = PRIMARY_TABLE_TEMPLATE_ROWS + SECONDARY_TABLE_TEMPLATE_ROWS;
+  if (payload.rows.length > templateCapacity) {
+    throw new Error(
+      `Resmi şablon en fazla ${templateCapacity} faaliyet satırını destekliyor. Fazla satırlar sayfa düzenini bozacağı için Word çıktısı oluşturulmadı.`,
+    );
+  }
+
   const response = await fetch(ANNUAL_WORK_PLAN_TEMPLATE_PATH);
   if (!response.ok) {
     throw new Error("Yıllık çalışma planı Word şablonu yüklenemedi.");
