@@ -103,32 +103,84 @@ Saklama süreleri:
     icon: FileText,
     content: `Bu gizlilik politikası, yasal düzenleme değişiklikleri veya hizmet güncellemeleri doğrultusunda güncellenebilir. Güncellemeler platform üzerinden veya ilgili iletişim kanallarından duyurulabilir.
 
-Son güncelleme: ${new Date().toLocaleDateString("tr-TR")}`,
+Son güncelleme: 13.05.2026`,
   },
   {
     id: "isgbot",
     title: "9. ISGBot Chrome Uzantısı Hakkında",
     icon: Shield,
-    content: `ISGBot Chrome uzantısı, ISGVizyon kullanıcılarının Chrome tarayıcısı üzerinden İSG-KATİP senkron durumunu, bağlı organizasyon/firma özetlerini, uyum göstergelerini ve öncelikli aksiyonlarını hızlıca görüntülemesini sağlayan yardımcı bir uzantıdır.
+    content: `ISGBot Chrome uzantısı, ISGVizyon kullanıcılarının kendi yetkili İSG-KATİP oturumlarında görüntüleyebildikleri aktif atama, firma, işyeri ve sözleşme bilgilerini, kullanıcının açık onayıyla İSGVizyon hesabına aktarmaya yardımcı olan bir tarayıcı uzantısıdır.
 
-ISGBot'un tek amacı, ISGVizyon hesabına bağlı iş sağlığı ve güvenliği süreçlerine hızlı erişim sağlamak ve kullanıcıya ilgili durum bilgilerini göstermektir.
+Uzantı, resmi İSG-KATİP, e-Devlet veya herhangi bir kamu kurumu ürünü değildir. İSG-KATİP adına işlem yapmaz; yalnızca kullanıcının kendi yetkili oturumunda ekranda görüntüleyebildiği bilgileri, kullanıcı tarafından başlatılan ve onaylanan aktarım işlemi kapsamında işler.
 
-ISGBot kapsamında aşağıdaki veriler işlenebilir:
+ISGBot'un temel amacı, kullanıcının kendi yetkili oturumunda gördüğü bilgileri manuel veri girişini azaltacak şekilde ISGVizyon hesabına taşımak, aktarım sonucunu kullanıcıya göstermek ve ISGVizyon hesabındaki ilgili İSG süreçlerinin yönetimini desteklemektir.
+
+Resmi İSG-KATİP, e-Devlet veya kamu kurumu ürünü değildir. Şifre, çerez veya kamu sistemi oturum bilgisi toplanmaz. Aktarım kullanıcı tarafından başlatılır ve kullanıcı onayı olmadan yapılmaz.`,
+  },
+  {
+    id: "isgbot-veriler",
+    title: "10. ISGBot Kapsamında İşlenen Veriler",
+    icon: FileText,
+    content: `ISGBot kapsamında, uzantının açıklanan amacını yerine getirmek için aşağıdaki veri türleri işlenebilir:
 
 • Kullanıcı hesap bilgileri: ad, soyad, e-posta adresi
-• Oturum bilgileri: giriş durumu, erişim belirteçleri ve temel kimlik doğrulama bilgileri
+• Oturum bilgileri: ISGVizyon giriş durumu, erişim belirteçleri ve temel kimlik doğrulama bilgileri
 • Organizasyon/firma bilgileri: kullanıcının bağlı olduğu organizasyon, firma özetleri ve yetkili olduğu kayıtlar
-• İSG-KATİP senkron bilgileri: senkron durumu, son senkron zamanı ve işlem sonuçları
+• İSG-KATİP ekranında görüntülenen aktif atama, firma, işyeri ve sözleşme bilgileri
+• Firma/işyeri unvanı
+• SGK sicil numarası
+• Çalışan sayısı
+• Tehlike sınıfı
+• NACE kodu
+• Sözleşme başlangıç/bitiş tarihleri
+• Atama/süre bilgileri
+• Senkronizasyon zamanı, işlem sonucu, hata durumu ve aktarım logları
 • Uyum ve aksiyon bilgileri: toplam firma sayısı, uyumlu/uyarı/kritik durum özetleri ve öncelikli aksiyon bilgileri
-• Uzantı kullanım tercihleri: oturum durumu, temel görünüm/ayar tercihleri ve uzantının çalışması için gerekli yerel kayıtlar
+• Uzantı kullanım tercihleri: temel görünüm/ayar tercihleri ve uzantının çalışması için gerekli yerel kayıtlar`,
+  },
+  {
+    id: "isgbot-toplanmayan",
+    title: "11. ISGBot Tarafından Toplanmayan Veriler",
+    icon: Lock,
+    content: `ISGBot aşağıdaki verileri toplamaz veya aktarmaz:
 
-Bu veriler yalnızca ISGBot'un temel işlevlerini sunmak, kullanıcının ISGVizyon hesabına bağlı bilgileri uzantı panelinde göstermek, oturum durumunu yönetmek, İSG-KATİP senkron bilgilerini görüntülemek ve kullanıcıya ilgili durum/aksiyon bildirimlerini sunmak amacıyla kullanılır.
+• e-Devlet şifresi
+• İSG-KATİP şifresi
+• Çerezler
+• Kamu sistemi oturum anahtarları
+• Kullanıcının genel tarayıcı geçmişi
+• Ziyaret edilen diğer web sitelerinin içerikleri
+• Finansal bilgiler
+• Sağlık bilgileri
+• Reklam, yeniden pazarlama, kullanıcı profilleme veya kredi değerlendirmesi amacıyla kullanılacak veriler
 
-ISGBot, kullanıcının genel web tarama geçmişini toplamaz, ziyaret edilen web sitelerinin içeriklerini izleme amacıyla işlemez ve kişisel verileri reklam, yeniden pazarlama, kredi değerlendirmesi veya borç verme amacıyla kullanmaz.
+Kullanıcının genel web tarama geçmişi toplanmaz. Veriler reklam veya kredi değerlendirmesi amacıyla kullanılmaz.`,
+  },
+  {
+    id: "isgbot-aktarim",
+    title: "12. İSG-KATİP Verilerinin Aktarımı",
+    icon: Shield,
+    content: `ISGBot, İSG-KATİP'teki verileri otomatik olarak arka planda göndermez.
 
-ISGBot tarafından işlenen kullanıcı verileri satılmaz. Veriler yalnızca ISGVizyon hizmetinin çalışması, güvenliği, kimlik doğrulama, altyapı barındırma, teknik destek, yasal yükümlülüklerin yerine getirilmesi ve hizmetin tek amacının sağlanması için gerekli olduğu ölçüde işlenir veya yetkili hizmet sağlayıcılarla paylaşılabilir.
+Aktarım süreci şu şekilde işler:
 
-ISGBot, Chrome Web Store Kullanıcı Verileri Politikası kapsamındaki sınırlı kullanım ilkelerine uygun şekilde, kullanıcı verilerini yalnızca uzantının açıklanan tek amacını sağlamak veya iyileştirmek için kullanır.`,
+• Kullanıcı önce "Firmalarımı Oku" işlemiyle verileri önizler
+• Aktarılacak bilgiler kullanıcıya gösterilir
+• Kullanıcı "Onayla ve İSGVizyon'a Aktar" şeklinde ikinci onay vermeden veri İSGVizyon'a gönderilmez
+• Kullanıcı iptal ederse hiçbir veri aktarılmaz
+• Aktarım yalnızca kullanıcının kendi yetkili oturumunda görüntüleyebildiği verilerle sınırlıdır
+
+Aktarım kullanıcı tarafından başlatılır ve kullanıcı onayı olmadan yapılmaz.`,
+  },
+  {
+    id: "isgbot-limited-use",
+    title: "13. Sınırlı Kullanım ve Üçüncü Taraflar",
+    icon: Eye,
+    content: `ISGBot tarafından işlenen kullanıcı verileri satılmaz, kiralanmaz veya reklam, yeniden pazarlama, kullanıcı profilleme, kredi değerlendirmesi ya da borç verme amacıyla kullanılmaz.
+
+Kullanıcı verileri yalnızca uzantının açıklanan tek amacını yerine getirmek için kullanılır: kullanıcının kendi yetkili İSG-KATİP oturumunda görüntüleyebildiği bilgileri, kullanıcının açık onayıyla İSGVizyon hesabına aktarmak, aktarım sonucunu kullanıcıya göstermek ve ISGVizyon hesabındaki ilgili İSG süreçlerini yönetmek.
+
+Veriler yalnızca hizmetin çalışması için gerekli altyapı sağlayıcılarıyla işlenebilir. Veriler reklam ağlarıyla, veri brokerlarıyla veya bağımsız pazarlama taraflarıyla paylaşılmaz. Supabase veya benzeri altyapı sağlayıcıları yalnızca barındırma, kimlik doğrulama, veri tabanı, loglama ve güvenlik amacıyla kullanılır.`,
   },
 ];
 
