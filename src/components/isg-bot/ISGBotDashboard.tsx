@@ -811,6 +811,14 @@ export default function ISGBotDashboard() {
 
 return (
   <div className="space-y-6">
+    <Alert className="border-cyan-500/20 bg-cyan-500/5 text-cyan-950 dark:text-cyan-100">
+      <Shield className="h-4 w-4" />
+      <AlertTitle>Aktarılan veri kapsamı</AlertTitle>
+      <AlertDescription>
+        Bu ekrandaki firma kayıtları, kullanıcının kendi yetkili İSG-KATİP oturumunda görüntüleyebildiği bilgilerden oluşur ve kullanıcı onayıyla aktarılır. Şifre, çerez ve e-Devlet oturum bilgileri toplanmaz.
+      </AlertDescription>
+    </Alert>
+
     {/* Header */}
     <div className="flex items-center justify-between">
       <div className="space-y-1">

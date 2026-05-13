@@ -3,21 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>İSGVizyon İSG Bot - Ayarlar</title>
+  <title>ISGVizyon İSG Bot - Ayarlar</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 40px 20px;
     }
-
     .container {
       max-width: 600px;
       margin: 0 auto;
@@ -26,14 +20,12 @@
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       overflow: hidden;
     }
-
     .header {
       background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       color: white;
       padding: 32px;
       text-align: center;
     }
-
     .header h1 {
       font-size: 28px;
       margin-bottom: 8px;
@@ -42,20 +34,9 @@
       justify-content: center;
       gap: 12px;
     }
-
-    .header p {
-      opacity: 0.9;
-      font-size: 14px;
-    }
-
-    .content {
-      padding: 32px;
-    }
-
-    .form-group {
-      margin-bottom: 24px;
-    }
-
+    .header p { opacity: 0.9; font-size: 14px; }
+    .content { padding: 32px; }
+    .form-group { margin-bottom: 24px; }
     label {
       display: block;
       font-weight: 600;
@@ -63,14 +44,12 @@
       color: #1e293b;
       font-size: 14px;
     }
-
     .label-help {
       font-weight: 400;
       color: #64748b;
       font-size: 12px;
       margin-left: 4px;
     }
-
     input {
       width: 100%;
       padding: 12px 16px;
@@ -78,17 +57,15 @@
       border-radius: 8px;
       font-size: 14px;
       transition: all 0.2s;
-      font-family: 'Courier New', monospace;
+      font-family: "Courier New", monospace;
       background: #f8fafc;
     }
-
     input:focus {
       outline: none;
       border-color: #3b82f6;
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
       background: white;
     }
-
     .btn {
       padding: 12px 24px;
       border: none;
@@ -103,33 +80,15 @@
       width: 100%;
       justify-content: center;
     }
-
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .btn-primary {
-      background: #3b82f6;
-      color: white;
-    }
-
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #3b82f6; color: white; }
     .btn-primary:hover:not(:disabled) {
       background: #2563eb;
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
-
-    .btn-secondary {
-      background: #f1f5f9;
-      color: #475569;
-      margin-top: 12px;
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: #e2e8f0;
-    }
-
+    .btn-secondary { background: #f1f5f9; color: #475569; margin-top: 12px; }
+    .btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
     .status {
       padding: 12px 16px;
       border-radius: 8px;
@@ -137,45 +96,18 @@
       display: none;
       animation: slideDown 0.3s ease;
     }
-
     @keyframes slideDown {
-      from {
-        opacity: 0;
-        transform: translateY(-10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-
-    .status.success {
-      background: #dcfce7;
-      color: #166534;
-      border: 1px solid #bbf7d0;
+    .status.success, .status.error, .status.info {
       display: flex;
       align-items: center;
       gap: 8px;
     }
-
-    .status.error {
-      background: #fee2e2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .status.info {
-      background: #e0f2fe;
-      color: #075985;
-      border: 1px solid #bae6fd;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
+    .status.success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .status.error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .status.info { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
     .info-box {
       background: #eff6ff;
       border: 1px solid #bfdbfe;
@@ -183,30 +115,10 @@
       padding: 16px;
       margin-top: 24px;
     }
-
-    .info-box h3 {
-      font-size: 14px;
-      color: #1e40af;
-      margin-bottom: 8px;
-    }
-
-    .info-box p {
-      font-size: 12px;
-      color: #1e3a8a;
-      line-height: 1.6;
-      margin-bottom: 8px;
-    }
-
-    .info-box a {
-      color: #2563eb;
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .info-box a:hover {
-      text-decoration: underline;
-    }
-
+    .info-box h3 { font-size: 14px; color: #1e40af; margin-bottom: 8px; }
+    .info-box p { font-size: 12px; color: #1e3a8a; line-height: 1.6; margin-bottom: 8px; }
+    .info-box a { color: #2563eb; text-decoration: none; font-weight: 500; }
+    .info-box a:hover { text-decoration: underline; }
     .spinner {
       border: 2px solid #f3f4f6;
       border-top: 2px solid #3b82f6;
@@ -215,7 +127,6 @@
       height: 16px;
       animation: spin 0.8s linear infinite;
     }
-
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
@@ -225,10 +136,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>
-        <span>⚙️</span>
-        İSGVizyon İSG Bot Ayarları
-      </h1>
+      <h1><span>⚙️</span>ISGVizyon İSG Bot Ayarları</h1>
       <p>Supabase ve organizasyon bilgilerinizi yapılandırın</p>
     </div>
 
@@ -237,67 +145,35 @@
 
       <form id="settingsForm">
         <div class="form-group">
-          <label>
-            Supabase URL
-            <span class="label-help">(Project Settings → API)</span>
-          </label>
-          <input
-            type="url"
-            id="supabaseUrl"
-            placeholder="https://xxxxxxxxxxx.supabase.co"
-            required
-          />
+          <label>Supabase URL <span class="label-help">(Project Settings → API)</span></label>
+          <input type="url" id="supabaseUrl" placeholder="https://xxxxxxxxxxx.supabase.co" required />
         </div>
 
         <div class="form-group">
-          <label>
-            Supabase Anon Key
-            <span class="label-help">(Project Settings → API → anon public)</span>
-          </label>
-          <input
-            type="text"
-            id="supabaseKey"
-            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            required
-          />
+          <label>Supabase Anon Key <span class="label-help">(Project Settings → API → anon public)</span></label>
+          <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." required />
         </div>
 
         <div class="form-group">
-          <label>
-            Organization ID
-            <span class="label-help">(İSGVizyon → Profile → Organization)</span>
-          </label>
-          <input
-            type="text"
-            id="orgId"
-            placeholder="550e8400-e29b-41d4-a716-446655440000"
-            required
-          />
+          <label>Organization ID <span class="label-help">(ISGVizyon → Profil → Organizasyon)</span></label>
+          <input type="text" id="orgId" placeholder="550e8400-e29b-41d4-a716-446655440000" required />
         </div>
 
-        <button type="submit" class="btn btn-primary" id="saveBtn">
-          💾 Kaydet
-        </button>
-
-        <button type="button" id="testBtn" class="btn btn-secondary">
-          🧪 Bağlantıyı Test Et
-        </button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">💾 Kaydet</button>
+        <button type="button" id="testBtn" class="btn btn-secondary">🧪 Bağlantıyı Test Et</button>
       </form>
 
       <div class="info-box">
-        <h3>📚 Bilgileri Nereden Bulabilirim?</h3>
-        <p>
-          <strong>Supabase URL & Key:</strong> 
-          <a href="https://supabase.com/dashboard" target="_blank">supabase.com/dashboard</a> 
-          → Projenizi seçin → Settings → API
-        </p>
-        <p>
-          <strong>Organization ID:</strong> 
-          İSGVizyon'a giriş yapın → Profile → Settings → Organization ID
-        </p>
-        <p style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #bfdbfe;">
-          <strong>💡 Not:</strong> Bu bilgiler sadece tarayıcınızda saklanır ve şifrelenir.
-        </p>
+        <h3>Gizlilik ve Resmi Kurum Beyanı</h3>
+        <p>ISGVizyon İSG Bot, resmi İSG-KATİP, e-Devlet veya kamu kurumu ürünü değildir.</p>
+        <p>Şifre, çerez ve e-Devlet oturum bilgileri toplanmaz. Kullanıcının gördüğü firma/sözleşme verileri yalnızca açık onayla ISGVizyon hesabına aktarılır.</p>
+      </div>
+
+      <div class="info-box">
+        <h3>Bilgileri Nereden Bulabilirim?</h3>
+        <p><strong>Supabase URL & Key:</strong> <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer noopener">supabase.com/dashboard</a> → Proje → Settings → API</p>
+        <p><strong>Organization ID:</strong> ISGVizyon'a giriş yapın → Profil → Organization ID</p>
+        <p style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #bfdbfe;"><strong>Not:</strong> Bu bilgiler yalnızca tarayıcınızda saklanır.</p>
       </div>
     </div>
   </div>

@@ -1,59 +1,36 @@
 {
   "manifest_version": 3,
-  "name": "İSGVizyon İSG Bot",
+  "name": "ISGVizyon İSG Bot",
   "version": "1.0.0",
-  "description": "İSG-KATİP entegrasyonu ve compliance takibi",
-
-  "permissions": [
-    "storage",
-    "tabs",
-    "notifications",
-    "scripting"
-  ],
-
+  "description": "İSG-KATİP verilerini kullanıcı onayıyla ISGVizyon hesabına aktarmaya yardımcı olur.",
+  "permissions": ["storage", "tabs", "notifications", "scripting"],
   "host_permissions": [
     "https://isgkatip.csgb.gov.tr/*",
     "https://elmdzekyyoepdrpnfppn.supabase.co/*",
     "https://www.isgvizyon.com/*",
     "https://isgvizyon.com/*"
   ],
-
   "externally_connectable": {
-    "matches": [
-      "https://www.isgvizyon.com/*",
-      "https://isgvizyon.com/*"
-    ]
+    "matches": ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"]
   },
-
   "content_scripts": [
     {
-      "matches": [
-        "https://isgkatip.csgb.gov.tr/*"
-      ],
-      "js": [
-        "content-scripts/isgkatip-scraper.js"
-      ],
+      "matches": ["https://isgkatip.csgb.gov.tr/*"],
+      "js": ["content-scripts/isgkatip-scraper.js"],
       "run_at": "document_end",
       "all_frames": false
     },
     {
-      "matches": [
-        "https://www.isgvizyon.com/*",
-        "https://isgvizyon.com/*"
-      ],
-      "js": [
-        "content-scripts/auth-listener.js"
-      ],
+      "matches": ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"],
+      "js": ["content-scripts/auth-listener.js"],
       "run_at": "document_start",
       "all_frames": false
     }
   ],
-
   "background": {
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
@@ -63,7 +40,6 @@
       "128": "assets/icon-128.png"
     }
   },
-
   "icons": {
     "16": "assets/icon-16.png",
     "32": "assets/icon-32.png",

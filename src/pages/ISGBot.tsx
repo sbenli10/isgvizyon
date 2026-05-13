@@ -351,6 +351,15 @@ export default function ISGBot() {
         </Card>
       </div>
 
+      <Alert className="border-cyan-500/20 bg-cyan-500/5 text-cyan-950 dark:text-cyan-100">
+        <Shield className="h-4 w-4" />
+        <AlertTitle>Veri aktarımı kullanıcı onayıyla yapılır</AlertTitle>
+        <AlertDescription className="space-y-1">
+          <p>ISGVizyon İSG Bot resmi İSG-KATİP, e-Devlet veya kamu kurumu ürünü değildir.</p>
+          <p>Uzantı yalnızca kullanıcının kendi yetkili oturumunda gördüğü firma ve sözleşme bilgilerini, açık onayla ISGVizyon hesabına aktarır.</p>
+        </AlertDescription>
+      </Alert>
+
       <ISGBotCommandCenter />
 
       <Card id="isg-bot-toolset">

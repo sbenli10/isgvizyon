@@ -1218,6 +1218,13 @@ export default function ISGBotCommandCenter() {
 
   return (
     <>
+      <Card className="border-cyan-500/20 bg-cyan-500/5">
+        <CardContent className="flex flex-col gap-2 p-4 text-sm text-cyan-950 dark:text-cyan-100">
+          <div className="font-semibold">ISGVizyon İSG Bot resmi kamu kurumu ürünü değildir.</div>
+          <p>Bu komuta merkezi, yalnızca kullanıcının kendi yetkili İSG-KATİP oturumunda gördüğü firma ve sözleşme verilerinden üretilen aksiyonları gösterir. Aktarım, kullanıcı onayı olmadan başlatılmaz.</p>
+        </CardContent>
+      </Card>
+
       <Card className="border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900">
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

@@ -1,10 +1,19 @@
-// chrome-extension/background/service-worker.js
 import { AuthHandler } from "../auth/auth-handler.js";
 import {
   DEFAULT_SUPABASE_ANON_KEY,
   DEFAULT_SUPABASE_URL,
 } from "../config/defaults.js";
 import { assertExtensionApi } from "../shared/extension-api.js";
+
+const MESSAGE_TYPES = {
+  authSessionUpdated: "AUTH_SESSION_UPDATED",
+  authPing: "DENETRON_AUTH_PING",
+  authSuccess: "DENETRON_AUTH_SUCCESS",
+  configUpdated: "CONFIG_UPDATED",
+  getConfig: "GET_CONFIG",
+  syncSubmit: "ISGKATIP_SYNC_SUBMIT",
+  syncNow: "SYNC_NOW",
+};
 
 class BackgroundService {
   constructor() {
@@ -21,7 +30,7 @@ class BackgroundService {
     await this.authHandler.init();
     await this.loadConfig();
     this.setupListeners();
-    console.log("ISGVizyon background service hazir");
+    console.log("[ISGVizyon Background] hazır");
   }
 
   async ensureDefaults() {
@@ -31,33 +40,8 @@ class BackgroundService {
     if (!config.supabaseUrl) payload.supabaseUrl = DEFAULT_SUPABASE_URL;
     if (!config.supabaseKey) payload.supabaseKey = DEFAULT_SUPABASE_ANON_KEY;
 
-    if (Object.keys(payload).length > 0) {
+    if (Object.keys(payload).length) {
       await this.extension.storage.local.set(payload);
-    }
-  }
-
-  async fetchOrganizationId(userId, accessToken) {
-    if (!userId || !accessToken) return null;
-
-    try {
-      const response = await fetch(
-        `${this.supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=organization_id&limit=1`,
-        {
-          headers: {
-            apikey: this.supabaseKey,
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) return null;
-
-      const rows = await response.json();
-      return rows?.[0]?.organization_id || null;
-    } catch (error) {
-      console.warn("Organization bilgisi alinamadi:", error?.message || error);
-      return null;
     }
   }
 
@@ -67,71 +51,70 @@ class BackgroundService {
       "supabaseKey",
       "orgId",
       "userId",
+      "organizationName",
       "denetron_auth",
     ]);
 
     this.supabaseUrl = config.supabaseUrl || DEFAULT_SUPABASE_URL;
     this.supabaseKey = config.supabaseKey || DEFAULT_SUPABASE_ANON_KEY;
     this.userId = config.userId || config.denetron_auth?.user?.id || null;
-
-    const user = config.denetron_auth?.user || null;
-    const accessToken =
-      config.denetron_auth?.accessToken || config.denetron_auth?.session?.access_token || null;
-
-    const fetchedOrgId = await this.fetchOrganizationId(this.userId, accessToken);
-
     this.orgId =
-      user?.organization_id ||
-      user?.user_metadata?.organization_id ||
-      user?.app_metadata?.organization_id ||
-      fetchedOrgId ||
       config.orgId ||
-      this.userId ||
+      config.denetron_auth?.user?.organization_id ||
+      config.denetron_auth?.user?.user_metadata?.organization_id ||
+      config.denetron_auth?.user?.app_metadata?.organization_id ||
       null;
 
-    await this.extension.storage.local.set({
+    return {
       supabaseUrl: this.supabaseUrl,
       supabaseKey: this.supabaseKey,
       orgId: this.orgId,
       userId: this.userId,
-    });
-
-    return Boolean(this.supabaseUrl && this.supabaseKey);
+      organizationName: config.organizationName || null,
+    };
   }
 
   setupListeners() {
     this.extension.runtime.onMessage.addListener((message, sender, sendResponse) => {
-      this.handleMessage(message, sender, sendResponse);
+      void this.handleMessage(message, sender)
+        .then((result) => sendResponse(result))
+        .catch((error) => {
+          console.error("[ISGVizyon Background] runtime message error:", error);
+          sendResponse({
+            success: false,
+            error: error?.message || "Beklenmeyen uzantı hatası.",
+          });
+        });
       return true;
     });
 
-    this.setupExternalAuthListener();
-
-    this.extension.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (changeInfo.status === "complete") {
-        this.handleTabUpdate(tabId, tab);
-      }
-    });
-  }
-
-  setupExternalAuthListener() {
-    if (!this.extension.runtime.onMessageExternal) {
-      console.warn("[Denetron Background] onMessageExternal kullanilamiyor");
-      return;
+    if (this.extension.runtime.onMessageExternal) {
+      this.extension.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+        void this.handleExternalMessage(message, sender)
+          .then((result) => sendResponse(result))
+          .catch((error) => {
+            console.error("[ISGVizyon Background] external message error:", error);
+            sendResponse({
+              ok: false,
+              success: false,
+              error: error?.message || "Harici mesaj işlenemedi.",
+            });
+          });
+        return true;
+      });
     }
 
-    this.extension.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-      this.handleExternalAuthMessage(message, sender, sendResponse);
-      return true;
+    this.extension.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+      if (changeInfo.status === "complete" && tab?.url?.includes("isgkatip.csgb.gov.tr")) {
+        void this.extension.action.setBadgeText({ tabId, text: "ISG" });
+        void this.extension.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" });
+      }
     });
-
-    console.log("[Denetron Background] external auth listener hazir");
   }
 
   isAllowedExternalSender(sender) {
     const senderUrl = sender?.url || "";
     const senderOrigin = sender?.origin || "";
-
     return (
       senderUrl.startsWith("https://www.isgvizyon.com/") ||
       senderUrl.startsWith("https://isgvizyon.com/") ||
@@ -140,174 +123,81 @@ class BackgroundService {
     );
   }
 
-  summarizeExternalAuthData(authData) {
-    const session = authData?.session || null;
-    const user = authData?.user || session?.user || null;
+  async handleExternalMessage(message, sender) {
+    if (!this.isAllowedExternalSender(sender)) {
+      return { ok: false, success: false, error: "INVALID_SENDER" };
+    }
+
+    if (message?.type === MESSAGE_TYPES.authPing) {
+      return { ok: true, success: true, pong: true };
+    }
+
+    if (message?.type !== MESSAGE_TYPES.authSuccess) {
+      return { ok: false, success: false, error: "INVALID_MESSAGE_TYPE" };
+    }
+
+    return this.persistAuthSession(message.authData);
+  }
+
+  async handleMessage(message) {
+    switch (message?.type) {
+      case MESSAGE_TYPES.authSessionUpdated:
+        return this.persistAuthSession(message.data);
+
+      case MESSAGE_TYPES.getConfig:
+        return {
+          success: true,
+          ...(await this.loadConfig()),
+        };
+
+      case MESSAGE_TYPES.configUpdated:
+        return this.handleConfigUpdated(message.data);
+
+      case MESSAGE_TYPES.syncSubmit:
+        return this.handleISGKatipSync(message.data || [], message.metadata || {});
+
+      case MESSAGE_TYPES.syncNow:
+        await this.loadStats();
+        return { success: true };
+
+      default:
+        return { success: false, error: "Unknown message type" };
+    }
+  }
+
+  async persistAuthSession(authData) {
+    if (!authData) {
+      return { ok: false, success: false, error: "MISSING_AUTH_DATA" };
+    }
+
+    await this.authHandler.init();
+    await this.authHandler.saveAuth(authData);
+    const config = await this.loadConfig();
 
     return {
-      hasAuthData: Boolean(authData),
-      hasSession: Boolean(session),
-      hasAccessToken: Boolean(authData?.accessToken || session?.access_token),
-      hasRefreshToken: Boolean(authData?.refreshToken || session?.refresh_token),
-      hasUser: Boolean(user),
-      userId: user?.id || null,
-      userEmail: user?.email || null,
-      expiresAt: authData?.expiresAt || session?.expires_at || null,
+      ok: true,
+      success: true,
+      saved: true,
+      userId: config.userId,
+      orgId: config.orgId,
     };
   }
 
-  async handleExternalAuthMessage(message, sender, sendResponse) {
-    console.log("[Denetron Background] external message received", {
-      messageType: message?.type,
-      senderUrl: sender?.url || null,
-      senderOrigin: sender?.origin || null,
-      authSummary: this.summarizeExternalAuthData(message?.authData),
-    });
+  async handleConfigUpdated(data) {
+    const payload = {};
 
-    try {
-      if (!this.isAllowedExternalSender(sender)) {
-        console.warn("[Denetron Background] external message rejected: invalid sender", {
-          senderUrl: sender?.url || null,
-          senderOrigin: sender?.origin || null,
-        });
+    if (data?.supabaseUrl) payload.supabaseUrl = data.supabaseUrl;
+    if (data?.supabaseKey) payload.supabaseKey = data.supabaseKey;
+    if (data?.orgId) payload.orgId = data.orgId;
 
-        sendResponse({
-          ok: false,
-          success: false,
-          error: "INVALID_SENDER",
-        });
-
-        return;
-      }
-
-      if (message?.type === "DENETRON_AUTH_PING") {
-        console.log("[Denetron Background] external ping received", {
-          senderUrl: sender?.url || null,
-          senderOrigin: sender?.origin || null,
-        });
-
-        sendResponse({
-          ok: true,
-          success: true,
-          pong: true,
-        });
-
-        return;
-      }
-
-      if (message?.type !== "DENETRON_AUTH_SUCCESS") {
-        console.warn("[Denetron Background] external message ignored: invalid type", {
-          type: message?.type,
-        });
-
-        sendResponse({
-          ok: false,
-          success: false,
-          error: "INVALID_MESSAGE_TYPE",
-        });
-
-        return;
-      }
-
-      if (!message?.authData) {
-        console.warn("[Denetron Background] external message missing authData");
-
-        sendResponse({
-          ok: false,
-          success: false,
-          error: "MISSING_AUTH_DATA",
-        });
-
-        return;
-      }
-
-      console.log("[Denetron Background] auth save start", {
-        authSummary: this.summarizeExternalAuthData(message.authData),
-      });
-
-     await this.authHandler.init();
-      await this.authHandler.saveAuth(message.authData);
-
-      const verify = await this.extension.storage.local.get([
-        "denetron_auth",
-        "orgId",
-        "userId",
-      ]);
-
-      this.userId = verify.userId || verify.denetron_auth?.user?.id || null;
-      this.orgId = verify.orgId || this.userId || null;
-
-      console.log("[Denetron Background] auth saved successfully", {
-        hasStoredAuth: Boolean(verify.denetron_auth),
-        userId: verify.userId || null,
-        orgId: verify.orgId || null,
-      });
-
-      sendResponse({
-        ok: true,
-        success: true,
-        saved: true,
-        userId: verify.userId || null,
-        orgId: verify.orgId || null,
-      });
-
-      console.log("[Denetron Background] auth saved successfully", {
-        hasStoredAuth: Boolean(verify.denetron_auth),
-        userId: verify.userId || null,
-        orgId: verify.orgId || null,
-      });
-
-      sendResponse({
-        ok: true,
-        success: true,
-        saved: true,
-        userId: verify.userId || null,
-        orgId: verify.orgId || null,
-      });
-    } catch (error) {
-      console.error("[Denetron Background] auth save failed", {
-        message: error?.message || String(error),
-        stack: error?.stack || null,
-      });
-
-      sendResponse({
-        ok: false,
-        success: false,
-        error: error?.message || "AUTH_SAVE_FAILED",
-      });
+    if (Object.keys(payload).length) {
+      await this.extension.storage.local.set(payload);
     }
-  }
 
-  async handleMessage(message, _sender, sendResponse) {
-    try {
-      switch (message?.type) {
-        case "SYNC_NOW":
-          await this.handleManualSync();
-          sendResponse({ success: true });
-          break;
-
-        case "ISGKATIP_COMPANIES_SCRAPED":
-          await this.handleISGKatipSync(message.data || [], message.metadata || {});
-          sendResponse({ success: true });
-          break;
-
-        case "GET_CONFIG":
-          sendResponse({
-            success: true,
-            supabaseUrl: this.supabaseUrl,
-            supabaseKey: this.supabaseKey,
-            orgId: this.orgId,
-            userId: this.userId,
-          });
-          break;
-
-        default:
-          sendResponse({ success: false, error: "Unknown message type" });
-      }
-    } catch (error) {
-      console.error("Background message handling error:", error);
-      sendResponse({ success: false, error: error?.message || "Unknown error" });
-    }
+    return {
+      success: true,
+      ...(await this.loadConfig()),
+    };
   }
 
   cleanString(value) {
@@ -315,204 +205,161 @@ class BackgroundService {
   }
 
   cleanNumber(value) {
-    const parsed = parseInt(value, 10);
-    return Number.isNaN(parsed) ? 0 : parsed;
+    const parsed = Number.parseInt(String(value ?? "").replace(/[^\d-]/g, ""), 10);
+    return Number.isNaN(parsed) ? null : parsed;
   }
 
-  validateDate(dateValue) {
-    if (!dateValue) return null;
-    const parsed = new Date(dateValue);
-    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-  }
-
-  calculateComplianceStatus(assigned, required) {
-    if (!required || required <= 0) return "UNKNOWN";
-    if (assigned >= required) return "COMPLIANT";
-    if (assigned >= required * 0.8) return "WARNING";
-    return "CRITICAL";
-  }
-
-  calculateRiskScore(company) {
-    let score = 50;
-    const hazardClass = String(company?.hazard_class || "");
-    const employeeCount = this.cleanNumber(company?.employee_count);
-    const complianceStatus = this.calculateComplianceStatus(
-      this.cleanNumber(company?.assigned_minutes),
-      this.cleanNumber(company?.required_minutes)
-    );
-
-    if (hazardClass.includes("Cok Tehlikeli") || hazardClass.includes("Çok Tehlikeli")) {
-      score += 30;
-    } else if (hazardClass.includes("Tehlikeli")) {
-      score += 15;
+  async getAuthorizedHeaders() {
+    const accessToken = await this.authHandler.getAccessToken();
+    if (!accessToken) {
+      throw new Error("ISGVizyon oturumu bulunamadı. Lütfen tekrar giriş yapın.");
     }
 
-    if (employeeCount > 100) score += 10;
-    else if (employeeCount > 50) score += 5;
-
-    if (complianceStatus === "CRITICAL") score += 20;
-    else if (complianceStatus === "WARNING") score += 10;
-
-    return Math.min(score, 100);
-  }
-
-  async saveSyncLog(logData) {
-    try {
-      await fetch(`${this.supabaseUrl}/rest/v1/isgkatip_sync_logs`, {
-        method: "POST",
-        headers: {
-          apikey: this.supabaseKey,
-          Authorization: `Bearer ${this.supabaseKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          org_id: this.orgId,
-          source: logData.source,
-          total_companies: logData.total_companies,
-          success_count: logData.success_count,
-          error_count: logData.error_count,
-          metadata: logData.metadata,
-        }),
-      });
-    } catch (error) {
-      console.warn("Sync log kaydedilemedi:", error?.message || error);
-    }
-  }
-
-  async loadStats() {
-    if (!this.orgId) return;
-
-    const scopeFilter = this.userId
-      ? `or=(org_id.eq.${this.orgId},user_id.eq.${this.userId})`
-      : `org_id=eq.${this.orgId}`;
-
-    const response = await fetch(
-      `${this.supabaseUrl}/rest/v1/isgkatip_companies?${scopeFilter}&select=compliance_status,last_synced_at&order=last_synced_at.desc`,
-      {
-        headers: {
-          apikey: this.supabaseKey,
-          Authorization: `Bearer ${this.supabaseKey}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Stats request failed with HTTP ${response.status}`);
-    }
-
-    const companies = await response.json();
-    const lastSyncedAt = companies.find((item) => item.last_synced_at)?.last_synced_at || null;
-
-    const stats = {
-      totalCompanies: companies.length,
-      warningCount: companies.filter((item) => item.compliance_status === "WARNING").length,
-      criticalCount: companies.filter((item) => item.compliance_status === "CRITICAL").length,
+    return {
+      apikey: this.supabaseKey,
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     };
-
-    await this.extension.storage.local.set({
-      stats,
-      extensionLastSyncedAt: lastSyncedAt,
-    });
   }
 
-  async handleManualSync() {
-    await this.loadConfig();
-    await this.loadStats();
+  mapCompanyForSync(company) {
+    const employeeCount = this.cleanNumber(company.employeeCount);
+    const assignedMinutes = this.cleanNumber(company.assignedMinutes);
+    const requiredMinutes = this.cleanNumber(company.requiredMinutes);
+
+    return {
+      sgkNo: this.cleanString(company.sgkNo),
+      companyName: this.cleanString(company.companyName),
+      employeeCount: employeeCount ?? 0,
+      hazardClass: this.cleanString(company.hazardClass) || "Az Tehlikeli",
+      naceCode: this.cleanString(company.naceCode) || null,
+      contractStart: this.cleanString(company.contractStart) || null,
+      contractEnd: this.cleanString(company.contractEnd) || null,
+      assignedMinutes: assignedMinutes ?? 0,
+      requiredMinutes,
+    };
   }
 
   async handleISGKatipSync(companies, metadata) {
     await this.loadConfig();
 
-    if (!this.supabaseUrl || !this.supabaseKey || !this.orgId) {
-      throw new Error("Supabase configuration eksik");
+    if (!this.orgId || !this.userId) {
+      throw new Error("ISGVizyon kullanıcı/organizasyon bilgisi bulunamadı.");
     }
 
-    const headers = {
-      apikey: this.supabaseKey,
-      Authorization: `Bearer ${this.supabaseKey}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
-    };
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (const company of companies) {
-      const payload = {
-        org_id: this.orgId,
-        user_id: this.userId,
-        sgk_no: this.cleanString(company.sgk_no),
-        company_name: this.cleanString(company.company_name),
-        employee_count: this.cleanNumber(company.employee_count),
-        hazard_class: this.cleanString(company.hazard_class) || "Az Tehlikeli",
-        nace_code: this.cleanString(company.nace_code) || null,
-        assigned_minutes: this.cleanNumber(company.assigned_minutes),
-        required_minutes: this.cleanNumber(company.required_minutes),
-        compliance_status: this.calculateComplianceStatus(
-          this.cleanNumber(company.assigned_minutes),
-          this.cleanNumber(company.required_minutes)
-        ),
-        risk_score: this.calculateRiskScore(company),
-        contract_start: this.validateDate(company.contract_start),
-        contract_end: this.validateDate(company.contract_end),
-        last_synced_at: new Date().toISOString(),
-      };
-
-      if (!payload.sgk_no || !payload.company_name) {
-        errorCount += 1;
-        continue;
-      }
-
-      const response = await fetch(`${this.supabaseUrl}/rest/v1/isgkatip_companies`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) successCount += 1;
-      else errorCount += 1;
+    if (!Array.isArray(companies) || !companies.length) {
+      throw new Error("Aktarılacak firma verisi bulunamadı.");
     }
 
-    await this.saveSyncLog({
-      source: "ISGKATIP_SCRAPER",
-      total_companies: companies.length,
-      success_count: successCount,
-      error_count: errorCount,
-      metadata,
+    const normalizedCompanies = companies
+      .map((company) => this.mapCompanyForSync(company))
+      .filter((company) => company.sgkNo && company.companyName);
+
+    if (!normalizedCompanies.length) {
+      throw new Error("Geçerli firma kaydı bulunamadı.");
+    }
+
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/isgkatip-sync`, {
+      method: "POST",
+      headers: await this.getAuthorizedHeaders(),
+      body: JSON.stringify({
+        action: "BATCH_SYNC",
+        data: {
+          source: "ISGKATIP_EXTENSION",
+          companies: normalizedCompanies,
+          metadata: {
+            ...metadata,
+            totalRequested: companies.length,
+          },
+        },
+      }),
     });
 
-    await this.extension.action.setBadgeText({ text: successCount ? String(successCount) : "" });
+    const payload = await response.json().catch(() => null);
 
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.error || `Senkronizasyon başarısız. HTTP ${response.status}`);
+    }
+
+    const summary = payload.summary || {
+      total: normalizedCompanies.length,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      errors: 0,
+    };
+
+    await this.extension.storage.local.set({
+      extensionLastSyncedAt: new Date().toISOString(),
+      extensionLastSyncSummary: summary,
+    });
+
+    await this.extension.action.setBadgeText({
+      text: summary.total ? String(summary.total) : "",
+    });
     await this.extension.action.setBadgeBackgroundColor({
-      color: successCount > 0 ? "#22c55e" : "#ef4444",
+      color: summary.errors > 0 ? "#dc2626" : "#059669",
     });
 
     this.extension.notifications.create({
       type: "basic",
       iconUrl: "/assets/icon-128.png",
-      title: successCount > 0 ? "ISG-KATIP senkronu tamamlandi" : "ISG-KATIP senkronu basarisiz",
-      message:
-        successCount > 0
-          ? `${successCount} firma senkronize edildi${
-              errorCount > 0 ? `, ${errorCount} kayit kontrol edilmeli.` : "."
-            }`
-          : "Kayitlar senkronize edilemedi.",
+      title: summary.errors > 0 ? "ISGVizyon senkronu tamamlandı (kontrol gerekli)" : "ISGVizyon senkronu tamamlandı",
+      message: `Yeni: ${summary.inserted ?? 0}, güncel: ${summary.updated ?? 0}, atlanan: ${
+        summary.skipped ?? 0
+      }, hatalı: ${summary.errors ?? 0}`,
       priority: 1,
     });
 
     await this.loadStats();
+
+    return {
+      success: true,
+      summary,
+      results: payload.results || [],
+    };
   }
 
-  handleTabUpdate(tabId, tab) {
-    if (tab?.url?.includes("isgkatip.csgb.gov.tr")) {
-      this.extension.action.setBadgeText({ tabId, text: "ISG" });
-      this.extension.action.setBadgeBackgroundColor({ tabId, color: "#2563eb" });
+  async loadStats() {
+    await this.loadConfig();
+    if (!this.orgId) return;
+
+    const headers = await this.getAuthorizedHeaders();
+    const response = await fetch(
+      `${this.supabaseUrl}/functions/v1/isgkatip-sync`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          action: "GET_COMPANIES",
+          data: {
+            filters: {},
+          },
+        }),
+      }
+    );
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.success) {
+      throw new Error(payload?.error || `İstatistikler alınamadı. HTTP ${response.status}`);
     }
+
+    const companies = Array.isArray(payload.companies) ? payload.companies : [];
+    const lastSyncedAt = companies.find((item) => item.last_synced_at)?.last_synced_at || null;
+
+    await this.extension.storage.local.set({
+      stats: {
+        totalCompanies: companies.length,
+        warningCount: companies.filter((item) => item.compliance_status === "WARNING").length,
+        criticalCount: companies.filter((item) => item.compliance_status === "CRITICAL").length,
+      },
+      companiesPreview: companies.slice(0, 50),
+      extensionLastSyncedAt: lastSyncedAt,
+    });
   }
 }
 
 const service = new BackgroundService();
-
 service.init().catch((error) => {
-  console.error("Background service baslatilamadi:", error);
+  console.error("[ISGVizyon Background] başlatılamadı:", error);
 });

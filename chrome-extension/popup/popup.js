@@ -1,8 +1,10 @@
 // chrome-extension/popup/popup.js
 import { AuthHandler } from "../auth/auth-handler.js";
 import {
+  DEFAULT_PRIVACY_POLICY_URL,
   DEFAULT_SUPABASE_ANON_KEY,
   DEFAULT_SUPABASE_URL,
+  EXTENSION_LEGAL_NOTICE,
 } from "../config/defaults.js";
 import { assertExtensionApi } from "../shared/extension-api.js";
 
@@ -352,6 +354,8 @@ class PopupController {
           <button id="btnOpenAppFallback" class="secondary-action full">ISGVizyon'u Aç</button>
 
           <div class="auth-note">Giriş tamamlandıktan sonra uzantıyı tekrar açın.</div>
+          <div class="auth-note">${escapeHtml(EXTENSION_LEGAL_NOTICE)}</div>
+          <div class="auth-note">Gizlilik: Şifre, çerez ve e-Devlet oturum bilgisi aktarılmaz. <a href="${DEFAULT_PRIVACY_POLICY_URL}" target="_blank" rel="noreferrer noopener">Gizlilik politikası</a></div>
         </section>
       </main>
     `;
@@ -1000,7 +1004,40 @@ class PopupController {
 
           <div class="secondary-actions">
             <button id="btnOpenDashboard" class="secondary-action">Paneli Aç</button>
-            <button id="btnSyncISGKatip" class="secondary-action">İSG-KATİP</button>
+            <button id="btnSyncISGKatip" class="secondary-action">İSG-KATİP Sayfasını Aç</button>
+          </div>
+        </section>
+
+        <section class="activity-card">
+          <div class="section-head compact">
+            <div>
+              <div class="section-title">Gizlilik ve Yetki</div>
+              <div class="section-subtitle">Aktarım her zaman kullanıcı onayıyla başlatılır.</div>
+            </div>
+          </div>
+
+          <div class="activity-list-premium">
+            <div class="activity-premium info">
+              <span class="activity-dot"></span>
+              <div>
+                <div class="activity-title">Resmi kurum değildir</div>
+                <div class="activity-text">${escapeHtml(EXTENSION_LEGAL_NOTICE)}</div>
+              </div>
+            </div>
+            <div class="activity-premium info">
+              <span class="activity-dot"></span>
+              <div>
+                <div class="activity-title">Aktarım onaylıdır</div>
+                <div class="activity-text">İSG-KATİP ekranındaki veriler önce önizlenir. Siz onay vermeden hiçbir kayıt ISGVizyon hesabınıza aktarılmaz.</div>
+              </div>
+            </div>
+            <div class="activity-premium info">
+              <span class="activity-dot"></span>
+              <div>
+                <div class="activity-title">Gizlilik</div>
+                <div class="activity-text">Şifre, çerez, token veya e-Devlet oturum bilgileri aktarılmaz. Ayrıntılar için: ${escapeHtml(DEFAULT_PRIVACY_POLICY_URL)}</div>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -1161,7 +1198,8 @@ class PopupController {
             type: "basic",
             iconUrl: "/assets/icon-128.png",
             title: "ISGVizyon İSG Bot",
-            message: 'Sağ alttaki "Verileri ISGVizyon\'a Aktar" butonuna tıklayın.',
+            message:
+              'Sağ alttaki "Firmalarımı Oku" butonuna tıklayın, önizlemeyi kontrol edin ve ardından "Onayla ve ISGVizyon’a Aktar" ile devam edin.',
             priority: 1,
           });
         }
