@@ -32,7 +32,9 @@ import {
   type AnnualWorkPlanRow,
 } from "@/lib/annualWorkPlanOfficialDocx";
 import { downloadAnnualWorkPlanPdf } from "@/lib/annualWorkPlanPdf";
-import { downloadAnnualEvaluationOfficialDocx } from "@/lib/annualEvaluationOfficialDocx";
+import { downloadAnnualEvaluationPdf } from "@/lib/annualEvaluationPdf";
+import { downloadAnnualTrainingPlanOfficialDocx } from "@/lib/annualTrainingPlanOfficialDocx";
+import { downloadAnnualTrainingPlanPdf } from "@/lib/annualTrainingPlanPdf";
 
 const MONTH_HEADERS = [
   "OCAK",
@@ -63,7 +65,7 @@ type StoredAnnualPlanData = {
   rows: AnnualWorkPlanRow[];
 };
 
-type AnnualPlansSection = "work-plan" | "annual-evaluation";
+type AnnualPlansSection = "work-plan" | "annual-evaluation" | "annual-training";
 
 type AnnualEvaluationWorkItem = {
   yapilanCalismalar: string;
@@ -88,6 +90,23 @@ type AnnualEvaluationCompanyFormState = {
   calisanToplam: string;
 };
 
+type AnnualTrainingPlanItem = {
+  egitimKonusu: string;
+  egitimiVerecekKisiKurulus: string;
+  planlananTarih: string;
+  gerceklesenTarih: string;
+  aciklamalar: string;
+};
+
+type AnnualTrainingPlanFormState = {
+  isYeriUnvani: string;
+  isYeriAdresi: string;
+  isYeriSicilNo: string;
+  isGuvenligiUzmani: string;
+  isyeriHekimi: string;
+  isverenVekili: string;
+};
+
 const currentYear = new Date().getFullYear();
 const createEmptyAnnualEvaluationWork = (): AnnualEvaluationWorkItem => ({
   yapilanCalismalar: "",
@@ -96,6 +115,14 @@ const createEmptyAnnualEvaluationWork = (): AnnualEvaluationWorkItem => ({
   tekrarSayisi: "",
   kullanilanYontem: "",
   sonucYorum: "",
+});
+
+const createEmptyAnnualTrainingPlanItem = (): AnnualTrainingPlanItem => ({
+  egitimKonusu: "",
+  egitimiVerecekKisiKurulus: "",
+  planlananTarih: "",
+  gerceklesenTarih: "",
+  aciklamalar: "",
 });
 
 const baseRows = [
@@ -362,6 +389,7 @@ export default function AnnualPlans() {
   const [searchParams] = useSearchParams();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("companyId") || "");
+  const [selectedTrainingCompanyId, setSelectedTrainingCompanyId] = useState(searchParams.get("companyId") || "");
   const [activeSection, setActiveSection] = useState<AnnualPlansSection>("work-plan");
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [companyForm, setCompanyForm] = useState<AnnualWorkPlanCompanyInfo>({
@@ -377,6 +405,8 @@ export default function AnnualPlans() {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [generatingAnnualEvaluationReport, setGeneratingAnnualEvaluationReport] = useState(false);
+  const [generatingAnnualTrainingPlan, setGeneratingAnnualTrainingPlan] = useState(false);
+  const [generatingAnnualTrainingPdf, setGeneratingAnnualTrainingPdf] = useState(false);
   const [annualEvaluationWorks, setAnnualEvaluationWorks] = useState<AnnualEvaluationWorkItem[]>([
     createEmptyAnnualEvaluationWork(),
   ]);
@@ -394,6 +424,17 @@ export default function AnnualPlans() {
     calisanCocuk: "",
     calisanToplam: "",
   });
+  const [annualTrainingPlanForm, setAnnualTrainingPlanForm] = useState<AnnualTrainingPlanFormState>({
+    isYeriUnvani: "",
+    isYeriAdresi: "",
+    isYeriSicilNo: "",
+    isGuvenligiUzmani: "",
+    isyeriHekimi: "",
+    isverenVekili: "",
+  });
+  const [annualTrainingPlanItems, setAnnualTrainingPlanItems] = useState<AnnualTrainingPlanItem[]>([
+    createEmptyAnnualTrainingPlanItem(),
+  ]);
 
   useEffect(() => {
     setCompanyForm((previous) => ({ ...previous, year: selectedYear }));
@@ -405,6 +446,15 @@ export default function AnnualPlans() {
       isyeriUnvani: companyForm.companyName,
       sgkSicilNo: companyForm.registrationNumber,
       adres: companyForm.address,
+    }));
+  }, [companyForm.address, companyForm.companyName, companyForm.registrationNumber]);
+
+  useEffect(() => {
+    setAnnualTrainingPlanForm((previous) => ({
+      ...previous,
+      isYeriUnvani: companyForm.companyName,
+      isYeriAdresi: companyForm.address,
+      isYeriSicilNo: companyForm.registrationNumber,
     }));
   }, [companyForm.address, companyForm.companyName, companyForm.registrationNumber]);
 
@@ -562,6 +612,51 @@ export default function AnnualPlans() {
       }
       return previous.filter((_, itemIndex) => itemIndex !== index);
     });
+  };
+
+  const handleAnnualTrainingPlanFormChange = (
+    field: keyof AnnualTrainingPlanFormState,
+    value: string,
+  ) => {
+    setAnnualTrainingPlanForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+  };
+
+  const handleAnnualTrainingPlanItemChange = (
+    index: number,
+    field: keyof AnnualTrainingPlanItem,
+    value: string,
+  ) => {
+    setAnnualTrainingPlanItems((previous) =>
+      previous.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, [field]: value } : item,
+      ),
+    );
+  };
+
+  const handleAddAnnualTrainingPlanItem = () => {
+    setAnnualTrainingPlanItems((previous) => [...previous, createEmptyAnnualTrainingPlanItem()]);
+  };
+
+  const handleRemoveAnnualTrainingPlanItem = (index: number) => {
+    setAnnualTrainingPlanItems((previous) => {
+      if (previous.length <= 1) {
+        return previous;
+      }
+      return previous.filter((_, itemIndex) => itemIndex !== index);
+    });
+  };
+
+  const applyTrainingCompany = (company: CompanyOption) => {
+    setSelectedTrainingCompanyId(company.id);
+    setAnnualTrainingPlanForm((previous) => ({
+      ...previous,
+      isYeriUnvani: company.name || "",
+      isYeriAdresi: company.address || "",
+      isYeriSicilNo: company.registry_no || company.tax_number || "",
+    }));
   };
 
   const activeMonthCount = useMemo(
@@ -750,17 +845,53 @@ export default function AnnualPlans() {
     setGeneratingAnnualEvaluationReport(true);
 
     try {
-      await downloadAnnualEvaluationOfficialDocx({
+      await downloadAnnualEvaluationPdf({
         company: annualEvaluationCompanyForm,
         works: annualEvaluationWorks,
         year: selectedYear,
       });
-      toast.success("Yıllık değerlendirme raporu oluşturuldu");
+      toast.success("Yıllık değerlendirme raporu PDF olarak oluşturuldu");
     } catch (error) {
       console.error("Annual evaluation report generation failed:", error);
       alert("Yıllık değerlendirme raporu oluşturulurken bir hata oluştu.");
     } finally {
       setGeneratingAnnualEvaluationReport(false);
+    }
+  };
+
+  const handleGenerateAnnualTrainingPlan = async () => {
+    setGeneratingAnnualTrainingPlan(true);
+
+    try {
+      await downloadAnnualTrainingPlanOfficialDocx({
+        year: selectedYear,
+        form: annualTrainingPlanForm,
+        items: annualTrainingPlanItems,
+      });
+      toast.success("İSG yıllık eğitim planı oluşturuldu");
+    } catch (error) {
+      console.error("İSG yıllık eğitim planı oluşturma hatası:", error);
+      alert("İSG yıllık eğitim planı oluşturulurken bir hata oluştu.");
+    } finally {
+      setGeneratingAnnualTrainingPlan(false);
+    }
+  };
+
+  const handleGenerateAnnualTrainingPdf = async () => {
+    setGeneratingAnnualTrainingPdf(true);
+
+    try {
+      await downloadAnnualTrainingPlanPdf({
+        year: selectedYear,
+        form: annualTrainingPlanForm,
+        items: annualTrainingPlanItems,
+      });
+      toast.success("İSG yıllık eğitim planı PDF olarak oluşturuldu");
+    } catch (error) {
+      console.error("İSG yıllık eğitim planı PDF oluşturma hatası:", error);
+      alert("İSG yıllık eğitim planı PDF oluşturulurken bir hata oluştu.");
+    } finally {
+      setGeneratingAnnualTrainingPdf(false);
     }
   };
 
@@ -827,7 +958,7 @@ export default function AnnualPlans() {
 
         <Card className="border-border bg-card shadow-sm">
           <CardContent className="pt-6">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setActiveSection("work-plan")}
@@ -855,6 +986,21 @@ export default function AnnualPlans() {
                 <div className="text-sm font-semibold text-foreground">YILLIK DEĞERLENDİRME RAPORU</div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Değerlendirme alanlarını doldurun ve hazır şablondan `.docx` rapor üretin.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveSection("annual-training")}
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  activeSection === "annual-training"
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border bg-background hover:bg-muted/60"
+                }`}
+              >
+                <div className="text-sm font-semibold text-foreground">İSG Yıllık Eğitim Planı</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  İş yeri, eğitim satırları ve imza bilgilerini girip dinamik Word çıktısı alın.
                 </p>
               </button>
             </div>
@@ -1354,11 +1500,11 @@ export default function AnnualPlans() {
                         </TableCell>
                         <TableCell>
                           <Input
-                            type="date"
                             value={item.tarih}
                             onChange={(event) =>
                               handleAnnualEvaluationWorkChange(index, "tarih", event.target.value)
                             }
+                            placeholder="Örn. Ekim 20"
                             className="bg-background"
                           />
                         </TableCell>
@@ -1373,11 +1519,11 @@ export default function AnnualPlans() {
                         </TableCell>
                         <TableCell>
                           <Input
-                            type="number"
                             value={item.tekrarSayisi}
                             onChange={(event) =>
                               handleAnnualEvaluationWorkChange(index, "tekrarSayisi", event.target.value)
                             }
+                            placeholder="Örn. 4 / Ekim 20"
                             className="bg-background"
                           />
                         </TableCell>
@@ -1425,11 +1571,250 @@ export default function AnnualPlans() {
                 onClick={() => void handleGenerateAnnualEvaluationReport()}
                 disabled={generatingAnnualEvaluationReport}
                 className="gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  {generatingAnnualEvaluationReport
+                    ? "PDF Oluşturuluyor..."
+                    : "Yıllık Değerlendirme Raporu PDF Oluştur"}
+                </Button>
+              </div>
+          </CardContent>
+        </Card>
+        ) : null}
+
+        {activeSection === "annual-training" ? (
+        <Card className="border-border bg-card shadow-sm">
+          <CardHeader>
+            <CardTitle>İŞ SAĞLIĞI ve GÜVENLİĞİ YILLIK EĞİTİM PLANI</CardTitle>
+            <CardDescription className="mt-2 text-sm text-muted-foreground">
+              İş yeri bilgilerini, eğitim planı satırlarını ve imza alanlarını doldurun. Word şablonunda
+              eğitim tablosu yalnızca eklediğiniz satır kadar çoğaltılmalıdır.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 text-sm font-semibold text-foreground">İş Yeri Bilgileri</div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Field label="İş Yeri Unvanı Seç">
+                  <Select
+                    value={selectedTrainingCompanyId}
+                    onValueChange={(value) => {
+                      const company = companies.find((item) => item.id === value);
+                      if (company) {
+                        applyTrainingCompany(company);
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Sistemdeki firmalarınızdan seçin" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+
+                <Field label="İş Yeri Unvanı">
+                  <Input
+                    value={annualTrainingPlanForm.isYeriUnvani}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isYeriUnvani", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İş Yeri Sicil No">
+                  <Input
+                    value={annualTrainingPlanForm.isYeriSicilNo}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isYeriSicilNo", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İş Yeri Adresi" className="lg:col-span-2">
+                  <Textarea
+                    value={annualTrainingPlanForm.isYeriAdresi}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isYeriAdresi", event.target.value)
+                    }
+                    className="min-h-[110px] bg-background"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Eğitim Planı Satırları</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Word şablonunda sabit 12 satır yerine tek bir Docxtemplater loop satırı kullanılmalıdır.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddAnnualTrainingPlanItem}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Yeni Eğitim Satırı Ekle
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-border bg-card">
+                <Table className="min-w-[1240px]">
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="w-16 text-center">Sıra No</TableHead>
+                      <TableHead className="min-w-[220px]">Eğitim Konusu</TableHead>
+                      <TableHead className="min-w-[220px]">Eğitimi Verecek Kişi/Kuruluş</TableHead>
+                      <TableHead className="min-w-[150px]">Planlanan Tarih</TableHead>
+                      <TableHead className="min-w-[150px]">Gerçekleşen Tarih</TableHead>
+                      <TableHead className="min-w-[240px]">Açıklamalar</TableHead>
+                      <TableHead className="w-28 text-center">İşlem</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {annualTrainingPlanItems.map((item, index) => (
+                      <TableRow key={`annual-training-plan-item-${index}`} className="align-top">
+                        <TableCell className="pt-4 text-center text-sm font-semibold text-foreground">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell>
+                          <Textarea
+                            value={item.egitimKonusu}
+                            onChange={(event) =>
+                              handleAnnualTrainingPlanItemChange(index, "egitimKonusu", event.target.value)
+                            }
+                            className="min-h-[110px] bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={item.egitimiVerecekKisiKurulus}
+                            onChange={(event) =>
+                              handleAnnualTrainingPlanItemChange(index, "egitimiVerecekKisiKurulus", event.target.value)
+                            }
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="text"
+                            value={item.planlananTarih}
+                            onChange={(event) =>
+                              handleAnnualTrainingPlanItemChange(index, "planlananTarih", event.target.value)
+                            }
+                            placeholder="Örn. Ekim 2026"
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="text"
+                            value={item.gerceklesenTarih}
+                            onChange={(event) =>
+                              handleAnnualTrainingPlanItemChange(index, "gerceklesenTarih", event.target.value)
+                            }
+                            placeholder="Örn. 20 Ekim 2026"
+                            className="bg-background"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Textarea
+                            value={item.aciklamalar}
+                            onChange={(event) =>
+                              handleAnnualTrainingPlanItemChange(index, "aciklamalar", event.target.value)
+                            }
+                            className="min-h-[110px] bg-background"
+                          />
+                        </TableCell>
+                        <TableCell className="pt-4 text-center">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleRemoveAnnualTrainingPlanItem(index)}
+                            disabled={annualTrainingPlanItems.length <= 1}
+                            className="gap-2"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Sil
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-muted/30 p-4">
+              <div className="mb-4 text-sm font-semibold text-foreground">İmza / Onay Bilgileri</div>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <Field label="İş Güvenliği Uzmanı">
+                  <Input
+                    value={annualTrainingPlanForm.isGuvenligiUzmani}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isGuvenligiUzmani", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İşyeri Hekimi">
+                  <Input
+                    value={annualTrainingPlanForm.isyeriHekimi}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isyeriHekimi", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+
+                <Field label="İşveren / İ.Vekili">
+                  <Input
+                    value={annualTrainingPlanForm.isverenVekili}
+                    onChange={(event) =>
+                      handleAnnualTrainingPlanFormChange("isverenVekili", event.target.value)
+                    }
+                    className="bg-background"
+                  />
+                </Field>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void handleGenerateAnnualTrainingPdf()}
+                disabled={generatingAnnualTrainingPdf}
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                {generatingAnnualTrainingPdf
+                  ? "PDF Oluşturuluyor..."
+                  : "İSG Yıllık Eğitim Planı PDF Oluştur"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleGenerateAnnualTrainingPlan()}
+                disabled={generatingAnnualTrainingPlan}
+                className="gap-2"
               >
                 <Download className="h-4 w-4" />
-                {generatingAnnualEvaluationReport
-                  ? "Rapor Oluşturuluyor..."
-                  : "Yıllık Değerlendirme Raporu Oluştur"}
+                {generatingAnnualTrainingPlan
+                  ? "Word Oluşturuluyor..."
+                  : "İSG Yıllık Eğitim Planı Word Oluştur"}
               </Button>
             </div>
           </CardContent>

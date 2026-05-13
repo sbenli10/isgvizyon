@@ -84,6 +84,29 @@ const getParagraphFrame = (paragraph: Element): FrameMeta | null => {
   return { x, y, w };
 };
 
+const setParagraphFrame = (
+  paragraph: Element | undefined,
+  updates: Partial<Pick<FrameMeta, "x" | "y" | "w">>,
+) => {
+  if (!paragraph) return;
+
+  const paragraphProperties = getChildElements(paragraph, "pPr")[0];
+  if (!paragraphProperties) return;
+
+  const frame = getChildElements(paragraphProperties, "framePr")[0];
+  if (!frame) return;
+
+  if (typeof updates.x === "number") {
+    frame.setAttribute("w:x", String(updates.x));
+  }
+  if (typeof updates.y === "number") {
+    frame.setAttribute("w:y", String(updates.y));
+  }
+  if (typeof updates.w === "number") {
+    frame.setAttribute("w:w", String(updates.w));
+  }
+};
+
 const createRunWithText = (paragraph: Element, value: string) => {
   const xml = paragraph.ownerDocument;
   const run = createElement(xml, "w:r");
@@ -174,6 +197,20 @@ const setLabelValue = (paragraphs: ParagraphMeta[], label: string, value: string
   setParagraphText(paragraph.element, `${label}${suffix} ${value}`.trim());
 };
 
+const setInlineValue = (
+  paragraphs: ParagraphMeta[],
+  label: string,
+  value: string,
+  width: number,
+) => {
+  const paragraph = findParagraphByLabel(paragraphs, label);
+  if (!paragraph) return;
+
+  const suffix = label.includes(":") ? "" : " :";
+  setParagraphFrame(paragraph.element, { w: width });
+  setParagraphText(paragraph.element, `${label}${suffix} ${value}`.trim());
+};
+
 const setHeaderTitle = (paragraphs: ParagraphMeta[], year?: number) => {
   const titleParagraph = paragraphs.find((paragraph) =>
     normalizeText(paragraph.text).startsWith(normalizeText("YILLIK DEGERLENDIRME RAPORU")),
@@ -183,20 +220,6 @@ const setHeaderTitle = (paragraphs: ParagraphMeta[], year?: number) => {
   const resolvedYear = year || new Date().getFullYear();
   setParagraphText(titleParagraph.element, `YILLIK DEĞERLENDİRME RAPORU (${resolvedYear})`);
 };
-
-const getWritableWorkParagraphs = (paragraphs: ParagraphMeta[]) =>
-  paragraphs
-    .filter((paragraph) => {
-      if (!paragraph.frame) return false;
-      if (paragraph.frame.y < 4000 || paragraph.frame.y > 11050) return false;
-      const normalized = normalizeText(paragraph.text);
-      return normalized === "" || normalized === "-";
-    })
-    .sort((left, right) => {
-      if (!left.frame || !right.frame) return 0;
-      if (left.frame.y !== right.frame.y) return left.frame.y - right.frame.y;
-      return left.frame.x - right.frame.x;
-    });
 
 const formatWorkRow = (item: AnnualEvaluationWorkItem, index: number) =>
   [
@@ -208,15 +231,22 @@ const formatWorkRow = (item: AnnualEvaluationWorkItem, index: number) =>
     `Sonuç: ${item.sonucYorum || "-"}`,
   ].join(" | ");
 
-const bindWorkItems = (paragraphs: ParagraphMeta[], works: AnnualEvaluationWorkItem[]) => {
-  const writableParagraphs = getWritableWorkParagraphs(paragraphs);
-  const visibleWorks = works.slice(0, writableParagraphs.length);
+const WORK_ROW_PARAGRAPH_INDEXES = [26, 27, 28, 29, 31, 32] as const;
+const WORK_ROW_FRAME = { x: 532, w: 13913 };
+const UNUSED_WORK_PARAGRAPH_INDEXES = [30, 33, 34] as const;
 
-  visibleWorks.forEach((item, index) => {
-    setParagraphText(writableParagraphs[index]?.element, formatWorkRow(item, index));
+const bindWorkItems = (paragraphs: ParagraphMeta[], works: AnnualEvaluationWorkItem[]) => {
+  WORK_ROW_PARAGRAPH_INDEXES.forEach((paragraphIndex, index) => {
+    const paragraph = paragraphs[paragraphIndex];
+    if (!paragraph) return;
+
+    setParagraphFrame(paragraph.element, WORK_ROW_FRAME);
+    setParagraphText(paragraph.element, works[index] ? formatWorkRow(works[index], index) : "");
   });
 
-  writableParagraphs.slice(visibleWorks.length).forEach((paragraph) => {
+  UNUSED_WORK_PARAGRAPH_INDEXES.forEach((paragraphIndex) => {
+    const paragraph = paragraphs[paragraphIndex];
+    if (!paragraph) return;
     setParagraphText(paragraph.element, "");
   });
 };
@@ -246,12 +276,12 @@ const buildDocumentBlob = async (payload: AnnualEvaluationOfficialDocxPayload) =
 
   const paragraphs = buildParagraphMeta(xml);
   setHeaderTitle(paragraphs, payload.year);
-  setLabelValue(paragraphs, "Unvani", payload.company.isyeriUnvani);
+  setInlineValue(paragraphs, "Unvani", payload.company.isyeriUnvani, 5200);
   setLabelValue(paragraphs, "SGK/Bölge Müdürlüğü Sicil No:", payload.company.sgkSicilNo);
-  setLabelValue(paragraphs, "Adres", payload.company.adres);
-  setLabelValue(paragraphs, "Tel ve Fax :", payload.company.telFax);
-  setLabelValue(paragraphs, "E-posta:", payload.company.eposta);
-  setLabelValue(paragraphs, "Iskolu", payload.company.iskolu);
+  setInlineValue(paragraphs, "Adres", payload.company.adres, 6200);
+  setInlineValue(paragraphs, "Tel ve Fax :", payload.company.telFax, 4200);
+  setInlineValue(paragraphs, "E-posta:", payload.company.eposta, 3500);
+  setInlineValue(paragraphs, "Iskolu", payload.company.iskolu, 3400);
   setLabelValue(paragraphs, "Erkek :", payload.company.calisanErkek);
   setLabelValue(paragraphs, "Kadin:", payload.company.calisanKadin);
   setLabelValue(paragraphs, "Genç:", payload.company.calisanGenc);
