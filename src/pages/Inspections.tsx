@@ -1172,7 +1172,7 @@ export default function Inspections() {
           <p className="text-sm text-slate-300">Denetimler yükleniyor...</p>
         </div>
       ) : inspections.length > 0 ? (
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {inspections.map((inspection) => {
             const hasLinkedReport = Boolean(inspectionReportIds[inspection.id]);
 
@@ -1182,7 +1182,7 @@ export default function Inspections() {
               onClick={() => {
                 void openInspectionDetails(inspection);
               }}
-              className={`group relative overflow-hidden rounded-[24px] border bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(12,19,32,0.95))] p-5 shadow-[0_18px_50px_rgba(2,8,23,0.28)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(2,8,23,0.42)] ${
+              className={`group relative overflow-hidden rounded-[24px] border bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(12,19,32,0.95))] p-4 shadow-[0_18px_50px_rgba(2,8,23,0.28)] transition-all hover:-translate-y-1 hover:shadow-[0_24px_60px_rgba(2,8,23,0.42)] sm:p-5 ${
                 highlightedInspectionId === inspection.id
                   ? "border-emerald-400/70 shadow-[0_0_0_1px_rgba(52,211,153,0.35),0_22px_50px_rgba(16,185,129,0.18)]"
                   : "border-white/10 hover:border-cyan-400/30"
@@ -1196,15 +1196,24 @@ export default function Inspections() {
                       <span className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">
                         Denetim
                       </span>
-                      <span className="inline-flex rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-slate-400">
+                        <Calendar className="h-3.5 w-3.5" />
                         {new Date(inspection.created_at).toLocaleDateString("tr-TR")}
                       </span>
                     </div>
-                    <h3 className="truncate text-lg font-semibold text-white transition-colors group-hover:text-cyan-200">
+                    <h3 className="text-base font-semibold leading-6 text-white transition-colors group-hover:text-cyan-200 sm:text-lg">
                       {inspection.location_name}
                     </h3>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {inspection.equipment_category || "Ekipman / kategori bilgisi eklenmemiş"}
+                    <p className="mt-2 flex items-start gap-2 text-sm text-slate-400">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                      <span className="min-w-0">
+                        {inspection.equipment_category || "Ekipman / kategori bilgisi eklenmemiş"}
+                      </span>
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-slate-500 sm:hidden">
+                      {inspection.notes?.trim()
+                        ? "Not, fotoğraf ve aksiyon özeti için kartı açabilirsiniz."
+                        : "Bu kayıt temel saha bilgileriyle oluşturuldu."}
                     </p>
                     {highlightedInspectionId === inspection.id ? (
                       <span className="mt-3 inline-flex rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
@@ -1237,7 +1246,7 @@ export default function Inspections() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   <div className="rounded-xl border border-white/8 bg-white/[0.03] p-3">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Aksiyon</p>
                     <p className="mt-2 text-sm font-semibold text-slate-100">
@@ -1259,12 +1268,12 @@ export default function Inspections() {
                 </div>
 
                 <div className="rounded-2xl border border-white/8 bg-white/[0.03] p-4">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-200">
                       <FileText className="h-4 w-4 text-cyan-200" />
                       Denetim özeti
                     </div>
-                    <span className="text-[11px] font-medium text-slate-500">Kart görünümü</span>
+                    <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">Kart görünümü</span>
                   </div>
                   <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-400">
                     {inspection.notes?.trim() || "Bu kayıtta henüz paylaşılmış saha notu bulunmuyor. Detay görünümünde tam kayıt akışını inceleyebilirsiniz."}
@@ -1287,9 +1296,9 @@ export default function Inspections() {
                   </Button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Button
-                    className="h-10 flex-1 gap-2 rounded-2xl border-0 bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-400 text-slate-950"
+                    className="h-10 w-full flex-1 gap-2 rounded-2xl border-0 bg-gradient-to-r from-cyan-400 via-sky-400 to-violet-400 text-slate-950"
                     onClick={(e) => {
                       e.stopPropagation();
                       void openInspectionDetails(inspection);
@@ -1300,13 +1309,13 @@ export default function Inspections() {
                   {hasLinkedReport ? (
                     <Button
                       variant="outline"
-                      className="h-10 rounded-2xl border-white/10 bg-white/[0.04] px-4 text-slate-100 hover:bg-white/[0.08]"
+                      className="h-10 w-full rounded-2xl border-white/10 bg-white/[0.04] px-4 text-slate-100 hover:bg-white/[0.08] sm:w-auto"
                       onClick={(e) => {
                         e.stopPropagation();
                         void openInspectionDetails(inspection);
                       }}
                     >
-                      Rapor
+                      Raporu Aç
                     </Button>
                   ) : null}
                 </div>
@@ -1604,4 +1613,3 @@ export default function Inspections() {
     </div>
   );
 }
-
