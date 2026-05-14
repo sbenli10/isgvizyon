@@ -1,5 +1,4 @@
 ﻿import { useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import type { ToolMode } from "./EditorToolbar";
 import { Fabric, FabricCtors } from "./FabricCompat";
 
@@ -15,6 +14,8 @@ interface CanvasWorkspaceProps {
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
+const CANVAS_WIDTH = 1100;
+const CANVAS_HEIGHT = 680;
 
 export function CanvasWorkspace({
   activeTool,
@@ -25,33 +26,55 @@ export function CanvasWorkspace({
   onCanvasResize,
   onZoomChange,
 }: CanvasWorkspaceProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const canvasRef = useRef<any | null>(null);
   const lineDraftRef = useRef<any | null>(null);
+  const callbacksRef = useRef({
+    onCanvasReady,
+    onSelectionChange,
+    onObjectsChange,
+    onToolConsumed,
+    onCanvasResize,
+    onZoomChange,
+  });
 
   const isSpacePressedRef = useRef(false);
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    callbacksRef.current = {
+      onCanvasReady,
+      onSelectionChange,
+      onObjectsChange,
+      onToolConsumed,
+      onCanvasResize,
+      onZoomChange,
+    };
+  }, [onCanvasReady, onCanvasResize, onObjectsChange, onSelectionChange, onToolConsumed, onZoomChange]);
+
+  useEffect(() => {
     if (!canvasElRef.current || canvasRef.current || !FabricCtors.Canvas) return;
 
     const canvas = new FabricCtors.Canvas(canvasElRef.current, {
-      width: 900,
-      height: 600,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
       preserveObjectStacking: true,
-      backgroundColor: "#0b1220",
+      backgroundColor: "#ffffff",
       selection: true,
     } as any);
 
     canvasRef.current = canvas;
-    onCanvasReady(canvas);
+    canvas.set("backgroundColor", "#ffffff");
+    canvas.setWidth(CANVAS_WIDTH);
+    canvas.setHeight(CANVAS_HEIGHT);
+    canvas.calcOffset();
+    callbacksRef.current.onCanvasReady(canvas);
 
-    const handleSelection = () => onSelectionChange(canvas.getActiveObject() || null);
+    const handleSelection = () => callbacksRef.current.onSelectionChange(canvas.getActiveObject() || null);
     const handleObjects = (event: any) => {
       if (event?.target?.denetronMeta?.kind === "grid") return;
-      onObjectsChange();
+      callbacksRef.current.onObjectsChange();
     };
 
     const handleWheel = (event: any) => {
@@ -66,7 +89,7 @@ export function CanvasWorkspace({
       const point = Fabric?.Point ? new Fabric.Point(pointer.x, pointer.y) : ({ x: pointer.x, y: pointer.y } as any);
 
       canvas.zoomToPoint(point, nextZoom);
-      onZoomChange?.(Math.round(nextZoom * 100));
+      callbacksRef.current.onZoomChange?.(Math.round(nextZoom * 100));
     };
 
     const handlePanMouseDown = (event: any) => {
@@ -124,7 +147,7 @@ export function CanvasWorkspace({
 
     canvas.on("selection:created", handleSelection);
     canvas.on("selection:updated", handleSelection);
-    canvas.on("selection:cleared", () => onSelectionChange(null));
+    canvas.on("selection:cleared", () => callbacksRef.current.onSelectionChange(null));
     canvas.on("object:added", handleObjects);
     canvas.on("object:removed", handleObjects);
     canvas.on("object:modified", handleObjects);
@@ -136,45 +159,32 @@ export function CanvasWorkspace({
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
-    let raf = 0;
-    const resize = () => {
-      if (!containerRef.current) return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        if (!containerRef.current) return;
-
-        const bounds = containerRef.current.getBoundingClientRect();
-        const width = Math.max(900, Math.floor(bounds.width - 8));
-        const height = Math.max(520, Math.floor(bounds.height - 8));
-
-        if (canvas.getWidth() !== width || canvas.getHeight() !== height) {
-          canvas.setWidth(width);
-          canvas.setHeight(height);
-          onCanvasResize?.(canvas);
-          canvas.requestRenderAll();
-        }
-      });
-    };
-
-    resize();
-    const observer = new ResizeObserver(resize);
-    if (containerRef.current) observer.observe(containerRef.current);
-
-    onZoomChange?.(100);
+    callbacksRef.current.onCanvasResize?.(canvas);
+    callbacksRef.current.onZoomChange?.(100);
+    canvas.requestRenderAll();
 
     return () => {
-      cancelAnimationFrame(raf);
-      observer.disconnect();
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
       canvas.dispose();
       canvasRef.current = null;
     };
-  }, [onCanvasReady, onCanvasResize, onObjectsChange, onSelectionChange, onZoomChange]);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+
+    canvas.isDrawingMode = false;
+    canvas.selection = activeTool === "select";
+    canvas.defaultCursor = activeTool === "select" ? "default" : "crosshair";
+    canvas.getObjects().forEach((obj: any) => {
+      if (obj?.denetronMeta?.kind === "grid") return;
+      const locked = obj.lockMovementX === true;
+      obj.selectable = activeTool === "select" && !locked;
+      obj.evented = activeTool === "select" && !locked;
+    });
+    canvas.requestRenderAll();
 
     const handleMouseDown = (event: any) => {
       if (isSpacePressedRef.current) return;
@@ -186,12 +196,15 @@ export function CanvasWorkspace({
           left: pointer.x,
           top: pointer.y,
           fontSize: 20,
-          fill: "#e2e8f0",
+          fill: "#0f172a",
         } as any);
         (text as any).denetronMeta = { kind: "text", name: "Metin" };
         canvas.add(text);
         canvas.setActiveObject(text);
-        onToolConsumed();
+        text.setCoords();
+        canvas.requestRenderAll();
+        callbacksRef.current.onObjectsChange();
+        callbacksRef.current.onToolConsumed();
         return;
       }
 
@@ -210,8 +223,10 @@ export function CanvasWorkspace({
         (rect as any).denetronMeta = { kind: "shape", name: "Dikdortgen" };
         canvas.add(rect);
         canvas.setActiveObject(rect);
+        rect.setCoords();
         canvas.requestRenderAll();
-        onToolConsumed();
+        callbacksRef.current.onObjectsChange();
+        callbacksRef.current.onToolConsumed();
         return;
       }
 
@@ -229,8 +244,10 @@ export function CanvasWorkspace({
         (circle as any).denetronMeta = { kind: "shape", name: "Daire" };
         canvas.add(circle);
         canvas.setActiveObject(circle);
+        circle.setCoords();
         canvas.requestRenderAll();
-        onToolConsumed();
+        callbacksRef.current.onObjectsChange();
+        callbacksRef.current.onToolConsumed();
         return;
       }
 
@@ -293,15 +310,18 @@ export function CanvasWorkspace({
         canvas.remove(draft);
         canvas.add(arrow as any);
         canvas.setActiveObject(arrow as any);
+        (arrow as any).setCoords?.();
       } else {
         draft.set({ selectable: true, evented: true });
         (draft as any).denetronMeta = { kind: "path", name: activeTool === "polyline" ? "Poliline" : "Cizgi" };
         canvas.setActiveObject(draft as any);
+        draft.setCoords();
       }
 
       lineDraftRef.current = null;
-      onToolConsumed();
+      callbacksRef.current.onToolConsumed();
       canvas.requestRenderAll();
+      callbacksRef.current.onObjectsChange();
     };
 
     if (activeTool !== "select") {
@@ -320,16 +340,17 @@ export function CanvasWorkspace({
       canvas.off("mouse:move", handleMouseMove);
       canvas.off("mouse:up", handleMouseUp);
     };
-  }, [activeTool, onToolConsumed]);
+  }, [activeTool]);
 
   return (
-    <Card className="h-full min-h-0 border-slate-700/80 bg-gradient-to-b from-slate-950/70 to-[#091634] shadow-[0_16px_50px_rgba(2,6,23,0.42)] backdrop-blur-sm">
-      <CardContent ref={containerRef} className="h-full min-h-0 p-2">
-        <div className="h-full w-full overflow-hidden rounded-xl border border-slate-700/80 bg-[#07152f]">
-          <canvas ref={canvasElRef} className="block" />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="relative bg-white" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+      <canvas
+        ref={canvasElRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        className="block h-[680px] w-[1100px] cursor-crosshair bg-white"
+      />
+    </div>
   );
 }
 
