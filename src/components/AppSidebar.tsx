@@ -2,6 +2,7 @@
 import {
   LayoutDashboard,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   Brain,
   Settings,
@@ -354,6 +355,7 @@ export function AppSidebar() {
           { title: "Sertifika Merkezi", url: "/dashboard/certificates", icon: Award, badge: "NEW" },
           { title: "Sertifika Geçmişi", url: "/dashboard/certificates/history", icon: History, badge: null },
           { title: "İSG Kütüphanesi", url: "/safety-library", icon: BookOpen, badge: null },
+          { title: "Çalışma Talimatları", url: "/work-instructions", icon: ClipboardList, badge: "NEW" },
         ],
       },
       {

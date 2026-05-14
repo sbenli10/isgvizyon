@@ -63,6 +63,7 @@ const BulkCAPAHowTo = lazyWithRetry("bulk-capa-how-to", loadBulkCapaHowToPage);
 const IncidentManagement = lazyWithRetry("incident-management", () => import("./pages/IncidentManagement"));
 const SafetyLibrary = lazyWithRetry("safety-library", () => import("./pages/SafetyLibrary"));
 const SafetyLibraryGuide = lazyWithRetry("safety-library-guide", () => import("./pages/SafetyLibraryGuide"));
+const WorkInstructions = lazyWithRetry("work-instructions", () => import("./pages/WorkInstructions"));
 const Settings = lazyWithRetry("settings", () => import("./pages/Settings"));
 const Profile = lazyWithRetry("profile", () => import("./pages/Profile"));
 const loadCompanyManagerPage = () => import("./pages/CompanyManager");
@@ -352,6 +353,8 @@ const ProtectedShell = () => {
             {/* ============================================ */}
             <Route path="/safety-library" element={<SafetyLibrary />} />
             <Route path="/safety-library/guide" element={<SafetyLibraryGuide />} />
+            <Route path="/work-instructions" element={<WorkInstructions />} />
+            <Route path="/calisma-talimatlari" element={<Navigate to="/work-instructions" replace />} />
             <Route path="nace-query" element={<NaceHazardQuery />} />
             <Route path="nace-query/sectors" element={<NaceSectorList />} />
 
