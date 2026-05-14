@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "generate:symbols": "node scripts/generate-public-symbols.mjs"
+    
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

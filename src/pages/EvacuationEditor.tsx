@@ -2,6 +2,7 @@
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { createPortal } from "react-dom";
+import { PUBLIC_SYMBOLS } from "@/components/evacuation-editor/publicSymbols.generated";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -18,8 +19,8 @@ import {
   Layers3,
   Lock,
   Maximize2,
-  Minus,
   MousePointer2,
+  Palette,
   PanelLeft,
   PenLine,
   Plus,
@@ -39,6 +40,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   createImageFromURLCompat,
+  fetchSVGTextCompat,
   groupSVGElementsCompat,
   loadSVGFromStringCompat,
   Fabric,
@@ -48,7 +50,6 @@ import { CanvasWorkspace } from "@/components/evacuation-editor/CanvasWorkspace"
 import { HistoryManager } from "@/components/evacuation-editor/HistoryManager";
 import { GridSystem } from "@/components/evacuation-editor/GridSystem";
 import { SnapSystem } from "@/components/evacuation-editor/SnapSystem";
-import type { EditorSymbol } from "@/components/evacuation-editor/SymbolLibrary";
 import { ISO7010_SYMBOLS } from "@/components/evacuation-editor/SymbolLibrary";
 import type { LegendEntry } from "@/components/evacuation-editor/LegendPanel";
 import type { LayerItem } from "@/components/evacuation-editor/LayerPanel";
@@ -96,6 +97,7 @@ interface SafetySymbol {
   color: string;
   shortCode: string;
   svg?: string;
+  svgUrl?: string;
   imageSrc?: string;
 }
 
@@ -126,13 +128,136 @@ const LOAD_KEY = "evacuation-editor-load-project";
 const DRAFT_KEY = "isgvizyon-evacuation-editor-draft";
 const CUSTOM_SYMBOLS_KEY = "isgvizyon-evacuation-custom-symbols";
 const CANVAS_BASE_SIZE = { width: 1100, height: 680 };
+const COLOR_PALETTE = [
+  "#ef4444",
+  "#f97316",
+  "#f59e0b",
+  "#eab308",
+  "#84cc16",
+  "#22c55e",
+  "#10b981",
+  "#14b8a6",
+  "#06b6d4",
+  "#0ea5e9",
+  "#3b82f6",
+  "#6366f1",
+  "#8b5cf6",
+  "#a855f7",
+  "#d946ef",
+  "#ec4899",
+  "#f43f5e",
+  "#f8fafc",
+  "#e2e8f0",
+  "#cbd5e1",
+  "#94a3b8",
+  "#64748b",
+  "#475569",
+  "#334155",
+  "#1e293b",
+  "#0f172a",
+  "#020617",
+  "#fef3c7",
+  "#dcfce7",
+  "#e0f2fe",
+  "#fee2e2",
+  "#e0e7ff",
+];
+
+const DEFAULT_FILL_COLOR = "#e2e8f0";
+const DEFAULT_STROKE_COLOR = "#64748b";
+const DEBUG_CANVAS = true;
 
 const loadEvacuationExportService = () => import("@/components/evacuation-editor/ExportService");
+
+const logFabricDomState = (label: string, canvas: any, object?: any) => {
+  if (!DEBUG_CANVAS || typeof window === "undefined" || !canvas) return;
+
+  const lowerCanvas = canvas.lowerCanvasEl as HTMLCanvasElement | undefined;
+  const upperCanvas = canvas.upperCanvasEl as HTMLCanvasElement | undefined;
+  const wrapper = canvas.wrapperEl as HTMLDivElement | undefined;
+  const lowerStyle = lowerCanvas ? window.getComputedStyle(lowerCanvas) : null;
+  const upperStyle = upperCanvas ? window.getComputedStyle(upperCanvas) : null;
+  const wrapperStyle = wrapper ? window.getComputedStyle(wrapper) : null;
+
+  console.log(label, {
+    objects: canvas.getObjects?.().length,
+    internalSize: { width: canvas.getWidth?.(), height: canvas.getHeight?.(), zoom: canvas.getZoom?.() },
+    object: object
+      ? {
+          type: object.type,
+          visible: object.visible,
+          selectable: object.selectable,
+          evented: object.evented,
+          left: object.left,
+          top: object.top,
+          width: object.width,
+          height: object.height,
+          scaleX: object.scaleX,
+          scaleY: object.scaleY,
+          opacity: object.opacity,
+        }
+      : null,
+    wrapper: wrapper
+      ? {
+          display: wrapperStyle?.display,
+          visibility: wrapperStyle?.visibility,
+          opacity: wrapperStyle?.opacity,
+          width: wrapperStyle?.width,
+          height: wrapperStyle?.height,
+          zIndex: wrapperStyle?.zIndex,
+        }
+      : null,
+    lower: lowerCanvas
+      ? {
+          display: lowerStyle?.display,
+          visibility: lowerStyle?.visibility,
+          opacity: lowerStyle?.opacity,
+          background: lowerStyle?.backgroundColor,
+          zIndex: lowerStyle?.zIndex,
+          width: lowerStyle?.width,
+          height: lowerStyle?.height,
+        }
+      : null,
+    upper: upperCanvas
+      ? {
+          display: upperStyle?.display,
+          visibility: upperStyle?.visibility,
+          opacity: upperStyle?.opacity,
+          background: upperStyle?.backgroundColor,
+          zIndex: upperStyle?.zIndex,
+          width: upperStyle?.width,
+          height: upperStyle?.height,
+        }
+      : null,
+  });
+};
 
 const initialFloor: FloorState = {
   id: "floor-ground",
   name: "Zemin Kat",
   canvasJson: null,
+};
+
+const createSymbolPlate = (symbol: SafetySymbol) => {
+  if (!FabricCtors.Rect) return null;
+
+  const isWarning = symbol.category === "warning";
+
+  return new FabricCtors.Rect({
+    left: 0,
+    top: 0,
+    width: 76,
+    height: 76,
+    rx: 10,
+    ry: 10,
+    originX: "center",
+    originY: "center",
+    fill: symbol.color || "#16a34a",
+    stroke: isWarning ? "#111827" : "rgba(255,255,255,0.85)",
+    strokeWidth: 2,
+    selectable: false,
+    evented: false,
+  } as any);
 };
 
 const categoryLabels: Record<SafetySymbolCategory, string> = {
@@ -162,6 +287,45 @@ const toolButtons: Array<{ id: EditorTool; label: string; icon: React.ComponentT
   { id: "eraser", label: "Silgi", icon: Eraser },
 ];
 
+const toolbarButtonBase =
+  "h-9 shrink-0 gap-1.5 rounded-lg px-3 text-xs font-semibold border shadow-sm transition-all duration-150";
+
+const toolbarIconButtonBase =
+  "h-9 w-9 shrink-0 rounded-xl border shadow-sm transition-all duration-150";
+
+const toolbarTone = {
+  emerald:
+    "border-emerald-600/60 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white hover:border-emerald-400 shadow-[0_2px_6px_rgba(16,185,129,0.15)]",
+  cyan:
+    "border-cyan-600/60 bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600 hover:text-white hover:border-cyan-400 shadow-[0_2px_6px_rgba(6,182,212,0.15)]",
+  violet:
+    "border-violet-600/60 bg-violet-600/20 text-violet-400 hover:bg-violet-600 hover:text-white hover:border-violet-400 shadow-[0_2px_6px_rgba(139,92,246,0.15)]",
+  blue:
+    "border-blue-600/60 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white hover:border-blue-400 shadow-[0_2px_6px_rgba(59,130,246,0.15)]",
+  sky:
+    "border-sky-600/60 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white hover:border-sky-400 shadow-[0_2px_6px_rgba(56,189,248,0.15)]",
+  amber:
+    "border-amber-600/60 bg-amber-600/20 text-amber-400 hover:bg-amber-600 hover:text-white hover:border-amber-400 shadow-[0_2px_6px_rgba(245,158,11,0.15)]",
+  rose:
+    "border-rose-600/60 bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white hover:border-rose-400 shadow-[0_2px_6px_rgba(244,63,94,0.15)]",
+  red:
+    "border-red-600/60 bg-red-600/25 text-red-400 hover:bg-red-600 hover:text-white hover:border-red-400 shadow-[0_2px_6px_rgba(239,68,68,0.15)]",
+  slate:
+    "border-slate-500/50 bg-slate-600/20 text-slate-300 hover:bg-slate-500 hover:text-white hover:border-slate-400 shadow-[0_2px_6px_rgba(100,116,139,0.1)]",
+  indigo:
+    "border-indigo-600/60 bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600 hover:text-white hover:border-indigo-400 shadow-[0_2px_6px_rgba(99,102,241,0.15)]",
+};
+
+const getToolButtonTone = (tool: EditorTool) => {
+  if (tool === "select") return toolbarTone.violet;
+  if (tool === "rect" || tool === "circle" || tool === "triangle") return toolbarTone.blue;
+  if (tool === "line" || tool === "arrow" || tool === "pen" || tool === "route") return toolbarTone.emerald;
+  if (tool === "text") return toolbarTone.amber;
+  if (tool === "wall" || tool === "door" || tool === "stairs" || tool === "room") return toolbarTone.cyan;
+  if (tool === "eraser") return toolbarTone.red;
+  return toolbarTone.slate;
+};
+
 const loadDefaultSvg = (id: string) => ISO7010_SYMBOLS.find((symbol) => symbol.id === id)?.svg;
 
 const buildSymbolSvg = (shortCode: string, background: string, foreground = "#ffffff") =>
@@ -173,92 +337,18 @@ const buildSymbolSvg = (shortCode: string, background: string, foreground = "#ff
     </text>
   </svg>`;
 
-const BASE_SYMBOLS: SafetySymbol[] = [
-  {
-    id: "emergency-exit",
-    label: "Acil Çikis",
-    category: "emergency",
-    color: "#16a34a",
-    shortCode: "E1",
-    svg: loadDefaultSvg("emergency-exit") || buildSymbolSvg("E1", "#16a34a"),
-  },
-  {
-    id: "emergency-door",
-    label: "Acil Çikis Kapisi",
-    category: "emergency",
-    color: "#15803d",
-    shortCode: "E2",
-    svg: loadDefaultSvg("emergency-door") || buildSymbolSvg("E2", "#15803d"),
-  },
-  {
-    id: "first-aid",
-    label: "Ilk Yardim",
-    category: "emergency",
-    color: "#16a34a",
-    shortCode: "E3",
-    svg: loadDefaultSvg("first-aid") || buildSymbolSvg("E3", "#16a34a"),
-  },
-  {
-    id: "emergency-phone",
-    label: "Acil Telefon",
-    category: "emergency",
-    color: "#2563eb",
-    shortCode: "E4",
-    svg: loadDefaultSvg("emergency-phone") || buildSymbolSvg("E4", "#2563eb"),
-  },
-  { id: "assembly-point", label: "Toplanma Noktasi", category: "emergency", color: "#1d4ed8", shortCode: "E5", svg: loadDefaultSvg("assembly-point") || buildSymbolSvg("E5", "#1d4ed8") },
-  { id: "aed-device", label: "AED Cihazi", category: "emergency", color: "#0f766e", shortCode: "E6", svg: buildSymbolSvg("AED", "#0f766e") },
-  { id: "eye-wash", label: "Göz Yikama", category: "emergency", color: "#0f766e", shortCode: "E7", svg: buildSymbolSvg("E7", "#0f766e") },
-  { id: "emergency-shower", label: "Acil Dus", category: "emergency", color: "#0891b2", shortCode: "E8", svg: buildSymbolSvg("E8", "#0891b2") },
-  { id: "stretcher", label: "Sedye", category: "emergency", color: "#0f766e", shortCode: "E9", svg: buildSymbolSvg("E9", "#0f766e") },
-  { id: "evacuation-plan", label: "Tahliye Plani", category: "emergency", color: "#2563eb", shortCode: "EP", svg: buildSymbolSvg("EP", "#2563eb") },
-  { id: "exit-down", label: "Çikis Asagi", category: "direction", color: "#16a34a", shortCode: "?", svg: buildSymbolSvg("?", "#16a34a") },
-  { id: "exit-right", label: "Çikis Sag", category: "direction", color: "#16a34a", shortCode: "?", svg: loadDefaultSvg("evac-arrow") || buildSymbolSvg("?", "#16a34a") },
-  { id: "exit-left", label: "Çikis Sol", category: "direction", color: "#16a34a", shortCode: "?", svg: buildSymbolSvg("?", "#16a34a") },
-  { id: "fire-extinguisher", label: "Yangin Söndürücü", category: "fire", color: "#dc2626", shortCode: "F1", svg: loadDefaultSvg("fire-extinguisher") || buildSymbolSvg("F1", "#dc2626") },
-  { id: "fire-hose", label: "Yangin Hortumu", category: "fire", color: "#b91c1c", shortCode: "F2", svg: loadDefaultSvg("fire-hose") || buildSymbolSvg("F2", "#b91c1c") },
-  { id: "fire-stairs", label: "Yangin Merdiveni", category: "fire", color: "#991b1b", shortCode: "F3", svg: loadDefaultSvg("stairs") || buildSymbolSvg("F3", "#991b1b") },
-  { id: "alarm-button", label: "Alarm Butonu", category: "fire", color: "#ef4444", shortCode: "F4", svg: loadDefaultSvg("alarm-button") || buildSymbolSvg("F4", "#ef4444") },
-  { id: "fire-phone", label: "Yangin Telefonu", category: "fire", color: "#b91c1c", shortCode: "F5", svg: buildSymbolSvg("F5", "#b91c1c") },
-  { id: "fire-door", label: "Yangin Kapisi", category: "fire", color: "#991b1b", shortCode: "F6", svg: buildSymbolSvg("F6", "#991b1b") },
-  { id: "blanket", label: "Söndürme Battaniyesi", category: "fire", color: "#dc2626", shortCode: "F7", svg: buildSymbolSvg("F7", "#dc2626") },
-  { id: "cabinet", label: "Hortum Dolabi", category: "fire", color: "#b91c1c", shortCode: "F8", svg: loadDefaultSvg("fire-cabinet") || buildSymbolSvg("F8", "#b91c1c") },
-  { id: "mandatory-general", label: "Genel Zorunluluk", category: "mandatory", color: "#2563eb", shortCode: "M1", svg: buildSymbolSvg("M1", "#2563eb") },
-  { id: "read-instruction", label: "Talimati Oku", category: "mandatory", color: "#1d4ed8", shortCode: "M2", svg: buildSymbolSvg("M2", "#1d4ed8") },
-  { id: "gloves", label: "Eldiven", category: "mandatory", color: "#2563eb", shortCode: "M3", svg: buildSymbolSvg("M3", "#2563eb") },
-  { id: "helmet", label: "Baret Kullan", category: "mandatory", color: "#2563eb", shortCode: "M4", svg: buildSymbolSvg("M4", "#2563eb") },
-  { id: "mask", label: "Maske Kullan", category: "mandatory", color: "#2563eb", shortCode: "M5", svg: buildSymbolSvg("M5", "#2563eb") },
-  { id: "safety-belt", label: "Emniyet Kemeri", category: "mandatory", color: "#1d4ed8", shortCode: "M6", svg: buildSymbolSvg("M6", "#1d4ed8") },
-  { id: "warning-general", label: "Genel Tehlike", category: "warning", color: "#f59e0b", shortCode: "W1", svg: buildSymbolSvg("W1", "#f59e0b", "#111827") },
-  { id: "radioactive", label: "Radyoaktif", category: "warning", color: "#f59e0b", shortCode: "W2", svg: buildSymbolSvg("W2", "#f59e0b", "#111827") },
-  { id: "laser", label: "Lazer Isini", category: "warning", color: "#f59e0b", shortCode: "W3", svg: buildSymbolSvg("W3", "#f59e0b", "#111827") },
-  { id: "electric", label: "Elektrik Tehlikesi", category: "warning", color: "#eab308", shortCode: "W4", svg: buildSymbolSvg("W4", "#eab308", "#111827") },
-  { id: "hot-surface", label: "Sicak Yüzey", category: "warning", color: "#f59e0b", shortCode: "W5", svg: buildSymbolSvg("W5", "#f59e0b", "#111827") },
-  { id: "panel", label: "Elektrik Panosu", category: "warning", color: "#f59e0b", shortCode: "W6", svg: buildSymbolSvg("W6", "#f59e0b", "#111827") },
-  { id: "prohibition-general", label: "Genel Yasak", category: "prohibition", color: "#dc2626", shortCode: "P1", svg: buildSymbolSvg("P1", "#dc2626") },
-  { id: "no-smoking", label: "Sigara Içilmez", category: "prohibition", color: "#dc2626", shortCode: "P2", svg: buildSymbolSvg("P2", "#dc2626") },
-  { id: "no-fire", label: "Atesle Yaklasma", category: "prohibition", color: "#dc2626", shortCode: "P3", svg: buildSymbolSvg("P3", "#dc2626") },
-  { id: "no-entry", label: "Giris Yasaktir", category: "prohibition", color: "#b91c1c", shortCode: "P4", svg: buildSymbolSvg("P4", "#b91c1c") },
-  { id: "do-not-touch", label: "Dokunma", category: "prohibition", color: "#b91c1c", shortCode: "P5", svg: buildSymbolSvg("P5", "#b91c1c") },
-  { id: "safe-way-1", label: "Güvenli Yol Oku 1", category: "direction", color: "#16a34a", shortCode: "?", svg: buildSymbolSvg("?", "#16a34a") },
-  { id: "safe-way-2", label: "Güvenli Yol Oku 2", category: "direction", color: "#16a34a", shortCode: "?", svg: buildSymbolSvg("?", "#16a34a") },
-  { id: "fire-arrow-1", label: "Yangin Ekipman Oku 1", category: "direction", color: "#dc2626", shortCode: "?", svg: buildSymbolSvg("?", "#dc2626") },
-  { id: "fire-arrow-2", label: "Yangin Ekipman Oku 2", category: "direction", color: "#dc2626", shortCode: "?", svg: buildSymbolSvg("?", "#dc2626") },
-];
+const PUBLIC_FILE_SYMBOLS: SafetySymbol[] = PUBLIC_SYMBOLS.map((symbol) => ({
+  id: symbol.id,
+  label: symbol.label,
+  category: symbol.category as SafetySymbolCategory,
+  color: symbol.color,
+  shortCode: symbol.shortCode,
+  svgUrl: symbol.svgUrl,
+  imageSrc: symbol.imageSrc,
+}));
 
-const PanelLoadingCard = ({ message, compact = false }: { message: string; compact?: boolean }) => (
-  <div
-    className={[
-      "flex h-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/60 px-4 text-center text-sm text-slate-300",
-      compact ? "min-h-[160px]" : "min-h-[220px]",
-    ].join(" ")}
-  >
-    <div className="flex items-center gap-3">
-      <div className="h-2 w-2 rounded-full bg-cyan-300" />
-      {message}
-    </div>
-  </div>
-);
+const BASE_SYMBOLS: SafetySymbol[] = [...PUBLIC_FILE_SYMBOLS];
+
 
 function SymbolCard({
   symbol,
@@ -281,12 +371,19 @@ function SymbolCard({
       ].join(" ")}
     >
       <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-white p-0.5">
-        {symbol.imageSrc ? (
-          <img src={symbol.imageSrc} alt={symbol.label} className="h-full w-full object-contain" />
+        {symbol.imageSrc || symbol.svgUrl ? (
+          <img
+            src={symbol.imageSrc || symbol.svgUrl}
+            alt={symbol.label}
+            className="h-full w-full object-contain"
+            loading="lazy"
+          />
         ) : (
           <div
             className="h-full w-full"
-            dangerouslySetInnerHTML={{ __html: symbol.svg || buildSymbolSvg(symbol.shortCode, symbol.color) }}
+            dangerouslySetInnerHTML={{
+              __html: symbol.svg || buildSymbolSvg(symbol.shortCode, symbol.color),
+            }}
           />
         )}
       </div>
@@ -399,6 +496,155 @@ function SymbolSidebar({
   );
 }
 
+function ObjectColorPalette({
+  title,
+  value,
+  onChange,
+}: {
+  title: string;
+  value: string;
+  onChange: (color: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const [position, setPosition] = useState({ left: 0, top: 0 });
+
+  const updatePosition = useCallback(() => {
+    const button = buttonRef.current;
+    if (!button) return;
+
+    const rect = button.getBoundingClientRect();
+
+    setPosition({
+      left: rect.left,
+      top: rect.bottom + 8,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    updatePosition();
+
+    const handleScroll = () => updatePosition();
+    const handleResize = () => updatePosition();
+
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      const button = buttonRef.current;
+
+      if (!target) return;
+      if (button && button.contains(target)) return;
+      if (target.closest("[data-object-color-palette='true']")) return;
+
+      setOpen(false);
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  const palette = open
+    ? createPortal(
+        <div
+          data-object-color-palette="true"
+          className="fixed z-[2147483647] w-[218px] rounded-lg border border-white/10 bg-[#334155] p-3 shadow-2xl"
+          style={{
+            left: position.left,
+            top: position.top,
+          }}
+        >
+          <p className="mb-2 text-xs font-semibold text-white">{title}</p>
+
+          <div className="grid grid-cols-8 gap-1.5">
+            {COLOR_PALETTE.map((color) => (
+              <button
+                key={color}
+                type="button"
+                aria-label={color}
+                title={color}
+                onClick={() => {
+                  onChange(color);
+                  setOpen(false);
+                }}
+                className={[
+                  "h-5 w-5 rounded border transition hover:scale-110",
+                  value.toLowerCase() === color.toLowerCase()
+                    ? "border-white ring-2 ring-violet-400"
+                    : "border-white/60",
+                ].join(" ")}
+                style={{ backgroundColor: color }}
+              />
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <div
+              className="h-7 w-9 rounded border border-white/50"
+              style={{ backgroundColor: value }}
+            />
+
+            <Input
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              className="h-7 border-white/10 bg-slate-950 text-xs text-slate-100"
+              placeholder="#000000"
+            />
+          </div>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <Button
+        ref={buttonRef}
+        type="button"
+        size="icon"
+        variant="outline"
+        className={[
+          toolbarIconButtonBase,
+          title.includes("Dolgu") ? toolbarTone.amber : toolbarTone.cyan,
+          open ? "ring-2 ring-white/40 scale-[1.03]" : "",
+        ].join(" ")}
+        onClick={() => {
+          updatePosition();
+          setOpen((prev) => !prev);
+        }}
+        title={title}
+      >
+        <Palette className="h-4 w-4" />
+      </Button>
+
+      {palette}
+    </>
+  );
+}
+
 export default function EvacuationEditor() {
   const navigate = useNavigate();
   const canvasRef = useRef<any | null>(null);
@@ -415,7 +661,6 @@ export default function EvacuationEditor() {
   const [activeTool, setActiveTool] = useState<EditorTool>("select");
   const [selectedObject, setSelectedObject] = useState<any | null>(null);
   const [zoomPercent, setZoomPercent] = useState(100);
-  const [legendOpen, setLegendOpen] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
   const [gridSnap, setGridSnap] = useState(true);
   const [snapToObjects, setSnapToObjects] = useState(true);
@@ -431,6 +676,8 @@ export default function EvacuationEditor() {
   const [layers, setLayers] = useState<LayerItem[]>([]);
   const [legendItems, setLegendItems] = useState<LegendEntry[]>([]);
 
+  const isFloorRestoringRef = useRef(false);
+
   const activeFloor = useMemo(() => floors.find((floor) => floor.id === activeFloorId) ?? floors[0], [floors, activeFloorId]);
 
   const allSymbols = useMemo(() => [...customSymbols, ...BASE_SYMBOLS], [customSymbols]);
@@ -439,6 +686,26 @@ export default function EvacuationEditor() {
     if (!normalized) return allSymbols;
     return allSymbols.filter((symbol) => symbol.label.toLocaleLowerCase("tr-TR").includes(normalized));
   }, [allSymbols, symbolQuery]);
+
+  const isColorEditableObject = (obj: any) => {
+    if (!obj) return false;
+    const kind = obj?.denetronMeta?.kind;
+    if (kind === "grid") return false;
+    if (kind === "background") return false;
+    if (obj.lockMovementX || obj.lockMovementY || obj.lockScalingX || obj.lockScalingY) return false;
+    return true;
+  };
+
+  const getColorEditableObjects = (active: any): any[] => {
+    if (!active) return [];
+    if (active.type === "activeSelection" && typeof active.getObjects === "function") {
+      return active.getObjects().filter(isColorEditableObject);
+    }
+    if (active.type === "group" && typeof active.getObjects === "function") {
+      return [active];
+    }
+    return isColorEditableObject(active) ? [active] : [];
+  };
 
   const buildCanvasJSON = useCallback((canvas: any) => {
     const json = canvas.toJSON(["denetronMeta", "symbolId", "symbolName", "legendEmoji", "name"] as any) as any;
@@ -505,7 +772,7 @@ export default function EvacuationEditor() {
 
   const syncActiveFloorJson = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || isFloorRestoringRef.current) return;
 
     const serialized = JSON.stringify(buildCanvasJSON(canvas));
     setFloors((prev) => prev.map((floor) => (floor.id === activeFloorId ? { ...floor, canvasJson: serialized } : floor)));
@@ -522,6 +789,7 @@ export default function EvacuationEditor() {
       const canvas = canvasRef.current;
       if (!canvas || !floor) return;
 
+      isFloorRestoringRef.current = true;
       canvas.clear();
       canvas.set("backgroundColor", "#ffffff");
 
@@ -534,6 +802,10 @@ export default function EvacuationEditor() {
       historyRef.current?.pushSnapshot();
       updateLayersAndLegend();
       refreshBackgroundState();
+      
+      window.setTimeout(() => {
+        isFloorRestoringRef.current = false;
+      }, 50);
     },
     [gridSpacing, refreshBackgroundState, showGrid, updateLayersAndLegend],
   );
@@ -582,7 +854,6 @@ export default function EvacuationEditor() {
 
       GridSystem.apply(canvas, showGrid, gridSpacing);
       setCanvasReady(true);
-      console.log("✅ canvasReady true", canvas.getWidth(), canvas.getHeight());
 
       const pendingId = localStorage.getItem(LOAD_KEY);
       if (pendingId) {
@@ -628,8 +899,8 @@ export default function EvacuationEditor() {
   }, []);
 
   useEffect(() => {
-  setMounted(true);
-}, []);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const warmupHandle = window.setTimeout(() => {
@@ -658,9 +929,9 @@ export default function EvacuationEditor() {
   }, [showGrid, gridSpacing]);
 
   useEffect(() => {
-    if (!editorOpen || !canvasRef.current) return;
+    if (!editorOpen || !canvasRef.current || isFloorRestoringRef.current) return;
     void restoreFloor(activeFloor);
-  }, [activeFloor, editorOpen, restoreFloor]);
+  }, [activeFloorId, editorOpen]);
 
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
@@ -682,15 +953,15 @@ export default function EvacuationEditor() {
   });
 
   useEffect(() => {
-  if (!editorOpen) return;
+    if (!editorOpen) return;
 
-  const previousBodyOverflow = document.body.style.overflow;
-  const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
 
-  document.body.style.overflow = "hidden";
-  document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
-  const handleEscape = (event: KeyboardEvent) => {
+    const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         syncActiveFloorJson();
         setEditorContentReady(false);
@@ -698,16 +969,16 @@ export default function EvacuationEditor() {
         canvasRef.current = null;
         setEditorOpen(false);
       }
-  };
+    };
 
-  window.addEventListener("keydown", handleEscape);
+    window.addEventListener("keydown", handleEscape);
 
-  return () => {
-    document.body.style.overflow = previousBodyOverflow;
-    document.documentElement.style.overflow = previousHtmlOverflow;
-    window.removeEventListener("keydown", handleEscape);
-  };
-}, [editorOpen, syncActiveFloorJson]);
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [editorOpen, syncActiveFloorJson]);
 
   const openEditorDialog = useCallback(() => {
     setCanvasReady(false);
@@ -756,15 +1027,82 @@ export default function EvacuationEditor() {
 
   const getActiveObject = () => canvasRef.current?.getActiveObject() as any;
 
-  const handleUpdateObject = (updates: Record<string, any>) => {
-    const canvas = canvasRef.current;
-    const object = getActiveObject();
-    if (!canvas || !object) return;
-    object.set(updates);
-    object.setCoords();
-    canvas.requestRenderAll();
-    syncActiveFloorJson();
-  };
+  const applyColorToObject = useCallback(
+    (target: any, property: "fill" | "stroke", color: string) => {
+      if (!target || !isColorEditableObject(target)) return;
+      const kind = target?.denetronMeta?.kind;
+
+      if (kind === "symbol") {
+        target.set({ [property]: color } as any);
+        return;
+      }
+
+      if (target.type === "group" && typeof target.getObjects === "function") {
+        target.getObjects().forEach((child: any) => {
+          if (!child || child?.denetronMeta?.kind === "grid" || child?.denetronMeta?.kind === "background") {
+            return;
+          }
+          if (property === "fill") {
+            if (child.type !== "line" && child.type !== "polyline") {
+              child.set({ fill: color } as any);
+            }
+          }
+          if (property === "stroke") {
+            child.set({ stroke: color } as any);
+          }
+        });
+        target.setCoords?.();
+        return;
+      }
+
+      if (property === "fill") {
+        if (target.type === "line" || target.type === "polyline") {
+          return;
+        }
+        target.set({ fill: color } as any);
+        return;
+      }
+      target.set({ stroke: color } as any);
+    },
+    [],
+  );
+
+  const applySelectedColor = useCallback(
+    (property: "fill" | "stroke", color: string) => {
+      const canvas = canvasRef.current;
+      const active = canvas?.getActiveObject();
+
+      if (!canvas || !active) {
+        toast.error("Renk uygulamak için önce bir nesne seçin.");
+        return;
+      }
+
+      const editableObjects = getColorEditableObjects(active);
+
+      if (!editableObjects.length) {
+        toast.error("Bu öğeye renk uygulanamaz.");
+        return;
+      }
+
+      editableObjects.forEach((obj) => applyColorToObject(obj, property, color));
+      active.setCoords?.();
+
+      if (typeof canvas.requestRenderAll === "function") {
+        canvas.requestRenderAll();
+      } else {
+        canvas.renderAll?.();
+      }
+
+      window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          updateLayersAndLegend();
+          syncActiveFloorJson();
+          historyRef.current?.pushSnapshot?.();
+        }, 0);
+      });
+    },
+    [applyColorToObject, syncActiveFloorJson, updateLayersAndLegend],
+  );
 
   const deleteSelected = () => {
     const canvas = canvasRef.current;
@@ -816,69 +1154,6 @@ export default function EvacuationEditor() {
     canvas.requestRenderAll();
     updateLayersAndLegend();
     syncActiveFloorJson();
-  };
-
-  const moveLayer = (layerId: string, direction: "up" | "down") => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const target = canvas.getObjects().find((obj: any) => obj?.denetronMeta?.layerId === layerId) as any;
-    if (!target) return;
-    if (direction === "up") target.bringForward();
-    else target.sendBackwards();
-    canvas.requestRenderAll();
-    updateLayersAndLegend();
-    syncActiveFloorJson();
-  };
-
-  const toggleLayerVisibility = (layerId: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const target = canvas.getObjects().find((obj: any) => obj?.denetronMeta?.layerId === layerId) as any;
-    if (!target) return;
-    target.set({ visible: !target.visible });
-    canvas.requestRenderAll();
-    updateLayersAndLegend();
-    syncActiveFloorJson();
-  };
-
-  const toggleLayerLock = (layerId: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const target = canvas.getObjects().find((obj: any) => obj?.denetronMeta?.layerId === layerId) as any;
-    if (!target) return;
-    const shouldLock = !target.lockMovementX;
-    target.set({
-      lockMovementX: shouldLock,
-      lockMovementY: shouldLock,
-      lockScalingX: shouldLock,
-      lockScalingY: shouldLock,
-      lockRotation: shouldLock,
-      selectable: !shouldLock,
-    });
-    canvas.requestRenderAll();
-    updateLayersAndLegend();
-    syncActiveFloorJson();
-  };
-
-  const deleteLayer = (layerId: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const target = canvas.getObjects().find((obj: any) => obj?.denetronMeta?.layerId === layerId);
-    if (!target) return;
-    canvas.remove(target);
-    canvas.requestRenderAll();
-    updateLayersAndLegend();
-    syncActiveFloorJson();
-    refreshBackgroundState();
-  };
-
-  const selectLayer = (layerId: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const target = canvas.getObjects().find((obj: any) => obj?.denetronMeta?.layerId === layerId);
-    if (!target) return;
-    canvas.setActiveObject(target);
-    canvas.requestRenderAll();
   };
 
   const saveProject = () => {
@@ -1027,70 +1302,183 @@ export default function EvacuationEditor() {
     }, 0);
   };
 
-  const handleAddSymbol = async (symbol: SafetySymbol) => {
-    const canvas = canvasRef.current;
-    console.log("Symbol clicked", symbol.label, "canvas:", canvas);
-    if (!canvas) {
-      toast.error("Çizim alani henüz hazir degil. Lütfen birkaç saniye sonra tekrar deneyin.");
-      return;
-    }
+  const handleAddSymbol = useCallback(
+    async (symbol: SafetySymbol) => {
+      const canvas = canvasRef.current;
+      console.log("Symbol clicked", symbol.label, "canvas:", canvas);
 
-    try {
-      if (symbol.imageSrc) {
-        const image = await createImageFromURLCompat(symbol.imageSrc);
-        image.set({
-          left: canvas.getWidth() / 2,
-          top: canvas.getHeight() / 2,
-          originX: "center",
-          originY: "center",
-          scaleX: 0.6,
-          scaleY: 0.6,
-          cornerStyle: "circle",
-          transparentCorners: false,
-        } as any);
-        (image as any).denetronMeta = {
-          kind: "symbol",
-          name: symbol.label,
-          symbolId: symbol.id,
-          symbolName: symbol.label,
-          legendEmoji: symbol.shortCode,
-        };
-        canvas.add(image);
-        canvas.setActiveObject(image);
-        image.setCoords();
-      } else {
-        const loaded = await loadSVGFromStringCompat(symbol.svg || buildSymbolSvg(symbol.shortCode, symbol.color));
-        const grouped = groupSVGElementsCompat(loaded.objects, loaded.options);
-        grouped.set({
-          left: canvas.getWidth() / 2,
-          top: canvas.getHeight() / 2,
-          originX: "center",
-          originY: "center",
-          scaleX: 0.78,
-          scaleY: 0.78,
-          cornerStyle: "circle",
-          transparentCorners: false,
-        } as any);
-        (grouped as any).denetronMeta = {
-          kind: "symbol",
-          name: symbol.label,
-          symbolId: symbol.id,
-          symbolName: symbol.label,
-          legendEmoji: symbol.shortCode,
-        };
-        canvas.add(grouped as any);
-        canvas.setActiveObject(grouped as any);
-        (grouped as any).setCoords?.();
+      if (!canvas) {
+        toast.error("Çizim alanı henüz hazır değil. Lütfen birkaç saniye sonra tekrar deneyin.");
+        return;
       }
 
-      canvas.requestRenderAll();
-      updateLayersAndLegend();
-      syncActiveFloorJson();
-    } catch (error) {
-      console.error("Sembol ekleme hatasi:", error);
-      toast.error("Sembol eklenemedi.");
-    }
-  };
+      try {
+        const centerLeft = canvas.getWidth() / 2;
+        const centerTop = canvas.getHeight() / 2;
+        let objectToAdd: any | null = null;
+
+        if (symbol.imageSrc) {
+          const image = await createImageFromURLCompat(symbol.imageSrc);
+          if (!image) throw new Error("Görsel yüklenemedi.");
+
+          image.set({
+            left: 0,
+            top: 0,
+            originX: "center",
+            originY: "center",
+            selectable: false,
+            evented: false,
+          } as any);
+
+          const maxSize = 64;
+          const width = image.width || maxSize;
+          const height = image.height || maxSize;
+          const fitScale = Math.min(maxSize / width, maxSize / height);
+          image.scale(fitScale);
+
+          const plate = createSymbolPlate(symbol);
+          if (plate && FabricCtors.Group) {
+            objectToAdd = new FabricCtors.Group([plate, image], {
+              left: centerLeft,
+              top: centerTop,
+              originX: "center",
+              originY: "center",
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              cornerStyle: "circle",
+              transparentCorners: false,
+              lockScalingFlip: true,
+            } as any);
+          } else {
+            objectToAdd = image;
+            objectToAdd.set({
+              left: centerLeft,
+              top: centerTop,
+              originX: "center",
+              originY: "center",
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              cornerStyle: "circle",
+              transparentCorners: false,
+              lockScalingFlip: true,
+            } as any);
+          }
+        } else {
+          const svgContent = symbol.svgUrl
+            ? await fetchSVGTextCompat(symbol.svgUrl)
+            : symbol.svg || buildSymbolSvg(symbol.shortCode, symbol.color);
+          const { objects, options } = await loadSVGFromStringCompat(svgContent);
+
+          if (!Array.isArray(objects) || objects.length === 0) {
+            throw new Error("SVG parse edilemedi veya boş nesne döndü.");
+          }
+
+          const svgObject = groupSVGElementsCompat(objects, options);
+          if (!svgObject) throw new Error("SVG gruplanamadı.");
+
+          svgObject.set({
+            left: 0,
+            top: 0,
+            originX: "center",
+            originY: "center",
+            selectable: false,
+            evented: false,
+          } as any);
+
+          const svgWidth = svgObject.width || options?.width || 72;
+          const svgHeight = svgObject.height || options?.height || 72;
+          const fitScale = Math.min(58 / svgWidth, 58 / svgHeight);
+          svgObject.scale(fitScale);
+
+          const plate = createSymbolPlate(symbol);
+          if (plate && FabricCtors.Group) {
+            objectToAdd = new FabricCtors.Group([plate, svgObject], {
+              left: centerLeft,
+              top: centerTop,
+              originX: "center",
+              originY: "center",
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              cornerStyle: "circle",
+              transparentCorners: false,
+              lockScalingFlip: true,
+            } as any);
+          } else {
+            objectToAdd = svgObject;
+            objectToAdd.set({
+              left: centerLeft,
+              top: centerTop,
+              originX: "center",
+              originY: "center",
+              scaleX: 0.78,
+              scaleY: 0.78,
+              selectable: true,
+              evented: true,
+              hasControls: true,
+              hasBorders: true,
+              cornerStyle: "circle",
+              transparentCorners: false,
+              lockScalingFlip: true,
+            } as any);
+          }
+        }
+
+        if (!objectToAdd) throw new Error("Sembol nesnesi oluşturulamadı.");
+
+        objectToAdd.denetronMeta = {
+          ...(objectToAdd.denetronMeta ?? {}),
+          kind: "symbol",
+          name: symbol.label,
+          symbolId: symbol.id,
+          symbolName: symbol.label,
+          legendEmoji: symbol.shortCode,
+        };
+
+        objectToAdd.set({
+          symbolId: symbol.id,
+          symbolName: symbol.label,
+          legendEmoji: symbol.shortCode,
+          name: symbol.label,
+          visible: true,
+          opacity: 1,
+          selectable: true,
+          evented: true,
+        } as any);
+
+        canvas.add(objectToAdd);
+        canvas.setActiveObject(objectToAdd);
+        canvas.bringToFront(objectToAdd);
+
+        if (typeof objectToAdd.setCoords === "function") {
+          objectToAdd.setCoords();
+        }
+        canvas.requestRenderAll();
+        canvas.renderAll();
+
+        logFabricDomState("Symbol added to live Fabric canvas", canvas, objectToAdd);
+
+        window.requestAnimationFrame(() => {
+          window.setTimeout(() => {
+            if (canvasRef.current !== canvas) return;
+            updateLayersAndLegend();
+            syncActiveFloorJson();
+            refreshBackgroundState();
+            historyRef.current?.pushSnapshot?.();
+          }, 0);
+        });
+      } catch (error) {
+        console.error("Sembol ekleme hatası:", error);
+        toast.error("Sembol eklenirken bir hata oluştu.");
+      }
+    },
+    [refreshBackgroundState, syncActiveFloorJson, updateLayersAndLegend],
+  );
 
   const applyUploadedBackground = async (file: File) => {
     const canvas = canvasRef.current;
@@ -1149,7 +1537,6 @@ export default function EvacuationEditor() {
 
   useEffect(() => {
     if (!canvasReady || !pendingBackgroundFile) return;
-
     const file = pendingBackgroundFile;
     setPendingBackgroundFile(null);
     void applyUploadedBackground(file);
@@ -1419,6 +1806,26 @@ export default function EvacuationEditor() {
     setActiveTool(tool);
   };
 
+  const selectedFillColor = useMemo(() => {
+    const active = selectedObject;
+    if (!active) return DEFAULT_FILL_COLOR;
+    if (active.type === "activeSelection" && typeof active.getObjects === "function") {
+      const first = active.getObjects().find((obj: any) => isColorEditableObject(obj) && obj.fill);
+      return typeof first?.fill === "string" ? first.fill : DEFAULT_FILL_COLOR;
+    }
+    return typeof active.fill === "string" ? active.fill : DEFAULT_FILL_COLOR;
+  }, [selectedObject]);
+
+  const selectedStrokeColor = useMemo(() => {
+    const active = selectedObject;
+    if (!active) return DEFAULT_STROKE_COLOR;
+    if (active.type === "activeSelection" && typeof active.getObjects === "function") {
+      const first = active.getObjects().find((obj: any) => isColorEditableObject(obj) && obj.stroke);
+      return typeof first?.stroke === "string" ? first.stroke : DEFAULT_STROKE_COLOR;
+    }
+    return typeof active.stroke === "string" ? active.stroke : DEFAULT_STROKE_COLOR;
+  }, [selectedObject]);
+
   const canvasTool = useMemo<CanvasTool>(() => {
     if (activeTool === "pen") return "polyline";
     if (activeTool === "select") return "select";
@@ -1429,12 +1836,6 @@ export default function EvacuationEditor() {
     if (activeTool === "circle") return "circle";
     return "select";
   }, [activeTool]);
-
-  const selectedLayerId = (selectedObject as any)?.denetronMeta?.layerId || null;
-  const selectedName =
-    (selectedObject as any)?.denetronMeta?.name ||
-    (selectedObject as any)?.denetronMeta?.symbolName ||
-    "Seçili öge yok";
 
   return (
     <>
@@ -1452,7 +1853,7 @@ export default function EvacuationEditor() {
                 </h1>
                 <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 lg:text-base">
                   Kendi kat planinizi yükleyin veya editörde sifirdan acil durum krokisi olusturun.
-                  Sol panelden sembolleri seçin, ortadaki beyaz çalisma alanina yerlestirin ve
+                  Sol panelden sembolleri seçin, ortadaki beyaz çalisma alanina yerlestirin og
                   profesyonel krokinizi PNG veya PDF olarak disa aktarin.
                 </p>
 
@@ -1463,7 +1864,7 @@ export default function EvacuationEditor() {
                       <p className="font-semibold">1. Kroki veya Kat Planini Yükle</p>
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      PNG, JPG, JPEG veya SVG dosyanizi yükleyin. Görsel çalisma alanina yerlesir ve
+                      PNG, JPG, JPEG veya SVG dosyanizi yükleyin. Görsel çalisma alanina yerlesir og
                       üzerine yönlendirme, yangin ve acil durum sembollerini eklemeye baslayabilirsiniz.
                     </p>
                   </div>
@@ -1537,8 +1938,8 @@ export default function EvacuationEditor() {
                     <ol className="mt-3 space-y-2 text-sm text-slate-300">
                       <li>1. Kroki adini verin ve kat planini yükleyin.</li>
                       <li>2. Gerekli sembolleri ve yapisal ögeleri ekleyin.</li>
-                      <li>3. Tahliye güzergahlarini ve açiklama metinlerini tamamlayin.</li>
-                      <li>4. Araç çubugundan grid, yakinlik ve çikti ayarlarini kontrol edin.</li>
+                      <li>3. Tahliye güzergahlarini og açiklama metinlerini tamamlayin.</li>
+                      <li>4. Araç çubugundan grid, yakinlik og çikti ayarlarini kontrol edin.</li>
                       <li>5. Taslagi kaydedin, ardindan PNG veya PDF çiktisi alin.</li>
                     </ol>
                   </div>
@@ -1567,278 +1968,412 @@ export default function EvacuationEditor() {
       </div>
 
       {mounted && editorOpen
-  ? createPortal(
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Acil Durum Kroki Editörü"
-        className="fixed inset-0 z-[2147483647] isolate h-[100dvh] w-screen overflow-hidden bg-[#0f172a] text-white"
-      >
-        <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#0f172a] text-white">
-          <header className="h-14 shrink-0 border-b border-white/10 bg-[#1b293d] px-4 shadow-[0_14px_40px_rgba(2,8,23,0.35)]">
-            <div className="flex h-full items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-cyan-500/12 text-cyan-200">
-                  <Layers3 className="h-4 w-4" />
-                </div>
-                <div>
-                  <h2 className="text-base font-semibold text-slate-50">{projectName || "Yeni Kroki"}</h2>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-9 w-9 rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]"
-                  onClick={zoomReset}
-                  aria-label="Yakinligi sifirla"
-                >
-                  <Maximize2 className="h-4 w-4" />
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-9 rounded-xl border-emerald-400/25 bg-emerald-500/10 px-3 text-emerald-100 hover:bg-emerald-500/20"
-                  onClick={handleExportPng}
-                >
-                  <FileImage className="mr-2 h-4 w-4" />
-                  PNG
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="h-9 rounded-xl border-rose-400/25 bg-rose-500/10 px-3 text-rose-100 hover:bg-rose-500/20"
-                  onClick={handleExportPdf}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  PDF
-                </Button>
-
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-9 w-9 rounded-xl border-red-400/25 bg-red-500/10 text-red-100 hover:bg-red-500/20"
-                  onClick={closeEditorDialog}
-                  aria-label="Kroki editörünü kapat"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </header>
-
-          <div className="h-10 shrink-0 border-b border-white/10 bg-[#111c2f] px-3 py-1.5">
-            <div className="flex items-center gap-1 overflow-x-auto pb-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 shrink-0 rounded-md text-emerald-200 hover:bg-emerald-500/15 hover:text-emerald-100"
-                onClick={() => hiddenPlanUploadRef.current?.click()}
-                title="Kroki / Kat Plani Yükle"
-              >
-                <ImagePlus className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 shrink-0 rounded-md text-cyan-200 hover:bg-cyan-500/15 hover:text-cyan-100"
-                onClick={saveProject}
-                title="Kaydet"
-              >
-                <Save className="h-4 w-4" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8 shrink-0 rounded-md text-violet-200 hover:bg-violet-500/15 hover:text-violet-100"
-                onClick={saveDraft}
-                title="Taslagi Kaydet"
-              >
-                <Layers3 className="h-4 w-4" />
-              </Button>
-
-              <Input
-                value={projectName}
-                onChange={(event) => setProjectName(event.target.value)}
-                className="h-8 w-[150px] shrink-0 rounded-md border-white/10 bg-slate-950/70 text-xs text-slate-100 sm:w-[190px]"
-                placeholder="Kroki adi"
-              />
-
-              <Select value={activeFloor?.id || floors[0].id} onValueChange={(value) => void changeFloor(value)}>
-                <SelectTrigger className="h-8 w-[110px] shrink-0 rounded-md border-white/10 bg-slate-950/70 text-xs text-slate-100 sm:w-[140px]">
-                  <SelectValue placeholder="Kat seç" />
-                </SelectTrigger>
-                <SelectContent>
-                  {floors.map((floor) => (
-                    <SelectItem key={floor.id} value={floor.id}>
-                      {floor.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-md text-slate-300 hover:bg-white/10 hover:text-white" onClick={addFloor} title="Kat ekle">
-                <Plus className="h-4 w-4" />
-              </Button>
-
-              <div className="mx-1 h-8 w-px shrink-0 bg-white/10" />
-
-              {toolButtons.map((tool) => (
-                <Button
-                  key={tool.id}
-                  size="sm"
-                  variant={activeTool === tool.id ? "default" : "outline"}
-                  title={tool.label}
-                  className={`h-8 shrink-0 gap-1.5 rounded-md px-2 text-xs ${
-                    activeTool === tool.id
-                      ? "bg-violet-500 text-white hover:bg-violet-500"
-                      : "border-transparent bg-transparent text-slate-300 hover:bg-white/10 hover:text-white"
-                  }`}
-                  onClick={() => handleToolChange(tool.id)}
-                >
-                  <tool.icon className="h-4 w-4" />
-                  <span className="hidden xl:inline">{tool.label}</span>
-                </Button>
-              ))}
-
-              <div className="mx-1 h-8 w-px shrink-0 bg-white/10" />
-
-              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04]" onClick={() => historyRef.current?.undo()}>
-                <Undo2 className="h-4 w-4" />
-              </Button>
-
-              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04]" onClick={() => historyRef.current?.redo()}>
-                <Redo2 className="h-4 w-4" />
-              </Button>
-
-              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04]" onClick={() => void duplicateSelected()}>
-                <Copy className="h-4 w-4" />
-              </Button>
-
-              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04]" onClick={groupSelection}>
-                <Layers3 className="h-4 w-4" />
-              </Button>
-
-              <Button size="icon" variant="outline" className="h-8 w-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04]" onClick={ungroupSelection}>
-                <PanelLeft className="h-4 w-4" />
-              </Button>
-
-              <div className="mx-1 h-8 w-px shrink-0 bg-white/10" />
-
-              <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-xs" onClick={zoomOut}>
-                <ZoomOut className="mr-2 h-4 w-4" />
-                -
-              </Button>
-
-              <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-xs" onClick={zoomReset}>
-                %{zoomPercent}
-              </Button>
-
-              <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-xs" onClick={zoomIn}>
-                <ZoomIn className="mr-2 h-4 w-4" />
-                +
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className={`h-8 shrink-0 rounded-xl text-xs ${
-                  showGrid ? "border-cyan-400/25 bg-cyan-500/10 text-cyan-100" : "border-white/10 bg-white/[0.04] text-slate-100"
-                }`}
-                onClick={() => setShowGrid((prev) => !prev)}
-              >
-                <Grid3X3 className="mr-2 h-4 w-4" />
-                Grid
-              </Button>
-
-              <Button
-                size="sm"
-                variant="outline"
-                className={`h-8 shrink-0 rounded-xl text-xs ${
-                  backgroundLocked ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-100" : "border-white/10 bg-white/[0.04] text-slate-100"
-                }`}
-                onClick={toggleBackgroundLock}
-                disabled={!backgroundImage}
-              >
-                {backgroundLocked ? <Lock className="mr-2 h-4 w-4" /> : <PanelLeft className="mr-2 h-4 w-4" />}
-                Arka Plani Kilitle
-              </Button>
-
-              <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-xs" onClick={() => void loadDraft()}>
-                <History className="mr-2 h-4 w-4" />
-                Taslagi Yükle
-              </Button>
-
-              <Button size="sm" variant="outline" className="h-8 shrink-0 rounded-xl border-white/10 bg-white/[0.04] text-xs" onClick={clearCanvas}>
-                <Eraser className="mr-2 h-4 w-4" />
-                Temizle
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex min-h-0 flex-1 overflow-hidden bg-[#0b1120]">
-            <aside className="w-[184px] shrink-0 overflow-y-auto border-r border-white/10 bg-[#172033]">
-              <SymbolSidebar
-                symbols={filteredSymbols}
-                query={symbolQuery}
-                onQueryChange={setSymbolQuery}
-                onAddSymbol={(symbol) => void handleAddSymbol(symbol)}
-                onUploadCustomSymbol={(file) => void handleUploadCustomSymbol(file)}
-                disabled={!canvasReady}
-              />
-            </aside>
-
-            <main className="relative min-w-0 flex-1 overflow-auto bg-[#0b1120]">
-              <div className="relative flex min-h-full min-w-max items-start justify-start px-5 py-4">
-                <div className="relative rounded-lg bg-white shadow-[0_18px_70px_rgba(0,0,0,0.35)]">
-                  {editorContentReady ? (
-                    <CanvasWorkspace
-                      key={activeFloorId}
-                      activeTool={canvasTool}
-                      onCanvasReady={handleCanvasReady}
-                      onSelectionChange={setSelectedObject}
-                      onObjectsChange={() => {
-                        updateLayersAndLegend();
-                        syncActiveFloorJson();
-                        refreshBackgroundState();
-                      }}
-                      onToolConsumed={() => setActiveTool("select")}
-                      onCanvasResize={handleCanvasResize}
-                      onZoomChange={setZoomPercent}
-                    />
-                  ) : (
-                    <div
-                      className="flex items-center justify-center bg-white"
-                      style={{ width: canvasSize.width, height: canvasSize.height }}
-                    >
-                      <PanelLoadingCard message="Editör hazirlaniyor..." compact />
+        ? createPortal(
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Acil Durum Kroki Editörü"
+              className="fixed inset-0 z-[2147483647] isolate h-[100dvh] w-screen overflow-hidden bg-[#0f172a] text-white"
+            >
+              <div className="flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#0f172a] text-white">
+                <header className="h-12 shrink-0 border-b border-white/10 bg-[#1b293d] px-4 shadow-[0_10px_28px_rgba(2,8,23,0.28)]">
+                  <div className="flex h-full items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-cyan-500/14 text-cyan-200">
+                        <Layers3 className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold text-slate-50">
+                          {projectName || "Yeni Kroki"}
+                        </h2>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            </main>
-          </div>
 
-          <footer className="h-9 shrink-0 border-t border-white/10 bg-[#172033] px-3 text-[11px] text-slate-300">
-            <div className="flex h-full items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span>Ölçek: 1m = 20px</span>
-                <span>{canvasSize.width}×{canvasSize.height}px</span>
-                <span className="hidden sm:inline">Grid: {showGrid ? "Açik" : "Kapali"}</span>
-                <span className="hidden md:inline">Canvas: {canvasReady ? "Hazir" : "Hazirlaniyor"}</span>
-                <span className="hidden lg:inline">
-                  Arka plan: {backgroundImage ? (backgroundLocked ? "Yüklü · Kilitli" : "Yüklü") : "Yok"}
-                </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-9 w-9 rounded-xl border-white/10 bg-white/[0.05] text-slate-100 hover:bg-white/[0.1]"
+                        onClick={zoomReset}
+                        aria-label="Yakınlığı sıfırla"
+                        title="Yakınlığı sıfırla"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="h-9 rounded-xl border-emerald-300/45 bg-emerald-500/25 px-4 text-sm font-semibold text-emerald-50 hover:bg-emerald-500/35"
+                        onClick={handleExportPng}
+                      >
+                        <FileImage className="mr-2 h-4 w-4" />
+                        PNG
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="h-9 rounded-xl border-rose-300/45 bg-rose-500/25 px-4 text-sm font-semibold text-rose-50 hover:bg-rose-500/35"
+                        onClick={handleExportPdf}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        PDF
+                      </Button>
+
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-9 w-9 rounded-xl border-red-300/45 bg-red-500/25 text-red-50 hover:bg-red-500/35"
+                        onClick={closeEditorDialog}
+                        aria-label="Kroki editörünü kapat"
+                        title="Kapat"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </header>
+
+                {/* 🚀 YENİLENEN TOOLBAR: Ezilmeyi, dikey hizasızlığı ve silikliği ortadan kaldıran birebir simetrik yerleşim */}
+<div className="h-14 shrink-0 border-b border-white/10 bg-[#111c2f] px-4 flex items-center">
+  <div className="w-full">
+    <div
+      className={[
+        "flex items-center gap-3 overflow-x-auto overflow-y-hidden whitespace-nowrap py-1",
+        "[scrollbar-width:thin]",
+        "[scrollbar-color:rgba(148,163,184,0.3)_transparent]",
+        "[&::-webkit-scrollbar]:h-1",
+        "[&::-webkit-scrollbar-track]:bg-transparent",
+        "[&::-webkit-scrollbar-thumb]:rounded-full",
+        "[&::-webkit-scrollbar-thumb]:bg-slate-600/50",
+      ].join(" ")}
+    >
+      {/* 🟢 KROKİ YÜKLE: Canlı yeşil, ezilmeyen tam kare buton */}
+      <Button
+        size="icon"
+        variant="outline"
+        className="h-9 w-9 shrink-0 rounded-xl border-emerald-500 bg-emerald-600 text-white shadow-[0_2px_8px_rgba(16,185,129,0.35)] transition-all hover:bg-emerald-500 hover:scale-[1.02] active:scale-[0.98]"
+        onClick={() => hiddenPlanUploadRef.current?.click()}
+        title="Kroki / Kat Planı Yükle"
+      >
+        <ImagePlus className="h-[18px] w-[18px]" />
+      </Button>
+
+      {/* 🔵 KAYDET: Canlı turkuaz/cyan, tam kare buton */}
+      <Button
+        size="icon"
+        variant="outline"
+        className="h-9 w-9 shrink-0 rounded-xl border-cyan-500 bg-cyan-600 text-white shadow-[0_2px_8px_rgba(6,182,212,0.35)] transition-all hover:bg-cyan-500 hover:scale-[1.02] active:scale-[0.98]"
+        onClick={saveProject}
+        title="Kaydet"
+      >
+        <Save className="h-[18px] w-[18px]" />
+      </Button>
+
+      {/* 🟣 TASLAK KAYDET: Canlı mor, tam kare buton */}
+      <Button
+        size="icon"
+        variant="outline"
+        className="h-9 w-9 shrink-0 rounded-xl border-violet-500 bg-violet-600 text-white shadow-[0_2px_8px_rgba(139,92,246,0.35)] transition-all hover:bg-violet-500 hover:scale-[1.02] active:scale-[0.98]"
+        onClick={saveDraft}
+        title="Taslağı Kaydet"
+      >
+        <Layers3 className="h-[18px] w-[18px]" />
+      </Button>
+
+      {/* İdeal Mesafe Ayırıcı Çizgi */}
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Kroki Adı Inputu */}
+      <Input
+        value={projectName}
+        onChange={(event) => setProjectName(event.target.value)}
+        className="h-9 w-[200px] shrink-0 rounded-xl border-cyan-500/30 bg-slate-950/80 text-xs font-semibold text-slate-100 placeholder:text-slate-500 focus-visible:ring-cyan-400/40 sm:w-[240px]"
+        placeholder="Kroki adı"
+      />
+
+      {/* Kat Seçim Dropdown */}
+      <Select value={activeFloor?.id || floors[0].id} onValueChange={(value) => void changeFloor(value)}>
+        <SelectTrigger className="h-9 w-[130px] shrink-0 rounded-xl border-violet-500/30 bg-slate-950/80 text-xs font-semibold text-slate-100 focus:ring-violet-400/40 sm:w-[150px]">
+          <SelectValue placeholder="Kat seç" />
+        </SelectTrigger>
+        <SelectContent>
+          {floors.map((floor) => (
+            <SelectItem key={floor.id} value={floor.id}>
+              {floor.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Kat Ekleme Butonu */}
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.violet}`}
+        onClick={addFloor}
+        title="Kat ekle"
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Çizim Araçları Butonları */}
+      {toolButtons.map((tool) => {
+        const active = activeTool === tool.id;
+
+        return (
+          <Button
+            key={tool.id}
+            size="sm"
+            variant="outline"
+            title={tool.label}
+            className={[
+              toolbarButtonBase,
+              active
+                ? "border-violet-300 bg-violet-600 text-white shadow-[0_0_12px_rgba(139,92,246,0.4)] hover:bg-violet-600"
+                : getToolButtonTone(tool.id),
+            ].join(" ")}
+            onClick={() => handleToolChange(tool.id)}
+          >
+            <tool.icon className="h-4 w-4 shrink-0" />
+            <span>{tool.label}</span>
+          </Button>
+        );
+      })}
+
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Renk Paleti Elementleri */}
+      <ObjectColorPalette
+        title="Dolgu Rengi"
+        value={selectedFillColor}
+        onChange={(color) => applySelectedColor("fill", color)}
+      />
+
+      <ObjectColorPalette
+        title="Çizgi/Kenar Rengi"
+        value={selectedStrokeColor}
+        onChange={(color) => applySelectedColor("stroke", color)}
+      />
+
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Geçmiş ve Manipülasyon Butonları */}
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.indigo}`}
+        onClick={() => historyRef.current?.undo()}
+        title="Geri al"
+      >
+        <Undo2 className="h-4 w-4" />
+      </Button>
+
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.indigo}`}
+        onClick={() => historyRef.current?.redo()}
+        title="İleri al"
+      >
+        <Redo2 className="h-4 w-4" />
+      </Button>
+
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.slate}`}
+        onClick={() => void duplicateSelected()}
+        title="Seçileni çoğalt"
+      >
+        <Copy className="h-4 w-4" />
+      </Button>
+
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.cyan}`}
+        onClick={groupSelection}
+        title="Grupla"
+      >
+        <Layers3 className="h-4 w-4" />
+      </Button>
+
+      <Button
+        size="icon"
+        variant="outline"
+        className={`${toolbarIconButtonBase} ${toolbarTone.cyan}`}
+        onClick={ungroupSelection}
+        title="Grubu çöz"
+      >
+        <PanelLeft className="h-4 w-4" />
+      </Button>
+
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Zoom / Yakınlaştırma Kontrolleri */}
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${toolbarButtonBase} ${toolbarTone.sky} px-2.5`}
+        onClick={zoomOut}
+        title="Uzaklaştır"
+      >
+        <ZoomOut className="mr-1 h-4 w-4" />
+        -
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${toolbarButtonBase} ${toolbarTone.sky} min-w-[64px] px-2`}
+        onClick={zoomReset}
+        title="Yakınlığı sıfırla"
+      >
+        %{zoomPercent}
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${toolbarButtonBase} ${toolbarTone.sky} px-2.5`}
+        onClick={zoomIn}
+        title="Yakınlaştır"
+      >
+        <ZoomIn className="mr-1 h-4 w-4" />
+        +
+      </Button>
+
+      <div className="mx-1 h-7 w-px shrink-0 bg-white/10" />
+
+      {/* Grid ve Arka Plan Durum Butonları */}
+      <Button
+        size="sm"
+        variant="outline"
+        className={[
+          toolbarButtonBase,
+          showGrid
+            ? "border-cyan-300 bg-cyan-600/40 text-cyan-100 shadow-[0_0_12px_rgba(34,211,238,0.3)] hover:bg-cyan-600/50"
+            : toolbarTone.cyan,
+          "px-3",
+        ].join(" ")}
+        onClick={() => setShowGrid((prev) => !prev)}
+        title="Grid aç/kapat"
+      >
+        <Grid3X3 className="mr-1.5 h-4 w-4" />
+        Grid
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={[
+          toolbarButtonBase,
+          backgroundLocked
+            ? "border-emerald-300 bg-emerald-600/40 text-emerald-100 shadow-[0_0_12px_rgba(16,185,129,0.3)] hover:bg-emerald-600/50"
+            : toolbarTone.emerald,
+          "px-3",
+        ].join(" ")}
+        onClick={toggleBackgroundLock}
+        disabled={!backgroundImage}
+        title="Arka planı kilitle/aç"
+      >
+        {backgroundLocked ? (
+          <Lock className="mr-1.5 h-4 w-4" />
+        ) : (
+          <PanelLeft className="mr-1.5 h-4 w-4" />
+        )}
+        Arka Plan
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${toolbarButtonBase} ${toolbarTone.violet} px-3`}
+        onClick={() => void loadDraft()}
+        title="Taslağı yükle"
+      >
+        <History className="mr-1.5 h-4 w-4" />
+        Taslak
+      </Button>
+
+      <Button
+        size="sm"
+        variant="outline"
+        className={`${toolbarButtonBase} ${toolbarTone.red} px-3`}
+        onClick={clearCanvas}
+        title="Canvas temizle"
+      >
+        <Eraser className="mr-1.5 h-4 w-4" />
+        Temizle
+      </Button>
+    </div>
+  </div>
+</div>
+
+                <div className="flex min-h-0 flex-1 overflow-hidden bg-[#0b1120]">
+                  <aside className="w-[260px] shrink-0 overflow-y-auto border-r border-white/10 bg-[#172033]">
+                    <SymbolSidebar
+                      symbols={filteredSymbols}
+                      query={symbolQuery}
+                      onQueryChange={setSymbolQuery}
+                      onAddSymbol={(symbol) => void handleAddSymbol(symbol)}
+                      onUploadCustomSymbol={(file) => void handleUploadCustomSymbol(file)}
+                      disabled={!canvasReady}
+                    />
+                  </aside>
+
+                  <main className="relative min-w-0 flex-1 overflow-auto bg-[#0b1120]">
+                    <div className="relative flex min-h-full min-w-max items-start justify-start px-5 py-4">
+                      <div className="relative rounded-lg bg-white shadow-[0_18px_70px_rgba(0,0,0,0.35)]">
+                        {editorContentReady ? (
+                          <CanvasWorkspace
+                            key={activeFloorId}
+                            activeTool={canvasTool}
+                            onCanvasReady={handleCanvasReady}
+                            onSelectionChange={setSelectedObject}
+                            onObjectsChange={() => {
+                              updateLayersAndLegend();
+                              syncActiveFloorJson();
+                              refreshBackgroundState();
+                            }}
+                            onToolConsumed={() => setActiveTool("select")}
+                            onCanvasResize={handleCanvasResize}
+                            onZoomChange={setZoomPercent}
+                          />
+                        ) : (
+                          <div
+                            className="flex items-center justify-center bg-white"
+                            style={{ width: canvasSize.width, height: canvasSize.height }}
+                          >
+                            <PanelLoadingCard message="Editör hazirlaniyor..." compact />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </main>
+                </div>
+
+                <footer className="h-9 shrink-0 border-t border-white/10 bg-[#172033] px-3 text-[11px] text-slate-300">
+                  <div className="flex h-full items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span>Ölçek: 1m = 20px</span>
+                      <span>{canvasSize.width}×{canvasSize.height}px</span>
+                      <span className="hidden sm:inline">Grid: {showGrid ? "Açik" : "Kapali"}</span>
+                      <span className="hidden md:inline">Canvas: {canvasReady ? "Hazir" : "Hazirlaniyor"}</span>
+                      <span className="hidden lg:inline">
+                        Arka plan: {backgroundImage ? (backgroundLocked ? "Yüklü · Kilitli" : "Yüklü") : "Yok"}
+                      </span>
+                    </div>
+                    <span className="shrink-0">Yakinlik: %{zoomPercent}</span>
+                  </div>
+                </footer>
               </div>
-              <span className="shrink-0">Yakinlik: %{zoomPercent}</span>
-            </div>
-          </footer>
-        </div>
-      </div>,
-      document.body
-    )
-  : null}
+            </div>,
+            document.body
+          )
+        : null}
       <input
         ref={hiddenPlanUploadRef}
         type="file"
@@ -1858,6 +2393,15 @@ export default function EvacuationEditor() {
         }}
       />
     </>
+  );
+}
+
+function PanelLoadingCard({ message, compact }: { message: string; compact?: boolean }) {
+  return (
+    <div className={`flex flex-col items-center justify-center gap-3 p-6 text-center ${compact ? "" : "min-h-[300px]"}`}>
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-cyan-500" />
+      <p className="text-sm font-medium text-slate-500">{message}</p>
+    </div>
   );
 }
 

@@ -366,7 +366,7 @@ Bu proje aktif gelisim mantiginda tasarlanmistir. Asagidaki alanlar ileride daha
 
 ## 15. Sonuc
 
-Denetron Safety Suite, yalnizca veri girisi yapilan bir panel degil; ISG sureclerini dijitallestiren, takip eden, yorumlayan ve aksiyon ureten bir platform olarak tasarlanmistir.
+isgvizyon, yalnizca veri girisi yapilan bir panel degil; ISG sureclerini dijitallestiren, takip eden, yorumlayan ve aksiyon ureten bir platform olarak tasarlanmistir.
 
 Akademik veya teknik acidan bakildiginda proje su uc boyutta deger tasir:
 
