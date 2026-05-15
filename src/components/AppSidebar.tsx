@@ -346,7 +346,7 @@ export function AppSidebar() {
                 ].filter((item): item is NonNullable<typeof item> => item !== null),
               }
             : null,
-        ].filter((item): item is MenuItem => item !== null),
+        ].filter((item): item is NonNullable<typeof item> => item !== null),
       },
       {
         label: "Belge Yönetimi",
@@ -365,7 +365,6 @@ export function AppSidebar() {
           { title: "Klasik Risk Editörü", url: "/risk-editor", icon: FileSearch, badge: "NEW" },
           { title: "DÖF Yönetimi", url: "/capa", icon: ShieldAlert, badge: null },
           { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
-          { title: "Mevzuat Belge Analizi", url: "/document-analysis", icon: Gavel, badge: "AI" },
           { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
           { title: "Tahliye Kroki Editörü", url: "/evacuation-editor", icon: MapPinned, badge: "NEW" },
           { title: "Kroki Geçmişleri", url: "/evacuation-editor/history", icon: History, badge: null },
