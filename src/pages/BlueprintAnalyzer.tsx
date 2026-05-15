@@ -122,23 +122,24 @@ const VIOLATION_PAGE_SIZE = 3;
 const HISTORY_PAGE_SIZE = 6;
 const SUGGESTION_PAGE_SIZE = 5;
 
-// ✅ Helper: Floor number parser
+// ✅ Geliştirilmiş Güvenli Floor parser
 const parseFloorNumber = (floor: any): number => {
+  // Eğer floor null veya undefined ise güvenli bir varsayılan dön
+  if (floor === null || floor === undefined) return 1;
+  
   if (typeof floor === 'number') return floor;
   
   if (typeof floor === 'string') {
-    // Sayı çıkar: "1.KAT" → 1, "2. Kat" → 2
     const match = floor.match(/\d+/);
     if (match) return parseInt(match[0]);
     
-    // Özel durumlar
     const lowerFloor = floor.toLowerCase();
     if (lowerFloor.includes('zemin') || lowerFloor.includes('ground')) return 0;
     if (lowerFloor.includes('bodrum') || lowerFloor.includes('basement')) return -1;
     if (lowerFloor.includes('çatı') || lowerFloor.includes('roof')) return 99;
   }
   
-  return 1; // Default: 1. kat
+  return 1;
 };
   
 
@@ -450,19 +451,18 @@ export default function BlueprintAnalyzer() {
       try {
         console.log("💾 Saving to database...");
 
-        const floorNumber = parseFloorNumber(data.analysis.project_info.detected_floor);
-        
-        const insertData = {
-          user_id: user?.id,
-          analysis_result: data.analysis as any,
-          building_type: data.analysis.project_info.area_type || "unknown",
-          floor_number: floorNumber,
-          area_sqm: data.analysis.project_info.estimated_area_sqm || 0,
-          image_size_kb: data.metadata?.image_size_kb || 0,
-          project_name: projectName || "Adsız Proje",
-          user_notes: manualNotes || null
-        };
+       const floorNumber = parseFloorNumber(data.analysis.project_info?.detected_floor);
 
+      const insertData = {
+        user_id: user?.id,
+        analysis_result: data.analysis as any,
+        building_type: String(data.analysis.project_info?.area_type || "unknown"),
+        floor_number: floorNumber,
+        area_sqm: Number(data.analysis.project_info?.estimated_area_sqm || 0),
+        image_size_kb: Number(data.metadata?.image_size_kb || 0),
+        project_name: projectName || "Adsız Proje",
+        user_notes: manualNotes || null
+      };
         console.log("📊 Insert data:", insertData);
 
         const { data: savedData, error: saveError } = await supabase
@@ -615,12 +615,13 @@ export default function BlueprintAnalyzer() {
 
     let y = 50;
 
+   // PDF Export içindeki buildingData kısmını bulun ve böyle değiştirin:
     const buildingData = [
-      ["Bina Tipi", analysisResult.project_info.building_category],
-      ["Kullanım Amacı", analysisResult.project_info.area_type],
-      ["Kat Sayısı", analysisResult.project_info.detected_floor.toString()],
-      ["Tahmini Alan", formatAreaWithUnit(analysisResult.project_info.estimated_area_sqm)],
-      ["Kapasite", analysisResult.project_info.occupancy_count?.toString() || "—"]
+      ["Bina Tipi", String(analysisResult.project_info?.building_category || "Belirtilmedi")],
+      ["Kullanım Amacı", String(analysisResult.project_info?.area_type || "Belirtilmedi")],
+      ["Kat Sayısı", String(analysisResult.project_info?.detected_floor ?? "1")],
+      ["Tahmini Alan", formatAreaWithUnit(analysisResult.project_info?.estimated_area_sqm)],
+      ["Kapasite", String(analysisResult.project_info?.occupancy_count || "—")]
     ];
 
     autoTable(doc, {
@@ -1390,10 +1391,10 @@ export default function BlueprintAnalyzer() {
           </CardHeader>
           <CardContent className="space-y-3">
             {pagedEquipment.map((eq, idx) => (
-              <div 
-                key={`${eq.type}-${idx}`}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-emerald-400/20"
-              >
+                <div 
+                  key={`${eq?.type || 'eq'}-${idx}`} // Optional chaining ve default değer ekledik
+                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-emerald-400/20"
+                >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <span className="text-3xl">{EQUIPMENT_ICONS[eq.type]}</span>

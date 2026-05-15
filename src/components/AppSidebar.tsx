@@ -284,7 +284,7 @@ export function AppSidebar() {
         label: "Operasyonlar",
         icon: Briefcase,
         items: [
-          { title: "Denetimler", url: "/inspections", icon: ClipboardCheck, badge: null },
+          { title: "DÖF Yönetimi", url: "/inspections", icon: ClipboardCheck, badge: null },
           {
             title: "Kurul Toplantıları",
             url: "/board-meetings",
@@ -363,7 +363,7 @@ export function AppSidebar() {
         icon: ShieldAlert,
         items: [
           { title: "Klasik Risk Editörü", url: "/risk-editor", icon: FileSearch, badge: "NEW" },
-          { title: "DÖF Yönetimi", url: "/capa", icon: ShieldAlert, badge: null },
+          { title: "Denetimler", url: "/capa", icon: ShieldAlert, badge: null },
           { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
           { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
           { title: "Tahliye Kroki Editörü", url: "/evacuation-editor", icon: MapPinned, badge: "NEW" },
