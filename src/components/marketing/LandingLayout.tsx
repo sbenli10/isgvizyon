@@ -1,5 +1,5 @@
 import { Menu, ShieldAlert, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -25,20 +25,24 @@ export function LandingLayout({
 }: LandingLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const previousThemeRef = useRef<string | null>(null);
 
   const activePath = useMemo(() => location.pathname, [location.pathname]);
 
   useEffect(() => {
-    const previousTheme = theme;
-
-    if (previousTheme !== "dark") setTheme("dark");
+    const storedTheme =
+      typeof window !== "undefined" ? window.localStorage.getItem("denetron-theme") : null;
+    previousThemeRef.current = storedTheme === "light" || storedTheme === "dark" ? storedTheme : null;
+    setTheme("dark");
 
     return () => {
-      if (previousTheme && previousTheme !== "dark") setTheme(previousTheme);
+      if (previousThemeRef.current && previousThemeRef.current !== "dark") {
+        setTheme(previousThemeRef.current);
+      }
     };
-  }, [setTheme, theme]);
+  }, [setTheme]);
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050B1E] font-['Inter',sans-serif] text-white">

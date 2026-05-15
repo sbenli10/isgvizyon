@@ -25,7 +25,6 @@ import {
   Award,
   Briefcase,
   FileSearch,
-  Gavel,
   CalendarClock,
   MapPinned,
   HeartPulse,
@@ -161,17 +160,42 @@ function PillBadge({ value }: { value: string | number }) {
 
 const getItemAccent = (item: MenuItem) => {
   const map: Array<[RegExp, string]> = [
-    [/(bot|otomasyon|yapay zeka|ai|analizi|sorgulama)/i, "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-400 dark:group-hover:text-cyan-300"],
-    [/(risk|kkd|iş kazası|güvenlik)/i, "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400 dark:group-hover:text-emerald-300"],
-    [/(döf|kurul|doküman|belge|sertifika|form|talimat|muayene)/i, "text-violet-600 group-hover:text-violet-700 dark:text-violet-400 dark:group-hover:text-violet-300"],
-    [/(acil|tahliye|kroki|plan)/i, "text-amber-600 group-hover:text-amber-700 dark:text-amber-400 dark:group-hover:text-amber-300"],
-    [/(osgb|firma|çalışan|ziyaret|programı|atama|arşiv|iş ilan)/i, "text-teal-600 group-hover:text-teal-700 dark:text-teal-400 dark:group-hover:text-teal-300"],
-    [/(profil|panel|dashboard)/i, "text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300"],
-    [/(nace|rapor|raporları)/i, "text-fuchsia-600 group-hover:text-fuchsia-700 dark:text-fuchsia-400 dark:group-hover:text-fuchsia-300"],
+    [
+      /(bot|otomasyon|yapay zeka|ai|analizi|sorgulama)/i,
+      "text-cyan-600 group-hover:text-cyan-700 dark:text-cyan-400 dark:group-hover:text-cyan-300",
+    ],
+    [
+      /(risk|kkd|iş kazası|güvenlik)/i,
+      "text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400 dark:group-hover:text-emerald-300",
+    ],
+    [
+      /(döf|kurul|doküman|belge|sertifika|form|talimat|muayene)/i,
+      "text-violet-600 group-hover:text-violet-700 dark:text-violet-400 dark:group-hover:text-violet-300",
+    ],
+    [
+      /(acil|tahliye|kroki|plan)/i,
+      "text-amber-600 group-hover:text-amber-700 dark:text-amber-400 dark:group-hover:text-amber-300",
+    ],
+    [
+      /(osgb|firma|çalışan|ziyaret|programı|atama|arşiv|iş ilan)/i,
+      "text-teal-600 group-hover:text-teal-700 dark:text-teal-400 dark:group-hover:text-teal-300",
+    ],
+    [
+      /(profil|panel|dashboard)/i,
+      "text-blue-600 group-hover:text-blue-700 dark:text-blue-400 dark:group-hover:text-blue-300",
+    ],
+    [
+      /(nace|rapor|raporları)/i,
+      "text-fuchsia-600 group-hover:text-fuchsia-700 dark:text-fuchsia-400 dark:group-hover:text-fuchsia-300",
+    ],
   ];
 
   const match = map.find(([regex]) => regex.test(item.title) || regex.test(item.url));
-  return match?.[1] ?? "text-slate-500 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-white";
+
+  return (
+    match?.[1] ??
+    "text-slate-500 group-hover:text-slate-700 dark:text-slate-300 dark:group-hover:text-white"
+  );
 };
 
 function MenuIcon({ item, active }: { item: MenuItem; active: boolean }) {
@@ -215,15 +239,22 @@ export function AppSidebar() {
     canViewPeople,
     canViewPortal,
   } = useOsgbAccess();
+
   const { hasAccess } = usePlanLimits();
   const canAccessOsgbModule = hasAccess("osgb_module").allowed;
   const canAccessIsgBot = hasAccess("isg_bot").allowed;
+
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>(["OSGB Modülü"]);
+  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([
+    "OSGB Modülü",
+    "Kroki Editörü",
+  ]);
+
   const [draftMeetingsCount, setDraftMeetingsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+
   const [favoriteUrls, setFavoriteUrls] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
 
@@ -234,6 +265,7 @@ export function AppSidebar() {
       return [];
     }
   });
+
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
 
   useEffect(() => {
@@ -248,6 +280,7 @@ export function AppSidebar() {
 
   const fetchDraftMeetingsCount = async () => {
     if (!user) return;
+
     try {
       const { count, error } = await supabase
         .from("board_meetings")
@@ -293,7 +326,12 @@ export function AppSidebar() {
           },
           { title: "İSG FORMLARI", url: "/assignment-letters", icon: FileText, badge: null },
           { title: "İş Kazası / Ramak Kala", url: "/incidents", icon: ShieldAlert, badge: "NEW" },
-          { title: "Periyodik Kontrol", url: "/periodic-controls", icon: CalendarClock, badge: "NEW" },
+          {
+            title: "Periyodik Kontrol",
+            url: "/periodic-controls",
+            icon: CalendarClock,
+            badge: "NEW",
+          },
         ],
       },
       {
@@ -303,7 +341,12 @@ export function AppSidebar() {
           { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
           { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
           { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
-          { title: "Sağlık Gözetimi", url: "/health-surveillance", icon: HeartPulse, badge: "NEW" },
+          {
+            title: "Sağlık Gözetimi",
+            url: "/health-surveillance",
+            icon: HeartPulse,
+            badge: "NEW",
+          },
           canAccessOsgbModule
             ? {
                 title: "OSGB Modülü",
@@ -311,37 +354,97 @@ export function AppSidebar() {
                 icon: Briefcase,
                 badge: "NEW",
                 children: [
-                  { title: "OSGB Başlangıç", url: "/osgb/dashboard", icon: LayoutDashboard, badge: null },
-                  { title: "Nasıl Kullanılır", url: "/osgb/how-to", icon: CircleHelp, badge: null },
+                  {
+                    title: "OSGB Başlangıç",
+                    url: "/osgb/dashboard",
+                    icon: LayoutDashboard,
+                    badge: null,
+                  },
+                  {
+                    title: "Nasıl Kullanılır",
+                    url: "/osgb/how-to",
+                    icon: CircleHelp,
+                    badge: null,
+                  },
                   canViewCompanyHub
-                    ? { title: "Firma Havuzu", url: "/osgb/company-tracking", icon: Building2, badge: null }
+                    ? {
+                        title: "Firma Havuzu",
+                        url: "/osgb/company-tracking",
+                        icon: Building2,
+                        badge: null,
+                      }
                     : null,
                   canViewPeople
-                    ? { title: "Personel ve Atamalar", url: "/osgb/assignments", icon: Briefcase, badge: null }
+                    ? {
+                        title: "Personel ve Atamalar",
+                        url: "/osgb/assignments",
+                        icon: Briefcase,
+                        badge: null,
+                      }
                     : null,
                   canViewPeople
-                    ? { title: "Dakika ve Kapasite", url: "/osgb/capacity", icon: TrendingUp, badge: null }
+                    ? {
+                        title: "Dakika ve Kapasite",
+                        url: "/osgb/capacity",
+                        icon: TrendingUp,
+                        badge: null,
+                      }
                     : null,
                   canViewPeople
-                    ? { title: "Saha Operasyonu", url: "/osgb/field-visits", icon: MapPinned, badge: "NEW" }
+                    ? {
+                        title: "Saha Operasyonu",
+                        url: "/osgb/field-visits",
+                        icon: MapPinned,
+                        badge: "NEW",
+                      }
                     : null,
                   canViewDocuments
-                    ? { title: "Yasal Evraklar", url: "/osgb/documents", icon: FileSearch, badge: null }
+                    ? {
+                        title: "Yasal Evraklar",
+                        url: "/osgb/documents",
+                        icon: FileSearch,
+                        badge: null,
+                      }
                     : null,
                   canViewFinance
-                    ? { title: "Finans ve Karlılık", url: "/osgb/finance", icon: FileText, badge: null }
+                    ? {
+                        title: "Finans ve Karlılık",
+                        url: "/osgb/finance",
+                        icon: FileText,
+                        badge: null,
+                      }
                     : null,
                   canViewAutomation
-                    ? { title: "Otomasyon Merkezi", url: "/osgb/automation", icon: Bot, badge: "NEW" }
+                    ? {
+                        title: "Otomasyon Merkezi",
+                        url: "/osgb/automation",
+                        icon: Bot,
+                        badge: "NEW",
+                      }
                     : null,
                   canViewKatip
-                    ? { title: "ISG-KATIP Merkezi", url: "/osgb/isgkatip", icon: Link2, badge: "NEW" }
+                    ? {
+                        title: "ISG-KATIP Merkezi",
+                        url: "/osgb/isgkatip",
+                        icon: Link2,
+                        badge: "NEW",
+                      }
                     : null,
                   canViewPortal
-                    ? { title: "Müşteri Portalı", url: "/osgb/client-portal", icon: Globe2, badge: "NEW" }
+                    ? {
+                        title: "Müşteri Portalı",
+                        url: "/osgb/client-portal",
+                        icon: Globe2,
+                        badge: "NEW",
+                      }
                     : null,
                   canViewAnalytics
-                    ? { title: "Trend Analizi", url: "/osgb/analytics", icon: TrendingUp, badge: null }
+                    ? {
+                        title: "Trend Analizi",
+                        url: "/osgb/analytics",
+                        icon: TrendingUp,
+                        badge: null,
+                      }
                     : null,
                 ].filter((item): item is NonNullable<typeof item> => item !== null),
               }
@@ -352,24 +455,72 @@ export function AppSidebar() {
         label: "Belge Yönetimi",
         icon: Award,
         items: [
-          { title: "Sertifika Merkezi", url: "/dashboard/certificates", icon: Award, badge: "NEW" },
-          { title: "Sertifika Geçmişi", url: "/dashboard/certificates/history", icon: History, badge: null },
+          {
+            title: "Sertifika Merkezi",
+            url: "/dashboard/certificates",
+            icon: Award,
+            badge: "NEW",
+          },
+          {
+            title: "Sertifika Geçmişi",
+            url: "/dashboard/certificates/history",
+            icon: History,
+            badge: null,
+          },
           { title: "İSG Kütüphanesi", url: "/safety-library", icon: BookOpen, badge: null },
-          { title: "Çalışma Talimatları", url: "/work-instructions", icon: ClipboardList, badge: "NEW" },
+          {
+            title: "Çalışma Talimatları",
+            url: "/work-instructions",
+            icon: ClipboardList,
+            badge: "NEW",
+          },
         ],
       },
       {
         label: "Risk & Güvenlik",
         icon: ShieldAlert,
         items: [
-          { title: "Klasik Risk Editörü", url: "/risk-editor", icon: FileSearch, badge: "NEW" },
+          {
+            title: "Klasik Risk Editörü",
+            url: "/risk-editor",
+            icon: FileSearch,
+            badge: "NEW",
+          },
           { title: "Denetimler", url: "/capa", icon: ShieldAlert, badge: null },
           { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
           { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
-          { title: "Tahliye Kroki Editörü", url: "/evacuation-editor", icon: MapPinned, badge: "NEW" },
-          { title: "Kroki Geçmişleri", url: "/evacuation-editor/history", icon: History, badge: null },
-          { title: "AI Kroki Analizi", url: "/blueprint-analyzer", icon: Search, badge: "AI" },
-          { title: "Kroki Kullanım Rehberi", url: "/blueprint-analyzer/how-to", icon: CircleHelp, badge: null },
+          {
+            title: "Kroki Editörü",
+            url: "/evacuation-editor",
+            icon: MapPinned,
+            badge: "NEW",
+            children: [
+              {
+                title: "Tahliye Kroki",
+                url: "/evacuation-editor",
+                icon: MapPinned,
+                badge: "NEW",
+              },
+              {
+                title: "Kroki Geçmişleri",
+                url: "/evacuation-editor/history",
+                icon: History,
+                badge: null,
+              },
+              {
+                title: "AI Kroki Analizi",
+                url: "/blueprint-analyzer",
+                icon: Search,
+                badge: "AI",
+              },
+              {
+                title: "Kroki Kullanım Rehberi",
+                url: "/blueprint-analyzer/how-to",
+                icon: CircleHelp,
+                badge: null,
+              },
+            ],
+          },
         ],
       },
       {
@@ -378,7 +529,12 @@ export function AppSidebar() {
         items: [
           { title: "Yıllık Planlar", url: "/annual-plans", icon: Calendar, badge: null },
           { title: "NACE Kod Sorgulama", url: "/nace-query", icon: Shield, badge: "AI" },
-          { title: "NACE Sektör Listesi", url: "/nace-query/sectors", icon: BookOpen, badge: null },
+          {
+            title: "NACE Sektör Listesi",
+            url: "/nace-query/sectors",
+            icon: BookOpen,
+            badge: null,
+          },
         ],
       },
       {
@@ -410,13 +566,20 @@ export function AppSidebar() {
     ],
   );
 
-  const isItemActive = (item: MenuItem) => {
-    if (item.url === "/") return location.pathname === "/";
-    return location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
+  const isItemActive = (item: MenuItem): boolean => {
+    const isSelfActive =
+      item.url === "/"
+        ? location.pathname === "/"
+        : location.pathname === item.url || location.pathname.startsWith(`${item.url}/`);
+
+    const isChildActive = item.children?.some((child) => isItemActive(child)) ?? false;
+
+    return isSelfActive || isChildActive;
   };
 
   const toggleSubmenu = (label: string) => {
     if (collapsed) return;
+
     setExpandedSubmenus((prev) =>
       prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
     );
@@ -451,6 +614,7 @@ export function AppSidebar() {
       if (group.label !== "Sık Kullanılanlar") return group;
 
       const defaultItems = group.items.filter((item) => !favoriteUrls.includes(item.url));
+
       return {
         ...group,
         items: [...favoriteItems, ...defaultItems],
@@ -468,12 +632,14 @@ export function AppSidebar() {
         const items = group.items
           .map((item) => {
             const matchesItem = item.title.toLocaleLowerCase("tr-TR").includes(normalizedSearch);
+
             const filteredChildren = item.children?.filter((child) =>
               child.title.toLocaleLowerCase("tr-TR").includes(normalizedSearch),
             );
 
             if (matchesGroup || matchesItem) return item;
             if (filteredChildren?.length) return { ...item, children: filteredChildren };
+
             return null;
           })
           .filter((x): x is MenuItem => x !== null);
@@ -489,7 +655,9 @@ export function AppSidebar() {
 
   const toggleFavoriteItem = (item: MenuItem) => {
     setFavoriteUrls((prev) =>
-      prev.includes(item.url) ? prev.filter((url) => url !== item.url) : [item.url, ...prev].slice(0, 8),
+      prev.includes(item.url)
+        ? prev.filter((url) => url !== item.url)
+        : [item.url, ...prev].slice(0, 8),
     );
   };
 
@@ -502,13 +670,16 @@ export function AppSidebar() {
 
   const handleFavoriteKeyDown = (event: React.KeyboardEvent, item: MenuItem) => {
     if (event.key !== "Enter" && event.key !== " ") return;
+
     event.preventDefault();
     event.stopPropagation();
+
     toggleFavoriteItem(item);
   };
 
   const toggleGroup = (label: string) => {
     if (collapsed || normalizedSearch) return;
+
     setCollapsedGroups((prev) =>
       prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
     );
@@ -556,7 +727,12 @@ export function AppSidebar() {
           </div>
         )}
 
-        <SidebarHeader className={cn("border-b border-slate-200/80 px-3 py-3 dark:border-white/8", collapsed && "hidden")}>
+        <SidebarHeader
+          className={cn(
+            "border-b border-slate-200/80 px-3 py-3 dark:border-white/8",
+            collapsed && "hidden",
+          )}
+        >
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 stroke-[1.9] text-slate-400 dark:text-slate-500" />
@@ -649,7 +825,10 @@ export function AppSidebar() {
 
                                 {!collapsed && (
                                   <>
-                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
+                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                      {item.title}
+                                    </span>
+
                                     <span
                                       role="button"
                                       tabIndex={0}
@@ -669,7 +848,9 @@ export function AppSidebar() {
                                         )}
                                       />
                                     </span>
+
                                     {item.badge && <PillBadge value={item.badge} />}
+
                                     <ChevronDown
                                       className={cn(
                                         "h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-400 transition-transform duration-150 dark:text-slate-500",
@@ -694,13 +875,20 @@ export function AppSidebar() {
                                           className={cn(
                                             submenuItemBase,
                                             "text-slate-600 hover:bg-slate-100/80 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
-                                            childActive && "bg-cyan-500/10 text-[#067f7f] ring-1 ring-cyan-500/15 dark:bg-white/6 dark:text-cyan-100",
+                                            childActive &&
+                                              "bg-cyan-500/10 text-[#067f7f] ring-1 ring-cyan-500/15 dark:bg-white/6 dark:text-cyan-100",
                                           )}
                                           activeClassName=""
                                         >
-                                          <span className={cn(subtleLine, childActive && subtleLineActive)} />
+                                          <span
+                                            className={cn(subtleLine, childActive && subtleLineActive)}
+                                          />
                                           <SubMenuIcon item={child} active={childActive} />
-                                          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{child.title}</span>
+
+                                          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                            {child.title}
+                                          </span>
+
                                           <span
                                             role="button"
                                             tabIndex={0}
@@ -709,17 +897,22 @@ export function AppSidebar() {
                                             className={cn(
                                               "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-400 transition dark:text-slate-500",
                                               "opacity-0 hover:text-amber-500 group-hover:opacity-100 dark:hover:text-amber-300",
-                                              childFavorite && "opacity-100 text-amber-500 dark:text-amber-300",
+                                              childFavorite &&
+                                                "opacity-100 text-amber-500 dark:text-amber-300",
                                             )}
-                                            title={childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                                            title={
+                                              childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"
+                                            }
                                           >
                                             <Star
                                               className={cn(
                                                 "h-3.5 w-3.5 stroke-[1.9]",
-                                                childFavorite && "fill-amber-400 dark:fill-amber-300",
+                                                childFavorite &&
+                                                  "fill-amber-400 dark:fill-amber-300",
                                               )}
                                             />
                                           </span>
+
                                           {child.badge && <PillBadge value={child.badge} />}
                                         </NavLink>
                                       </SidebarMenuButton>
@@ -751,7 +944,10 @@ export function AppSidebar() {
 
                                 {!collapsed && (
                                   <>
-                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">{item.title}</span>
+                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                      {item.title}
+                                    </span>
+
                                     <span
                                       role="button"
                                       tabIndex={0}
@@ -771,7 +967,9 @@ export function AppSidebar() {
                                         )}
                                       />
                                     </span>
+
                                     {item.badge && <PillBadge value={item.badge} />}
+
                                     <ChevronRight className="h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-400 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300" />
                                   </>
                                 )}

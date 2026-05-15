@@ -52,6 +52,17 @@ function entitlementMap(entitlements: SubscriptionFeatureEntitlement[]) {
 }
 
 function deriveLegacyFeatures(entitlements: SubscriptionFeatureEntitlement[], plan: SubscriptionPlan | string): SubscriptionFeatures {
+  if (plan === "osgb") {
+    return {
+      maxCompanies: null,
+      maxEmployees: null,
+      aiRiskAnalysis: true,
+      pdfExport: true,
+      excelExport: true,
+      prioritySupport: true,
+    };
+  }
+
   const featureMap = entitlementMap(entitlements);
 
   return {
@@ -190,14 +201,14 @@ export function useSubscription() {
   const plan = useMemo<SubscriptionPlan>(() => {
     if (!profile?.organization_id) {
       if (personalStatus === "trial") {
-        return personalDaysLeftInTrial > 0 ? "osgb" : "free";
+        return personalDaysLeftInTrial > 0 ? "premium" : "free";
       }
 
       return personalPlan;
     }
 
     if (status === "trial" && (overview?.daysLeftInTrial ?? 0) > 0) {
-      return "osgb";
+      return overview?.planCode === "osgb" ? "osgb" : "premium";
     }
 
     if (overview?.planCode === "osgb") {
@@ -224,7 +235,7 @@ export function useSubscription() {
     : personalTrialEndsAt;
   const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
   const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
-  const isPremiumPlan = plan === "premium" || status === "trial";
+  const isPremiumPlan = plan === "premium" || plan === "osgb" || status === "trial";
   const isOsgbPlan = plan === "osgb";
   const isPaidPlan = plan === "premium" || plan === "osgb";
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
@@ -243,6 +254,10 @@ export function useSubscription() {
 
   const isFeatureAllowed = useCallback(
     (feature: keyof SubscriptionFeatures | FeatureKey | string) => {
+      if (plan === "osgb") {
+        return true;
+      }
+
       if (feature in features) {
         const featureValue = features[feature as keyof SubscriptionFeatures];
         return typeof featureValue === "boolean" ? featureValue : true;

@@ -10,14 +10,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function ThemeToggle() {
-  const { setTheme, resolvedTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const isDark = mounted ? resolvedTheme !== "light" : true;
+  const currentTheme = theme === "light" || theme === "dark" ? theme : resolvedTheme;
+  const isDark = mounted ? currentTheme !== "light" : true;
+
+  const handleThemeChange = (nextTheme: "light" | "dark") => {
+    if (currentTheme !== nextTheme) {
+      setTheme(nextTheme);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -26,6 +33,7 @@ export function ThemeToggle() {
           variant="outline"
           size="icon"
           className="relative h-10 w-10 rounded-2xl border-border/70 bg-card/80 shadow-sm backdrop-blur transition hover:border-primary/30 hover:bg-accent"
+          aria-label="Tema değiştir"
         >
           <Sun
             className={`h-[1.1rem] w-[1.1rem] transition-all ${
@@ -41,11 +49,11 @@ export function ThemeToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme("light")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("light")}>
           <Sun className="mr-2 h-4 w-4" />
           Açık tema
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme("dark")}>
+        <DropdownMenuItem onClick={() => handleThemeChange("dark")}>
           <Moon className="mr-2 h-4 w-4" />
           Koyu tema
         </DropdownMenuItem>

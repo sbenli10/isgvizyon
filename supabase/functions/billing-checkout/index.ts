@@ -80,6 +80,19 @@ serve(async (req): Promise<Response> => {
           .maybeSingle()
       : { data: null };
 
+    if (
+      planCode === "premium" &&
+      (existingSubscription?.plan_code === "osgb" || context.profile.subscription_plan === "osgb")
+    ) {
+      return jsonResponse(409, {
+        success: false,
+        error: {
+          message:
+            "OSGB paketinde Premium özellikleri zaten dahildir. OSGB üyeliği aktifken ayrıca Premium pakete geçiş başlatılamaz.",
+        },
+      });
+    }
+
     let stripeCustomerId = existingSubscription?.stripe_customer_id ?? null;
 
     if (!stripeCustomerId) {

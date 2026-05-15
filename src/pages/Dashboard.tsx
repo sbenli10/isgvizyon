@@ -1,1126 +1,1047 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Activity,
   AlertTriangle,
-  Clock,
-  TrendingUp,
-  AlertCircle,
-  BarChart3,
-  PieChart as PieChartIcon,
+  Archive,
+  Bot,
+  BriefcaseBusiness,
+  Building2,
+  CalendarClock,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  ClipboardList,
+  FileText,
+  MapPin,
+  Megaphone,
+  Plus,
   RefreshCw,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Users,
+  Zap,
 } from "lucide-react";
-import { lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
-import { useSafeMode } from "@/hooks/useSafeMode";
-import { useReducedMotion } from "@/hooks/useReducedMotion";
-import NotificationWidget from "@/components/NotificationWidget";
 import { supabase } from "@/integrations/supabase/client";
-import { startPremiumTrial } from "@/lib/billing";
 import { toast } from "sonner";
 import {
   DASHBOARD_CACHE_TTL,
   fetchDashboardSnapshot,
   readDashboardSnapshot,
   writeDashboardSnapshot,
-  type DashboardFinding,
   type DashboardInspection,
-  type DashboardInspectionStatus,
-  type DashboardRiskLevel,
   type DashboardSnapshot,
 } from "@/lib/dashboardCache";
-const RiskDistributionChart = lazy(() => import("@/components/dashboard/RiskDistributionChart"));
 
-type RiskLevel = DashboardRiskLevel;
-type InspectionStatus = DashboardInspectionStatus;
-type Inspection = DashboardInspection;
+type CountResult = {
+  ok: boolean;
+  count: number;
+};
 
-interface MetricCard {
+type RowsResult<T> = {
+  ok: boolean;
+  rows: T[];
+};
+
+type DashboardStats = {
+  activeCompanies: number;
+  employees: number;
+  openCapa: number;
+  upcomingControls: number;
+  draftMeetings: number;
+  monthlyReports: number;
+  activeInspections: number;
+  openFindings: number;
+  criticalRiskPercent: number;
+  overdueActions: number;
+  recentInspections: DashboardInspection[];
+  riskDistribution: DashboardSnapshot["riskDistribution"];
+};
+
+type ActionCard = {
   title: string;
-  subtitle: string;
-  value: number;
-  insight: string;
-  icon: React.ReactNode;
-  color: string;
-}
+  description: string;
+  route?: string;
+  externalUrl?: string;
+  cta: string;
+  icon: ReactNode;
+  tone: string;
+  badge?: string;
+};
 
-function RevealBlock({
-  children,
-  delay = 0,
-  className = "",
-  disabled = false,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-  disabled?: boolean;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [visible, setVisible] = useState(false);
+const CHROME_STORE_URL = "https://chromewebstore.google.com/detail/ombgdbjkinmfbkpenjihlakgdppkcdbj";
 
-  useEffect(() => {
-    if (disabled) {
-      setVisible(true);
-      return;
-    }
+const EMPTY_STATS: DashboardStats = {
+  activeCompanies: 0,
+  employees: 0,
+  openCapa: 0,
+  upcomingControls: 0,
+  draftMeetings: 0,
+  monthlyReports: 0,
+  activeInspections: 0,
+  openFindings: 0,
+  criticalRiskPercent: 0,
+  overdueActions: 0,
+  recentInspections: [],
+  riskDistribution: [],
+};
 
-    const node = ref.current;
-    if (!node) return;
+const announcementItems = [
+  {
+    title: "Çalışma Talimatları AI üretimi yayında",
+    date: "15 Mayıs 2026",
+    text: "İş/makine adına göre beş başlıklı profesyonel talimat üretip PDF ve Word olarak indirebilirsiniz.",
+    tone:
+      "border-cyan-300 bg-cyan-50 text-cyan-950 dark:border-cyan-400/30 dark:bg-cyan-500/10 dark:text-cyan-100",
+  },
+  {
+    title: "ISGVizyon İSG Bot Chrome eklentisi güncellendi",
+    date: "12 Mayıs 2026",
+    text: "İSG-KATİP ekranındaki firma/sözleşme verilerini açık onayla içeri aktarma akışı güçlendirildi.",
+    tone:
+      "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-400/30 dark:bg-emerald-500/10 dark:text-emerald-100",
+  },
+  {
+    title: "Resmi çıktı şablonları iyileştirildi",
+    date: "8 Mayıs 2026",
+    text: "Yıllık plan, değerlendirme raporu ve eğitim planı çıktı düzenleri daha stabil hale getirildi.",
+    tone:
+      "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-400/30 dark:bg-violet-500/10 dark:text-violet-100",
+  },
+  {
+    title: "OSGB yönetim modülleri sadeleştirildi",
+    date: "3 Mayıs 2026",
+    text: "Firma arşivi, görevlendirme, yetkilendirme ve İSG-KATİP merkezi tek akışta toplandı.",
+    tone:
+      "border-orange-300 bg-orange-50 text-orange-950 dark:border-orange-400/30 dark:bg-orange-500/10 dark:text-orange-100",
+  },
+];
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.18 },
-    );
+const getMonthStartIso = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+};
 
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [disabled]);
+const getTodayIsoDate = () => new Date().toISOString().slice(0, 10);
+
+const getNextDateIso = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+
+const formatNumber = (value: number) => new Intl.NumberFormat("tr-TR").format(value);
+
+const getPlanLabel = (plan?: string | null, status?: string | null) => {
+  if (plan === "osgb") return "OSGB Paket";
+  if (plan === "premium") return "Premium";
+  if (status === "trial") return "Deneme";
+  return "Ücretsiz";
+};
+
+const getUserDisplayName = (
+  user: ReturnType<typeof useAuth>["user"],
+  profile: ReturnType<typeof useAuth>["profile"],
+) => {
+  const typedProfile = profile as { full_name?: string; name?: string } | null | undefined;
+  const metadata = user?.user_metadata as { full_name?: string; name?: string } | undefined;
 
   return (
+    typedProfile?.full_name ||
+    typedProfile?.name ||
+    metadata?.full_name ||
+    metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "Kullanıcı"
+  );
+};
+
+async function safeCount(
+  label: string,
+  query: PromiseLike<{ count: number | null; error: { message?: string } | null }>,
+): Promise<CountResult> {
+  try {
+    const { count, error } = await query;
+
+    if (error) {
+      console.warn(`[Dashboard] ${label} sayısı alınamadı:`, error.message);
+      return { ok: false, count: 0 };
+    }
+
+    return { ok: true, count: count ?? 0 };
+  } catch (error) {
+    console.warn(`[Dashboard] ${label} sayısı alınamadı:`, error);
+    return { ok: false, count: 0 };
+  }
+}
+
+async function safeRows<T>(
+  label: string,
+  query: PromiseLike<{ data: T[] | null; error: { message?: string } | null }>,
+): Promise<RowsResult<T>> {
+  try {
+    const { data, error } = await query;
+
+    if (error) {
+      console.warn(`[Dashboard] ${label} verisi alınamadı:`, error.message);
+      return { ok: false, rows: [] };
+    }
+
+    return { ok: true, rows: data ?? [] };
+  } catch (error) {
+    console.warn(`[Dashboard] ${label} verisi alınamadı:`, error);
+    return { ok: false, rows: [] };
+  }
+}
+
+async function fetchCompanyIds(userId: string, orgId?: string | null) {
+  const client = supabase as any;
+
+  if (orgId) {
+    const byOrg = await safeRows<{ id: string }>(
+      "kuruluş firmaları",
+      client.from("companies").select("id").eq("org_id", orgId).eq("is_active", true),
+    );
+
+    if (byOrg.ok) {
+      return byOrg.rows.map((company) => company.id);
+    }
+  }
+
+  const byUser = await safeRows<{ id: string }>(
+    "kullanıcı firmaları",
+    client.from("companies").select("id").eq("user_id", userId).eq("is_active", true),
+  );
+
+  return byUser.rows.map((company) => company.id);
+}
+
+function applySnapshot(base: DashboardStats, snapshot: DashboardSnapshot): DashboardStats {
+  return {
+    ...base,
+    activeInspections: snapshot.activeInspections,
+    openFindings: snapshot.openFindings,
+    openCapa: snapshot.openFindings,
+    criticalRiskPercent: snapshot.criticalRiskPercent,
+    overdueActions: snapshot.overdueActions,
+    recentInspections: snapshot.recentInspections,
+    riskDistribution: snapshot.riskDistribution,
+  };
+}
+
+function DashboardCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
     <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0px)" : "translateY(26px)",
-        transition: `opacity 700ms ease ${delay}ms, transform 700ms ease ${delay}ms`,
-      }}
+      className={`rounded-2xl border border-slate-200/90 bg-white text-slate-950 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-white/10 dark:bg-[#0f172a]/92 dark:text-slate-100 dark:shadow-[0_18px_60px_rgba(2,8,23,0.45)] ${className}`}
     >
       {children}
     </div>
   );
 }
 
-function StorySurface({
-  children,
-  className = "",
-  disabled = false,
+function SectionHeader({
+  eyebrow,
+  title,
+  action,
 }: {
-  children: React.ReactNode;
-  className?: string;
-  disabled?: boolean;
+  eyebrow?: string;
+  title: string;
+  action?: ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  const handleMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    const node = ref.current;
-    if (!node) return;
-
-    const rect = node.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 100;
-    const y = ((event.clientY - rect.top) / rect.height) * 100;
-    node.style.setProperty("--glow-x", `${x}%`);
-    node.style.setProperty("--glow-y", `${y}%`);
-  };
-
   return (
-    <div
-      ref={ref}
-      onMouseMove={handleMove}
-      className={`relative overflow-hidden ${className}`}
-      style={
-        {
-          "--glow-x": "50%",
-          "--glow-y": "30%",
-        } as React.CSSProperties
-      }
-    >
-      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-300 [background:radial-gradient(circle_at_var(--glow-x)_var(--glow-y),rgba(56,189,248,0.14),transparent_24%),radial-gradient(circle_at_calc(var(--glow-x)_-_14%)_calc(var(--glow-y)_+_18%),rgba(99,102,241,0.10),transparent_26%)] ${disabled ? "opacity-0" : "opacity-70"}`} />
-      <div className="relative">{children}</div>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <div>
+        {eyebrow ? (
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-700 dark:text-cyan-300/80">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+      </div>
+      {action}
     </div>
   );
 }
 
-function AnimatedNumber({ value, disabled = false }: { value: number; disabled?: boolean }) {
-  const [displayValue, setDisplayValue] = useState(0);
+function KpiCard({
+  title,
+  value,
+  hint,
+  icon,
+  tone,
+}: {
+  title: string;
+  value: number;
+  hint: string;
+  icon: ReactNode;
+  tone: string;
+}) {
+  return (
+    <DashboardCard className="group overflow-hidden p-4 transition duration-200 hover:-translate-y-0.5 hover:border-cyan-300/40">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-slate-600 dark:text-slate-400">{title}</p>
+          <p className="mt-2 text-2xl font-bold text-slate-950 dark:text-white">
+            {formatNumber(value)}
+          </p>
+        </div>
+        <div className={`rounded-2xl p-2.5 ${tone}`}>{icon}</div>
+      </div>
+      <p className="mt-3 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{hint}</p>
+    </DashboardCard>
+  );
+}
 
-  useEffect(() => {
-    if (disabled) {
-      setDisplayValue(value);
+function CompactAction({
+  title,
+  description,
+  route,
+  cta,
+  icon,
+  tone,
+}: ActionCard) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/90 p-3 shadow-sm dark:border-white/10 dark:bg-slate-950/45 dark:shadow-none">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`shrink-0 rounded-xl p-2 ${tone}`}>{icon}</div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-slate-950 dark:text-white">{title}</p>
+          <p className="line-clamp-1 text-xs text-slate-600 dark:text-slate-400">
+            {description}
+          </p>
+        </div>
+      </div>
+      <Button
+        size="sm"
+        className="h-8 shrink-0 rounded-xl bg-cyan-500/15 text-xs text-cyan-800 hover:bg-cyan-500/25 dark:text-cyan-100"
+        onClick={() => route && navigate(route)}
+      >
+        {cta}
+      </Button>
+    </div>
+  );
+}
+
+function LargeActionCard({
+  title,
+  description,
+  route,
+  externalUrl,
+  cta,
+  icon,
+  tone,
+  badge,
+}: ActionCard) {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    if (externalUrl) {
+      window.open(externalUrl, "_blank", "noopener,noreferrer");
       return;
     }
 
-    const duration = 700;
-    const steps = 24;
-    const increment = value / steps;
-    let currentStep = 0;
+    if (route) navigate(route);
+  };
 
-    const timer = window.setInterval(() => {
-      currentStep += 1;
-      if (currentStep >= steps) {
-        setDisplayValue(value);
-        window.clearInterval(timer);
-        return;
-      }
+  return (
+    <DashboardCard
+      className={`group relative min-h-[190px] overflow-hidden p-5 transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_70px_rgba(15,23,42,0.16)] dark:hover:shadow-[0_22px_70px_rgba(2,8,23,0.62)] ${tone}`}
+    >
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-slate-900/[0.04] blur-2xl dark:bg-white/[0.08]" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white/40 to-transparent dark:from-black/15" />
 
-      setDisplayValue(Math.round(increment * currentStep));
-    }, duration / steps);
+      <div className="relative flex items-start justify-between gap-4">
+        <div className="rounded-2xl border border-slate-300/70 bg-white/90 p-3 text-slate-900 shadow-sm dark:border-white/10 dark:bg-white/10 dark:text-white">
+          {icon}
+        </div>
 
-    return () => window.clearInterval(timer);
-  }, [value]);
+        {badge ? (
+          <Badge className="border-slate-300 bg-white/85 text-slate-800 shadow-sm dark:border-white/20 dark:bg-white/15 dark:text-white">
+            {badge}
+          </Badge>
+        ) : null}
+      </div>
 
-  return <span className="notranslate" translate="no">{displayValue}</span>;
+      <div className="relative mt-4">
+        <h3 className="text-base font-bold text-slate-950 dark:text-white">
+          {title}
+        </h3>
+
+        <p className="mt-2 min-h-[44px] text-sm leading-relaxed text-slate-700 dark:text-slate-200/80">
+          {description}
+        </p>
+
+        <Button
+          variant="ghost"
+          className="mt-4 h-8 px-0 text-xs font-bold text-slate-900 hover:bg-transparent hover:text-cyan-700 dark:text-white dark:hover:text-cyan-100"
+          onClick={handleClick}
+        >
+          {cta}
+          <ChevronRight className="ml-1 h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </DashboardCard>
+  );
+}
+
+function RiskSummaryCard({
+  title,
+  value,
+  description,
+  route,
+  tone,
+}: {
+  title: string;
+  value: string;
+  description: string;
+  route: string;
+  tone: string;
+}) {
+  const navigate = useNavigate();
+
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(route)}
+      className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${tone}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-950 dark:text-white">{title}</p>
+        <span className="text-xl font-bold text-slate-950 dark:text-white">{value}</span>
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-slate-700 dark:text-white/70">
+        {description}
+      </p>
+    </button>
+  );
+}
+
+function AnnouncementList() {
+  return (
+    <DashboardCard className="p-4">
+      <SectionHeader
+        eyebrow="Güncel"
+        title="Duyurular & Yenilikler"
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800 dark:text-cyan-200 dark:hover:text-cyan-100"
+          >
+            Tümünü Gör
+          </Button>
+        }
+      />
+
+      <div className="space-y-2">
+        {announcementItems.slice(0, 4).map((item) => (
+          <div key={item.title} className={`rounded-xl border p-3 ${item.tone}`}>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold">{item.title}</p>
+              <span className="shrink-0 text-[10px] opacity-75">{item.date}</span>
+            </div>
+            <p className="mt-1 line-clamp-2 text-xs opacity-85">{item.text}</p>
+          </div>
+        ))}
+      </div>
+    </DashboardCard>
+  );
+}
+
+function RecentActivityList({ inspections }: { inspections: DashboardInspection[] }) {
+  const items =
+    inspections.length > 0
+      ? inspections.map((inspection) => ({
+          title: inspection.location_name || "Denetim kaydı",
+          text:
+            inspection.status === "completed"
+              ? "Denetim tamamlandı"
+              : inspection.status === "in_progress"
+                ? "Denetim devam ediyor"
+                : "Denetim taslakta",
+          date: new Date(inspection.created_at).toLocaleDateString("tr-TR"),
+        }))
+      : [
+          {
+            title: "Risk sihirbazı hazır",
+            text: "Yeni risk raporu oluşturmak için hızlı işlem kartını kullanabilirsiniz.",
+            date: "Bugün",
+          },
+          {
+            title: "Acil durum planı",
+            text: "Firma özelinde ADEP planı hazırlama akışı hazır.",
+            date: "Bu hafta",
+          },
+          {
+            title: "İSG Bot",
+            text: "Chrome eklentisi ile firma aktarımını başlatabilirsiniz.",
+            date: "Yeni",
+          },
+        ];
+
+  return (
+    <DashboardCard className="p-4">
+      <SectionHeader eyebrow="Akış" title="Son Aktiviteler" />
+
+      <div className="space-y-3">
+        {items.slice(0, 4).map((item) => (
+          <div
+            key={`${item.title}-${item.date}`}
+            className="flex gap-3 rounded-xl border border-slate-200/70 bg-slate-50/90 p-3 dark:border-white/8 dark:bg-slate-950/40"
+          >
+            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-500 shadow-[0_0_16px_rgba(6,182,212,0.5)] dark:bg-cyan-300 dark:shadow-[0_0_16px_rgba(34,211,238,0.7)]" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-slate-950 dark:text-white">
+                {item.title}
+              </p>
+              <p className="line-clamp-1 text-xs text-slate-600 dark:text-slate-400">
+                {item.text}
+              </p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-500">{item.date}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </DashboardCard>
+  );
 }
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user, profile, refreshProfile } = useAuth();
-  const { status, plan, canStartTrial, daysLeftInTrial, refetch: refetchSubscription } = useSubscription();
-  const { safeMode } = useSafeMode();
-  const prefersReducedMotion = useReducedMotion();
-  const reduceMotion = safeMode || prefersReducedMotion;
+  const { user, profile } = useAuth();
+  const { status, plan } = useSubscription();
+
+  const [stats, setStats] = useState<DashboardStats>(EMPTY_STATS);
   const [loading, setLoading] = useState(true);
-  const [startingTrial, setStartingTrial] = useState(false);
-  usePageDataTiming(loading);
   const [refreshing, setRefreshing] = useState(false);
-  const [, setOrgId] = useState<string | null>(null);
 
-  const [activeInspections, setActiveInspections] = useState(0);
-  const [openFindings, setOpenFindings] = useState(0);
-  const [criticalRiskPercent, setCriticalRiskPercent] = useState(0);
-  const [overdueActions, setOverdueActions] = useState(0);
+  const mountedRef = useRef(true);
 
-  const [riskDistribution, setRiskDistribution] = useState<
-    Array<{ name: string; value: number; color: string }>
-  >([]);
-  const [monthlyTrend, setMonthlyTrend] = useState<
-    Array<{ month: string; denetimler: number }>
-  >([]);
-  const [recentInspections, setRecentInspections] = useState<Inspection[]>([]);
+  usePageDataTiming(loading);
 
-  const hasHydratedFromCache = useRef(false);
-  const isFetching = useRef(false);
-  const hasPremiumAccess = status === "trial" || plan === "premium";
-  const isTrialActive = status === "trial";
-  const isPremiumMember = plan === "premium";
+  const displayName = useMemo(() => getUserDisplayName(user, profile), [user, profile]);
 
-  const applySnapshot = useCallback((snapshot: DashboardSnapshot) => {
-    setOrgId(snapshot.orgId);
-    setActiveInspections(snapshot.activeInspections);
-    setOpenFindings(snapshot.openFindings);
-    setCriticalRiskPercent(snapshot.criticalRiskPercent);
-    setOverdueActions(snapshot.overdueActions);
-    setRiskDistribution(snapshot.riskDistribution);
-    setMonthlyTrend(snapshot.monthlyTrend);
-    setRecentInspections(snapshot.recentInspections);
-  }, []);
+  const orgId =
+    (profile as { organization_id?: string | null } | null | undefined)?.organization_id ?? null;
 
-  const fetchPersonalDashboardData = useCallback(async () => {
-    if (!user) {
-      return;
-    }
+  const planLabel = getPlanLabel(plan, status);
 
-    const { data: companies, error: companiesError } = await supabase
-      .from("companies")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("is_active", true);
-
-    if (companiesError) {
-      throw new Error(`Firma verileri alınamadı: ${companiesError.message}`);
-    }
-
-    const companyIds = (companies ?? []).map((company) => company.id);
-
-    const [
-      { count: employeesCount, error: employeesError },
-      { count: riskAssessmentCount, error: riskAssessmentsError },
-      { data: inspections, error: inspectionsError },
-      { count: analysisCount, error: analysisError },
-    ] = await Promise.all([
-      companyIds.length > 0
-        ? supabase
-            .from("employees")
-            .select("id", { count: "exact", head: true })
-            .in("company_id", companyIds)
-            .eq("is_active", true)
-        : Promise.resolve({ count: 0, error: null, data: null }),
-      supabase
-        .from("risk_assessments")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("is_deleted", false),
-      supabase
-        .from("inspections")
-        .select("id, location_name, risk_level, status, created_at, org_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false }),
-      supabase
-        .from("document_analyses")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id),
-    ]);
-
-    if (employeesError) {
-      throw new Error(`Çalışan verileri alınamadı: ${employeesError.message}`);
-    }
-
-    if (riskAssessmentsError) {
-      throw new Error(`Risk değerlendirme verileri alınamadı: ${riskAssessmentsError.message}`);
-    }
-
-    if (inspectionsError) {
-      throw new Error(`Denetim verileri alınamadı: ${inspectionsError.message}`);
-    }
-
-    if (analysisError) {
-      throw new Error(`Analiz verileri alınamadı: ${analysisError.message}`);
-    }
-
-    const inspectionList = (inspections ?? []) as DashboardInspection[];
-    let findingsList: DashboardFinding[] = [];
-
-    if (inspectionList.length > 0) {
-      const inspectionIds = inspectionList.map((inspection) => inspection.id);
-      const { data: findings, error: findingsError } = await supabase
-        .from("findings")
-        .select("id, description, due_date, is_resolved, inspection_id")
-        .in("inspection_id", inspectionIds);
-
-      if (findingsError) {
-        throw new Error(`Bulgu verileri alınamadı: ${findingsError.message}`);
-      }
-
-      findingsList = (findings ?? []) as DashboardFinding[];
-    }
-
-    const activeInspectionsCount = inspectionList.filter((inspection) => inspection.status === "in_progress").length;
-    const openFindingsCount = findingsList.filter((finding) => !finding.is_resolved).length;
-    const criticalCount = inspectionList.filter((inspection) => inspection.risk_level === "critical").length;
-    const criticalPercent = inspectionList.length > 0 ? Math.round((criticalCount / inspectionList.length) * 100) : 0;
-    const today = new Date();
-    const overdueCount = findingsList.filter(
-      (finding) => !finding.is_resolved && finding.due_date && new Date(finding.due_date) < today,
-    ).length;
-
-    setOrgId("personal");
-    setActiveInspections(activeInspectionsCount);
-    setOpenFindings(openFindingsCount);
-    setCriticalRiskPercent(criticalPercent);
-    setOverdueActions(overdueCount);
-    setRiskDistribution(
-      [
-        { name: "Düşük", value: inspectionList.filter((item) => item.risk_level === "low").length, color: "#10b981" },
-        { name: "Orta", value: inspectionList.filter((item) => item.risk_level === "medium").length, color: "#f59e0b" },
-        { name: "Yüksek", value: inspectionList.filter((item) => item.risk_level === "high").length, color: "#f97316" },
-        { name: "Kritik", value: criticalCount, color: "#ef4444" },
-      ].filter((item) => item.value > 0),
-    );
-    setMonthlyTrend(() => {
-      const months = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
-      const last6Months: Array<{ month: string; denetimler: number }> = [];
-      const baseDate = new Date();
-
-      for (let i = 5; i >= 0; i -= 1) {
-        const date = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 1);
-        const count = inspectionList.filter((inspection) => {
-          const createdAt = new Date(inspection.created_at);
-          return createdAt.getMonth() === date.getMonth() && createdAt.getFullYear() === date.getFullYear();
-        }).length;
-
-        last6Months.push({
-          month: months[date.getMonth()],
-          denetimler: count,
-        });
-      }
-
-      return last6Months;
-    });
-    setRecentInspections(inspectionList.slice(0, 5));
-
-    return {
-      companiesCount: companyIds.length,
-      employeesCount: employeesCount ?? 0,
-      riskAssessmentCount: riskAssessmentCount ?? 0,
-      documentAnalysisCount: analysisCount ?? 0,
-    };
-  }, [user]);
-
-  const fetchDashboardData = useCallback(
-    async (isRefresh = false, force = false) => {
-      if (!user || isFetching.current) {
+  const loadDashboard = useCallback(
+    async (forceRefresh = false) => {
+      if (!user?.id) {
+        setLoading(false);
         return;
       }
 
-      const shouldUseOrganizationDashboard = Boolean(profile?.organization_id);
-      const shouldUsePersonalDashboard = !profile?.organization_id && hasPremiumAccess;
-
-      if (!shouldUseOrganizationDashboard && !shouldUsePersonalDashboard) {
-        return;
-      }
-
-      if (!force && !isRefresh && hasHydratedFromCache.current) {
-        return;
-      }
-
-      isFetching.current = true;
-
-      if (isRefresh) {
-        setRefreshing(true);
-      } else if (!hasHydratedFromCache.current) {
-        setLoading(true);
-      }
+      if (forceRefresh) setRefreshing(true);
+      else setLoading(true);
 
       try {
-        if (shouldUseOrganizationDashboard && profile?.organization_id) {
-          const snapshot = await fetchDashboardSnapshot(profile.organization_id);
-          applySnapshot(snapshot);
-          writeDashboardSnapshot(user.id, snapshot);
+        const client = supabase as any;
+        let nextStats: DashboardStats = { ...EMPTY_STATS };
+
+        const companyIds = await fetchCompanyIds(user.id, orgId);
+
+        nextStats.activeCompanies = companyIds.length;
+
+        if (companyIds.length > 0) {
+          const employees = await safeCount(
+            "aktif çalışanlar",
+            client
+              .from("employees")
+              .select("id", { count: "exact", head: true })
+              .in("company_id", companyIds)
+              .eq("is_active", true),
+          );
+
+          nextStats.employees = employees.count;
+        }
+
+        if (orgId) {
+          const cached = forceRefresh ? null : readDashboardSnapshot(user.id);
+          const isCacheValid =
+            cached &&
+            cached.orgId === orgId &&
+            Date.now() - cached.timestamp < DASHBOARD_CACHE_TTL;
+
+          const snapshot = isCacheValid ? cached : await fetchDashboardSnapshot(orgId);
+
+          if (!isCacheValid) writeDashboardSnapshot(user.id, snapshot);
+
+          nextStats = applySnapshot(nextStats, snapshot);
         } else {
-          await fetchPersonalDashboardData();
+          const inspections = await safeRows<DashboardInspection>(
+            "kişisel denetimler",
+            client
+              .from("inspections")
+              .select("id, location_name, risk_level, status, created_at, org_id")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(8),
+          );
+
+          nextStats.recentInspections = inspections.rows;
+          nextStats.activeInspections = inspections.rows.filter(
+            (inspection) => inspection.status === "in_progress",
+          ).length;
+
+          nextStats.criticalRiskPercent =
+            inspections.rows.length > 0
+              ? Math.round(
+                  (inspections.rows.filter((inspection) => inspection.risk_level === "critical")
+                    .length /
+                    inspections.rows.length) *
+                    100,
+                )
+              : 0;
         }
 
-        hasHydratedFromCache.current = true;
+        const [monthlyReports, upcomingControls, draftMeetings] = await Promise.all([
+          safeCount(
+            "bu ay oluşturulan rapor",
+            client
+              .from("document_analyses")
+              .select("id", { count: "exact", head: true })
+              .eq("user_id", user.id)
+              .gte("created_at", getMonthStartIso()),
+          ),
+          safeCount(
+            "yaklaşan periyodik kontrol",
+            client
+              .from("periodic_controls")
+              .select("id", { count: "exact", head: true })
+              .gte("next_control_date", getTodayIsoDate())
+              .lte("next_control_date", getNextDateIso(30)),
+          ),
+          safeCount(
+            "taslak kurul toplantısı",
+            client
+              .from("board_meetings")
+              .select("id", { count: "exact", head: true })
+              .eq("status", "draft"),
+          ),
+        ]);
 
-        if (isRefresh) {
-          toast.success("Dashboard güncellendi", {
-            description: shouldUseOrganizationDashboard
-              ? "Organizasyon verileri yenilendi."
-              : "Bireysel premium metrikleri güncellendi.",
-          });
+        nextStats.monthlyReports = monthlyReports.count;
+        nextStats.upcomingControls = upcomingControls.count;
+        nextStats.draftMeetings = draftMeetings.count;
+
+        if (nextStats.openCapa === 0 && nextStats.openFindings > 0) {
+          nextStats.openCapa = nextStats.openFindings;
         }
-      } catch (error: any) {
-        console.error("Dashboard fetch error:", error);
 
-        let errorMessage = "Dashboard yüklenemedi";
-        let errorDescription = error?.message || "Bilinmeyen hata";
-
-        if (error?.message?.includes("Profil bilgisi")) {
-          errorMessage = "Profil hatası";
-          errorDescription = "Kullanıcı profili bulunamadı";
-        } else if (error?.message?.includes("Kuruluş bilgisi")) {
-          errorMessage = "Kuruluş hatası";
-          errorDescription = "Kuruluş bilgisi eksik";
-        } else if (error?.message?.includes("Denetim verileri")) {
-          errorMessage = "Veri hatası";
-          errorDescription = "Denetim verileri alınamadı";
-        }
-
-        toast.error(errorMessage, {
-          description: errorDescription,
-          duration: 8000,
-          action: {
-            label: "Tekrar Dene",
-            onClick: () => {
-              hasHydratedFromCache.current = false;
-              void fetchDashboardData(true, true);
-            },
-          },
-        });
+        if (mountedRef.current) setStats(nextStats);
+      } catch (error) {
+        console.error("Dashboard verileri alınamadı:", error);
+        toast.error("Dashboard verileri alınırken bir sorun oluştu.");
       } finally {
-        setLoading(false);
-        setRefreshing(false);
-        isFetching.current = false;
+        if (mountedRef.current) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
     },
-    [applySnapshot, fetchPersonalDashboardData, hasPremiumAccess, profile?.organization_id, user]
+    [orgId, user?.id],
   );
 
   useEffect(() => {
-    if (!user || !profile) {
-      return;
-    }
+    mountedRef.current = true;
+    void loadDashboard();
 
-    if (!profile.organization_id && !hasPremiumAccess) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
-    if (profile.organization_id) {
-      const cachedSnapshot = readDashboardSnapshot(user.id);
-      const isCacheFresh =
-        cachedSnapshot && Date.now() - cachedSnapshot.timestamp < DASHBOARD_CACHE_TTL;
-
-      if (cachedSnapshot) {
-        applySnapshot(cachedSnapshot);
-        hasHydratedFromCache.current = true;
-        setLoading(false);
-      }
-
-      void fetchDashboardData(false, !isCacheFresh);
-      return;
-    }
-
-    hasHydratedFromCache.current = false;
-    void fetchDashboardData(false, true);
-  }, [applySnapshot, fetchDashboardData, hasPremiumAccess, profile, user]);
-
-  const handleRefresh = () => {
-    void fetchDashboardData(true, true);
-  };
-
-  const handleStartTrial = async () => {
-    setStartingTrial(true);
-    try {
-      await startPremiumTrial();
-      await refreshProfile();
-      await refetchSubscription();
-      toast.success("7 günlük premium deneme başlatıldı", {
-        description: "Deneme süresince Premium üyeliğin açtığı tüm özellikler ve ekranlar aktif.",
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Deneme üyeliği başlatılamadı.";
-      toast.error("Deneme üyeliği başlatılamadı", { description: message });
-    } finally {
-      setStartingTrial(false);
-    }
-  };
-
-  if (user && profile && !profile.organization_id && !hasPremiumAccess) {
-    const trialButtonDisabled = startingTrial || !canStartTrial;
-  const heroTitle = "İSGVizyon Dünyasına Hoş Geldiniz";
-  const heroDescription =
-  "Platformumuzu kişisel hesabınızla hemen keşfetmeye başlayabilirsiniz. Yapay zeka analiz araçlarımız ve akıllı asistanımız kullanımınıza hazırdır. Çoklu ekip yönetimi, firma koordinasyonu ve kurumsal finans süreçlerini de aktif hale getirmek isterseniz, kendinize saniyeler içinde şık bir çalışma alanı (organizasyon) tanımlayabilirsiniz.";
-    const secondaryActionLabel = "Premium'u incele";
-    const secondaryActionTarget = "/settings?tab=billing&upgrade=1";
-
-    return (
-      <div className="space-y-6">
-        <section className="rounded-[28px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-6 text-white shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:p-8">
-          <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">Hoş geldiniz</Badge>
-          <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">{heroTitle}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-            {heroDescription}
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button
-              onClick={() => void handleStartTrial()}
-              disabled={trialButtonDisabled}
-              className="bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-400 hover:to-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {startingTrial
-                ? "Premium deneme başlatılıyor..."
-                : "7 günlük premium denemeyi başlat"}
-            </Button>
-            <Button
-              onClick={() => navigate("/profile?tab=workspace&action=create")}
-              className="bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-            >
-              Organizasyon Oluştur
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate(secondaryActionTarget)}
-              className="border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-            >
-              {secondaryActionLabel}
-            </Button>
-          </div>
-          <p className="mt-4 max-w-2xl text-xs leading-5 text-slate-400">
-            Premium deneme sırasında Premium üyeliğin açtığı tüm AI, raporlama, çıktı ve gelişmiş operasyon ekranları erişilebilir olur. OSGB modülü bu kapsama dahil değildir.
-          </p>
-        </section>
-      </div>
-    );
-  }
-  const getRiskColor = (level: RiskLevel) => {
-    const colors: Record<RiskLevel, string> = {
-      low: "bg-success/10 text-success border-success/30",
-      medium: "bg-warning/10 text-warning border-warning/30",
-      high: "bg-orange-500/10 text-orange-500 border-orange-500/30",
-      critical: "bg-destructive/10 text-destructive border-destructive/30",
+    return () => {
+      mountedRef.current = false;
     };
-    return colors[level] || "bg-secondary";
-  };
+  }, [loadDashboard]);
 
-  const getRiskLabel = (level: RiskLevel) => {
-    const labels: Record<RiskLevel, string> = {
-      low: "Düşük",
-      medium: "Orta",
-      high: "Yüksek",
-      critical: "Kritik",
-    };
-    return labels[level] || level;
-  };
-   
-  const getStatusLabel = (status: InspectionStatus) => {
-    const labels: Record<InspectionStatus, string> = {
-      in_progress: "Devam Ediyor",
-      completed: "Tamamlandı",
-      draft: "Taslak",
-      cancelled: "İptal",
-    };
-    return labels[status] || status;
-  };
-
-  const getStatusColor = (status: InspectionStatus) => {
-    const colors: Record<InspectionStatus, string> = {
-      in_progress: "bg-blue-500/10 text-blue-500 border-blue-500/30",
-      completed: "bg-success/10 text-success border-success/30",
-      draft: "bg-secondary/50 text-muted-foreground border-border",
-      cancelled: "bg-destructive/10 text-destructive border-destructive/30",
-    };
-    return colors[status] || "bg-secondary";
-  };
-
-  const metrics: MetricCard[] = [
+  const kpis = [
     {
-      title: "Aktif Denetim Hattı",
-      subtitle: "Sahada devam eden iş akışı",
-      value: activeInspections,
-      insight: activeInspections > 0 ? "İş yükü aktif şekilde ilerliyor" : "Yeni denetim planlanmalı",
-      icon: <Activity className="h-5 w-5" />,
-      color: "from-cyan-500 via-sky-500 to-blue-600",
+      title: "Aktif Firma",
+      value: stats.activeCompanies,
+      hint: "Portföyünüzde takip edilen aktif işyerleri.",
+      icon: <Building2 className="h-5 w-5 text-cyan-700 dark:text-cyan-100" />,
+      tone: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-100",
     },
     {
-      title: "Açık DÖF Havuzu",
-      subtitle: "Takip isteyen bulgular",
-      value: openFindings,
-      insight: openFindings > 0 ? "Kapanış odaklı takip gerekli" : "Açık bulgu baskısı görünmüyor",
-      icon: <AlertTriangle className="h-5 w-5" />,
-      color: "from-amber-500 via-orange-500 to-orange-600",
+      title: "Toplam Çalışan",
+      value: stats.employees,
+      hint: "Firma kayıtlarından gelen aktif çalışan sayısı.",
+      icon: <Users className="h-5 w-5 text-emerald-700 dark:text-emerald-100" />,
+      tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-100",
     },
     {
-      title: "Kritik Risk Oranı",
-      subtitle: "En yüksek öncelikli risk payı",
-      value: criticalRiskPercent,
-      insight:
-        criticalRiskPercent > 20
-          ? "Yönetim müdahalesi gerekiyor"
-          : criticalRiskPercent > 0
-            ? "Kontrol altında izlenmeli"
-            : "Kritik yoğunluk görünmüyor",
-      icon: <AlertCircle className="h-5 w-5" />,
-      color: "from-rose-500 via-red-500 to-red-700",
+      title: "Açık DÖF",
+      value: stats.openCapa,
+      hint: "Kapanmayı bekleyen düzeltici/önleyici aksiyonlar.",
+      icon: <ClipboardCheck className="h-5 w-5 text-rose-700 dark:text-rose-100" />,
+      tone: "bg-rose-500/15 text-rose-700 dark:text-rose-100",
     },
     {
-      title: "Geciken İşlemler",
-      subtitle: "Termin aşımı yaşayan aksiyonlar",
-      value: overdueActions,
-      insight: overdueActions > 0 ? "Hızlı kapanış gerekli" : "Takvim baskısı görünmüyor",
-      icon: <Clock className="h-5 w-5" />,
-      color: "from-fuchsia-500 via-violet-500 to-purple-600",
+      title: "Yaklaşan Periyodik Kontrol",
+      value: stats.upcomingControls,
+      hint: "Önümüzdeki 30 gün içinde takibe düşen kontroller.",
+      icon: <CalendarClock className="h-5 w-5 text-amber-700 dark:text-amber-100" />,
+      tone: "bg-amber-500/15 text-amber-700 dark:text-amber-100",
+    },
+    {
+      title: "Taslak Kurul Toplantısı",
+      value: stats.draftMeetings,
+      hint: "Tamamlanmayı bekleyen kurul toplantısı kayıtları.",
+      icon: <ClipboardList className="h-5 w-5 text-violet-700 dark:text-violet-100" />,
+      tone: "bg-violet-500/15 text-violet-700 dark:text-violet-100",
+    },
+    {
+      title: "Bu Ay Oluşturulan Rapor",
+      value: stats.monthlyReports,
+      hint: "Bu ay hazırlanan analiz ve rapor çıktıları.",
+      icon: <FileText className="h-5 w-5 text-sky-700 dark:text-sky-100" />,
+      tone: "bg-sky-500/15 text-sky-700 dark:text-sky-100",
     },
   ];
 
-  const operationalScore = Math.max(
-    0,
-    100 - Math.min(criticalRiskPercent * 2, 50) - Math.min(overdueActions * 4, 30) - Math.min(openFindings, 20),
-  );
-
-  const criticalRecentCount = recentInspections.filter((inspection) => inspection.risk_level === "critical").length;
-  const totalRiskVolume = riskDistribution.reduce((sum, item) => sum + item.value, 0);
-  const dominantRisk = [...riskDistribution].sort((a, b) => b.value - a.value)[0];
-  const latestTrend = monthlyTrend[monthlyTrend.length - 1]?.denetimler ?? 0;
-  const previousTrend = monthlyTrend[monthlyTrend.length - 2]?.denetimler ?? 0;
-  const momentumDelta = latestTrend - previousTrend;
-
-  const priorityHeadline =
-    overdueActions > 0
-      ? `${overdueActions} geciken işlem bugün öncelik istiyor`
-      : openFindings > 0
-        ? `${openFindings} açık DÖF için kapanış takibi gerekli`
-        : "Operasyon görünümü dengeli, yeni denetim planlamasına geçilebilir";
-
-  const priorityActions = [
+  const priorityActions: ActionCard[] = [
     {
-      title: "Geciken İşlemler",
-      detail:
-        overdueActions > 0
-          ? `${overdueActions} kayıt için kapanış aksiyonu planlanmalı`
-          : "Geciken işlem görünmüyor",
-      tone:
-        overdueActions > 0
-          ? "border-red-500/20 bg-red-500/10 text-red-100"
-          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+      title: "Risk değerlendirmesi oluştur",
+      description: "Firma risklerini hızlı sihirbazla puanlayın ve raporlayın.",
+      route: "/risk-wizard",
+      cta: "Başla",
+      icon: <TrendingUp className="h-4 w-4" />,
+      tone: "bg-violet-500/15 text-violet-700 dark:text-violet-100",
     },
     {
-      title: "Açık DÖF Akışı",
-      detail:
-        openFindings > 0
-          ? `${openFindings} açık kayıt için sorumlu ve termin kontrolü gerekli`
-          : "Açık DÖF baskısı görünmüyor",
-      tone:
-        openFindings > 0
-          ? "border-amber-500/20 bg-amber-500/10 text-amber-100"
-          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+      title: "Acil durum planı hazırla",
+      description: "Tahliye, ekip ve senaryo planlarını tek ekranda tamamlayın.",
+      route: "/adep-wizard",
+      cta: "Hazırla",
+      icon: <ShieldCheck className="h-4 w-4" />,
+      tone: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-100",
     },
     {
-      title: "Kritik Risk Yoğunluğu",
-      detail:
-        criticalRiskPercent > 20
-          ? `Kritik oran %${criticalRiskPercent}; yönetim değerlendirmesi gerekli`
-          : criticalRiskPercent > 0
-            ? `Kritik oran %${criticalRiskPercent}; kontrollü takip önerilir`
-            : "Kritik risk baskısı görünmüyor",
-      tone:
-        criticalRiskPercent > 20
-          ? "border-rose-500/20 bg-rose-500/10 text-rose-100"
-          : criticalRiskPercent > 0
-            ? "border-orange-500/20 bg-orange-500/10 text-orange-100"
-            : "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
+      title: "Firma ziyareti bildir",
+      description: "OSGB saha hizmetinizi kanıtlarıyla kayıt altına alın.",
+      route: "/osgb/field-visits",
+      cta: "Bildir",
+      icon: <MapPin className="h-4 w-4" />,
+      tone: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-100",
+    },
+    {
+      title: "Kurul toplantısı taslağını tamamla",
+      description: "Gündem, kararlar ve katılımcıları resmi çıktı için hazırlayın.",
+      route: "/board-meetings/new",
+      cta: "Tamamla",
+      icon: <ClipboardList className="h-4 w-4" />,
+      tone: "bg-amber-500/15 text-amber-700 dark:text-amber-100",
     },
   ];
+
+  const quickActions: ActionCard[] = [
+  {
+    title: "Yeni Firma Ekle",
+    description: "Firma bilgilerini kaydedin, çalışan ve belge süreçlerini başlatın.",
+    route: "/companies",
+    cta: "Firma ekle",
+    icon: <Plus className="h-5 w-5" />,
+    tone:
+      "border-cyan-300 bg-gradient-to-br from-cyan-100 via-cyan-50 to-white dark:border-cyan-400/20 dark:from-cyan-500/20 dark:via-slate-900/90 dark:to-slate-950",
+  },
+  {
+    title: "Risk Sihirbazı",
+    description: "Adım adım Fine-Kinney risk raporu oluşturun.",
+    route: "/risk-wizard",
+    cta: "Rapor hazırla",
+    icon: <Sparkles className="h-5 w-5" />,
+    tone:
+      "border-violet-300 bg-gradient-to-br from-violet-100 via-fuchsia-50 to-white dark:border-violet-400/20 dark:from-violet-600/30 dark:via-slate-900/90 dark:to-fuchsia-950/40",
+    badge: "AI",
+  },
+  {
+    title: "Acil Durum Planı",
+    description: "ADEP planı, ekipler, senaryolar ve resmi çıktılar.",
+    route: "/adep-wizard",
+    cta: "Plan oluştur",
+    icon: <ShieldAlert className="h-5 w-5" />,
+    tone:
+      "border-orange-300 bg-gradient-to-br from-orange-100 via-amber-50 to-white dark:border-orange-400/20 dark:from-orange-600/28 dark:via-slate-900/90 dark:to-slate-950",
+  },
+  {
+    title: "Chrome Web Store",
+    description: "ISGVizyon İSG Bot eklentisi ile İSG-KATİP firma aktarımını hızlandırın.",
+    externalUrl: CHROME_STORE_URL,
+    cta: "Hemen yükle",
+    icon: <Bot className="h-5 w-5" />,
+    tone:
+      "border-sky-300 bg-gradient-to-br from-sky-100 via-cyan-50 to-white dark:border-sky-400/20 dark:from-sky-500/25 dark:via-slate-900/90 dark:to-cyan-950/40",
+    badge: "GOOGLE",
+  },
+];
+
+ const osgbModules: ActionCard[] = [
+  {
+    title: "Firma Arşiv Depolama",
+    description: "OSGB müşterilerinin resmi belge, PDF ve kayıtlarını güvenle saklayın.",
+    route: "/osgb/documents",
+    cta: "Arşive git",
+    icon: <Archive className="h-5 w-5" />,
+    tone:
+      "border-purple-300 bg-gradient-to-br from-purple-100 via-violet-50 to-white dark:border-purple-400/20 dark:from-purple-600/30 dark:via-slate-900/90 dark:to-slate-950",
+    badge: "YENİ",
+  },
+  {
+    title: "Personel Görevlendirme",
+    description: "Uzman, hekim ve DSP atamalarını portföy kapasitesine göre yönetin.",
+    route: "/osgb/assignments",
+    cta: "İncele",
+    icon: <BriefcaseBusiness className="h-5 w-5" />,
+    tone:
+      "border-emerald-300 bg-gradient-to-br from-emerald-100 via-teal-50 to-white dark:border-emerald-400/20 dark:from-emerald-600/28 dark:via-slate-900/90 dark:to-teal-950/40",
+    badge: "OSGB",
+  },
+  {
+    title: "Firma Yetkilendirme",
+    description: "Müşteri portalı ve dış erişim bağlantılarını kontrollü şekilde yönetin.",
+    route: "/osgb/client-portal",
+    cta: "Yetkilendir",
+    icon: <Zap className="h-5 w-5" />,
+    tone:
+      "border-orange-300 bg-gradient-to-br from-orange-100 via-amber-50 to-white dark:border-orange-400/20 dark:from-orange-600/30 dark:via-slate-900/90 dark:to-amber-950/40",
+  },
+  {
+    title: "İSG-KATİP / Chrome Eklentisi",
+    description: "Aktarım, uyum bayrakları ve senkronizasyon durumlarını izleyin.",
+    route: "/osgb/isgkatip",
+    cta: "Merkeze git",
+    icon: <Bot className="h-5 w-5" />,
+    tone:
+      "border-cyan-300 bg-gradient-to-br from-cyan-100 via-blue-50 to-white dark:border-cyan-400/20 dark:from-cyan-600/28 dark:via-slate-900/90 dark:to-blue-950/40",
+  },
+];
 
   return (
-    <div className="space-y-8 notranslate" translate="no">
-      {!profile?.organization_id && hasPremiumAccess && (
-        <RevealBlock disabled={reduceMotion}>
-          <section className="relative overflow-hidden rounded-[26px] border border-emerald-400/18 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.2),_transparent_34%),radial-gradient(circle_at_82%_18%,_rgba(34,211,238,0.14),_transparent_28%),linear-gradient(145deg,rgba(5,10,22,0.98),rgba(12,20,36,0.94))] p-5 shadow-[0_20px_60px_rgba(6,95,70,0.22)] md:p-6">
-            <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.05)_48%,transparent_100%)] opacity-70" />
-            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="border-emerald-400/20 bg-emerald-400/12 px-3 py-1 text-emerald-50 shadow-[0_8px_24px_rgba(16,185,129,0.14)]">
-                    {isTrialActive ? `Premium demo aktif · ${daysLeftInTrial} gün` : "Premium üyelik aktif"}
-                  </Badge>
-                  <Badge variant="outline" className="border-white/10 bg-white/5 px-3 py-1 text-slate-200">
-                    Bireysel kullanım modu
-                  </Badge>
-                </div>
-                <div className="space-y-2">
-                  <h2 className="text-xl font-semibold tracking-[-0.03em] text-white md:text-2xl">Premium araç setiniz aktif</h2>
-                  <p className="max-w-3xl text-sm leading-6 text-slate-300">
-                    AI analiz, raporlama ve premium üretim ekranları bireysel hesabınızda açık. Organizasyon kurmadan kişisel premium akışlarını kullanabilirsiniz; sadece OSGB, ekip yönetimi ve finans operasyonları için organizasyon gerekir.
-                  </p>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Erişim Türü</p>
-                    <p className="mt-2 text-sm font-semibold text-white">{isTrialActive ? "Premium Demo" : "Premium Üyelik"}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Kalan Süre</p>
-                    <p className="mt-2 text-sm font-semibold text-white">{isTrialActive ? `${daysLeftInTrial} gün` : "Süre kısıtı yok"}</p>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
-                    <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Açık Modüller</p>
-                    <p className="mt-2 text-sm font-semibold text-white">{isPremiumMember ? "Premium üretim araçları" : "AI, raporlama ve premium akışlar"}</p>
-                  </div>
-                </div>
-                <p className="text-xs leading-5 text-slate-400">
-                  Trial sürecinde Premium üyeliğin açtığı tüm bireysel modüller kullanılabilir. OSGB modülü ve kurumsal finans ekranları bu kapsamın dışındadır.
-                </p>
-              </div>
-              <div className="flex flex-col gap-3 xl:min-w-[320px]">
-                <Button
-                  onClick={() => navigate("/settings?tab=billing&upgrade=1")}
-                  className="h-11 bg-gradient-to-r from-emerald-400 to-cyan-400 text-slate-950 shadow-[0_14px_32px_rgba(34,211,238,0.22)] hover:from-emerald-300 hover:to-cyan-300"
-                >
-                  Premium avantajlarını yönet
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate("/profile?tab=workspace&action=create")}
-                  className="h-11 border-white/10 bg-white/5 text-slate-100 hover:border-emerald-300/30 hover:bg-white/10"
-                >
-                  OSGB için organizasyon oluştur
-                </Button>
-              </div>
-            </div>
-          </section>
-        </RevealBlock>
-      )}
-
-      <RevealBlock disabled={reduceMotion}>
-        <section className="relative overflow-hidden rounded-[24px] border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.18),_transparent_32%),radial-gradient(circle_at_80%_20%,_rgba(59,130,246,0.16),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.98),_rgba(10,15,28,0.94))] p-4 shadow-[0_20px_80px_rgba(2,6,23,0.45)] md:rounded-[28px] md:p-8">
-        <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0%,rgba(255,255,255,0.04)_45%,transparent_100%)]" />
-        <div className="relative grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-          <div className="space-y-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <Badge className="border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">İSG Yönetim Paneli</Badge>
-              <Badge variant="outline" className="border-white/10 bg-white/5 px-3 py-1 text-slate-200">
-                Operasyon skoru: {operationalScore}/100
-              </Badge>
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-[11px] uppercase tracking-[0.34em] text-cyan-200/70">Executive Safety Narrative</p>
-              <h1 className="max-w-4xl text-2xl font-semibold leading-[1.02] tracking-[-0.04em] text-white sm:text-3xl md:text-5xl xl:text-[3.8rem]">
-                Denetim, risk ve aksiyon yükünü tek bakışta yöneten kurumsal kontrol masası
+    <div className="min-h-screen bg-slate-100 px-4 py-5 text-slate-950 dark:bg-[#08111f] dark:text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1800px] flex-col gap-5">
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-r from-cyan-100 via-violet-100 to-indigo-100 p-5 shadow-[0_24px_90px_rgba(15,23,42,0.12)] dark:border-white/10 dark:from-indigo-600 dark:via-fuchsia-600 dark:to-violet-700 dark:shadow-[0_24px_90px_rgba(124,58,237,0.35)] sm:p-6">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-slate-700 dark:text-white/75">İyi Günler</p>
+              <h1 className="mt-1 text-2xl font-bold text-slate-950 dark:text-white sm:text-3xl">
+                {displayName}
               </h1>
-              <p className="max-w-2xl text-sm leading-6 text-slate-300 md:text-[15px]">
-                Kritik yoğunluğu, saha hareketini ve kapanış baskısını aynı çerçevede gösterir. Panelin amacı sayı
-                vermek değil, yöneticiye bugün neye odaklanması gerektiğini netleştirmektir.
+              <p className="mt-3 max-w-2xl text-sm text-slate-700 dark:text-white/80">
+                Bugün İSG süreçleriniz için kritik takipleri buradan yönetebilirsiniz.
               </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Bugünün Önceliği</p>
-                <p className="mt-3 text-sm font-medium leading-6 text-white">{priorityHeadline}</p>
+            <div className="flex flex-col gap-3 sm:flex-row lg:items-stretch">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                <Button
+                  className="h-10 rounded-xl bg-cyan-500 text-xs font-semibold text-white hover:bg-cyan-600 dark:bg-cyan-400 dark:text-slate-950 dark:hover:bg-cyan-300"
+                  onClick={() => navigate("/companies")}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Yeni Firma Ekle
+                </Button>
+
+                <Button
+                  className="h-10 rounded-xl bg-orange-500 text-xs font-semibold text-white hover:bg-orange-600 dark:bg-orange-400 dark:text-slate-950 dark:hover:bg-orange-300"
+                  onClick={() => navigate("/risk-wizard")}
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Risk Raporu Oluştur
+                </Button>
+
+                <Button
+                  className="h-10 rounded-xl bg-slate-900/10 text-xs font-semibold text-slate-950 hover:bg-slate-900/15 dark:bg-white/15 dark:text-white dark:hover:bg-white/25"
+                  onClick={() => navigate("/osgb/field-visits")}
+                >
+                  <MapPin className="mr-2 h-4 w-4" />
+                  Firma Ziyareti Bildir
+                </Button>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Kritik Sonuçlar</p>
-                <p className="mt-3 text-3xl font-semibold text-white"><AnimatedNumber value={criticalRecentCount} disabled={reduceMotion} /></p>
-                <p className="mt-1 text-sm text-slate-300">Son denetimlerde kritik risk etiketi alan kayıtlar</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Operasyon Yorumu</p>
-                <p className="mt-3 text-sm font-medium leading-6 text-white">
-                  {operationalScore >= 80
-                    ? "Sistem dengeli görünüyor, standart takiple ilerlenebilir."
-                    : operationalScore >= 60
-                      ? "Panel kontrollü ama dikkat isteyen alanlar var."
-                      : "Yük baskısı yüksek, kritik akışlar ayrıştırılmalı."}
+
+              <div className="min-w-[190px] rounded-2xl border border-slate-300/80 bg-white/70 p-4 text-slate-950 shadow-sm backdrop-blur dark:border-white/20 dark:bg-white/10 dark:text-white">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-white/60">
+                  Mevcut Abonelik
+                </p>
+                <p className="mt-2 text-xl font-bold text-slate-950 dark:text-white">{planLabel}</p>
+                <p className="mt-1 text-xs text-slate-700 dark:text-white/70">
+                  Başlangıç, bitiş ve kullanım durumunu ayarlardan yönetebilirsiniz.
                 </p>
               </div>
             </div>
           </div>
+        </section>
 
-          <div className="flex flex-col justify-between gap-4">
-            <div className="rounded-[22px] border border-white/10 bg-black/20 p-4 backdrop-blur md:rounded-[24px] md:p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Canlı Durum</p>
-                  <p className="mt-2 text-3xl font-semibold text-white md:text-4xl">
-                    <AnimatedNumber value={operationalScore} disabled={reduceMotion} />
-                  </p>
-                </div>
-                <Button
-                  onClick={handleRefresh}
-                  disabled={refreshing}
-                  variant="outline"
-                  size="sm"
-                  className="gap-2 border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"
-                >
-                  <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-                  Yenile
-                </Button>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
+          {kpis.map((kpi) => (
+            <KpiCard key={kpi.title} {...kpi} />
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(360px,0.85fr)]">
+          <div className="space-y-5">
+            <DashboardCard className="p-4 sm:p-5">
+              <SectionHeader
+                eyebrow="Öncelik"
+                title="Bugün Ne Yapmalıyım?"
+                action={
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 text-xs text-cyan-700 hover:bg-cyan-500/10 hover:text-cyan-800 dark:text-cyan-200 dark:hover:text-cyan-100"
+                    onClick={() => loadDashboard(true)}
+                    disabled={refreshing}
+                  >
+                    <RefreshCw
+                      className={`mr-1.5 h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
+                    />
+                    Yenile
+                  </Button>
+                }
+              />
+
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                {priorityActions.map((action) => (
+                  <CompactAction key={action.title} {...action} />
+                ))}
               </div>
-              <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full bg-[linear-gradient(90deg,#22d3ee_0%,#3b82f6_45%,#8b5cf6_100%)]"
-                  style={{ width: `${operationalScore}%` }}
+            </DashboardCard>
+
+            <DashboardCard className="p-4 sm:p-5">
+              <SectionHeader eyebrow="Uyum" title="Risk ve Uyum Özeti" />
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <RiskSummaryCard
+                  title="Kritik Uyarı"
+                  value={`${stats.criticalRiskPercent}%`}
+                  description="Kritik risk oranı ve geciken aksiyonları gözden geçirin."
+                  route="/inspections"
+                  tone="border-rose-300 bg-rose-50 hover:border-rose-400 dark:border-rose-400/30 dark:bg-rose-500/12 dark:hover:border-rose-300/60"
+                />
+
+                <RiskSummaryCard
+                  title="Orta Öncelik"
+                  value={formatNumber(stats.openFindings)}
+                  description="Açık bulgular ve takip bekleyen iyileştirmeler."
+                  route="/inspections"
+                  tone="border-amber-300 bg-amber-50 hover:border-amber-400 dark:border-amber-400/30 dark:bg-amber-500/12 dark:hover:border-amber-300/60"
+                />
+
+                <RiskSummaryCard
+                  title="Düşük Öncelik"
+                  value={formatNumber(Math.max(stats.activeCompanies - stats.openCapa, 0))}
+                  description="Kontrol altında görünen firma ve süreçler."
+                  route="/companies"
+                  tone="border-emerald-300 bg-emerald-50 hover:border-emerald-400 dark:border-emerald-400/30 dark:bg-emerald-500/12 dark:hover:border-emerald-300/60"
                 />
               </div>
-              <p className="mt-3 text-sm text-slate-300">
-                Skor; kritik risk oranı, geciken işlemler ve açık DÖF yoğunluğuna göre dinamik hesaplanır.
-              </p>
-            </div>
+            </DashboardCard>
 
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-2xl border border-emerald-400/10 bg-emerald-400/5 p-4 transition-transform duration-300 hover:-translate-y-0.5">
-                <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">Saha Akışı</p>
-                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={activeInspections} disabled={reduceMotion} /></p>
-                <p className="mt-1 text-sm text-slate-300">Aktif yürüyen denetim</p>
-              </div>
-              <div className="rounded-2xl border border-amber-400/10 bg-amber-400/5 p-4 transition-transform duration-300 hover:-translate-y-0.5">
-                <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Kapanış Baskısı</p>
-                <p className="mt-2 text-2xl font-semibold text-white"><AnimatedNumber value={openFindings + overdueActions} disabled={reduceMotion} /></p>
-                <p className="mt-1 text-sm text-slate-300">Açık bulgu + geciken işlem toplamı</p>
-              </div>
-            </div>
-          </div>
-        </div>
-        </section>
-      </RevealBlock>
-
-      <Tabs defaultValue="executive" className="space-y-6">
-        <RevealBlock delay={80} disabled={reduceMotion}>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Dashboard Akışı</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-white">Sade görünüm seçin</h2>
+              <SectionHeader eyebrow="Kısayollar" title="Hızlı İşlem Kartları" />
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+                {quickActions.map((action) => (
+                  <LargeActionCard key={action.title} {...action} />
+                ))}
+              </div>
             </div>
-            <TabsList className="h-auto rounded-2xl border border-white/10 bg-white/5 p-1 text-slate-300">
-              <TabsTrigger
-                value="executive"
-                className="rounded-xl px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-950"
-              >
-                Yönetici Özeti
-              </TabsTrigger>
-              <TabsTrigger
-                value="operations"
-                className="rounded-xl px-4 py-2 text-sm font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-950"
-              >
-                Operasyon Görünümü
-              </TabsTrigger>
-            </TabsList>
+
+            <div>
+              <SectionHeader eyebrow="OSGB" title="OSGB Yönetim Modülleri" />
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+                {osgbModules.map((action) => (
+                  <LargeActionCard key={action.title} {...action} />
+                ))}
+              </div>
+            </div>
           </div>
-        </RevealBlock>
 
-        <TabsContent value="executive" className="space-y-6">
-          <RevealBlock delay={100} disabled={reduceMotion}>
-            <section className="grid gap-3 md:grid-cols-3">
-              {priorityActions.map((action, index) => (
-                <div
-                  key={action.title}
-                  className={`rounded-2xl border p-4 shadow-[0_10px_30px_rgba(2,6,23,0.18)] transition-transform duration-300 hover:-translate-y-0.5 ${action.tone}`}
-                  style={{ animationDelay: `${index * 80}ms` }}
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{action.title}</p>
-                    <span className="h-2.5 w-2.5 rounded-full bg-current opacity-80 animate-pulse" />
-                  </div>
-                  <p className="mt-2 text-sm leading-6 opacity-90">{action.detail}</p>
-                </div>
-              ))}
-            </section>
-          </RevealBlock>
-
-          <RevealBlock delay={140} disabled={reduceMotion}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <div key={idx} className="glass-card space-y-3 border border-primary/10 p-5">
-                    <div className="flex items-center justify-between">
-                      <div className="h-3 w-24 animate-pulse rounded bg-slate-800" />
-                      <div className="h-10 w-10 animate-pulse rounded-lg bg-slate-800" />
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-8 w-16 animate-pulse rounded bg-slate-800" />
-                      <div className="h-3 w-28 animate-pulse rounded bg-slate-900" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                metrics.map((metric) => (
-                  <div
-                    key={metric.title}
-                    className="group relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.92),rgba(8,12,22,0.96))] p-5 transition-all hover:-translate-y-0.5 hover:border-cyan-400/20"
-                  >
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{metric.title}</p>
-                        <p className="text-sm text-slate-300">{metric.subtitle}</p>
-                      </div>
-                      <div className={`rounded-2xl bg-gradient-to-br p-3 text-white shadow-lg ${metric.color}`}>
-                        {metric.icon}
-                      </div>
-                    </div>
-                    <div className="mt-6 space-y-2">
-                      <p className="text-4xl font-semibold tracking-tight text-white">
-                        <AnimatedNumber value={metric.value} disabled={reduceMotion} />
-                      </p>
-                      <p className="text-sm text-slate-300">{metric.insight}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </RevealBlock>
-
-          <RevealBlock delay={180} disabled={reduceMotion}>
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-              <section className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-5">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Risk Hacmi</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    <AnimatedNumber value={totalRiskVolume} disabled={reduceMotion} />
+          <aside className="space-y-5">
+            <DashboardCard className="p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-700 dark:text-cyan-300/80">
+                    Durum
                   </p>
-                  <p className="mt-2 text-sm text-slate-300">Toplam sınıflandırılmış risk kaydı</p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                    Operasyon Nabzı
+                  </h2>
                 </div>
-                <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-5">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Baskın Seviye</p>
-                  <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
-                    {dominantRisk?.name ?? "Veri yok"}
+
+                {loading ? (
+                  <Badge className="bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                    Yükleniyor
+                  </Badge>
+                ) : (
+                  <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-200">
+                    Sistem hazır
+                  </Badge>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-slate-950/40">
+                  <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-300" />
+                  <p className="mt-2 text-xl font-bold text-slate-950 dark:text-white">
+                    {formatNumber(stats.overdueActions)}
                   </p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {dominantRisk ? `${dominantRisk.value} kayıt ile en yoğun alan` : "Risk dağılımı oluşmadı"}
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Geciken aksiyon</p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 dark:border-white/10 dark:bg-slate-950/40">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+                  <p className="mt-2 text-xl font-bold text-slate-950 dark:text-white">
+                    {formatNumber(stats.activeInspections)}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">Aktif denetim</p>
+                </div>
+              </div>
+            </DashboardCard>
+
+            <AnnouncementList />
+
+            <RecentActivityList inspections={stats.recentInspections} />
+
+            <DashboardCard className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-2xl bg-cyan-500/15 p-3 text-cyan-700 dark:text-cyan-100">
+                  <Megaphone className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-slate-950 dark:text-white">
+                    Chrome eklentisiyle hız kazanın
+                  </p>
+                  <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                    Firma aktarımı ve İSG-KATİP takibini tek yerden yönetin.
                   </p>
                 </div>
-                <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(14,18,31,0.96),rgba(10,14,24,0.98))] p-5">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Ritim Farkı</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">
-                    {momentumDelta > 0 ? "+" : ""}
-                    <AnimatedNumber value={Math.abs(momentumDelta)} disabled={reduceMotion} />
-                  </p>
-                  <p className="mt-2 text-sm text-slate-300">
-                    {momentumDelta === 0 ? "Son iki ay aynı ritimde" : momentumDelta > 0 ? "Son ay yukarı yönlü" : "Son ay aşağı yönlü"}
-                  </p>
-                </div>
-              </section>
+              </div>
 
-              <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(18,24,41,0.92))] p-6 md:p-7">
-                <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-400/10 blur-3xl" />
-                <div className="relative grid gap-6 lg:grid-cols-[0.44fr_0.56fr]">
-                  <div className="space-y-5">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Risk Özeti</p>
-                      <h3 className="mt-3 text-[1.8rem] font-semibold leading-[1.08] tracking-[-0.04em] text-white">
-                        Risk dağılımını tek panelde okuyun
-                      </h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-300">
-                        Yönetici özeti tarafında sadece karar verdiren ana görünüm bırakıldı.
-                      </p>
-                    </div>
-                    <div className="grid gap-3">
-                      {riskDistribution.slice(0, 4).map((item) => (
-                        <div key={item.name} className="rounded-2xl border border-white/8 bg-white/[0.04] p-4">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-white">{item.name}</p>
-                            <span className="text-sm text-slate-300">{item.value}</span>
-                          </div>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full"
-                              style={{
-                                width: `${totalRiskVolume > 0 ? (item.value / totalRiskVolume) * 100 : 0}%`,
-                                background: item.color,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                    <div className="rounded-[26px] border border-white/8 bg-black/20 p-4">
-                      <Suspense fallback={<div className="h-[320px] animate-pulse rounded-2xl bg-slate-900/70" />}>
-                        <RiskDistributionChart loading={loading} riskDistribution={riskDistribution} />
-                      </Suspense>
-                    </div>
-                </div>
-              </StorySurface>
-            </div>
-          </RevealBlock>
-        </TabsContent>
-
-        <TabsContent value="operations" className="space-y-6">
-          <RevealBlock delay={140} disabled={reduceMotion}>
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.02fr_0.98fr]">
-              <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(10,14,26,0.98),rgba(20,26,44,0.92))] p-6 md:p-7">
-                <div className="relative">
-                  <div className="mb-5 flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Saha Akışı</p>
-                      <h3 className="mt-3 text-[1.8rem] font-semibold leading-[1.08] tracking-[-0.04em] text-white">
-                        Son denetimler ve kritik etiketler
-                      </h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                        Son kayıtları, risk seviyesi ve durum etiketiyle birlikte hızlıca tarayın.
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
-                      {recentInspections.length} kayıt
-                    </Badge>
-                  </div>
-
-                  <div className="relative ml-2 space-y-3 border-l border-white/10 pl-5">
-                    {loading ? (
-                      Array.from({ length: 4 }).map((_, idx) => (
-                        <div key={idx} className="rounded-2xl border border-border/40 bg-secondary/30 p-4">
-                          <div className="mb-2 h-4 w-52 animate-pulse rounded bg-slate-800" />
-                          <div className="h-3 w-36 animate-pulse rounded bg-slate-900" />
-                        </div>
-                      ))
-                    ) : recentInspections.length > 0 ? (
-                      recentInspections.map((inspection, index) => (
-                        <div
-                          key={inspection.id}
-                          className="relative grid gap-4 rounded-2xl border border-white/8 bg-white/[0.03] p-4 transition-all hover:border-cyan-400/20 hover:bg-white/[0.05] md:grid-cols-[1fr_auto]"
-                        >
-                          <div className="absolute -left-[30px] top-6 flex h-4 w-4 items-center justify-center rounded-full border border-cyan-400/30 bg-slate-950">
-                            <div className={`h-2 w-2 rounded-full ${inspection.risk_level === "critical" ? "bg-red-400" : inspection.risk_level === "high" ? "bg-orange-400" : "bg-cyan-400"}`} />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-3">
-                              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">#{String(index + 1).padStart(2, "0")}</p>
-                              <p className="truncate text-sm font-medium text-white">
-                                {inspection.location_name || "İsimsiz Lokasyon"}
-                              </p>
-                            </div>
-                            <p className="mt-2 text-xs text-slate-400">
-                              {new Date(inspection.created_at).toLocaleDateString("tr-TR", {
-                                day: "numeric",
-                                month: "long",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-start gap-2 md:items-end">
-                            <div className="flex items-center gap-2 md:justify-end">
-                              <Badge variant="outline" className={`text-[10px] ${getRiskColor(inspection.risk_level)}`}>
-                                {getRiskLabel(inspection.risk_level)}
-                              </Badge>
-                              <Badge variant="outline" className={`text-[10px] ${getStatusColor(inspection.status)}`}>
-                                {getStatusLabel(inspection.status)}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-slate-500">Denetim akışındaki son kayıt</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="py-12 text-center">
-                        <AlertCircle className="mx-auto mb-3 h-12 w-12 text-muted-foreground opacity-30" />
-                        <p className="text-sm font-medium text-foreground">Henüz denetim bulunmuyor</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          İlk denetiminizi oluşturmak için "Denetimler" sayfasını ziyaret edin
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </StorySurface>
-
-              <section className="space-y-6">
-                <div className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(12,16,29,0.96),rgba(8,12,22,0.98))] p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Aylık Ritim</p>
-                      <h3 className="mt-3 text-[1.55rem] font-semibold leading-[1.08] tracking-[-0.035em] text-white">
-                        Grafik yerine kısa okuma
-                      </h3>
-                    </div>
-                    <Badge variant="outline" className="border-white/10 bg-white/5 text-slate-200">
-                      6 aylık görünüm
-                    </Badge>
-                  </div>
-                  <div className="mt-5 grid gap-3">
-                    {monthlyTrend.map((item) => (
-                      <div key={item.month} className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em] text-slate-400">{item.month}</p>
-                          <p className="mt-1 text-sm text-slate-300">Tamamlanan denetim</p>
-                        </div>
-                        <p className="text-2xl font-semibold text-white">{item.denetimler}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-5 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3">
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Yorum</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-200">
-                      {momentumDelta > 0
-                        ? "Denetim temposu toparlanıyor."
-                        : momentumDelta < 0
-                          ? "Ritim zayıflıyor, planlama gözden geçirilmeli."
-                          : "Ritim stabil ilerliyor."}
-                    </p>
-                  </div>
-                </div>
-
-                <StorySurface disabled={reduceMotion} className="rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,rgba(9,13,24,0.98),rgba(19,24,41,0.92))] p-6 md:p-7">
-                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-200/70">Bildirim Merkezi</p>
-                      <h3 className="mt-3 text-[1.8rem] font-semibold leading-[1.08] tracking-[-0.04em] text-white">
-                        Canlı bildirim akışı
-                      </h3>
-                      <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                        Operasyon akışını kesen uyarılar, hatırlatmalar ve işlem çağrıları burada toplanır.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-right">
-                      <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Kontrol modu</p>
-                      <p className="mt-2 text-sm font-medium text-white">Gerçek zamanlı bildirim akışı</p>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-white/8 bg-black/20">
-                    <NotificationWidget />
-                  </div>
-                </StorySurface>
-              </section>
-            </div>
-          </RevealBlock>
-        </TabsContent>
-      </Tabs>
+              <Button
+                className="mt-4 h-9 w-full rounded-xl bg-cyan-500 text-sm font-semibold text-white hover:bg-cyan-600 dark:bg-cyan-500 dark:text-slate-950 dark:hover:bg-cyan-400"
+                onClick={() => window.open(CHROME_STORE_URL, "_blank", "noopener,noreferrer")}
+              >
+                Eklentiyi Aç
+              </Button>
+            </DashboardCard>
+          </aside>
+        </div>
+      </div>
     </div>
   );
 }

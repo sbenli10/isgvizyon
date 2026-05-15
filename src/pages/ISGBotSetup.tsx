@@ -18,6 +18,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { ISGVIZYON_CHROME_EXTENSION_URL } from "@/lib/constants/extension";
 
 const extensionDownloadUrl = "/chrome-extension.zip";
 const isgKatipUrl = "https://isgkatip.csgb.gov.tr";
@@ -100,12 +101,16 @@ export default function ISGBotSetup() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex justify-center">
-            <Button size="lg" className="h-14 px-10 text-base" asChild>
-              <a href={extensionDownloadUrl} target="_blank" rel="noopener noreferrer">
-                <Chrome className="mr-3 h-5 w-5" />
-                Eklentiyi İndir
-              </a>
-            </Button>
+           <Button size="lg" className="h-14 px-10 text-base" asChild>
+            <a
+              href={ISGVIZYON_CHROME_EXTENSION_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Chrome className="mr-3 h-5 w-5" />
+              Eklentiyi Chrome’a Ekle
+            </a>
+          </Button>
           </div>
 
           <div className="rounded-2xl border bg-muted/50 p-5">

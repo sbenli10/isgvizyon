@@ -46,7 +46,7 @@ export function usePlanLimits() {
 
   const currentPlan = useMemo<SubscriptionPlan>(() => {
     if (status === "trial" && daysLeftInTrial > 0) {
-      return "osgb";
+      return plan;
     }
 
     return plan;

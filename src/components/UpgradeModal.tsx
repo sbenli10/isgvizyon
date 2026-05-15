@@ -453,6 +453,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
   const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
   const canPurchaseOsgb = hasOrganization && isOrganizationAdmin;
   const hasActivePremiumAccess = status === "trial" || plan === "premium" || plan === "osgb";
+  const premiumCheckoutDisabled = loadingAction !== null || !canPurchasePremium || hasActivePremiumAccess;
   const canStartTrialCta = canStartTrial && !hasActivePremiumAccess && canPurchasePremium;
 
   const freePlan = plans.find((entry) => entry.planCode === "free");
@@ -677,10 +678,16 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <Button
                         onClick={() => void handleCheckout("premium", "monthly")}
-                        disabled={loadingAction !== null || !canPurchasePremium}
+                        disabled={premiumCheckoutDisabled}
                         className="h-12 bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white hover:from-fuchsia-500 hover:to-cyan-400"
                       >
-                        {loadingAction === "checkout-premium-monthly" ? "Hazırlanıyor..." : "Premium’a geç"}
+                        {loadingAction === "checkout-premium-monthly"
+                          ? "Hazırlanıyor..."
+                          : plan === "osgb"
+                            ? "Premium OSGB’ye dahil"
+                            : plan === "premium" || status === "trial"
+                              ? "Premium erişim aktif"
+                              : "Premium’a geç"}
                       </Button>
 
                       {canStartTrialCta ? (

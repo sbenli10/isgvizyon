@@ -6,6 +6,7 @@ import ISGBotCommandCenter from "@/components/isg-bot/ISGBotCommandCenter";
 import AuditReadiness from "@/components/isg-bot/AuditReadiness";
 import ComplianceReport from "@/components/isg-bot/ComplianceReport";
 import RiskAnalyzer from "@/components/isg-bot/RiskAnalyzer";
+import { ISGVIZYON_CHROME_EXTENSION_URL } from "@/lib/constants/extension";
 import {
   Card,
   CardContent,
@@ -219,10 +220,16 @@ export default function ISGBot() {
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Kurulum Rehberi
                 </Button>
-                <Button onClick={handleDownloadExtension} className="bg-cyan-500 text-slate-950 hover:bg-cyan-400">
-                  <Chrome className="mr-2 h-4 w-4" />
-                  Eklentiyi İndir
-                </Button>
+                <Button size="lg" className="h-14 px-10 text-base" asChild>
+                <a
+                  href={ISGVIZYON_CHROME_EXTENSION_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Chrome className="mr-3 h-5 w-5" />
+                  Eklentiyi Chrome’a Ekle
+                </a>
+              </Button>
               </div>
             </div>
 
