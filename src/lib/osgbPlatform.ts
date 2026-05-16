@@ -1979,8 +1979,7 @@ export interface OsgbManagedCompanyRecord {
   contractStart: string | null;
   contractEnd: string | null;
   monthlyFee: number;
-  assignmentApprovalStatus: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned";
-  totalRequiredMinutes: number;
+  assignmentApprovalStatus?: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees" | null;  totalRequiredMinutes: number;
   totalAssignedMinutes: number;
   requiredMinutesByRole: Record<OsgbRole, number>;
   assignedMinutesByRole: Record<OsgbRole, number>;
@@ -2033,6 +2032,15 @@ export interface OsgbCompanyManagementInput {
   contractEnd?: string | null;
   monthlyFee?: number;
   assignmentMode?: string;
+   // ✅ EKLE: Atama Durumu (DB'ye yazacağız)
+  assignmentApprovalStatus?:
+    | "approved"
+    | "pending_personnel"
+    | "pending_workplace"
+    | "missing_contract"
+    | "planned"
+    | "zero_employees"
+    | null;
   visitFrequency?: string;
   notes?: string | null;
   managementSource?: "manual" | "import" | "isgkatip" | "extension";
@@ -2292,6 +2300,7 @@ export const upsertOsgbManagedCompany = async (
   const companyPayload = {
     org_id: organizationId,
     company_name: input.companyName,
+    branch_name: (input as any).branchName?.trim() || null, // ✅ yeni alan
     sgk_no: input.sgkNo?.trim() || `MANUAL-${Date.now()}`,
     tax_number: input.taxNumber?.trim() || null,
     employee_count: Math.max(0, Number(input.employeeCount || 0)),
@@ -2301,6 +2310,7 @@ export const upsertOsgbManagedCompany = async (
     email: input.email?.trim() || null,
     contact_name: input.contactName?.trim() || null,
     assignment_mode: input.assignmentMode || "automatic",
+    assignment_approval_status: input.assignmentApprovalStatus || null,
     visit_frequency: input.visitFrequency || "monthly_once",
     notes: input.notes?.trim() || null,
     is_osgb_managed: true,

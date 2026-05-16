@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,8 +23,32 @@ interface AuthContext {
   userId: string;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
+interface SyncSummary {
+  total: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+}
+
+interface SyncResult {
+  success: boolean;
+  operation: "inserted" | "updated" | "skipped";
+  company: Record<string, unknown>;
+}
+
+interface StatusError extends Error {
+  status?: number;
+}
+
+serve(async (req: Request) => {
+  const requestUrl = req.url;
+  const requestMethod = req.method;
+  
+  console.log(`[ISG-KATIP-SYNC] [REQUEST_START] Metot: ${requestMethod} | URL: ${requestUrl}`);
+
+  if (requestMethod === "OPTIONS") {
+    console.log("[ISG-KATIP-SYNC] [CORS_OPTIONS] OPTIONS isteği alındı, CORS başlıkları dönülüyor.");
     return new Response("ok", { headers: corsHeaders });
   }
 
@@ -33,71 +57,114 @@ serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
+    console.log("[ISG-KATIP-SYNC] [ENV_CHECK] Ortam değişkenleri başarıyla okundu.");
+
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    
+    // Yetkilendirme bağlamını doğrula ve logla
+    console.log("[ISG-KATIP-SYNC] [AUTH_INIT] Kullanıcı kimlik doğrulama adımı başlatılıyor...");
     const authContext = await requireAuthContext(req, supabaseUrl, anonKey, serviceClient);
-    const { action, data } = await req.json();
+    console.log(`[ISG-KATIP-SYNC] [AUTH_SUCCESS] Kullanıcı doğrulandı. UserID: ${authContext.userId} | OrgID: ${authContext.organizationId}`);
+
+    // Gelen JSON gövdesini oku
+    const body = await req.json();
+    const { action, data } = body;
+    console.log(`[ISG-KATIP-SYNC] [ACTION_RECEIVED] Tetiklenen Aksiyon: "${action}"`);
 
     let response;
     switch (action) {
       case "SYNC_COMPANY":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
         response = await syncCompany(serviceClient, authContext, data);
         break;
       case "BATCH_SYNC":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor. Firma adedi: " + (data?.companies?.length || 0));
         response = await batchSyncCompanies(serviceClient, authContext, data);
         break;
       case "GET_COMPANIES":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
         response = await getCompanies(serviceClient, authContext, data?.filters || {});
         break;
       case "PULL_REMOTE_AND_SYNC":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
         response = await pullRemoteAndSync(serviceClient, authContext, data || {});
         break;
+      case "GET_CHANGE_TRACKING":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
+        response = await getChangeTracking(serviceClient, authContext);
+        break;
       default:
+        console.error(`[ISG-KATIP-SYNC] [ROUTING_ERROR] Bilinmeyen aksiyon talebi: ${action}`);
         throw new Error(`Unknown action: ${action}`);
     }
 
+    console.log(`[ISG-KATIP-SYNC] [REQUEST_SUCCESS] Aksiyon "${action}" başarıyla tamamlandı. Yanıt gönderiliyor.`);
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as StatusError;
+    console.error(`[ISG-KATIP-SYNC] [CRITICAL_EXCEPTION] Hata Yakalandı! Mesaj: ${err.message} | HTTP Status: ${err?.status || 500}`);
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "Unknown error",
+        error: err.message || "Unknown error",
       }),
       {
-        status: error?.status || 500,
+        status: err?.status || 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
   }
 });
 
-async function requireAuthContext(req: Request, supabaseUrl: string, anonKey: string, serviceClient: any): Promise<AuthContext> {
+async function requireAuthContext(
+  req: Request, 
+  _supabaseUrl: string, 
+  _anonKey: string, 
+  serviceClient: SupabaseClient
+): Promise<AuthContext> {
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    const error: any = new Error("Yetkisiz istek.");
+  
+  // 401 hatasını yakalamak için başlığı detaylıca loglayalım
+  if (!authHeader) {
+    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] İstek başlığında (Headers) 'Authorization' alanı bulunamadı! İstemci token göndermiyor.");
+    const error = new Error("Yetkisiz istek. Authorization başlığı eksik.") as StatusError;
     error.status = 401;
     throw error;
   }
 
-  const userClient = createClient(supabaseUrl, anonKey, {
-    global: {
-      headers: {
-        Authorization: authHeader,
-      },
-    },
-  });
+  if (!authHeader.startsWith("Bearer ")) {
+    console.error(`[ISG-KATIP-SYNC] [AUTH_FAIL] Authorization başlığı 'Bearer ' ile başlamıyor! Gelen değer: "${authHeader.substring(0, 15)}..."`);
+    const error = new Error("Yetkisiz istek. Geçersiz token formatı.") as StatusError;
+    error.status = 401;
+    throw error;
+  }
+
+  console.log("[ISG-KATIP-SYNC] [AUTH_TOKEN_CHECK] Token başlığı mevcut. Supabase Auth doğrulaması başlatılıyor...");
+
+  const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!accessToken) {
+    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] Bearer token boÅŸ geldi.");
+    const error = new Error("Yetkisiz istek. Token boÅŸ.") as StatusError;
+    error.status = 401;
+    throw error;
+  }
 
   const {
     data: { user },
     error: authError,
-  } = await userClient.auth.getUser();
+  } = await serviceClient.auth.getUser(accessToken);
 
   if (authError || !user) {
-    const error: any = new Error("ISGVizyon oturumu doğrulanamadı.");
+    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] Supabase auth.getUser() başarısız oldu veya oturum geçersiz.", authError);
+    const error = new Error("ISGVizyon oturumu doğrulanamadı veya süresi doldu.") as StatusError;
     error.status = 401;
     throw error;
   }
+
+  console.log(`[ISG-KATIP-SYNC] [AUTH_USER_OK] Kullanıcı oturumu geçerli. UID: ${user.id}. Profil organizasyon verisi sorgulanıyor...`);
 
   const { data: profile, error: profileError } = await serviceClient
     .from("profiles")
@@ -105,7 +172,10 @@ async function requireAuthContext(req: Request, supabaseUrl: string, anonKey: st
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError) throw profileError;
+  if (profileError) {
+    console.error(`[ISG-KATIP-SYNC] [DB_ERROR] 'profiles' tablosundan organization_id okunurken hata oluştu:`, profileError);
+    throw profileError;
+  }
 
   const organizationId =
     profile?.organization_id ||
@@ -114,7 +184,8 @@ async function requireAuthContext(req: Request, supabaseUrl: string, anonKey: st
     null;
 
   if (!organizationId) {
-    const error: any = new Error("Kullanıcı için organization_id bulunamadı.");
+    console.error(`[ISG-KATIP-SYNC] [AUTH_FORBIDDEN] Kullanıcı sisteme giriş yaptı fakat herhangi bir organizasyon (organization_id) bağı bulunamadı!`);
+    const error = new Error("Kullanıcı için organization_id bulunamadı.") as StatusError;
     error.status = 403;
     throw error;
   }
@@ -221,7 +292,11 @@ function buildCompanyPayload(authContext: AuthContext, company: CompanyData) {
   };
 }
 
-async function findExistingCompany(supabase: any, authContext: AuthContext, payload: ReturnType<typeof buildCompanyPayload>) {
+async function findExistingCompany(
+  supabase: SupabaseClient, 
+  authContext: AuthContext, 
+  payload: ReturnType<typeof buildCompanyPayload>
+) {
   const bySgk = payload.sgk_no
     ? await supabase
         .from("isgkatip_companies")
@@ -265,7 +340,9 @@ function hasMeaningfulChange(existing: Record<string, unknown> | null, payload: 
   return keys.some((key) => (existing?.[key] ?? null) !== (payload[key] ?? null));
 }
 
-async function syncCompany(supabase: any, authContext: AuthContext, incoming: CompanyData) {
+async function syncCompany(supabase: SupabaseClient, authContext: AuthContext, incoming: CompanyData): Promise<SyncResult> {
+  console.log(`[ISG-KATIP-SYNC] [syncCompany] Eşleştirme başlatıldı. SGK: ${incoming?.sgkNo || 'Eksik'} | Unvan: ${incoming?.companyName || 'Eksik'}`);
+  
   if (!incoming?.sgkNo || !incoming?.companyName) {
     throw new Error("sgkNo ve companyName zorunludur.");
   }
@@ -274,6 +351,7 @@ async function syncCompany(supabase: any, authContext: AuthContext, incoming: Co
   const existing = await findExistingCompany(supabase, authContext, payload);
 
   if (existing && !hasMeaningfulChange(existing, payload)) {
+    console.log(`[ISG-KATIP-SYNC] [syncCompany] Değişiklik yok, veritabanı yazma adımı atlanıyor (Skipped). SGK: ${payload.sgk_no}`);
     await logAudit(supabase, authContext, {
       action: "SYNC_COMPANY_SKIPPED",
       source: "ISGKATIP_EXTENSION",
@@ -292,6 +370,7 @@ async function syncCompany(supabase: any, authContext: AuthContext, incoming: Co
   }
 
   const upsertPayload = existing ? { ...payload, id: existing.id } : payload;
+  console.log(`[ISG-KATIP-SYNC] [syncCompany] Veritabanına yazılıyor (Upsert). İşlem Tipi: ${existing ? 'UPDATE' : 'INSERT'}`);
 
   const { data, error } = await supabase
     .from("isgkatip_companies")
@@ -302,9 +381,14 @@ async function syncCompany(supabase: any, authContext: AuthContext, incoming: Co
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error(`[ISG-KATIP-SYNC] [syncCompany] Tabloya yazılırken hata fırlatıldı:`, error);
+    throw error;
+  }
 
+  console.log(`[ISG-KATIP-SYNC] [syncCompany] Uyum (Compliance) kontrolleri tetikleniyor... ID: ${data.id}`);
   await runComplianceCheck(supabase, data);
+  
   await logAudit(supabase, authContext, {
     action: existing ? "SYNC_COMPANY_UPDATED" : "SYNC_COMPANY_CREATED",
     source: "ISGKATIP_EXTENSION",
@@ -323,14 +407,16 @@ async function syncCompany(supabase: any, authContext: AuthContext, incoming: Co
   };
 }
 
-async function batchSyncCompanies(supabase: any, authContext: AuthContext, data: any) {
+async function batchSyncCompanies(supabase: SupabaseClient, authContext: AuthContext, data: Record<string, unknown>) {
   const companies = Array.isArray(data?.companies) ? data.companies : [];
+  console.log(`[ISG-KATIP-SYNC] [batchSyncCompanies] Toplu senkronizasyon havuzu işleniyor. Toplam adet: ${companies.length}`);
+  
   if (!companies.length) {
     throw new Error("Aktarılacak firma listesi boş.");
   }
 
   const results = [];
-  const summary = {
+  const summary: SyncSummary = {
     total: companies.length,
     inserted: 0,
     updated: 0,
@@ -348,36 +434,44 @@ async function batchSyncCompanies(supabase: any, authContext: AuthContext, data:
         success: true,
       });
       summary[result.operation] += 1;
-    } catch (error: any) {
+    } catch (error) {
+      const err = error as Error;
+      console.error(`[ISG-KATIP-SYNC] [batchSyncCompanies] Firma döngüsünde hata! SGK: ${company?.sgkNo}`, err);
       results.push({
         sgkNo: company?.sgkNo || null,
         companyName: company?.companyName || null,
         success: false,
-        error: error.message || "Unknown sync error",
+        error: err.message || "Unknown sync error",
       });
       summary.errors += 1;
     }
   }
 
-  await supabase.from("isgkatip_sync_logs").insert({
+  console.log(`[ISG-KATIP-SYNC] [batchSyncCompanies] Döngü bitti. Özet: Toplam=${summary.total}, Eklenen=${summary.inserted}, Güncellenen=${summary.updated}, Atlanan=${summary.skipped}, Hatalı=${summary.errors}`);
+
+  const { error: logError } = await supabase.from("isgkatip_sync_logs").insert({
     org_id: authContext.organizationId,
     user_id: authContext.userId,
     action: "BATCH_SYNC",
-    source: data?.source || "ISGKATIP_EXTENSION",
+    source: (data?.source as string) || "ISGKATIP_EXTENSION",
     total_companies: summary.total,
     success_count: summary.inserted + summary.updated,
     error_count: summary.errors,
+    details: null,
     metadata: {
       inserted: summary.inserted,
       updated: summary.updated,
       skipped: summary.skipped,
-      previewSummary: data?.metadata?.previewSummary || null,
+      previewSummary: (data?.metadata as Record<string, unknown> | undefined)?.previewSummary || null,
     },
     status: summary.errors > 0 ? "PARTIAL" : "SUCCESS",
-    details: null,
     resource_type: "isgkatip_company_batch",
     resource_id: null,
   });
+
+  if (logError) {
+    console.error("[ISG-KATIP-SYNC] [batchSyncCompanies] 'isgkatip_sync_logs' tablosuna log atılırken hata oluştu:", logError);
+  }
 
   return {
     success: true,
@@ -386,7 +480,8 @@ async function batchSyncCompanies(supabase: any, authContext: AuthContext, data:
   };
 }
 
-async function getCompanies(supabase: any, authContext: AuthContext, filters: Record<string, unknown>) {
+async function getCompanies(supabase: SupabaseClient, authContext: AuthContext, filters: Record<string, unknown>) {
+  console.log("[ISG-KATIP-SYNC] [getCompanies] Firma listeleme filtresi:", filters);
   let query = supabase
     .from("isgkatip_companies")
     .select("*")
@@ -411,7 +506,135 @@ async function getCompanies(supabase: any, authContext: AuthContext, filters: Re
   };
 }
 
-async function runComplianceCheck(supabase: any, company: Record<string, unknown>) {
+function getComparableCompanyKey(row: Record<string, unknown>): string {
+  return String(row.sgk_no || row.id || "").trim();
+}
+
+function getComparableValue(row: Record<string, unknown>, key: string): string {
+  const value = row[key];
+  if (value === null || typeof value === "undefined" || value === "") return "-";
+  return String(value);
+}
+
+function compareCompanySnapshots(currentRows: Array<Record<string, unknown>>, backupRows: Array<Record<string, unknown>>) {
+  const previousByKey = new Map<string, Record<string, unknown>>();
+  const sortedBackups = [...backupRows].sort((first, second) => {
+    const firstTime = new Date(String(first.last_synced_at || first.updated_at || first.created_at || 0)).getTime();
+    const secondTime = new Date(String(second.last_synced_at || second.updated_at || second.created_at || 0)).getTime();
+    return secondTime - firstTime;
+  });
+
+  for (const row of sortedBackups) {
+    const key = getComparableCompanyKey(row);
+    if (key && !previousByKey.has(key)) previousByKey.set(key, row);
+  }
+
+  const currentByKey = new Map(
+    currentRows
+      .map((row) => [getComparableCompanyKey(row), row] as const)
+      .filter(([key]) => Boolean(key)),
+  );
+
+  const watchedFields = [
+    { key: "company_name", label: "Firma adı" },
+    { key: "employee_count", label: "Çalışan sayısı" },
+    { key: "hazard_class", label: "Tehlike sınıfı" },
+    { key: "contract_start", label: "Sözleşme başlangıcı" },
+    { key: "contract_end", label: "Sözleşme bitişi" },
+    { key: "assigned_minutes", label: "Atanan süre" },
+    { key: "required_minutes", label: "Gerekli süre" },
+    { key: "nace_code", label: "NACE kodu" },
+  ];
+
+  const changes = [];
+
+  for (const row of currentRows) {
+    const key = getComparableCompanyKey(row);
+    const previous = key ? previousByKey.get(key) : null;
+
+    if (!previous) {
+      changes.push({
+        id: String(row.id || key),
+        companyName: String(row.company_name || "Firma"),
+        type: "added",
+        summary: "Yeni firma eklendi",
+        details: [
+          `Çalışan: ${String(row.employee_count || 0)}`,
+          `Tehlike sınıfı: ${String(row.hazard_class || "-")}`,
+        ],
+      });
+      continue;
+    }
+
+    const details = watchedFields
+      .map((field) => {
+        const before = getComparableValue(previous, field.key);
+        const after = getComparableValue(row, field.key);
+        return before !== after ? `${field.label}: ${before} → ${after}` : null;
+      })
+      .filter(Boolean);
+
+    if (details.length > 0) {
+      changes.push({
+        id: String(row.id || key),
+        companyName: String(row.company_name || "Firma"),
+        type: "updated",
+        summary: `${details.length} alanda değişiklik var`,
+        details,
+      });
+    }
+  }
+
+  for (const [key, previous] of previousByKey.entries()) {
+    if (!currentByKey.has(key)) {
+      changes.push({
+        id: String(previous.id || key),
+        companyName: String(previous.company_name || "Firma"),
+        type: "removed",
+        summary: "Firma son senkronda aktif listede görünmüyor",
+        details: [
+          `SGK: ${String(previous.sgk_no || "-")}`,
+          `Son bilinen çalışan: ${String(previous.employee_count || 0)}`,
+        ],
+      });
+    }
+  }
+
+  return {
+    checkedAt: new Date().toISOString(),
+    hasBaseline: backupRows.length > 0,
+    changes,
+    currentCount: currentRows.length,
+    previousCount: previousByKey.size,
+  };
+}
+
+async function getChangeTracking(supabase: SupabaseClient, authContext: AuthContext) {
+  console.log("[ISG-KATIP-SYNC] [getChangeTracking] Değişiklik izleme kuyruğu tetiklendi.");
+  const { data: companies, error: companyError } = await supabase
+    .from("isgkatip_companies")
+    .select("id, company_name, sgk_no, last_synced_at, contract_start, contract_end, contract_status, risk_score, hazard_class, employee_count, nace_code, assigned_minutes, required_minutes")
+    .eq("org_id", authContext.organizationId)
+    .eq("is_deleted", false)
+    .order("company_name", { ascending: true });
+
+  if (companyError) throw companyError;
+
+  const { data: backups, error: backupError } = await supabase
+    .from("isgkatip_companies_backup")
+    .select("*")
+    .eq("org_id", authContext.organizationId);
+
+  if (backupError) throw backupError;
+
+  return {
+    success: true,
+    result: compareCompanySnapshots(companies || [], backups || []),
+    companies: companies || [],
+  };
+}
+
+async function runComplianceCheck(supabase: SupabaseClient, company: Record<string, unknown>) {
   const flags = [];
   const assigned = normalizeInteger(company.assigned_minutes, 0);
   const required = normalizeInteger(company.required_minutes, 0);
@@ -461,8 +684,10 @@ async function runComplianceCheck(supabase: any, company: Record<string, unknown
     });
   }
 
+  console.log(`[ISG-KATIP-SYNC] [runComplianceCheck] Saptanan Uyumsuzluk (Flag) adedi: ${flags.length}`);
+
   for (const flag of flags) {
-    await supabase.from("isgkatip_compliance_flags").upsert(
+    const { error: upsertError } = await supabase.from("isgkatip_compliance_flags").upsert(
       {
         org_id: String(company.org_id),
         company_id: String(company.id),
@@ -474,17 +699,24 @@ async function runComplianceCheck(supabase: any, company: Record<string, unknown
       },
       { onConflict: "company_id,rule_name,status", ignoreDuplicates: true },
     );
+    if (upsertError) {
+      console.error("[ISG-KATIP-SYNC] [runComplianceCheck] Compliance flag eklenirken hata:", upsertError);
+    }
   }
 }
 
-async function logAudit(supabase: any, authContext: AuthContext, logData: {
-  action: string;
-  source: string;
-  details: unknown;
-  status: string;
-  resourceId?: string | null;
-}) {
-  await supabase.from("isgkatip_sync_logs").insert({
+async function logAudit(
+  supabase: SupabaseClient, 
+  authContext: AuthContext, 
+  logData: {
+    action: string;
+    source: string;
+    details: unknown;
+    status: string;
+    resourceId?: string | null;
+  }
+) {
+  const { error } = await supabase.from("isgkatip_sync_logs").insert({
     org_id: authContext.organizationId,
     user_id: authContext.userId,
     action: logData.action,
@@ -498,6 +730,9 @@ async function logAudit(supabase: any, authContext: AuthContext, logData: {
     resource_type: "isgkatip_company",
     resource_id: logData.resourceId || null,
   });
+  if (error) {
+    console.error("[ISG-KATIP-SYNC] [logAudit] Denetim günlüğü yazılamadı:", error);
+  }
 }
 
 function getDaysUntil(dateString: string): number {
@@ -530,7 +765,8 @@ function normalizeRemoteCompany(row: Record<string, unknown>): CompanyData | nul
   };
 }
 
-async function pullRemoteAndSync(supabase: any, authContext: AuthContext, data: Record<string, unknown>) {
+async function pullRemoteAndSync(supabase: SupabaseClient, authContext: AuthContext, data: Record<string, unknown>) {
+  console.log("[ISG-KATIP-SYNC] [pullRemoteAndSync] Dış entegrasyon havuzu çekiliyor...");
   let query = supabase
     .from("osgb_external_integrations")
     .select("*")
@@ -564,7 +800,7 @@ async function pullRemoteAndSync(supabase: any, authContext: AuthContext, data: 
 
   return batchSyncCompanies(supabase, authContext, {
     companies: normalizedCompanies,
-    source: data?.source || integration.integration_name || "external_integration",
+    source: (data?.source as string) || (integration.integration_name as string) || "external_integration",
     metadata: {
       integrationId: integration.id,
     },
@@ -576,7 +812,9 @@ async function fetchRemoteCompanies(integration: Record<string, unknown>) {
   const apiPath = String(integration.api_path || "/companies");
   const url = `${baseUrl}${apiPath.startsWith("/") ? apiPath : `/${apiPath}`}`;
 
-  const headers: HeadersInit = { Accept: "application/json" };
+  console.log(`[ISG-KATIP-SYNC] [fetchRemoteCompanies] İstek atılan uç nokta (Endpoint): ${url}`);
+
+  const headers: Record<string, string> = { Accept: "application/json" };
   const authHeaderName = Deno.env.get("ISGKATIP_REMOTE_AUTH_HEADER") || "x-api-key";
   const apiKey = Deno.env.get("ISGKATIP_REMOTE_API_KEY");
   const bearerToken = Deno.env.get("ISGKATIP_REMOTE_BEARER");
@@ -586,6 +824,7 @@ async function fetchRemoteCompanies(integration: Record<string, unknown>) {
 
   const response = await fetch(url, { method: "GET", headers });
   if (!response.ok) {
+    console.error(`[ISG-KATIP-SYNC] [fetchRemoteCompanies] İstek başarısız oldu. Durum kodu: ${response.status}`);
     throw new Error(`Dış kaynak cevabı başarısız: ${response.status}`);
   }
 

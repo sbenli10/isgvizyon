@@ -21,6 +21,11 @@ import {
   Sparkles,
   TrendingUp,
   Users,
+  Bot,
+  RefreshCcw,
+  ChevronRight,
+  Play,
+  FileText
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +39,7 @@ import {
 import { getIsgkatipOrgScope } from "@/domain/isgkatip/isgkatipOrgScope";
 import { createOsgbTask } from "@/lib/osgbOperations";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
+import { downloadCsv } from "@/lib/csvExport";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -62,6 +68,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 type LayerMode = "expert" | "company" | "osgb";
 type Severity = "critical" | "high" | "medium";
@@ -175,9 +182,9 @@ type CompanyPlanItem = {
 };
 
 const severityBadgeClass: Record<Severity, string> = {
-  critical: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  high: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  medium: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  critical: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20",
+  high: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+  medium: "bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20",
 };
 
 const complianceLabels: Record<string, string> = {
@@ -191,11 +198,10 @@ const complianceLabels: Record<string, string> = {
 const ruleCatalog: Record<string, RuleMeta> = {
   DURATION_CHECK: {
     title: "Asgari hizmet süresi uyumsuzluğu",
-    legalReference:
-      "İşyeri hekimi ve iş güvenliği uzmanı görevlendirme süreleri - 6331 sayılı Kanun ve ilgili yönetmelik",
+    legalReference: "İşyeri hekimi ve iş güvenliği uzmanı görevlendirme süreleri - 6331 sayılı Kanun ve ilgili yönetmelik",
     category: "Görevlendirme",
     defaultRoute: "/isg-bot?tab=compliance",
-    template: "Eksik süreyi kapatacak sözleşme revizyonu hazırlayın ve görevlendirme sürelerini güncelleyin.",
+    template: "Eksik süreyi kapatacak sözleşme revizyonu hazırlayın bitirerek süre atamalarını güncelleyin.",
   },
   CONTRACT_EXPIRED: {
     title: "Sözleşme süresi dolmuş veya bitişe yaklaşmış",
@@ -268,7 +274,7 @@ const calculatePriorityScore = (params: {
   employeeCount?: number;
   openFlagCount?: number;
 }) => {
-  const severityBase = { critical: 95, high: 78, medium: 55 }[params.severity];
+  const severityBase = { critical: 95, hıgh: 78, medium: 55 }[params.severity] || 60;
   const contractBoost =
     params.contractDays == null
       ? 0
@@ -309,7 +315,7 @@ export default function ISGBotCommandCenter() {
     void loadCommandData();
   }, [user?.id]);
 
- const osgbExpertOptions = useMemo(
+  const osgbExpertOptions = useMemo(
     () => [
       "ALL",
       ...Array.from(
@@ -337,8 +343,7 @@ export default function ISGBotCommandCenter() {
         await Promise.all([
           listIsgkatipCompanies({
             userId: user.id,
-            select:
-              "id, company_name, sgk_no, employee_count, hazard_class, assigned_minutes, required_minutes, compliance_status, risk_score, contract_end, contract_start, assigned_person_name, service_provider_name",
+            select: "id, company_name, sgk_no, employee_count, hazard_class, assigned_minutes, required_minutes, compliance_status, risk_score, contract_end, contract_start, assigned_person_name, service_provider_name",
           }),
           listIsgkatipComplianceFlags({
             userId: user.id,
@@ -392,6 +397,26 @@ export default function ISGBotCommandCenter() {
     }
   };
 
+  const handleExport = () => {
+    if (!companies.length) {
+      toast.error("Dışa aktarılacak veri yok");
+      return;
+    }
+    downloadCsv(
+      "isg-bot-portfoy-raporu.csv",
+      ["Firma Adı", "SGK Sicil No", "Çalışan Sayısı", "Tehlike Sınıfı", "Uyum Durumu", "Risk Skoru"],
+      companies.map((c) => [
+        c.company_name,
+        c.sgk_no || "",
+        c.employee_count,
+        c.hazard_class,
+        complianceLabels[c.compliance_status] || c.compliance_status,
+        c.risk_score ?? 0,
+      ])
+    );
+    toast.success("CSV raporu başarıyla indirildi.");
+  };
+
   const expertActions = useMemo<ActionItem[]>(() => {
     const actions: ActionItem[] = [];
 
@@ -415,19 +440,15 @@ export default function ISGBotCommandCenter() {
           companyName: company.company_name,
           title: ruleCatalog.DURATION_CHECK.title,
           detail: `${deficit} dakika/ay eksik. Mevcut: ${company.assigned_minutes}, gerekli: ${company.required_minutes}.`,
-          severity:
-            company.assigned_minutes < company.required_minutes * 0.5 ? "critical" : "high",
+          severity: company.assigned_minutes < company.required_minutes * 0.5 ? "critical" : "high",
           legalReference: ruleCatalog.DURATION_CHECK.legalReference,
           route: ruleCatalog.DURATION_CHECK.defaultRoute,
           deadline: format(addDays(new Date(), 7), "yyyy-MM-dd"),
-          assignedPerson:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
-          suggestedOwner:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          assignedPerson: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          suggestedOwner: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
           template: ruleCatalog.DURATION_CHECK.template,
           priorityScore: calculatePriorityScore({
-            severity:
-              company.assigned_minutes < company.required_minutes * 0.5 ? "critical" : "high",
+            severity: company.assigned_minutes < company.required_minutes * 0.5 ? "critical" : "high",
             riskScore: company.risk_score,
             employeeCount: company.employee_count,
             openFlagCount: companyFlags.length,
@@ -442,22 +463,14 @@ export default function ISGBotCommandCenter() {
           sourceType: "contract",
           companyId: company.id,
           companyName: company.company_name,
-          title:
-            contractDays < 0
-              ? "Sözleşme süresi dolmuş"
-              : "Sözleşme bitiş tarihi yaklaşıyor",
-          detail:
-            contractDays < 0
-              ? `Sözleşme ${Math.abs(contractDays)} gün önce sona ermiş.`
-              : `Sözleşme ${contractDays} gün içinde sona erecek.`,
+          title: contractDays < 0 ? "Sözleşme süresi dolmuş" : "Sözleşme bitiş tarihi yaklaşıyor",
+          detail: contractDays < 0 ? `Sözleşme ${Math.abs(contractDays)} gün önce sona ermiş.` : `Sözleşme ${contractDays} gün içinde sona erecek.`,
           severity,
           legalReference: ruleCatalog.CONTRACT_EXPIRED.legalReference,
           route: ruleCatalog.CONTRACT_EXPIRED.defaultRoute,
           deadline: format(addDays(new Date(), 3), "yyyy-MM-dd"),
-          assignedPerson:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
-          suggestedOwner:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          assignedPerson: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          suggestedOwner: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
           template: ruleCatalog.CONTRACT_EXPIRED.template,
           priorityScore: calculatePriorityScore({
             severity,
@@ -476,16 +489,13 @@ export default function ISGBotCommandCenter() {
           companyId: company.id,
           companyName: company.company_name,
           title: ruleCatalog.BOARD_REQUIRED.title,
-          detail:
-            "50+ çalışanlı firmada son 6 ay içinde kurul toplantısı kaydı bulunmuyor.",
+          detail: "50+ çalışanlı firmada son 6 ay içinde kurul toplantısı kaydı bulunmuyor.",
           severity: "high",
           legalReference: ruleCatalog.BOARD_REQUIRED.legalReference,
           route: ruleCatalog.BOARD_REQUIRED.defaultRoute,
           deadline: format(addDays(new Date(), 10), "yyyy-MM-dd"),
-          assignedPerson:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
-          suggestedOwner:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          assignedPerson: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          suggestedOwner: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
           template: ruleCatalog.BOARD_REQUIRED.template,
           priorityScore: calculatePriorityScore({
             severity: "high",
@@ -521,10 +531,8 @@ export default function ISGBotCommandCenter() {
             legalReference: meta.legalReference,
             route: meta.defaultRoute,
             deadline: format(addDays(new Date(), severity === "critical" ? 3 : 7), "yyyy-MM-dd"),
-            assignedPerson:
-              company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
-            suggestedOwner:
-              company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+            assignedPerson: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+            suggestedOwner: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
             template: meta.template,
             priorityScore: calculatePriorityScore({
               severity,
@@ -548,12 +556,9 @@ export default function ISGBotCommandCenter() {
           severity,
           legalReference: ruleCatalog.PREDICTIVE_ALERT.legalReference,
           route: ruleCatalog.PREDICTIVE_ALERT.defaultRoute,
-          deadline:
-            alert.predicted_date?.slice(0, 10) || format(addDays(new Date(), 14), "yyyy-MM-dd"),
-          assignedPerson:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
-          suggestedOwner:
-            company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          deadline: alert.predicted_date?.slice(0, 10) || format(addDays(new Date(), 14), "yyyy-MM-dd"),
+          assignedPerson: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
+          suggestedOwner: company.assigned_person_name || company.service_provider_name || "İSG Uzmanı",
           template: ruleCatalog.PREDICTIVE_ALERT.template,
           priorityScore: calculatePriorityScore({
             severity,
@@ -641,8 +646,7 @@ export default function ISGBotCommandCenter() {
         notes: "Asgari hizmet süresi açığını kapatacak revizyon kararını başlatın ve görevlendirme sürelerini güncelleyin.",
         severity: selectedCompany.assigned_minutes < selectedCompany.required_minutes * 0.5 ? "critical" : "high",
         priorityScore: calculatePriorityScore({
-          severity:
-            selectedCompany.assigned_minutes < selectedCompany.required_minutes * 0.5 ? "critical" : "high",
+          severity: selectedCompany.assigned_minutes < selectedCompany.required_minutes * 0.5 ? "critical" : "high",
           riskScore: selectedCompany.risk_score,
           employeeCount: selectedCompany.employee_count,
           openFlagCount: baseFlagCount,
@@ -708,8 +712,7 @@ export default function ISGBotCommandCenter() {
         dueRaw,
         status: flag.severity === "CRITICAL" ? "Öncelikli" : "Planlı",
         sourceType: "flag",
-        legalReference:
-          meta?.legalReference || "İlgili mevzuat yükümlülüğünü doğrulayın ve düzeltici faaliyet başlatın.",
+        legalReference: meta?.legalReference || "İlgili mevzuat yükümlülüğünü doğrulayın ve düzeltici faaliyet başlatın.",
         route: meta?.defaultRoute || "/isg-bot?tab=compliance",
         notes: flag.message,
         severity,
@@ -788,27 +791,19 @@ export default function ISGBotCommandCenter() {
     [companies]
   );
 
-  
-
   const filteredOsgbCompanies = useMemo(
     () =>
       companies.filter((company) => {
-        const owner =
-          company.assigned_person_name || company.service_provider_name || "Atanmamış";
-        const hazardMatches =
-          osgbHazardFilter === "ALL" || company.hazard_class === osgbHazardFilter;
-        const expertMatches =
-          osgbExpertFilter === "ALL" || owner === osgbExpertFilter;
+        const owner = company.assigned_person_name || company.service_provider_name || "Atanmamış";
+        const hazardMatches = osgbHazardFilter === "ALL" || company.hazard_class === osgbHazardFilter;
+        const expertMatches = osgbExpertFilter === "ALL" || owner === osgbExpertFilter;
         return hazardMatches && expertMatches;
       }),
     [companies, osgbExpertFilter, osgbHazardFilter]
   );
 
   const filteredRiskyPortfolio = useMemo(
-    () =>
-      [...filteredOsgbCompanies]
-        .sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0))
-        .slice(0, 6),
+    () => [...filteredOsgbCompanies].sort((a, b) => (b.risk_score || 0) - (a.risk_score || 0)).slice(0, 6),
     [filteredOsgbCompanies]
   );
 
@@ -819,8 +814,7 @@ export default function ISGBotCommandCenter() {
     >();
 
     filteredOsgbCompanies.forEach((company) => {
-      const owner =
-        company.assigned_person_name || company.service_provider_name || "Atanmamış";
+      const owner = company.assigned_person_name || company.service_provider_name || "Atanmamış";
       const current = grouped.get(owner) ?? {
         name: owner,
         companyCount: 0,
@@ -829,17 +823,12 @@ export default function ISGBotCommandCenter() {
       };
       current.companyCount += 1;
       current.employeeCount += company.employee_count || 0;
-      current.deficit += Math.max(
-        0,
-        (company.required_minutes || 0) - (company.assigned_minutes || 0)
-      );
+      current.deficit += Math.max(0, (company.required_minutes || 0) - (company.assigned_minutes || 0));
       grouped.set(owner, current);
     });
 
     return Array.from(grouped.values()).sort((a, b) =>
-      b.companyCount === a.companyCount
-        ? b.employeeCount - a.employeeCount
-        : b.companyCount - a.companyCount
+      b.companyCount === a.companyCount ? b.employeeCount - a.employeeCount : b.companyCount - a.companyCount
     );
   }, [filteredOsgbCompanies]);
 
@@ -847,8 +836,7 @@ export default function ISGBotCommandCenter() {
     if (!selectedOsgbExpert || selectedOsgbExpert === "ALL") return null;
 
     const expertCompanies = filteredOsgbCompanies.filter((company) => {
-      const owner =
-        company.assigned_person_name || company.service_provider_name || "Atanmamış";
+      const owner = company.assigned_person_name || company.service_provider_name || "Atanmamış";
       return owner === selectedOsgbExpert;
     });
 
@@ -857,15 +845,8 @@ export default function ISGBotCommandCenter() {
     return {
       name: selectedOsgbExpert,
       companyCount: expertCompanies.length,
-      employeeCount: expertCompanies.reduce(
-        (sum, company) => sum + (company.employee_count || 0),
-        0
-      ),
-      deficit: expertCompanies.reduce(
-        (sum, company) =>
-          sum + Math.max(0, (company.required_minutes || 0) - (company.assigned_minutes || 0)),
-        0
-      ),
+      employeeCount: expertCompanies.reduce((sum, company) => sum + (company.employee_count || 0), 0),
+      deficit: expertCompanies.reduce((sum, company) => sum + Math.max(0, (company.required_minutes || 0) - (company.assigned_minutes || 0)), 0),
       companies: expertCompanies
         .map((company) => ({
           id: company.id,
@@ -885,8 +866,7 @@ export default function ISGBotCommandCenter() {
       {
         id: "priority-action",
         title: "Bugün önce bunu yap",
-        description:
-          expertActions[0]?.title ?? "İlk senkron sonrası öncelikli iş burada görünecek.",
+        description: expertActions[0]?.title ?? "İlk senkron sonrası öncelikli iş burada görünecek.",
         actionLabel: expertActions[0] ? "Aksiyonu aç" : "Kurulum rehberine dön",
         onClick: () => {
           if (expertActions[0]) {
@@ -899,29 +879,21 @@ export default function ISGBotCommandCenter() {
       {
         id: "contracts",
         title: "Eksik sözleşmeleri kontrol et",
-        description:
-          upcomingContractCount > 0
-            ? `${upcomingContractCount} firma için sözleşme takibi bekliyor.`
-            : "Şu an yaklaşan sözleşme baskısı görünmüyor.",
+        description: upcomingContractCount > 0 ? `${upcomingContractCount} firma için sözleşme takibi bekliyor.` : "Şu an yaklaşan sözleşme baskısı görünmüyor.",
         actionLabel: "Sözleşme görünümüne git",
         onClick: () => navigate("/isg-bot?tab=readiness"),
       },
       {
         id: "readiness",
         title: "Denetime hazır olmayan firmaları aç",
-        description:
-          criticalFlagCount > 0
-            ? `${criticalFlagCount} kritik açık denetim hazırlığını etkiliyor.`
-            : "Denetim hazırlığı tarafında kritik açık görünmüyor.",
+        description: criticalFlagCount > 0 ? `${criticalFlagCount} kritik açık denetim hazırlığını etkiliyor.` : "Denetim hazırlığı tarafında kritik açık görünmüyor.",
         actionLabel: "Denetim hazırlığını aç",
         onClick: () => navigate("/isg-bot?tab=readiness"),
       },
       {
         id: "boards",
         title: "Kurul gereken firmalara git",
-        description: expertActions.some((action) => action.sourceType === "board")
-          ? "Kurul toplantısı gerektiren firmalar bulundu."
-          : "Şu an kurul açısından yeni bir baskı görünmüyor.",
+        description: expertActions.some((action) => action.sourceType === "board") ? "Kurul toplantısı gerektiren firmalar bulundu." : "Şu an kurul açısından yeni bir baskı görünmüyor.",
         actionLabel: "Kurul işlemlerine git",
         onClick: () => navigate("/board-meetings"),
       },
@@ -954,12 +926,7 @@ export default function ISGBotCommandCenter() {
       actionId: item.id,
       assignedPerson: item.owner,
       deadline: item.dueRaw,
-      priority:
-        item.severity === "critical"
-          ? "Kritik"
-          : item.severity === "high"
-          ? "Yüksek"
-          : "Orta",
+      priority: item.severity === "critical" ? "Kritik" : item.severity === "high" ? "Yüksek" : "Orta",
       notes: item.notes,
     });
   };
@@ -1107,7 +1074,7 @@ export default function ISGBotCommandCenter() {
       toast.error("Yonetici PDF ozeti olusturulamadi", {
         description: error.message,
       });
-    } finally {
+    } companions: {
       setExportingCompanyPdf(false);
     }
   };
@@ -1118,12 +1085,7 @@ export default function ISGBotCommandCenter() {
       actionId: action.id,
       assignedPerson: action.suggestedOwner,
       deadline: action.deadline,
-      priority:
-        action.severity === "critical"
-          ? "Kritik"
-          : action.severity === "high"
-          ? "Yüksek"
-          : "Orta",
+      priority: action.severity === "critical" ? "Kritik" : action.severity === "high" ? "Yüksek" : "Orta",
       notes: action.template,
     });
   };
@@ -1135,12 +1097,7 @@ export default function ISGBotCommandCenter() {
       companyName: companies[0]?.company_name ?? "Portföy geneli",
       title: template.title,
       detail: template.detail,
-      severity:
-        template.priority === "Kritik"
-          ? "critical"
-          : template.priority === "Yüksek"
-          ? "high"
-          : "medium",
+      severity: template.priority === "Kritik" ? "critical" : template.priority === "Yüksek" ? "high" : "medium",
       legalReference: template.legalReference,
       route: template.defaultRoute,
       deadline: format(addDays(new Date(), 7), "yyyy-MM-dd"),
@@ -1169,12 +1126,7 @@ export default function ISGBotCommandCenter() {
         description: `${selectedAction.companyName}\n\n${selectedAction.detail}\n\nMevzuat: ${selectedAction.legalReference}\n\nÖnerilen aksiyon: ${taskDraft.notes}`,
         assignedTo: taskDraft.assignedPerson,
         dueDate: taskDraft.deadline,
-        priority:
-          taskDraft.priority === "Kritik"
-            ? "critical"
-            : taskDraft.priority === "Yüksek"
-              ? "high"
-              : "medium",
+        priority: taskDraft.priority === "Kritik" ? "critical" : taskDraft.priority === "Yüksek" ? "high" : "medium",
         source: "bot",
       });
 
@@ -1205,11 +1157,11 @@ export default function ISGBotCommandCenter() {
 
   if (loading) {
     return (
-      <Card className="border-slate-800 bg-slate-950/60">
-        <CardContent className="flex min-h-[260px] items-center justify-center">
-          <div className="flex items-center gap-3 text-slate-300">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Bot komuta merkezi hazırlanıyor...</span>
+      <Card className="border-border/60 bg-card/60">
+        <CardContent className="flex min-h-[300px] items-center justify-center">
+          <div className="flex items-center gap-3 text-muted-foreground animate-pulse">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            <span className="font-medium text-sm">Bot komuta merkezi verileri analiz ediliyor...</span>
           </div>
         </CardContent>
       </Card>
@@ -1217,333 +1169,497 @@ export default function ISGBotCommandCenter() {
   }
 
   return (
-    <>
-      <Card className="border-cyan-500/20 bg-cyan-500/5">
-        <CardContent className="flex flex-col gap-2 p-4 text-sm text-cyan-950 dark:text-cyan-100">
-          <div className="font-semibold">ISGVizyon İSG Bot resmi kamu kurumu ürünü değildir.</div>
-          <p>Bu komuta merkezi, yalnızca kullanıcının kendi yetkili İSG-KATİP oturumunda gördüğü firma ve sözleşme verilerinden üretilen aksiyonları gösterir. Aktarım, kullanıcı onayı olmadan başlatılmaz.</p>
+    <div className="container mx-auto space-y-6 py-6 px-4">
+      {/* ÜST KAMU UYARI ALANI */}
+      <Card className="border-blue-500/20 bg-blue-50/50 dark:bg-blue-950/20 rounded-2xl shadow-none">
+        <CardContent className="flex flex-col gap-1 p-4 text-xs text-blue-800 dark:text-blue-300 font-medium">
+          <div className="font-bold flex items-center gap-1.5 text-sm mb-0.5">
+            <ShieldAlert className="h-4 w-4 text-blue-500" />
+            Resmi Bilgilendirme ve Oturum Güvenliği
+          </div>
+          <p>ISGVizyon İSG Bot resmi bir kamu kurumu ürünü değildir. Bu komuta merkezi, yalnızca kendi yetkili İSG-KATİP oturumunuzda izin verdiğiniz verilerden üretilen akıllı analizleri gösterir.</p>
         </CardContent>
       </Card>
 
-      <Card className="border-slate-800 bg-gradient-to-br from-slate-950 to-slate-900">
-        <CardHeader className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="space-y-2">
-              <CardTitle className="flex items-center gap-2 text-2xl">
-                <Sparkles className="h-6 w-6 text-cyan-400" />
-                Öneri ve Aksiyon Merkezi
-              </CardTitle>
-              <CardDescription className="max-w-3xl text-slate-400">
-                Aynı veriyi önce yapılacak işlere, sonra firma özetine ve ardından portföy görünümüne
-                çevirir. Teknik komutlardan önce iş diliyle yönlendirme üretir.
-              </CardDescription>
-            </div>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Firma</div><div className="mt-2 text-2xl font-semibold text-white">{companies.length}</div></CardContent></Card>
-              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Kritik açık</div><div className="mt-2 text-2xl font-semibold text-rose-300">{criticalFlagCount}</div></CardContent></Card>
-              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Yaklaşan iş</div><div className="mt-2 text-2xl font-semibold text-amber-300">{upcomingContractCount}</div></CardContent></Card>
-              <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-4"><div className="text-xs uppercase tracking-wide text-slate-500">Açık görev</div><div className="mt-2 text-2xl font-semibold text-cyan-300">{openTaskCount}</div></CardContent></Card>
-            </div>
+      {/* SAYFA BAŞLIK ALANI */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-6">
+        <div className="flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20">
+            <Bot className="h-7 w-7 stroke-[2]" />
           </div>
-        </CardHeader>
+          <div className="space-y-0.5">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground flex items-center gap-2">
+              ISG-Bot Durum Merkezi
+            </h1>
+            <p className="text-sm text-muted-foreground">Yapay zeka denetim havuzu, risk analiz yükümlülükleri ve mevzuat uyumu.</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => void loadCommandData()} className="h-10 rounded-xl font-semibold border-border/80 shadow-sm transition-all hover:bg-muted">
+          <RefreshCcw className="mr-2 h-4 w-4 text-muted-foreground" /> Paneli Yenile
+        </Button>
+      </div>
 
-        <CardContent>
-          <Tabs value={layer} onValueChange={(value) => setLayer(value as LayerMode)} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-1 gap-2 bg-transparent p-0 md:grid-cols-3 lg:w-[620px]">
-              <TabsTrigger value="expert" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
-                Uzman Akışı
+      {/* FERAH METRİK ÖZET KARTLARI */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <Card className="shadow-sm rounded-2xl border border-border/60 bg-card overflow-hidden">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-muted-foreground tracking-wider uppercase">Takipteki Firma</span>
+              <p className="text-2xl font-extrabold text-foreground tracking-tight">{companies.length}</p>
+            </div>
+            <div className="p-2.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl">
+              <Building2 className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm rounded-2xl border border-border/60 bg-card overflow-hidden">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-muted-foreground tracking-wider uppercase">Kritik Mevzuat Açığı</span>
+              <p className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">{criticalFlagCount}</p>
+            </div>
+            <div className="p-2.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-xl">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm rounded-2xl border border-border/60 bg-card overflow-hidden">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-muted-foreground tracking-wider uppercase">Yaklaşan Sözleşme</span>
+              <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-400 tracking-tight">{upcomingContractCount}</p>
+            </div>
+            <div className="p-2.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-xl">
+              <CalendarClock className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm rounded-2xl border border-border/60 bg-card overflow-hidden">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-xs font-bold text-muted-foreground tracking-wider uppercase">Aktif Açık Görev</span>
+              <p className="text-2xl font-extrabold text-purple-600 dark:text-purple-400 tracking-tight">{openTaskCount}</p>
+            </div>
+            <div className="p-2.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl">
+              <ClipboardCheck className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ANA 3 SÜTUNLU DASHBOARD DÜZENİ */}
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+        
+        {/* SOL GRUP PANELİ */}
+        <div className="lg:col-span-2 space-y-6">
+          <Tabs value={layer} onValueChange={(value) => setLayer(value as LayerMode)} className="space-y-5">
+            <TabsList className="inline-flex w-auto p-1 bg-muted/60 backdrop-blur-sm rounded-xl border border-border/40">
+              <TabsTrigger value="expert" className="rounded-lg text-sm font-semibold px-4 py-1.5 transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                Uzman Akışı ve Bulgular
               </TabsTrigger>
-              <TabsTrigger value="company" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
-                Firma Özeti
+              <TabsTrigger value="company" className="rounded-lg text-sm font-semibold px-4 py-1.5 transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                Firma Karar Özeti
               </TabsTrigger>
-              <TabsTrigger value="osgb" className="border border-slate-800 bg-slate-900 text-slate-200 data-[state=active]:border-cyan-500/40 data-[state=active]:bg-cyan-500/10 data-[state=active]:text-cyan-100">
-                OSGB Görünümü
+              <TabsTrigger value="osgb" className="rounded-lg text-sm font-semibold px-4 py-1.5 transition-all data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+                OSGB Portföy Matrisi
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="expert" className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {prioritySuggestions.map((suggestion) => (
-                  <Card key={suggestion.id} className="border-slate-800 bg-slate-900/70">
-                    <CardContent className="p-5">
-                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-                        <Sparkles className="h-4 w-4 text-cyan-400" />
-                        {suggestion.title}
-                      </div>
-                      <p className="min-h-[60px] text-sm leading-6 text-slate-300">{suggestion.description}</p>
-                      <Button
-                        variant="outline"
-                        className="mt-4 w-full border-slate-700 text-slate-200 hover:bg-slate-800"
-                        onClick={suggestion.onClick}
-                      >
-                        {suggestion.actionLabel}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-4">
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-400">Kritik mevzuat açığı</p><p className="mt-2 text-3xl font-semibold text-white">{criticalFlagCount}</p></div><ShieldAlert className="h-8 w-8 text-rose-400" /></div></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-400">Üretilecek aksiyon</p><p className="mt-2 text-3xl font-semibold text-white">{expertActions.length}</p></div><ClipboardCheck className="h-8 w-8 text-cyan-400" /></div></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div><p className="text-sm text-slate-400">Ortalama öncelik skoru</p><p className="mt-2 text-3xl font-semibold text-white">{expertActions.length ? Math.round(expertActions.reduce((sum, action) => sum + action.priorityScore, 0) / expertActions.length) : 0}</p></div></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><div className="flex items-center justify-between"><div><p className="text-sm text-slate-400">Tahminsel uyarı</p><p className="mt-2 text-3xl font-semibold text-white">{alerts.length}</p></div><BellRing className="h-8 w-8 text-amber-400" /></div></CardContent></Card>
-              </div>
-
-              <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-                <Card className="border-slate-800 bg-slate-900/70">
-                  <CardHeader>
-                    <CardTitle>Öncelikli işler</CardTitle>
-                    <CardDescription>Bugün hangi işi öne almanız gerektiği burada sıralanır.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {expertActions.map((action) => (
-                      <div key={action.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className={severityBadgeClass[action.severity]}>{action.severity === "critical" ? "Kritik" : action.severity === "high" ? "Yüksek" : "Orta"}</Badge>
-                              <Badge variant="outline" className="border-slate-700 text-slate-300">{action.companyName}</Badge>
-                              <Badge variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-300">Skor {action.priorityScore}</Badge>
-                            </div>
-                            <h3 className="text-lg font-semibold text-white">{action.title}</h3>
-                            <p className="text-sm text-slate-300">{action.detail}</p>
-                            <p className="text-xs text-slate-500">Mevzuat dayanağı: {action.legalReference}</p>
-                            <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500"><span>Sorumlu: {action.suggestedOwner}</span><span>Termin: {formatDateLabel(action.deadline)}</span></div>
+            {/* TAB CONTENT: UZMAN AKIŞI */}
+            <TabsContent value="expert" className="space-y-5 mt-0 outline-none">
+              <Card className="rounded-2xl border border-border/60 shadow-sm overflow-hidden bg-card">
+                <CardHeader className="px-6 py-5 border-b border-border/40">
+                  <CardTitle className="text-lg font-bold text-foreground">Sistem Tarafından Sıralanan Öncelikli İşler</CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">Mevzuat açıkları ve uyumsuzluk skorlarına göre bugün öncelik verilmesi gereken başlıklar.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 space-y-4">
+                  {expertActions.length ? expertActions.map((action) => (
+                    <div key={action.id} className="rounded-xl border border-border/60 bg-muted/20 p-4 transition-all hover:bg-muted/40 group">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-1.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className={cn("font-bold text-xs rounded-md", severityBadgeClass[action.severity])}>
+                              {action.severity === "critical" ? "Kritik" : action.severity === "high" ? "Yüksek" : "Orta"}
+                            </Badge>
+                            <Badge variant="secondary" className="font-semibold text-xs text-foreground bg-secondary/80 rounded-md">{action.companyName}</Badge>
+                            <Badge variant="outline" className="font-bold text-xs border-purple-500/20 bg-purple-500/5 text-purple-700 dark:text-purple-300 rounded-md">Öncelik Skoru: {action.priorityScore}</Badge>
                           </div>
-                          <div className="flex flex-col gap-2 lg:w-[220px]">
-                            <Button onClick={() => openTaskDialog(action)} className="w-full">Görev ata</Button>
-                            <Button variant="outline" className="w-full border-slate-700 text-slate-200" onClick={() => navigate(action.route)}>İlgili modüle git<ArrowRight className="ml-2 h-4 w-4" /></Button>
-                          </div>
+                          <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors mt-1">{action.title}</h3>
+                          <p className="text-sm text-muted-foreground font-medium leading-relaxed">{action.detail}</p>
+                          <div className="text-xs text-muted-foreground/80 font-medium pt-1">Yasal Dayanak: <span className="italic">{action.legalReference}</span></div>
                         </div>
-                        <Progress value={action.priorityScore} className="mt-3 h-2" />
+                        <div className="flex flex-col gap-1.5 lg:w-[140px] shrink-0">
+                          <Button size="sm" onClick={() => openTaskDialog(action)} className="w-full rounded-lg font-semibold bg-primary hover:bg-primary/90 shadow-sm h-8 text-xs">Görev Tanımla</Button>
+                          <Button size="sm" variant="outline" onClick={() => navigate(action.route)} className="w-full rounded-lg font-medium border-border/80 h-8 text-xs text-muted-foreground hover:text-foreground">Modüle Git</Button>
+                        </div>
+                      </div>
+                      <Progress value={action.priorityScore} className="mt-3.5 h-1.5" />
+                    </div>
+                  )) : (
+                    <div className="p-8 text-center border border-dashed rounded-xl bg-muted/10 text-muted-foreground font-medium text-sm">Aktif veya taranan kritik bir açık bulunmuyor.</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+                <Card className="rounded-2xl border border-border/60 shadow-sm bg-card">
+                  <CardHeader><CardTitle className="text-base font-bold">En Çok Tekrar Eden Yükümlülükler</CardTitle></CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-3">
+                    {legislationCards.map((item) => (
+                      <div key={item.title} className="rounded-xl border border-border/50 bg-muted/10 p-3.5 space-y-1">
+                        <div className="flex items-center justify-between"><span className="text-xs font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">{item.category}</span><Badge variant="secondary" className="text-[10px] font-bold rounded px-1.5">{item.count} Kez</Badge></div>
+                        <h4 className="text-sm font-bold text-foreground tracking-tight mt-0.5">{item.title}</h4>
+                        <p className="text-xs text-muted-foreground font-medium leading-relaxed">{item.legalReference}</p>
                       </div>
                     ))}
                   </CardContent>
                 </Card>
 
-                <div className="space-y-6">
-                  <Card className="border-slate-800 bg-slate-900/70">
-                    <CardHeader>
-                      <CardTitle>En çok tekrar eden yükümlülükler</CardTitle>
-                      <CardDescription>Hangi başlıkların sık tekrar ettiğini sade şekilde görün.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {legislationCards.map((item) => (
-                        <div key={item.title} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="mb-2 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-white"><Gavel className="h-4 w-4 text-amber-400" />{item.title}</div>
-                            <Badge variant="outline" className="border-slate-700 text-slate-300">{item.count} kayıt</Badge>
-                          </div>
-                          <p className="text-xs uppercase tracking-wide text-slate-500">{item.category}</p>
-                          <p className="mt-2 text-sm text-slate-300">{item.legalReference}</p>
+                <Card className="rounded-2xl border border-border/60 shadow-sm bg-card">
+                  <CardHeader><CardTitle className="text-base font-bold">Sık Kullanılan İş Akış Şablonları</CardTitle></CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-3">
+                    {expertTemplates.map((template) => (
+                      <div key={template.id} className="rounded-xl border border-border/50 bg-muted/10 p-3.5 flex flex-col justify-between group">
+                        <div>
+                          <div className="flex items-center justify-between"><h4 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{template.title}</h4><Badge variant="outline" className="text-[10px] font-semibold rounded">{template.priority}</Badge></div>
+                          <p className="text-xs text-muted-foreground font-medium mt-1 leading-relaxed">{template.detail}</p>
                         </div>
-                      ))}
-                    </CardContent>
-                  </Card>
+                        <Button size="sm" variant="outline" className="mt-3 w-full border-border/80 font-semibold rounded-lg text-xs h-8" onClick={() => openTemplateDialog(template)}>Görevi Başlat</Button>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
 
-                  <Card className="border-slate-800 bg-slate-900/70">
-                    <CardHeader>
-                      <CardTitle>Hazır iş akışları</CardTitle>
-                      <CardDescription>Tekrarlanan işler için önceden hazırlanmış görev taslakları.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {expertTemplates.map((template) => (
-                        <div key={template.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h4 className="font-semibold text-white">{template.title}</h4>
-                              <p className="mt-1 text-sm text-slate-300">{template.detail}</p>
+            {/* TAB CONTENT: FİRMA ÖZETİ */}
+            <TabsContent value="company" className="space-y-5 mt-0 outline-none">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-muted/30 p-4 rounded-xl border">
+                <div className="w-full sm:w-[280px]">
+                  <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                    <SelectTrigger className="bg-background rounded-lg border-border/80"><SelectValue placeholder="Firma Seçiniz" /></SelectTrigger>
+                    <SelectContent className="rounded-lg">{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.company_name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <Button variant="outline" size="sm" className="h-9 rounded-lg font-semibold border-border/80 shrink-0" onClick={handleExportCompanySummary} disabled={!selectedCompany || exportingCompanyPdf}>
+                  {exportingCompanyPdf ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />} Yönetici Özet Raporu İndir
+                </Button>
+              </div>
+
+              {selectedCompany ? (
+                <div className="space-y-5">
+                  <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+                    <Card className="p-4 rounded-xl border border-border/50 bg-card"><span className="text-xs font-bold text-muted-foreground uppercase">Uyum Seviyesi</span><p className="text-lg font-bold text-foreground mt-1">{complianceLabels[selectedCompany.compliance_status] || "Bilinmiyor"}</p></Card>
+                    <Card className="p-4 rounded-xl border border-border/50 bg-card"><span className="text-xs font-bold text-muted-foreground uppercase">Mevcut Risk Skoru</span><p className="text-lg font-bold text-foreground mt-1">{selectedCompany.risk_score ?? 0}/100</p></Card>
+                    <Card className="p-4 rounded-xl border border-border/50 bg-card"><span className="text-xs font-bold text-muted-foreground uppercase">Aktif Flag</span><p className="text-lg font-bold text-foreground mt-1">{selectedCompanyFlags.length}</p></Card>
+                    <Card className="p-4 rounded-xl border border-border/50 bg-card"><span className="text-xs font-bold text-muted-foreground uppercase">Sözleşme Bitiş</span><p className="text-lg font-bold text-foreground mt-1">{formatDateLabel(selectedCompany.contract_end)}</p></Card>
+                  </div>
+
+                  <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+                    <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+                      <CardHeader><CardTitle className="text-base font-bold">Yönetici Görüş Notları</CardTitle></CardHeader>
+                      <CardContent className="p-5 pt-0 space-y-3 text-sm font-medium text-muted-foreground">
+                        {companyManagementSummary && (
+                          <>
+                            <div className="p-3.5 rounded-xl border bg-muted/10 space-y-1">
+                              <div className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase text-primary tracking-wide"><Building2 className="h-3.5 w-3.5" /> Genel Operasyon Uyumu</div>
+                              <p className="text-xs">Uyum durumu <strong>{companyManagementSummary.overallStatus}</strong> • Kritiklik düzeyi <strong>{companyManagementSummary.severityLevel}</strong></p>
+                              <p className="text-xs text-foreground/90 mt-1 leading-relaxed">{companyManagementSummary.keyMessage}</p>
                             </div>
-                            <Badge variant="outline" className="border-slate-700 text-slate-300">{template.priority}</Badge>
+                            <div className="p-3.5 rounded-xl border bg-muted/10 space-y-1">
+                              <div className="font-bold text-foreground flex items-center gap-1.5 text-xs uppercase text-amber-600 tracking-wide"><Briefcase className="h-3.5 w-3.5" /> Bütçe ve Kaynak Planı</div>
+                              <p className="text-xs leading-relaxed">{companyManagementSummary.budgetNote}</p>
+                              <p className="text-xs text-foreground/90 mt-1 leading-relaxed">{companyManagementSummary.contractNote}</p>
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+                      <CardHeader><CardTitle className="text-base font-bold">Mevcut Planlı Aksiyonlar</CardTitle></CardHeader>
+                      <CardContent className="p-5 pt-0 space-y-2.5">
+                        {companyMonthlyActionPlan.length === 0 ? (
+                          <div className="p-6 text-center text-xs font-semibold text-emerald-600 bg-emerald-500/5 rounded-xl border border-emerald-500/15">Bu ay için atanmış acil yönetim aksiyonu bulunmuyor.</div>
+                        ) : companyMonthlyActionPlan.map((item) => (
+                          <div key={item.id} className="p-3 rounded-xl border bg-muted/10 flex items-center justify-between gap-3 text-xs">
+                            <div className="space-y-0.5">
+                              <h4 className="font-bold text-foreground leading-snug">{item.title}</h4>
+                              <p className="text-muted-foreground font-medium">Sorumlu: {item.owner} • Termin: {item.due}</p>
+                            </div>
+                            <Button size="sm" variant="outline" className="text-[10px] h-7 px-2 font-bold shrink-0 border-border/80 rounded-lg" onClick={() => openCompanyPlanTaskDialog(item)}>Aç</Button>
                           </div>
-                          <Button variant="outline" className="mt-3 w-full border-slate-700 text-slate-200" onClick={() => openTemplateDialog(template)}>Şablonu kullan</Button>
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="company" className="space-y-6">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div><h3 className="text-lg font-semibold text-white">Firma karar özeti</h3><p className="text-sm text-slate-400">Teknik detay yerine yönetim için sade aksiyon özetleri gösterilir.</p></div>
-                <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:items-center">
-                  <div className="w-full lg:w-[360px]"><Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}><SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200"><SelectValue placeholder="Firma seçin" /></SelectTrigger><SelectContent>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.company_name}</SelectItem>)}</SelectContent></Select></div>
-                  <Button variant="outline" className="border-slate-700 text-slate-200" onClick={handleExportCompanySummary} disabled={!selectedCompany || exportingCompanyPdf}>
-                    {exportingCompanyPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    Yonetici PDF ozeti
-                  </Button>
-                </div>
-              </div>
-
-              {selectedCompany ? <>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Uyum durumu</p><p className="mt-2 text-2xl font-semibold text-white">{complianceLabels[selectedCompany.compliance_status] || "Bilinmiyor"}</p></CardContent></Card>
-                  <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Risk puanı</p><p className="mt-2 text-2xl font-semibold text-white">{selectedCompany.risk_score ?? 0}/100</p><Progress value={selectedCompany.risk_score ?? 0} className="mt-3 h-2" /></CardContent></Card>
-                  <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Açık uyumsuzluk</p><p className="mt-2 text-2xl font-semibold text-white">{selectedCompanyFlags.length}</p></CardContent></Card>
-                  <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Sözleşme bitişi</p><p className="mt-2 text-2xl font-semibold text-white">{formatDateLabel(selectedCompany.contract_end)}</p></CardContent></Card>
-                </div>
-
-                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div className="space-y-6">
-                    <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Yönetici özeti</CardTitle><CardDescription>Firma yetkilisi için teknik olmayan özet karar görünümü.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-300">{companyManagementSummary && <><div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><Building2 className="h-4 w-4 text-cyan-400" />Genel durum</div><p>Uyum durumu: <strong>{companyManagementSummary.overallStatus}</strong> • Risk seviyesi: <strong>{companyManagementSummary.severityLevel}</strong></p><p className="mt-2">{companyManagementSummary.keyMessage}</p></div><div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><Briefcase className="h-4 w-4 text-amber-400" />Yönetim notu</div><p>{companyManagementSummary.budgetNote}</p><p className="mt-2">{companyManagementSummary.contractNote}</p></div></>}</CardContent></Card>
-                    <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Kritik eksikler</CardTitle><CardDescription>Firma yöneticisinin teknik terminolojiye boğulmadan görebileceği öncelikli açıklar.</CardDescription></CardHeader><CardContent className="space-y-3">
-                      {selectedCompanyFlags.length === 0 && selectedCompanyAlerts.length === 0 && selectedCompany.assigned_minutes >= selectedCompany.required_minutes ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-200">Bu firma için şu an kritik açık görünmüyor. Periyodik izleme ve kurul takibi yeterli.</div> : <>
-                        {selectedCompany.assigned_minutes < selectedCompany.required_minutes && <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4"><p className="font-semibold text-white">Hizmet süresi yetersiz</p><p className="mt-1 text-sm text-slate-300">Atanan süre {selectedCompany.assigned_minutes} dk, gerekli süre {selectedCompany.required_minutes} dk.</p></div>}
-                        {selectedCompanyFlags.map((flag) => <div key={flag.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="flex items-center gap-2"><Badge variant="outline" className={flag.severity === "CRITICAL" ? severityBadgeClass.critical : severityBadgeClass.medium}>{flag.severity}</Badge><span className="font-medium text-white">{flag.rule_name}</span></div><p className="mt-2 text-sm text-slate-300">{flag.message}</p></div>)}
-                        {selectedCompanyAlerts.map((alert) => <div key={alert.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><p className="font-semibold text-white">Yaklaşan risk uyarısı</p><p className="mt-1 text-sm text-slate-300">{alert.message}</p></div>)}
-                      </>}
-                    </CardContent></Card>
-                  </div>
-
-                  <div className="space-y-6">
-                    <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Aylık aksiyon planı</CardTitle><CardDescription>Bu ay tamamlanması gereken yönetim ve operasyon aksiyonları.</CardDescription></CardHeader><CardContent className="space-y-3">{companyMonthlyActionPlan.length === 0 ? <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-sm text-emerald-200">Bu ay için planlanmış kritik aksiyon görünmüyor.</div> : companyMonthlyActionPlan.map((item) => <div key={item.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold text-white">{item.title}</h4><Badge variant="outline" className={severityBadgeClass[item.severity]}>{item.severity === "critical" ? "Kritik" : item.severity === "high" ? "Yuksek" : "Orta"}</Badge></div><p className="mt-1 text-sm text-slate-300">Sorumlu: {item.owner}</p><p className="text-sm text-slate-400">Termin: {item.due}</p></div><div className="flex flex-col items-end gap-2"><Badge variant="outline" className="border-slate-700 text-slate-300">{item.status}</Badge><Button size="sm" variant="outline" className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20" onClick={() => openCompanyPlanTaskDialog(item)}>Gorev olustur</Button></div></div></div>)}</CardContent></Card>
-                    <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Yaklaşan işler ve yönetim aksiyonu</CardTitle><CardDescription>Yönetim tarafında gecikmeden alınması gereken kararlar.</CardDescription></CardHeader><CardContent className="space-y-4 text-sm text-slate-300">
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><CalendarClock className="h-4 w-4 text-cyan-400" />Yaklaşan iş</div><p>Sözleşme bitiş tarihi: <strong>{formatDateLabel(selectedCompany.contract_end)}</strong></p><p className="mt-1">Son kurul kaydı: <strong>{selectedCompanyMeetings[0] ? formatDateLabel(selectedCompanyMeetings[0].meeting_date) : "Kayıt bulunmuyor"}</strong></p></div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="mb-2 flex items-center gap-2 font-semibold text-white"><Building2 className="h-4 w-4 text-amber-400" />Yönetim aksiyonu</div><p>Öncelik, süre eksiği ve açık kritik uyumsuzlukları kapatmak. Karar mekanizması olarak kurul gündemi veya ek uzman süresi planlaması önerilir.</p></div>
-                      <div className="flex gap-2"><Button className="flex-1" onClick={() => navigate("/isg-bot?tab=readiness")}>Denetim özetine git</Button><Button variant="outline" className="flex-1 border-slate-700 text-slate-200" onClick={() => navigate("/board-meetings")}>Kurul işlemleri</Button></div>
-                    </CardContent></Card>
+                        ))}
+                      </CardContent>
+                    </Card>
                   </div>
                 </div>
-              </> : <div className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-slate-400">Firma verisi bulunmuyor. Önce İSG-KATİP senkronizasyonu yapın.</div>}
+              ) : (
+                <div className="p-8 text-center border rounded-xl font-medium text-sm text-muted-foreground">Lütfen yukarıdaki menüden özetini incelemek istediğiniz firmayı seçin.</div>
+              )}
             </TabsContent>
 
-            <TabsContent value="osgb" className="space-y-6">
-              <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white"><SlidersHorizontal className="h-4 w-4 text-cyan-400" />Tehlike sinifi filtresi</div>
+            {/* TAB CONTENT: OSGB GÖRÜNÜMÜ */}
+            <TabsContent value="osgb" className="space-y-5 mt-0 outline-none">
+              <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
+                <div className="p-3 bg-muted/20 border rounded-xl">
+                  <span className="text-xs font-bold text-muted-foreground block mb-1.5 uppercase">Tehlike Sınıfı</span>
                   <Select value={osgbHazardFilter} onValueChange={setOsgbHazardFilter}>
-                    <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>{osgbHazardOptions.map((option) => <SelectItem key={option} value={option}>{option === "ALL" ? "Tum siniflar" : option}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-9 bg-background border-border/80 rounded-lg"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-lg">{osgbHazardOptions.map((opt) => <SelectItem key={opt} value={opt}>{opt === "ALL" ? "Tüm Sınıflar" : opt}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white"><Users className="h-4 w-4 text-amber-400" />Uzman filtresi</div>
+                <div className="p-3 bg-muted/20 border rounded-xl">
+                  <span className="text-xs font-bold text-muted-foreground block mb-1.5 uppercase">Sorumlu Uzman</span>
                   <Select value={osgbExpertFilter} onValueChange={setOsgbExpertFilter}>
-                    <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>{osgbExpertOptions.map((option) => <SelectItem key={option} value={option}>{option === "ALL" ? "Tum uzmanlar" : option}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-9 bg-background border-border/80 rounded-lg"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-lg">{osgbExpertOptions.map((opt) => <SelectItem key={opt} value={opt}>{opt === "ALL" ? "Tüm Uzmanlar" : opt}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-white"><Briefcase className="h-4 w-4 text-emerald-400" />Uzman drill-down</div>
+                <div className="p-3 bg-muted/20 border rounded-xl">
+                  <span className="text-xs font-bold text-muted-foreground block mb-1.5 uppercase">Uzman Detay Analizi</span>
                   <Select value={selectedOsgbExpert} onValueChange={setSelectedOsgbExpert}>
-                    <SelectTrigger className="border-slate-700 bg-slate-950 text-slate-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>{["ALL", ...filteredOsgbWorkload.map((item) => item.name)].map((option) => <SelectItem key={option} value={option}>{option === "ALL" ? "Detay secilmedi" : option}</SelectItem>)}</SelectContent>
+                    <SelectTrigger className="h-9 bg-background border-border/80 rounded-lg"><SelectValue /></SelectTrigger>
+                    <SelectContent className="rounded-lg">{["ALL", ...filteredOsgbWorkload.map((i) => i.name)].map((opt) => <SelectItem key={opt} value={opt}>{opt === "ALL" ? "Seçim Yapılmadı" : opt}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Riskli firma</p><p className="mt-2 text-3xl font-semibold text-white">{filteredOsgbCompanies.filter((company) => (company.risk_score ?? 0) >= 70).length}</p></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Açık uyumsuzluk</p><p className="mt-2 text-3xl font-semibold text-white">{flags.filter((flag) => filteredOsgbCompanies.some((company) => company.id === flag.company_id)).length}</p></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Yoğun uzman</p><p className="mt-2 text-lg font-semibold text-white">{filteredOsgbWorkload[0]?.name ?? "Veri yok"}</p></CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardContent className="p-5"><p className="text-sm text-slate-400">Toplam çalışan</p><p className="mt-2 text-3xl font-semibold text-white">{filteredOsgbCompanies.reduce((sum, company) => sum + (company.employee_count || 0), 0)}</p></CardContent></Card>
+              <div className="grid gap-5 grid-cols-1 md:grid-cols-2">
+                <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+                  <CardHeader><CardTitle className="text-base font-bold">Portföy Risk Dağılım Listesi</CardTitle></CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-2.5">
+                    {filteredRiskyPortfolio.map((company) => {
+                      const companyOpenFlags = flags.filter((f) => f.company_id === company.id).length;
+                      const deficit = Math.max(0, company.required_minutes - company.assigned_minutes);
+                      return (
+                        <div key={company.id} className="p-3 rounded-xl border bg-muted/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-xs">
+                          <div>
+                            <h4 className="font-bold text-foreground">{company.company_name}</h4>
+                            <p className="text-muted-foreground font-medium mt-0.5">Risk Skoru: {company.risk_score ?? 0} • {company.hazard_class} • {company.employee_count} Çalışan</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                            <Badge variant="outline" className="text-[10px] font-bold rounded bg-rose-500/5 text-rose-700 dark:text-rose-400 border-rose-500/10">{companyOpenFlags} Açık Flag</Badge>
+                            {deficit > 0 && <Badge variant="outline" className="text-[10px] font-bold rounded bg-amber-500/5 text-amber-700 dark:text-amber-400 border-amber-500/10">{deficit} Dk Eksik</Badge>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+                  <CardHeader><CardTitle className="text-base font-bold">Uzman Görev ve Yoğunluk Endeksi</CardTitle></CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-2">
+                    {filteredOsgbWorkload.map((item) => (
+                      <button type="button" key={item.name} className={cn("w-full rounded-xl border p-3 text-left transition-all text-xs flex items-center justify-between gap-4", selectedOsgbExpert === item.name ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-border/80 bg-muted/5 hover:bg-muted/20")} onClick={() => setSelectedOsgbExpert(item.name)}>
+                        <div>
+                          <p className="font-bold text-foreground">{item.name}</p>
+                          <p className="text-muted-foreground font-medium mt-0.5">{item.companyCount} Firma • {item.employeeCount} Atanmış Çalışan</p>
+                        </div>
+                        <div className="text-right shrink-0"><span className="text-[10px] font-bold text-muted-foreground uppercase block">Kapasite Açığı</span><span className="font-bold text-foreground text-sm">{item.deficit} Dk</span></div>
+                      </button>
+                    ))}
+                  </CardContent>
+                </Card>
               </div>
 
-              <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Portföy risk görünümü</CardTitle><CardDescription>Hangi firmada hangi açık var sorusuna hızlı yanıt veren üst düzey tablo.</CardDescription></CardHeader><CardContent className="space-y-3">{filteredRiskyPortfolio.map((company) => { const companyOpenFlags = flags.filter((flag) => flag.company_id === company.id).length; const deficit = Math.max(0, company.required_minutes - company.assigned_minutes); return <div key={company.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><h3 className="font-semibold text-white">{company.company_name}</h3><p className="mt-1 text-sm text-slate-400">Risk skoru {company.risk_score ?? 0} • {company.hazard_class} • {company.employee_count} çalışan</p></div><div className="flex flex-wrap items-center gap-2"><Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-300">{companyOpenFlags} açık flag</Badge>{deficit > 0 && <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300">{deficit} dk eksik</Badge>}<Badge variant="outline" className="border-slate-700 text-slate-300">{company.assigned_person_name || company.service_provider_name || "Atanmamış"}</Badge></div></div></div>; })}</CardContent></Card>
-                <Card className="border-slate-800 bg-slate-900/70"><CardHeader><CardTitle>Uzman yoğunluk matrisi</CardTitle><CardDescription>Hangi uzmanın üzerinde kaç firma ve kaç çalışan yoğunluğu olduğunu gösterir.</CardDescription></CardHeader><CardContent className="space-y-3">{filteredOsgbWorkload.map((item) => <button type="button" key={item.name} className={`w-full rounded-xl border p-4 text-left transition ${selectedOsgbExpert === item.name ? "border-cyan-500/40 bg-cyan-500/10" : "border-slate-800 bg-slate-950/70 hover:border-slate-700"}`} onClick={() => setSelectedOsgbExpert(item.name)}><div className="flex items-center justify-between"><div><p className="font-semibold text-white">{item.name}</p><p className="text-sm text-slate-400">{item.companyCount} firma • {item.employeeCount} çalışan</p></div><div className="text-right"><p className="text-sm text-slate-400">Süre açığı</p><p className="text-lg font-semibold text-white">{item.deficit} dk</p></div></div></button>)}</CardContent></Card>
-              </div>
-
-              {selectedOsgbExpertDetails ? (
-                <Card className="border-slate-800 bg-slate-900/70">
-                  <CardHeader>
-                    <CardTitle>{selectedOsgbExpertDetails.name} uzman drill-down</CardTitle>
-                    <CardDescription>Uzmanın sorumlu olduğu firmalar, açıklar ve risk dağılımı.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><p className="text-sm text-slate-400">Firma sayısı</p><p className="mt-2 text-2xl font-semibold text-white">{selectedOsgbExpertDetails.companyCount}</p></div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><p className="text-sm text-slate-400">Toplam çalışan</p><p className="mt-2 text-2xl font-semibold text-white">{selectedOsgbExpertDetails.employeeCount}</p></div>
-                      <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4"><p className="text-sm text-slate-400">Toplam süre açığı</p><p className="mt-2 text-2xl font-semibold text-white">{selectedOsgbExpertDetails.deficit} dk</p></div>
+              {selectedOsgbExpertDetails && (
+                <Card className="rounded-xl border border-border/60 shadow-sm bg-card">
+                  <CardHeader><CardTitle className="text-base font-bold">{selectedOsgbExpertDetails.name} Detaylı Atama Analizi</CardTitle></CardHeader>
+                  <CardContent className="p-5 pt-0 space-y-4">
+                    <div className="grid gap-3 grid-cols-3 text-center text-xs">
+                      <div className="p-2.5 rounded-xl border bg-muted/10"><span className="text-[10px] font-bold text-muted-foreground uppercase">Firma Sayısı</span><p className="text-lg font-bold text-foreground mt-0.5">{selectedOsgbExpertDetails.companyCount}</p></div>
+                      <div className="p-2.5 rounded-xl border bg-muted/10"><span className="text-[10px] font-bold text-muted-foreground uppercase">Çalışan Havuzu</span><p className="text-lg font-bold text-foreground mt-0.5">{selectedOsgbExpertDetails.employeeCount}</p></div>
+                      <div className="p-2.5 rounded-xl border bg-muted/10"><span className="text-[10px] font-bold text-muted-foreground uppercase">Toplam Süre Açığı</span><p className="text-lg font-bold text-foreground mt-0.5">{selectedOsgbExpertDetails.deficit} Dk</p></div>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       {selectedOsgbExpertDetails.companies.map((company) => (
-                        <div key={company.id} className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-                          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div>
-                              <h4 className="font-semibold text-white">{company.companyName}</h4>
-                              <p className="mt-1 text-sm text-slate-400">{company.hazardClass} • {company.employeeCount} çalışan • Risk skoru {company.riskScore}</p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-300">{company.openFlags} açık</Badge>
-                              {company.deficit > 0 ? <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-300">{company.deficit} dk eksik</Badge> : <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Süre dengeli</Badge>}
-                            </div>
+                        <div key={company.id} className="p-3 rounded-xl border bg-card flex items-center justify-between text-xs gap-3">
+                          <div>
+                            <h5 className="font-bold text-foreground">{company.companyName}</h5>
+                            <p className="text-muted-foreground font-medium mt-0.5">{company.hazardClass} • {company.employeeCount} Çalışan • Risk Skoru: {company.riskScore}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Badge variant="outline" className="text-[10px] font-medium rounded">{company.openFlags} Flag</Badge>
+                            {company.deficit > 0 ? <Badge variant="outline" className="text-[10px] font-bold text-amber-600 bg-amber-500/5 rounded border-amber-500/20">{company.deficit} Dk Eksik</Badge> : <Badge variant="outline" className="text-[10px] font-bold text-emerald-600 bg-emerald-500/5 rounded border-emerald-500/20">Dengeli</Badge>}
                           </div>
                         </div>
                       ))}
                     </div>
                   </CardContent>
                 </Card>
-              ) : null}
+              )}
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+        </div>
 
+        {/* SAĞ GRUP PANELİ: DİKEY OPERASYONEL RENKLİ REHBER & AKSİYON KARTLARI */}
+        <div className="space-y-5">
+          
+          {/* REHBER: TURUNCU SOFT DEGRADE TEMA */}
+          <Card className="rounded-2xl border border-orange-500/20 shadow-md bg-gradient-to-b from-orange-500/[0.03] to-transparent overflow-hidden">
+            <CardHeader className="pb-3 border-b border-orange-500/10 bg-orange-500/[0.02]">
+              <div className="flex items-center gap-2 text-sm font-bold text-orange-800 dark:text-orange-400">
+                <Sparkles className="h-4 w-4 text-orange-500 stroke-[2.5]" />
+                Akıllı Öneri ve Hızlı Eylemler
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2.5">
+              {prioritySuggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  onClick={suggestion.onClick}
+                  className="w-full p-3 text-left rounded-xl border border-orange-500/10 bg-card hover:bg-orange-500/[0.04] hover:border-orange-500/30 transition-all flex items-center justify-between group gap-4 shadow-sm"
+                >
+                  <div className="space-y-0.5">
+                    <div className="text-xs font-bold text-foreground group-hover:text-orange-600 dark:group-hover:text-orange-400 transition-colors">{suggestion.title}</div>
+                    <p className="text-[11px] text-muted-foreground font-medium leading-relaxed line-clamp-1">{suggestion.description}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-orange-500/60 group-hover:text-orange-600 transition-colors shrink-0 group-hover:translate-x-0.5 duration-200" />
+                </button>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* MOTOR: MAVİ SOFT DEGRADE TEMA */}
+          <Card className="rounded-2xl border border-blue-500/20 shadow-md bg-gradient-to-b from-blue-500/[0.03] to-transparent overflow-hidden">
+            <CardHeader className="pb-3 border-b border-blue-500/10 bg-blue-500/[0.02]">
+              <div className="flex items-center gap-2 text-sm font-bold text-blue-800 dark:text-blue-400">
+                <Bot className="h-4 w-4 text-blue-500 stroke-[2.5]" />
+                Denetim Motoru Durumu
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center justify-between p-3 bg-blue-500/[0.06] border border-blue-500/20 rounded-xl">
+                <div className="space-y-0.5">
+                  <span className="text-xs font-bold text-blue-900 dark:text-blue-300 block">AI Core Tarayıcı</span>
+                  <span className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">Veri analizi kararlı durumda</span>
+                </div>
+                <Badge className="bg-blue-600 text-white font-bold rounded px-2 py-0.5 text-[10px] tracking-wide shadow-none border-0">AKTiF</Badge>
+              </div>
+
+              <div className="space-y-1.5">
+                <Button 
+                  onClick={() => {
+                    toast.success("Denetim motoru tetiklendi", { description: "Tüm aktif portföy ve uyumsuzluk listeleri taranıyor." });
+                    void loadCommandData();
+                  }}
+                  className="w-full h-10 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-sm text-xs flex items-center justify-between px-4"
+                >
+                  <span className="flex items-center gap-2"><Play className="h-3.5 w-3.5 fill-white stroke-none" /> Anlık Denetim Başlat</span>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate("/osgb/batch-logs")}
+                  className="w-full h-10 rounded-xl font-semibold border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 text-xs text-left px-4 flex items-center justify-between"
+                >
+                  Sistem Log Defterini Aç
+                  <FileText className="h-3.5 w-3.5 text-blue-500/60" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* EXPORT: MOR SOFT DEGRADE TEMA */}
+          <Card className="rounded-2xl border border-purple-500/20 shadow-md bg-gradient-to-b from-purple-500/[0.03] to-transparent overflow-hidden">
+            <CardHeader className="pb-3 border-b border-purple-500/10 bg-purple-500/[0.02]">
+              <div className="flex items-center gap-2 text-sm font-bold text-purple-800 dark:text-purple-400">
+                <FileWarning className="h-4 w-4 text-purple-500 stroke-[2.5]" />
+                Analiz ve Rapor Çıktıları
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2">
+              <Button 
+                variant="outline"
+                onClick={handleExport}
+                className="w-full h-10 rounded-xl font-semibold border-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-50/50 dark:hover:bg-purple-950/20 text-xs px-4 flex items-center justify-between text-left"
+              >
+                <span>Genel Portföy CSV Çıktısı</span>
+                <Download className="h-3.5 w-3.5" />
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => navigate("/osgb/analytics")}
+                className="w-full h-10 rounded-xl font-semibold border-purple-500/20 text-purple-600 dark:text-purple-400 hover:bg-purple-50/50 dark:hover:bg-purple-950/20 text-xs px-4 flex items-center justify-between text-left"
+              >
+                <span>Gelişmiş Analitik Grafiklerini Aç</span>
+                <BarChart3 className="h-3.5 w-3.5" />
+              </Button>
+            </CardContent>
+          </Card>
+
+        </div>
+      </div>
+
+      {/* DIALOG: GÖREV ATAMA DETAYLARI */}
       <Dialog open={Boolean(selectedAction && taskDraft)} onOpenChange={(open) => { if (!open) { setSelectedAction(null); setTaskDraft(null); } }}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl rounded-2xl shadow-xl border">
           <DialogHeader>
-            <DialogTitle>Görev atama detayları</DialogTitle>
-            <DialogDescription>
-              Bot tarafından üretilen aksiyonu doğrudan görev kaydına dönüştürün.
+            <DialogTitle className="text-lg font-bold tracking-tight">Görev Atama Detayları</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              Bot tarafından üretilen mevzuat aksiyonunu doğrudan resmi iş görevine dönüştürün.
             </DialogDescription>
           </DialogHeader>
 
           {selectedAction && taskDraft && (
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+            <div className="space-y-4 py-2 my-1 border-y max-h-[60vh] overflow-y-auto px-1">
+              <div className="rounded-xl border bg-muted/20 p-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className={severityBadgeClass[selectedAction.severity]}>{selectedAction.severity === "critical" ? "Kritik" : selectedAction.severity === "high" ? "Yüksek" : "Orta"}</Badge>
-                  <Badge variant="outline">Skor {selectedAction.priorityScore}</Badge>
-                  <Badge variant="outline">{selectedAction.companyName}</Badge>
+                  <Badge variant="outline" className={cn("font-bold text-xs rounded", severityBadgeClass[selectedAction.severity])}>
+                    {selectedAction.severity === "critical" ? "Kritik" : selectedAction.severity === "high" ? "Yüksek" : "Orta"}
+                  </Badge>
+                  <Badge variant="secondary" className="font-semibold text-xs rounded">{selectedAction.companyName}</Badge>
+                  <Badge variant="outline" className="font-bold text-xs rounded border-purple-500/20 bg-purple-500/5 text-purple-700 dark:text-purple-300">Skor: {selectedAction.priorityScore}</Badge>
                 </div>
-                <h3 className="mt-3 text-lg font-semibold">{selectedAction.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{selectedAction.detail}</p>
-                <p className="mt-2 text-xs text-muted-foreground">Mevzuat: {selectedAction.legalReference}</p>
+                <h3 className="text-base font-bold text-foreground mt-2">{selectedAction.title}</h3>
+                <p className="text-sm text-muted-foreground font-medium leading-relaxed">{selectedAction.detail}</p>
+                <div className="text-xs text-muted-foreground font-medium">Mevzuat: <span className="italic">{selectedAction.legalReference}</span></div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Atanacak kişi</label>
-                  <Input value={taskDraft.assignedPerson} onChange={(e) => setTaskDraft({ ...taskDraft, assignedPerson: e.target.value })} />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Atanacak Sorumlu Personel</label>
+                  <Input value={taskDraft.assignedPerson} onChange={(e) => setTaskDraft({ ...taskDraft, assignedPerson: e.target.value })} className="rounded-lg h-9" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Termin tarihi</label>
-                  <Input type="date" value={taskDraft.deadline} onChange={(e) => setTaskDraft({ ...taskDraft, deadline: e.target.value })} />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Termin / Tamamlama Tarihi</label>
+                  <Input type="date" value={taskDraft.deadline} onChange={(e) => setTaskDraft({ ...taskDraft, deadline: e.target.value })} className="rounded-lg h-9" />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Öncelik</label>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Görev Öncelik Seviyesi</label>
                 <Select value={taskDraft.priority} onValueChange={(value) => setTaskDraft({ ...taskDraft, priority: value as TaskDraft["priority"] })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Kritik">Kritik</SelectItem>
-                    <SelectItem value="Yüksek">Yüksek</SelectItem>
-                    <SelectItem value="Orta">Orta</SelectItem>
+                  <SelectTrigger className="rounded-lg h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-lg">
+                    <SelectItem value="Kritik">Kritik Öncelikli</SelectItem>
+                    <SelectItem value="Yüksek">Yüksek Öncelikli</SelectItem>
+                    <SelectItem value="Orta">Orta Seviye</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Aksiyon şablonu / görev notu</label>
-                <Textarea value={taskDraft.notes} onChange={(e) => setTaskDraft({ ...taskDraft, notes: e.target.value })} className="min-h-[140px]" />
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Aksiyon Talimatı / Görev Notu</label>
+                <Textarea value={taskDraft.notes} onChange={(e) => setTaskDraft({ ...taskDraft, notes: e.target.value })} className="min-h-[110px] rounded-lg text-sm leading-relaxed" />
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setSelectedAction(null); setTaskDraft(null); }}>İptal</Button>
-            <Button onClick={() => void handleCreateTask()} disabled={Boolean(creatingTaskId)}>
-              {creatingTaskId ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Görevi oluştur
+          <DialogFooter className="pt-2">
+            <Button variant="outline" onClick={() => { setSelectedAction(null); setTaskDraft(null); }} className="rounded-lg h-9 text-xs">Vazgeç</Button>
+            <Button onClick={() => void handleCreateTask()} disabled={Boolean(creatingTaskId)} className="rounded-lg h-9 text-xs font-semibold bg-primary hover:bg-primary/90">
+              {creatingTaskId ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : null} Görevi Kaydet ve Ata
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
