@@ -1,229 +1,246 @@
+import React from "react";
 import {
-  AlertTriangle,
   ArrowRight,
-  CheckCircle2,
+  Bot,
+  ClipboardCheck,
+  FileCheck2,
   Sparkles,
-  TrendingUp,
   Workflow,
+  ShieldAlert,
+  Activity,
+  CheckCircle2,
+  Lock,
+  Cpu,
+  Terminal,
+  Network
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { landingHeroStats } from "@/lib/landingContent";
 
 type HeroSectionProps = {
-  onRequestDemo: () => void;
-  onInspectFeatures: () => void;
+  onRequestDemo: () => void; // LandingPage -> /auth
+  onInspectFeatures: () => void; // Özellikler kaydırma alanı
 };
-
-const floatingInsights = [
-  "AI Risk Analizi Aktif",
-  "Aksiyon Önerisi Oluşturuldu",
-  "Rapor Özeti Hazır",
-  "Yüksek Riskli Alan Tespit Edildi",
-];
 
 export function HeroSection({ onRequestDemo, onInspectFeatures }: HeroSectionProps) {
   return (
-    <section className="relative mx-auto grid min-h-[78vh] max-w-7xl gap-12 overflow-visible px-4 py-10 xl:grid-cols-[0.96fr_1.04fr] xl:items-center">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute left-[8%] top-[8%] h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[160px]" />
-        <div className="absolute bottom-[6%] right-[4%] h-[420px] w-[420px] rounded-full bg-blue-500/12 blur-[160px]" />
-        <div className="absolute inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(148,163,184,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.55)_1px,transparent_1px)] [background-size:120px_120px]" />
+    <section className="relative overflow-hidden bg-[#050B1A] pt-24 pb-16">
+      {/* Küresel Siber Işımalar ve Arka Plan Izgara Efekti */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-48 top-[-180px] h-[620px] w-[620px] rounded-full bg-blue-500/10 blur-[180px]" />
+        <div className="absolute right-[-280px] top-[10%] h-[750px] w-[750px] rounded-full bg-purple-500/8 blur-[200px]" />
+        <div className="absolute left-[30%] bottom-[10%] h-[500px] w-[500px] rounded-full bg-cyan-500/6 blur-[160px]" />
+        <div className="absolute inset-0 opacity-[0.025] [background-image:linear-gradient(rgba(148,163,184,0.6)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.6)_1px,transparent_1px)] [background-size:120px_120px]" />
       </div>
 
-      <div className="relative z-10 space-y-8">
-        <Badge className="inline-flex items-center rounded-full border border-cyan-400/25 bg-cyan-400/10 px-4 py-2 text-cyan-100 backdrop-blur">
-          <Sparkles className="mr-2 h-4 w-4 text-cyan-300" />
-          <span className="text-xs font-semibold tracking-[0.18em] uppercase">
-            AI Destekli İSG Platformu
-          </span>
-        </Badge>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
+        {/* ASİMETRİK İKİ SÜTUNLU YERLEŞİM */}
+        <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+          
+          {/* SOL SÜTUN: Başlık, Değer Önerisi ve Güvenlik Bilgileri */}
+          <div className="text-left space-y-6">
+            <Badge className="inline-flex items-center rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-1.5 text-cyan-200 backdrop-blur-md">
+              <Sparkles className="mr-2 h-3.5 w-3.5 text-cyan-400 animate-pulse" />
+              AI DESTEKLİ YENİ NESİL PLATFORMU
+            </Badge>
 
-        <div className="space-y-5">
-          <h1 className="text-5xl font-semibold leading-[0.98] tracking-[-0.065em] text-white md:text-7xl">
-            Riskleri Sadece
-            <br />
-            Kaydetmeyin,
-            <br />
-            <span className="bg-gradient-to-r from-[#22D3EE] via-[#60A5FA] to-[#93C5FD] bg-clip-text text-transparent">
-              Önceden Görün
-            </span>
-          </h1>
+            <h1 className="text-4xl font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl leading-[1.08]">
+              İş Güvenliğini
+              <br />
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                Kolaylaştırıyoruz
+              </span>
+            </h1>
 
-          <p className="max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
-            İSGVizyon, saha denetimleri, uygunsuzluklar, riskler ve aksiyon verilerini yapay zeka ile analiz ederek İSG süreçlerinizi daha görünür, ölçülebilir ve yönetilebilir hale getirir.
-          </p>
-        </div>
+            <p className="max-w-xl text-base leading-8 text-slate-300 sm:text-lg">
+              İSG Robot ve yapay zeka desteğiyle risk analizi, OSGB yönetimi ogları ve tüm dokümantasyon süreçlerinizi <span className="text-cyan-400 font-semibold">%80 daha hızlı</span> tamamlayın. Mevzuata tam uyumlu, akıllı çözüm ortağınız.
+            </p>
 
-        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
-          <Button
-            onClick={onRequestDemo}
-            className="h-14 rounded-2xl bg-gradient-to-r from-[#22D3EE] via-[#2563EB] to-[#5B7CFA] px-8 text-base font-semibold text-slate-950 shadow-[0_18px_60px_rgba(34,211,238,0.22)] transition-transform duration-200 hover:-translate-y-[1px] hover:from-cyan-200 hover:via-blue-400 hover:to-indigo-300"
-          >
-            Panele Git
-            <ArrowRight className="ml-2 h-5 w-5" />
-          </Button>
-
-          <Button
-            variant="outline"
-            onClick={onInspectFeatures}
-            className="h-14 rounded-2xl border-white/12 bg-white/[0.03] px-8 text-base font-semibold text-slate-100 backdrop-blur hover:bg-white/[0.06] hover:text-white"
-          >
-            Özellikleri İncele
-          </Button>
-        </div>
-
-        <div className="grid gap-2 pt-2 text-sm text-slate-400 sm:grid-cols-2">
-          {[
-            "Merkezi kayıt ve izlenebilir aksiyon takibi",
-            "Yapay zeka ile risk önceliklendirme",
-            "Yönetici raporlaması için görünür veri akışı",
-            "Kurumsal ekipler için rol bazlı operasyon modeli",
-          ].map((item) => (
-            <div key={item} className="flex items-start gap-2">
-              <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid gap-3 pt-2 sm:grid-cols-2 xl:grid-cols-4">
-          {landingHeroStats.map((item) => {
-            const Icon = item.icon;
-            return (
-              <div
-                key={item.label}
-                className="rounded-[22px] border border-[rgba(148,163,184,0.18)] bg-[rgba(15,23,42,0.72)] p-4 backdrop-blur-xl"
+            {/* Karar Butonları */}
+            <div className="flex flex-col gap-3 sm:flex-row pt-2">
+              <Button
+                onClick={onRequestDemo}
+                className="h-14 px-8 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-sm font-bold uppercase tracking-wider text-white shadow-[0_20px_50px_rgba(99,102,241,0.25)] hover:shadow-[0_25px_60px_rgba(99,102,241,0.35)] transition-all hover:-translate-y-0.5"
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs uppercase tracking-[0.16em] text-slate-400">{item.label}</span>
-                  <Icon className="h-4 w-4 text-cyan-300" />
+                Şimdi Başla
+                <ArrowRight className="ml-2 h-5 w-5 shrink-0" />
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={onInspectFeatures}
+                className="h-14 px-8 rounded-2xl border-white/10 bg-white/[0.02] text-sm font-bold uppercase tracking-wider text-slate-200 backdrop-blur-md hover:bg-white/[0.06] hover:text-white"
+              >
+                Giriş Yap
+              </Button>
+            </div>
+
+            {/* Güven Rozetleri */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-4 text-xs font-medium text-slate-400 border-t border-slate-900">
+              <div className="flex items-center gap-1.5">
+                <span className="text-amber-400 font-bold text-sm">4.9/5</span>
+                <span>Kullanıcı Memnuniyeti</span>
+              </div>
+              <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+              <div className="flex items-center gap-1.5">
+                <Lock className="h-3.5 w-3.5 text-cyan-400" />
+                <span>KVKK & ISO 27001 Güvencesi</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SAĞ SÜTUN: FÜTURİSTİK SİBER KAM PANELİ (YENİ GÖRSELİN BİREBİR YANSIMASI) */}
+          <div className="relative group">
+            {/* Panel Arkası Neon Dağılım Işığı */}
+            <div className="pointer-events-none absolute -inset-2 rounded-[32px] bg-gradient-to-tr from-cyan-500/20 via-purple-500/10 to-transparent blur-xl opacity-90 transition-opacity group-hover:opacity-100" />
+            
+            <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-b from-slate-950 via-slate-900/40 to-slate-950 p-5 shadow-[0_40px_100px_rgba(0,0,0,0.7)] backdrop-blur-2xl">
+              
+              {/* Üst Başlık Satırı */}
+              <div className="flex items-center justify-between pb-3.5 border-b border-slate-900 mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-red-500/40" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-amber-500/40" />
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/40 animate-pulse" />
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-2">
+                    <Cpu className="h-3.5 w-3.5 text-cyan-400 animate-spin [animation-duration:10s]" />
+                    <span className="text-[10px] font-mono tracking-widest text-slate-400 uppercase">
+                      ISG-AI-CEKIRDEGI_V2.0
+                    </span>
+                  </div>
                 </div>
-                <p className="mt-3 text-2xl font-semibold text-white">{item.value}</p>
-                <p className="mt-2 text-xs leading-6 text-slate-400">{item.hint}</p>
+                <Badge variant="outline" className="border-emerald-500/40 bg-emerald-500/10 text-[9px] tracking-[0.18em] text-emerald-400 rounded-md font-mono px-2.5 py-0.5 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                  YAPAY ZEKA ANALİZİ AKTİF
+                </Badge>
+              </div>
+
+              {/* GÖRSELDEKİ ULTRA-MODERN İKİLİ MONITOR SEKTÖRÜ */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                
+                {/* SOL PANEL: Dairesel Sinirsel Veri Matrisi Grafik Alanı (AI Radar Map) */}
+                <div className="rounded-xl border border-white/5 bg-[#060c18]/90 p-4 flex flex-col justify-between aspect-[4/3.2] relative overflow-hidden group/node">
+                  {/* Görseldeki Hafif Yeşil Kod/Grid Süzgeci */}
+                  <div className="absolute inset-0 opacity-[0.08] bg-[linear-gradient(rgba(16,185,129,0.3)_1px,transparent_1px),linear-gradient(90deg,rgba(16,185,129,0.3)_1px,transparent_1px)] [background-size:20px_20px]" />
+                  <div className="absolute inset-0 bg-radial-gradient from-emerald-500/10 via-transparent to-transparent opacity-60 pointer-events-none" />
+
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="flex items-center gap-1.5">
+                      <Network className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+                      <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">Sinirsel Ağ Haritası</span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono text-emerald-400 border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+                      <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />
+                      TARANIYOR
+                    </span>
+                  </div>
+
+                  {/* Görseldeki Fütüristik Dairesel / Katmanlı Yapay Zeka Grafiği */}
+                  <div className="my-auto relative flex items-center justify-center h-24">
+                    <svg className="absolute w-20 h-20 animate-[spin_20s_linear_infinite]" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="40" stroke="#10b981" strokeWidth="1" fill="none" strokeDasharray="5,15" className="opacity-30" />
+                      <circle cx="50" cy="50" r="30" stroke="#06b6d4" strokeWidth="1.5" fill="none" strokeDasharray="40,20" className="opacity-60" />
+                    </svg>
+                    <svg className="absolute w-14 h-14 animate-[spin_8s_linear_infinite_reverse]" viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="35" stroke="#a855f7" strokeWidth="2" fill="none" strokeDasharray="60,40" className="opacity-50" />
+                    </svg>
+                    <div className="relative z-10 flex flex-col items-center justify-center">
+                      <span className="text-xl font-black text-white tracking-tighter">84</span>
+                      <span className="text-[8px] uppercase tracking-widest text-emerald-400 font-mono font-bold">AI SKORU</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-[9px] text-slate-500 border-t border-slate-900/80 pt-2 relative z-10 font-mono">
+                    <span>Mekanik Risk Eğrisi</span>
+                    <span className="text-white font-semibold">Tolerans İçi</span>
+                  </div>
+                </div>
+
+                {/* SAĞ PANEL: Canlı Akış Terminal Alanı ve Sürekli Taranan Log Listesi */}
+                <div className="rounded-xl border border-white/5 bg-[#040811] p-3.5 flex flex-col justify-between border-l-emerald-500/20 relative overflow-hidden">
+                  {/* Görseldeki Aşağı Doğru Süzülen Tarama Çizgisi (Laser Scan Effect) */}
+                  <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-500/40 to-transparent top-0 animate-[scan_3s_ease-in-out_infinite] z-10 pointer-events-none" />
+
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-[10px] font-mono tracking-wider text-slate-400 uppercase">Karar Destek Günlüğü</span>
+                    </div>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  </div>
+                  
+                  {/* Şablon Modüllerle Entegre Canlı Türkçe Karar Blokları */}
+                  <div className="space-y-2 font-mono text-[9px] flex-1 flex flex-col justify-center">
+                    {[
+                      { baslik: "Kök Neden Doğrulaması", icerik: "ADEP / Acil durum tahliye izolasyon analizi yapıldı.", sinif: "border-emerald-500/20 bg-emerald-500/5 text-emerald-300" },
+                      { baslik: "Otomatic Matris Ataması", icerik: "Fine-Kinney üzerinde 24 yeni risk sınıflandırıldı.", sinif: "border-cyan-500/20 bg-cyan-500/5 text-cyan-300" }
+                    ].map((item, i) => (
+                      <div key={i} className={cn("p-2 rounded-lg border text-left leading-normal border-white/5 bg-slate-950/40", item.sinif)}>
+                        <span className="font-bold block text-[8px] uppercase tracking-wide opacity-80">{item.baslik}</span>
+                        <span className="mt-0.5 block opacity-90">{item.icerik}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Alt Gerçek Zamanlı Metrik Göstergeleri Satırı */}
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-900 pt-4">
+                <div className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex items-center justify-between group/stat hover:border-cyan-500/20 transition-colors">
+                  <div>
+                    <span className="text-[9px] text-slate-500 block font-mono uppercase tracking-wider">Tespit Edilen Tehlike</span>
+                    <span className="text-xl font-extrabold text-white tracking-tight group-hover/stat:text-cyan-400 transition-colors">24</span>
+                  </div>
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                    <ShieldAlert className="h-4 w-4 text-amber-500/80" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/5 bg-slate-950/40 p-3 flex items-center justify-between group/stat hover:border-emerald-500/20 transition-colors">
+                  <div>
+                    <span className="text-[9px] text-slate-500 block font-mono uppercase tracking-wider">Matris Kapsamı</span>
+                    <span className="text-xl font-extrabold text-emerald-400 tracking-tight">100%</span>
+                  </div>
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                    <Bot className="h-4 w-4 text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {/* YATAY GENİŞ İSTATİSTİK ŞERİDİ */}
+        <div className="mt-24 grid grid-cols-2 gap-4 md:grid-cols-4 border-t border-slate-900 pt-12">
+          {[
+            { value: "10.000+", label: "Hazır Risk Kütüphanesi", icon: ClipboardCheck },
+            { value: "2.500+", label: "Aktif İSG Profesyoneli", icon: Workflow },
+            { value: "50.000+", label: "Oluşturulan Akıllı Rapor", icon: FileCheck2 },
+            { value: "7/24", label: "Bulut Erişim & Yedekleme", icon: Activity }
+          ].map((stat, idx) => {
+            const StatIcon = stat.icon;
+            return (
+              <div key={idx} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-900 bg-slate-950/10 text-left group hover:border-slate-800 transition-colors">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 border border-white/5 text-cyan-400 shadow-sm group-hover:scale-105 transition-transform">
+                  <StatIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-white tracking-tight leading-none">
+                    {stat.value}
+                  </p>
+                  <p className="mt-1.5 text-xs text-slate-400 font-medium leading-none">
+                    {stat.label}
+                  </p>
+                </div>
               </div>
             );
           })}
         </div>
-      </div>
 
-      <div className="relative">
-        <div className="pointer-events-none absolute -inset-3 -z-10 rounded-[44px] bg-gradient-to-r from-cyan-500/24 via-blue-500/18 to-sky-500/24 blur-2xl" />
-
-        <div className="relative overflow-hidden rounded-[36px] border border-[rgba(148,163,184,0.18)] bg-[rgba(15,23,42,0.72)] p-3 shadow-[0_30px_110px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-          <div className="rounded-[30px] border border-white/8 bg-[#081224] p-6">
-            <div className="mb-8 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-                  Ürün
-                </p>
-                <h2 className="mt-3 text-2xl font-semibold text-white">
-                  İSGVizyon Risk Intelligence Paneli
-                </h2>
-                <p className="mt-2 text-sm text-slate-400">
-                  Saha verisini analiz eden, riskleri önceliklendiren ve yöneticilere karar desteği veren görünüm.
-                </p>
-              </div>
-              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
-                Canlı Panel
-              </span>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-[22px] border border-cyan-400/20 bg-cyan-400/10 p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-cyan-100/80">AI Risk Skoru</p>
-                <p className="mt-3 text-4xl font-semibold text-white">84/100</p>
-                <p className="mt-2 text-sm text-slate-300">Yapay zeka kritik alanları öncelikli takip listesine taşıdı.</p>
-              </div>
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.03] p-5">
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Tamamlanan Denetim</p>
-                <p className="mt-3 text-4xl font-semibold text-white">%92</p>
-                <p className="mt-2 text-sm text-slate-300">Operasyon görünürlüğü sayesinde saha denetimleri tek panelde takip ediliyor.</p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
-              <div className="space-y-4">
-                {[
-                  { label: "Kritik Uygunsuzluk", value: "17", tone: "warning" },
-                  { label: "Geciken Aksiyon", value: "9", tone: "warning" },
-                  { label: "Akıllı Öneri", value: "12", tone: "primary" },
-                ].map((row) => (
-                  <div
-                    key={row.label}
-                    className={`rounded-[20px] border p-4 ${
-                      row.tone === "warning"
-                        ? "border-amber-400/20 bg-amber-400/10"
-                        : "border-cyan-400/20 bg-cyan-400/10"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-slate-200">{row.label}</span>
-                      <span className="text-lg font-semibold text-white">{row.value}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,18,36,0.96),rgba(7,17,31,0.98))] p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white">Risk Trend Analizi</p>
-                  <TrendingUp className="h-4 w-4 text-cyan-300" />
-                </div>
-                <div className="mt-5 space-y-4">
-                  {[74, 82, 91, 88, 95].map((value, index) => (
-                    <div key={`${value}-${index}`} className="space-y-2">
-                      <div className="flex items-center justify-between text-xs text-slate-400">
-                        <span>Alan {index + 1}</span>
-                        <span>{value}</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-white/8">
-                        <div
-                          className="h-2 rounded-full bg-gradient-to-r from-cyan-400 via-blue-500 to-sky-400"
-                          style={{ width: `${value}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-5 rounded-[18px] border border-white/8 bg-white/[0.03] p-4">
-                  <div className="flex items-center gap-2 text-sm text-white">
-                    <Workflow className="h-4 w-4 text-cyan-300" />
-                    Akıllı Aksiyon Önerileri
-                  </div>
-                  <p className="mt-2 text-sm leading-7 text-slate-300">
-                    Tekrarlayan saha bulgularına göre bakım alanı, depo geçişleri ve enerji izolasyonu öncelikli aksiyon listesine alındı.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute -left-4 top-[10%] hidden w-44 rounded-[20px] border border-white/10 bg-[rgba(15,23,42,0.78)] px-4 py-3 text-sm text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:block">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-cyan-300" />
-            {floatingInsights[0]}
-          </div>
-        </div>
-        <div className="pointer-events-none absolute -right-6 top-[16%] hidden w-48 rounded-[20px] border border-white/10 bg-[rgba(15,23,42,0.78)] px-4 py-3 text-sm text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:block">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-            {floatingInsights[1]}
-          </div>
-        </div>
-        <div className="pointer-events-none absolute left-[8%] top-[78%] hidden w-44 rounded-[20px] border border-white/10 bg-[rgba(15,23,42,0.78)] px-4 py-3 text-sm text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:block">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4 text-cyan-300" />
-            {floatingInsights[2]}
-          </div>
-        </div>
-        <div className="pointer-events-none absolute right-[4%] top-[84%] hidden w-52 rounded-[20px] border border-white/10 bg-[rgba(15,23,42,0.78)] px-4 py-3 text-sm text-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl lg:block">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-[#FF9F1C]" />
-            {floatingInsights[3]}
-          </div>
-        </div>
       </div>
     </section>
   );
