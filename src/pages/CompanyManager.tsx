@@ -344,7 +344,7 @@ function createBulkCompanyClientId(
 }
 
 export default function CompanyManager() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const runtimeMode = useSafeMode();
@@ -441,6 +441,7 @@ export default function CompanyManager() {
   const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
   const [restoredWizardDraftLabel, setRestoredWizardDraftLabel] = useState<string | null>(null);
+  const organizationId = (profile as { organization_id?: string | null } | null | undefined)?.organization_id ?? null;
 
   const companyWizardDraftKey = useMemo(
     () => `company-manager:${user?.id || "guest"}:${editingCompanyId || "new"}`,
@@ -504,10 +505,12 @@ export default function CompanyManager() {
       loadRiskTemplates();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user?.id, organizationId]);
 
   useEffect(() => {
-    const next = new URLSearchParams(searchParams);
+    if (location.pathname !== "/companies") return;
+
+    const next = new URLSearchParams(location.search);
 
     if (searchQuery.trim()) {
       next.set("search", searchQuery.trim());
@@ -533,10 +536,11 @@ export default function CompanyManager() {
       next.delete("workspace");
     }
 
-    if (next.toString() !== searchParams.toString()) {
+    const currentSearch = location.search.startsWith("?") ? location.search.slice(1) : location.search;
+    if (next.toString() !== currentSearch) {
       setSearchParams(next, { replace: true });
     }
-  }, [companyViewMode, hazardFilter, searchParams, searchQuery, setSearchParams, workspaceMode]);
+  }, [companyViewMode, hazardFilter, location.pathname, location.search, searchQuery, setSearchParams, workspaceMode]);
 
   useEffect(() => {
     if (runtimeMode.safeMode) {
@@ -568,13 +572,20 @@ export default function CompanyManager() {
   const loadCompanies = async () => {
     try {
       setLoading(true);
-      
-      const { data, error } = await supabase
+
+      let query = (supabase as any)
         .from("companies")
         .select("*")
-        .eq("user_id", user?.id)
         .eq("is_active", true)
         .order("created_at", { ascending: false });
+
+      if (organizationId) {
+        query = query.eq("organization_id", organizationId);
+      } else {
+        query = query.eq("user_id", user?.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -603,7 +614,12 @@ export default function CompanyManager() {
       setCompanies(mappedData as Company[]);
       
     } catch (e: any) {
-      console.error("❌ Veri çekme hatası:", e.message);
+      console.error("❌ Firmalar yüklenemedi:", {
+        message: e?.message,
+        code: e?.code,
+        details: e?.details,
+        hint: e?.hint,
+      });
       toast.error(`Firmalar yüklenemedi: ${e.message}`);
     } finally {
       setLoading(false);
@@ -1123,10 +1139,19 @@ export default function CompanyManager() {
 
           if (error) throw error;
 
-          const result = data as { success: boolean; error?: string };
+          const result = data as { success: boolean; error?: string; company_id?: string };
           if (!result?.success) throw new Error(result?.error || "Kayıt başarısız");
 
           if (typeof result?.company_id === "string" && result.company_id) {
+            if (organizationId) {
+              const { error: orgUpdateError } = await (supabase as any)
+                .from("companies")
+                .update({ organization_id: organizationId })
+                .eq("id", result.company_id);
+
+              if (orgUpdateError) throw orgUpdateError;
+            }
+
             await ensureCompanyArchiveStructure(result.company_id);
           }
 
@@ -1215,6 +1240,7 @@ export default function CompanyManager() {
         address: formData.address,
         phone: formData.phone,
         email: formData.email,
+        ...(organizationId ? { organization_id: organizationId } : {}),
         ...(includeLogo ? { logo_url: formData.logo_url || null } : {}),
         employee_count: employeesJson.length || formData.employee_count,
         hazard_class: formData.hazard_class,
@@ -1363,6 +1389,7 @@ export default function CompanyManager() {
         const { error: extendedUpdateError } = await (supabase as any)
           .from("companies")
           .update({
+            ...(organizationId ? { organization_id: organizationId } : {}),
             hazard_class: formData.hazard_class,
             workplace_registration_number: formData.workplace_registration_number || null,
             sgk_workplace_number: formData.workplace_registration_number || null,

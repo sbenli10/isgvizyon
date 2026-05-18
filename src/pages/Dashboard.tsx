@@ -49,6 +49,13 @@ type RowsResult<T> = {
   rows: T[];
 };
 
+type SupabaseQueryError = {
+  message?: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+};
+
 type DashboardStats = {
   activeCompanies: number;
   employees: number;
@@ -151,12 +158,12 @@ async function safeCount(label: string, query: PromiseLike<{ count: number | nul
   try {
     const { count, error } = await query;
     if (error) {
-      console.warn(`[Dashboard] ${label} sayısı alınamadı:`, error.message);
+      logSupabaseDashboardError(`${label} sayısı alınamadı`, error);
       return { ok: false, count: 0 };
     }
     return { ok: true, count: count ?? 0 };
   } catch (error) {
-    console.warn(`[Dashboard] ${label} sayısı alınamadı:`, error);
+    logSupabaseDashboardError(`${label} sayısı alınamadı`, error);
     return { ok: false, count: 0 };
   }
 }
@@ -165,14 +172,24 @@ async function safeRows<T>(label: string, query: PromiseLike<{ data: T[] | null;
   try {
     const { data, error } = await query;
     if (error) {
-      console.warn(`[Dashboard] ${label} verisi alınamadı:`, error.message);
+      logSupabaseDashboardError(`${label} verisi alınamadı`, error);
       return { ok: false, rows: [] };
     }
     return { ok: true, rows: data ?? [] };
   } catch (error) {
-    console.warn(`[Dashboard] ${label} verisi alınamadı:`, error);
+    logSupabaseDashboardError(`${label} verisi alınamadı`, error);
     return { ok: false, rows: [] };
   }
+}
+
+function logSupabaseDashboardError(label: string, error: unknown) {
+  const supabaseError = error as SupabaseQueryError;
+  console.error(`[Dashboard] ${label}`, {
+    message: supabaseError?.message ?? String(error),
+    code: supabaseError?.code,
+    details: supabaseError?.details,
+    hint: supabaseError?.hint,
+  });
 }
 
 async function fetchCompanyIds(userId: string, orgId?: string | null) {
@@ -181,7 +198,7 @@ async function fetchCompanyIds(userId: string, orgId?: string | null) {
   if (orgId) {
     const byOrg = await safeRows<{ id: string }>(
       "kuruluş firmaları",
-      client.from("companies").select("id").eq("org_id", orgId).eq("is_active", true)
+      client.from("companies").select("id").eq("organization_id", orgId).eq("is_active", true)
     );
 
     if (byOrg.ok) {
