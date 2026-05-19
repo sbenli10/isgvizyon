@@ -10,6 +10,7 @@ import {
   type ADEPTeam,
   type ADEPTeamKey,
 } from "@/lib/adepPlanSchema";
+import { loadSavedEvacuationProjects } from "@/lib/evacuationProjectStorage";
 
 export const ADEP_OFFICIAL_TEMPLATE_PATH = "/templates/ACİL DURUM PLANI.docx";
 
@@ -189,6 +190,32 @@ const fillSimpleRows = (
   }
 };
 
+const fillSimpleRowsStrict = (
+  table: Element | undefined,
+  rows: Array<Array<string>>,
+  startRowIndex: number,
+  templateRowIndex: number,
+) => {
+  if (!table) return;
+
+  if (rows.length > 0) {
+    ensureRowCount(table, Math.max(startRowIndex + rows.length, templateRowIndex + 1), templateRowIndex);
+  }
+
+  let tableRows = getRows(table);
+  const desiredTotalRows = startRowIndex + rows.length;
+  while (tableRows.length > desiredTotalRows && tableRows.length > startRowIndex) {
+    const lastRow = tableRows[tableRows.length - 1];
+    lastRow.parentNode?.removeChild(lastRow);
+    tableRows = getRows(table);
+  }
+
+  rows.forEach((source, rowOffset) => {
+    const cells = getCells(tableRows[startRowIndex + rowOffset]);
+    source.forEach((value, cellIndex) => setCellText(cells[cellIndex], value));
+  });
+};
+
 const teamLabels: Record<ADEPTeamKey, string> = {
   sondurme: "Söndürme Elemanı",
   kurtarma: "Kurtarma Elemanı",
@@ -288,29 +315,42 @@ const fillMaterialInventory = (table: Element | undefined, planData: ADEPPlanDat
   fillSimpleRows(table, equipmentPairs.length ? equipmentPairs : [["", "", "", ""]], 1, 6);
 };
 
-const buildTeamRows = (team: ADEPTeam, fallbackArea: string) => {
-  const members = team.uyeler.filter((member) => member.ad_soyad.trim() || member.telefon.trim() || member.tc_no.trim());
-  const leader = team.ekip_baskani;
-  const assistant = members[0];
-  const remainingMembers = members.slice(1);
+const hasPersonValue = (person?: ADEPPerson | null) =>
+  Boolean(person?.ad_soyad?.trim() || person?.telefon?.trim() || person?.tc_no?.trim());
 
-  return [
-    [safeText(leader.ad_soyad, ""), "Ekip Bşk.", fallbackArea, safeText(leader.telefon, ""), ""],
-    [safeText(assistant?.ad_soyad, ""), "Ekip Bşk. Yard.", fallbackArea, safeText(assistant?.telefon, ""), ""],
-    ...remainingMembers.map((member) => [
-      safeText(member.ad_soyad, ""),
-      "Üye",
-      fallbackArea,
-      safeText(member.telefon, ""),
-      "",
-    ]),
-  ];
+const buildTeamRows = (team: ADEPTeam, fallbackArea: string) => {
+  const members = team.uyeler.filter((member) => hasPersonValue(member));
+  const leader = team.ekip_baskani;
+  const rows: Array<Array<string>> = [];
+
+  if (hasPersonValue(leader)) {
+    rows.push([safeText(leader.ad_soyad, ""), "Ekip Bşk.", fallbackArea, safeText(leader.telefon, ""), ""]);
+  }
+
+  members.forEach((member, memberIndex) => {
+    const duty = memberIndex === 0 && rows.length > 0 ? "Ekip Bşk. Yard." : "Üye";
+    rows.push([safeText(member.ad_soyad, ""), duty, fallbackArea, safeText(member.telefon, ""), ""]);
+  });
+
+  return rows;
 };
 
 const fillTeamTable = (table: Element | undefined, team: ADEPTeam, fallbackArea: string) => {
   if (!table) return;
   const rows = buildTeamRows(team, fallbackArea);
-  fillSimpleRows(table, rows.length ? rows : [["", "", "", "", ""]], 2, 5);
+  fillSimpleRowsStrict(table, rows, 2, 5);
+};
+
+const resolveSelectedSketchDataUrl = (planData: ADEPPlanData) => {
+  const selectedSketch = planData.ekler.secili_kroki;
+  if (!selectedSketch) return "";
+
+  if (selectedSketch.thumbnail_data_url?.trim()) {
+    return selectedSketch.thumbnail_data_url;
+  }
+
+  const savedProject = loadSavedEvacuationProjects().find((project) => project.id === selectedSketch.id);
+  return savedProject?.thumbnail_data_url || "";
 };
 
 const dataUrlToArrayBuffer = async (dataUrl: string) => {
@@ -560,8 +600,9 @@ const replaceWordTemplate = async (plan: ADEPWordPlanSource) => {
   setTableCell(tables, 66, 1, 1, safeText(planData.toplanma_alani));
   fillSignatureTable(tables[68], planData);
 
-  if (planData.ekler.secili_kroki?.thumbnail_data_url) {
-    await addAppendixSketchImage(zip, xml, planData.ekler.secili_kroki.thumbnail_data_url);
+  const selectedSketchDataUrl = resolveSelectedSketchDataUrl(planData);
+  if (selectedSketchDataUrl) {
+    await addAppendixSketchImage(zip, xml, selectedSketchDataUrl);
   }
 
   zip.file("word/document.xml", serializeXml(xml));

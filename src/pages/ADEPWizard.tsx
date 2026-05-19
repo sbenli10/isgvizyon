@@ -37,7 +37,6 @@ import {
   DEFAULT_ADEP_PLAN_DATA,
   HAZARD_CLASSES,
   mergeADEPPlanData,
-  toCoreADEPPlanData,
   type ADEPPlanData,
   type ADEPTeamKey,
   type ADEPPerson,
@@ -393,7 +392,7 @@ export default function ADEPWizard() {
         employee_count: normalizedData.firma_bilgileri.calisan_sayisi,
         status: "draft",
         completion_percentage: 100,
-        plan_data: toCoreADEPPlanData(normalizedData) as any,
+        plan_data: normalizedData as any,
         next_review_date: normalizedData.genel_bilgiler.gecerlilik_tarihi || null,
       };
 
