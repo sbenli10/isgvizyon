@@ -1208,7 +1208,7 @@ export default function CompanyManager() {
         full_name: emp.full_name || `${emp.first_name || ""} ${emp.last_name || ""}`.trim() || null,
         first_name: emp.first_name || "",
         last_name: emp.last_name || "",
-        tc_number: emp.tc_number || null,
+        tc_number: emp.tc_number ? emp.tc_number.replace(/\D/g, "") : null,
         job_title: emp.job_title || emp.insured_job_name || "Belirtilmemiş",
         department: emp.department || null,
         start_date: emp.start_date || new Date().toISOString().split("T")[0],
@@ -1221,6 +1221,42 @@ export default function CompanyManager() {
         email: emp.email || null,
         phone: emp.phone || null,
       }));
+
+      const duplicateTcNumbers = new Set<string>();
+      const seenTcNumbers = new Set<string>();
+      const invalidTcNumbers = new Set<string>();
+
+      employeesJson.forEach((employee) => {
+        const tcNumber = employee.tc_number?.trim();
+        if (!tcNumber) return;
+
+        if (tcNumber.length !== 11) {
+          invalidTcNumbers.add(tcNumber);
+          return;
+        }
+
+        if (seenTcNumbers.has(tcNumber)) {
+          duplicateTcNumbers.add(tcNumber);
+          return;
+        }
+
+        seenTcNumbers.add(tcNumber);
+      });
+
+      if (invalidTcNumbers.size > 0) {
+        toast.error("T.C. kimlik numarası 11 haneli olmalıdır. Lütfen çalışan listesini kontrol edin.");
+        return;
+      }
+
+      if (employeesJson.some((employee) => !employee.tc_number)) {
+        toast.error("Çalışan aktarımı için T.C. kimlik numarası zorunludur. Lütfen çalışan listesini kontrol edin.");
+        return;
+      }
+
+      if (duplicateTcNumbers.size > 0) {
+        toast.error("Aynı T.C. kimlik numarasına sahip çalışan birden fazla kez eklenemez.");
+        return;
+      }
 
       const isMissingLogoColumnError = (error: unknown) => {
         const message =
@@ -1314,15 +1350,16 @@ export default function CompanyManager() {
         }
 
         if (employeesJson.length > 0) {
-          const employeesToInsert = employeesJson.map(emp => ({
+          const employeesToUpsert = employeesJson.map(emp => ({
             ...emp,
             company_id: editingCompanyId,
             is_active: true,
+            updated_at: new Date().toISOString(),
           }));
 
           const { error: employeesError } = await supabase
             .from("employees")
-            .insert(employeesToInsert);
+            .upsert(employeesToUpsert, { onConflict: "company_id,tc_number" });
 
           if (employeesError) throw employeesError;
         }
@@ -1423,11 +1460,12 @@ export default function CompanyManager() {
           ...employee,
           company_id: result.company_id,
           is_active: true,
+          updated_at: new Date().toISOString(),
         }));
 
         const { error: employeesError } = await (supabase as any)
           .from("employees")
-          .insert(employeesToInsert);
+          .upsert(employeesToInsert, { onConflict: "company_id,tc_number" });
 
         if (employeesError) throw employeesError;
         insertedEmployeesCount = employeesToInsert.length;
@@ -1443,9 +1481,31 @@ export default function CompanyManager() {
       resetWizard();
       loadCompanies();
     } catch (e: unknown) {
-      const error = e as Error;
-      console.error("❌ Kaydetme Hatası:", error);
-      toast.error(`❌ Kaydetme hatası: ${error.message}`);
+      const error = e as {
+        message?: string;
+        code?: string;
+        details?: string;
+        hint?: string;
+      };
+      console.error("❌ Kaydetme Hatası:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        raw: e,
+      });
+
+      const isDuplicateEmployeeError =
+        error.code === "23505" ||
+        error.message?.includes("employees_tc_company_unique") ||
+        error.message?.toLocaleLowerCase("tr-TR").includes("duplicate key");
+
+      if (isDuplicateEmployeeError) {
+        toast.error("Aynı T.C. kimlik numarasına sahip çalışan bu firmada zaten kayıtlı. Lütfen çalışan listesini kontrol edin.");
+        return;
+      }
+
+      toast.error(`❌ Kaydetme hatası: ${error.message || "Beklenmeyen bir hata oluştu"}`);
     } finally {
       setSaving(false);
     }
