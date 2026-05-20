@@ -463,22 +463,23 @@ function RecentActivityList({ inspections }: { inspections: DashboardInspection[
   const items =
     inspections.length > 0
       ? inspections.map((inspection) => ({
+          key: inspection.id,
           title: inspection.location_name || "Denetim kaydı",
           text: inspection.status === "completed" ? "Denetim tamamlandı" : inspection.status === "in_progress" ? "Denetim devam ediyor" : "Denetim taslakta",
           date: new Date(inspection.created_at).toLocaleDateString("tr-TR"),
         }))
       : [
-          { title: "Risk sihirbazı hazır", text: "Yeni risk raporu oluşturmak için hızlı işlem kartını kullanabilirsiniz.", date: "Bugün" },
-          { title: "Acil durum planı", text: "Firma özelinde ADEP planı hazırlama akışı hazır.", date: "Bu hafta" },
-          { title: "İSG Bot", text: "Chrome eklentisi ile firma aktarımını başlatabilirsiniz.", date: "Yeni" },
+          { key: "fallback-risk-wizard", title: "Risk sihirbazı hazır", text: "Yeni risk raporu oluşturmak için hızlı işlem kartını kullanabilirsiniz.", date: "Bugün" },
+          { key: "fallback-adep-plan", title: "Acil durum planı", text: "Firma özelinde ADEP planı hazırlama akışı hazır.", date: "Bu hafta" },
+          { key: "fallback-isg-bot", title: "İSG Bot", text: "Chrome eklentisi ile firma aktarımını başlatabilirsiniz.", date: "Yeni" },
         ];
 
   return (
     <DashboardCard className="p-4">
       <SectionHeader eyebrow="Akış" title="Son Aktiviteler" />
       <div className="space-y-3">
-        {items.slice(0, 4).map((item) => (
-          <div key={`${item.title}-${item.date}`} className="flex gap-3 rounded-xl bg-slate-50/80 p-3 dark:bg-slate-950/40">
+        {items.slice(0, 4).map((item, index) => (
+          <div key={item.key || `activity-${item.title}-${item.date}-${index}`} className="flex gap-3 rounded-xl bg-slate-50/80 p-3 dark:bg-slate-950/40">
             <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.7)]" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-slate-950 dark:text-white">{item.title}</p>
