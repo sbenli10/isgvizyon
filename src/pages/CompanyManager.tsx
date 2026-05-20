@@ -2168,10 +2168,26 @@ export default function CompanyManager() {
                               <TableCell>
                                 {editingEmployeeId === employee.id ? (
                                   <Input
+                                    value={employeeDraft.phone || ""}
+                                    onChange={(e) => updateEmployeeDraft({ phone: e.target.value })}
+                                    placeholder="Telefon"
+                                  />
+                                ) : (
+                                  employee.phone || "-"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {editingEmployeeId === employee.id ? (
+                                  <select
                                     value={employeeDraft.gender || ""}
                                     onChange={(e) => updateEmployeeDraft({ gender: normalizeEmployeeGender(e.target.value) })}
-                                    placeholder="Cinsiyet"
-                                  />
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                  >
+                                    <option value="">Seçiniz</option>
+                                    <option value="Erkek">Erkek</option>
+                                    <option value="Kadın">Kadın</option>
+                                    <option value="Diğer">Diğer</option>
+                                  </select>
                                 ) : (
                                   employee.gender || "-"
                                 )}
