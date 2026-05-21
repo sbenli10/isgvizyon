@@ -349,6 +349,7 @@ export default function CompanyManager() {
   const [searchParams, setSearchParams] = useSearchParams();
   const runtimeMode = useSafeMode();
   const overlayContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastSearchSyncRef = useRef<string | null>(null);
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -537,10 +538,12 @@ export default function CompanyManager() {
     }
 
     const currentSearch = location.search.startsWith("?") ? location.search.slice(1) : location.search;
-    if (next.toString() !== currentSearch) {
+    const nextSearch = next.toString();
+    if (nextSearch !== currentSearch && lastSearchSyncRef.current !== nextSearch) {
+      lastSearchSyncRef.current = nextSearch;
       setSearchParams(next, { replace: true });
     }
-  }, [companyViewMode, hazardFilter, location.pathname, location.search, searchQuery, setSearchParams, workspaceMode]);
+  }, [companyViewMode, hazardFilter, location.pathname, searchQuery, setSearchParams, workspaceMode]);
 
   useEffect(() => {
     if (runtimeMode.safeMode) {
