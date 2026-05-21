@@ -600,6 +600,7 @@ export default function CompanyManager() {
         nace_code: item.industry || "",
         hazard_class: item.hazard_class || "Az Tehlikeli",
         industry_sector: item.industry_sector || "",
+        city: item.city || "",
         workplace_registration_number: item.workplace_registration_number || item.sgk_workplace_number || "",
         sgk_workplace_number: item.sgk_workplace_number || "",
         visit_frequency: item.visit_frequency || "Ayda 1 Defa",
@@ -968,19 +969,40 @@ export default function CompanyManager() {
 
     try {
       const existingCompany = companies.find((company) => company.id === companyId);
-      const { error } = await supabase
+      const { data: deletedCompany, error } = await (supabase as any)
         .from("companies")
-        .delete()
-        .eq("id", companyId);
+        .update({
+          is_active: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", companyId)
+        .select("id")
+        .maybeSingle();
 
       if (error) throw error;
+      if (!deletedCompany?.id) {
+        throw new Error("Firma silinemedi veya bu işlem için yetkiniz bulunmuyor.");
+      }
+
+      setCompanies((prev) => prev.filter((company) => company.id !== companyId));
+      if (viewingCompany?.id === companyId) {
+        setViewingCompany(null);
+      }
+      if (editingCompanyId === companyId) {
+        setEditingCompanyId(null);
+        setWorkspaceMode("list");
+        resetWizard();
+      }
 
       if (existingCompany?.logo_url && !/^https?:\/\//i.test(existingCompany.logo_url) && !existingCompany.logo_url.startsWith("data:")) {
-        await supabase.storage.from("company-logos").remove([existingCompany.logo_url]);
+        const { error: logoRemoveError } = await supabase.storage.from("company-logos").remove([existingCompany.logo_url]);
+        if (logoRemoveError) {
+          console.warn("Firma silindi ancak logo dosyası temizlenemedi:", logoRemoveError);
+        }
       }
 
       toast.success(`✅ "${companyName}" firması silindi`);
-      loadCompanies();
+      void loadCompanies();
     } catch (error: any) {
       console.error("Delete company error:", error);
       toast.error(`❌ Firma silinemedi: ${error.message}`);
@@ -1276,12 +1298,15 @@ export default function CompanyManager() {
         name: formData.company_name,
         tax_number: formData.tax_number || null,
         industry: formData.nace_code || null,
+        industry_sector: formData.industry_sector || null,
         address: formData.address,
+        city: formData.city || null,
         phone: formData.phone,
         email: formData.email,
         ...(organizationId ? { organization_id: organizationId } : {}),
         ...(includeLogo ? { logo_url: formData.logo_url || null } : {}),
         employee_count: employeesJson.length || formData.employee_count,
+        updated_at: new Date().toISOString(),
         hazard_class: formData.hazard_class,
         workplace_registration_number: formData.workplace_registration_number || null,
         sgk_workplace_number: formData.workplace_registration_number || null,
@@ -1303,6 +1328,7 @@ export default function CompanyManager() {
         hazard_class: formData.hazard_class,
         industry_sector: formData.industry_sector,
         address: formData.address,
+        city: formData.city || null,
         phone: formData.phone,
         email: formData.email,
         ...(includeLogo ? { logo_url: formData.logo_url || null } : {}),
@@ -1430,6 +1456,8 @@ export default function CompanyManager() {
           .from("companies")
           .update({
             ...(organizationId ? { organization_id: organizationId } : {}),
+            city: formData.city || null,
+            industry_sector: formData.industry_sector || null,
             hazard_class: formData.hazard_class,
             workplace_registration_number: formData.workplace_registration_number || null,
             sgk_workplace_number: formData.workplace_registration_number || null,
