@@ -45,6 +45,7 @@ import {
   createCertificate,
   generateCertificateJob,
   getCertificateDownload,
+  getCertificateItemDownload,
   getCertificateStatus,
 } from "@/lib/certificateApi";
 import { createCertificateExcelTemplate, parseCertificateParticipantsExcel } from "@/lib/certificateExcel";
@@ -70,6 +71,101 @@ type CertificateSignatureConfig = {
   image_url?: string;
 };
 
+const CERTIFICATE_BUCKET = "certificate-files";
+
+function safeDecodeStoragePath(path: string) {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+function normalizeCertificateStoragePath(input?: string | null): string {
+  if (!input) return "";
+
+  let path = input.trim();
+  if (!path) return "";
+
+  path = path.split("?")[0].split("#")[0];
+  path = path.replace(/^https?:\/\/[^/]+\/storage\/v1\/object\/(?:public|sign)\/certificate-files\//i, "");
+  path = path.replace(/^certificate-files\//i, "");
+  path = path.replace(/^\/+/, "");
+
+  return safeDecodeStoragePath(path).replace(/^\/+/, "");
+}
+
+function splitStoragePath(path: string) {
+  const segments = path.split("/").filter(Boolean);
+  const name = segments.pop() || "";
+
+  return {
+    folder: segments.join("/"),
+    name,
+  };
+}
+
+async function certificateStorageObjectExists(path: string) {
+  const { folder, name } = splitStoragePath(path);
+  if (!folder || !name) return false;
+
+  const { data, error } = await supabase.storage
+    .from(CERTIFICATE_BUCKET)
+    .list(folder, {
+      limit: 100,
+      search: name,
+    });
+
+  if (error) {
+    console.error("[CertificatesDashboard] storage object existence check failed", {
+      bucket: CERTIFICATE_BUCKET,
+      folder,
+      name,
+      message: error.message,
+      statusCode: (error as { statusCode?: string | number } | null)?.statusCode,
+    });
+
+    return true;
+  }
+
+  return Boolean(data?.some((item) => item.name === name));
+}
+
+async function createCertificateSignedUrl(rawPath?: string | null, expiresIn = 60 * 60) {
+  const path = normalizeCertificateStoragePath(rawPath);
+
+  if (!path) {
+    throw new Error("Sertifika dosya yolu bulunamadı.");
+  }
+
+  const exists = await certificateStorageObjectExists(path);
+  if (!exists) {
+    console.error("[CertificatesDashboard] certificate file missing in storage", {
+      bucket: CERTIFICATE_BUCKET,
+      path,
+    });
+
+    throw new Error("PDF dosyası depolama alanında bulunamadı. Dosya silinmiş, taşınmış veya yükleme tamamlanmamış olabilir.");
+  }
+
+  const { data, error } = await supabase.storage
+    .from(CERTIFICATE_BUCKET)
+    .createSignedUrl(path, expiresIn);
+
+  if (error || !data?.signedUrl) {
+    console.error("[CertificatesDashboard] signed url failed", {
+      bucket: CERTIFICATE_BUCKET,
+      path,
+      message: error?.message,
+      statusCode: (error as { statusCode?: string | number } | null)?.statusCode,
+    });
+
+    throw new Error("PDF dosyası depolama alanında bulunamadı veya erişim bağlantısı oluşturulamadı.");
+  }
+
+  return data.signedUrl;
+}
+
 // ====================================================
 // DEFAULTS
 // ====================================================
@@ -85,13 +181,13 @@ const defaultForm: CertificateFormValues = {
   certificate_type: "Katılım",
   validity_date: "",
   logo_url: "",
-  template_type: "classic",
-  frame_style: "gold",
+  template_type: "academy",
+  frame_style: "blue",
   trainer_names: [""],
   notes: "",
   design_config: {
-    primaryColor: "#d4af37",
-    secondaryColor: "#294d77",
+    primaryColor: "#005a9c",
+    secondaryColor: "#0ea5e9",
     fontFamily: "serif",
     showBadge: true,
     showSeal: true,
@@ -109,8 +205,8 @@ const defaultForm: CertificateFormValues = {
 };
 
 const templateCards = [
+  { value: "academy", title: "İSGVİZYON Kurumsal Mavi", text: "Mavi/beyaz resmi çerçeve, QR doğrulama, konu ve imza alanlarıyla baskıya uygun ana şablon" },
   { value: "classic", title: "Prestij Klasik", text: "Geleneksel çerçeve, resmi görünüm ve sade kurumsal yerleşim" },
-  { value: "academy", title: "Akademi Mavi", text: "Mavi-gold üst bant, mühür hissi ve resmi eğitim belgesi kompozisyonu" },
   { value: "executive", title: "Yönetici Altın", text: "Üst düzey teslimler için daha seçkin, premium ve davetiye benzeri sertifika yapısı" },
   { value: "compliance", title: "Mevzuat Uyum", text: "OSGB ve İSG eğitimleri için bilgi yoğun, düzenli ve denetim dostu resmi düzen" },
   { value: "modern", title: "Kurumsal Modern", text: "Çağdaş görünüm, yüksek kontrast ve dijital teslim odaklı premium tasarım" },
@@ -357,10 +453,14 @@ export default function CertificatesDashboard() {
         return;
       }
 
-      const certificateLogoResult = await supabase.storage.from("certificate-files").createSignedUrl(nextValue, 3600);
-      if (!certificateLogoResult.error && certificateLogoResult.data?.signedUrl) {
-        setter(certificateLogoResult.data.signedUrl);
-        return;
+      try {
+        const certificateLogoUrl = await createCertificateSignedUrl(nextValue);
+        if (certificateLogoUrl) {
+          setter(certificateLogoUrl);
+          return;
+        }
+      } catch {
+        // Company logo fallback above may legitimately fail for certificate bucket paths.
       }
 
       setter("");
@@ -640,18 +740,30 @@ export default function CertificatesDashboard() {
     const item =
       completedItems.find((entry) => entry.participant_id === selectedPdfParticipantId) || completedItems[0];
 
-    if (!item?.pdf_path) {
-      toast.error("İndirilebilir PDF bulunamadı");
+    if (!item?.id) {
+      toast.error("Dosya yolu bulunamadı", {
+        description: "Bu katılımcı için indirilebilir PDF kaydı bulunmuyor.",
+      });
       return;
     }
 
-    const { data, error } = await supabase.storage.from("certificate-files").createSignedUrl(item.pdf_path, 3600);
-    if (error || !data?.signedUrl) {
-      toast.error("PDF bağlantısı oluşturulamadı");
-      return;
+    try {
+      const payload = await getCertificateItemDownload(item.id);
+      window.open(payload.downloadUrl, "_blank", "noopener,noreferrer");
+      if (payload.regenerated && activeCertificate?.id) {
+        toast.success("PDF yeniden oluşturuldu", {
+          description: "Eksik tekil PDF dosyası yeniden üretildi ve indirme bağlantısı hazırlandı.",
+        });
+        await refreshJobStatus(activeCertificate.id);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "PDF bağlantısı oluşturulamadı.";
+      toast.error("PDF dosyası açılamadı", {
+        description:
+          message ||
+          "PDF dosyası depolama alanında bulunamadı. Dosya silinmiş, taşınmış veya yükleme tamamlanmamış olabilir.",
+      });
     }
-
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
 
   async function loadCertificate(certificate: CertificateRecord) {
@@ -1094,7 +1206,6 @@ export default function CertificatesDashboard() {
               <CardTitle className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-primary" /> Üretim Durumu
               </CardTitle>
-              <CardDescription>Queue, worker ve ZIP üretim akışını gerçek zamanlı izleyin.</CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-4">
@@ -1161,7 +1272,9 @@ export default function CertificatesDashboard() {
                       </DialogDescription>
                     </DialogHeader>
 
-                    <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+                    <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
+                      <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+                    </div>
                   </DialogContent>
                 </Dialog>
 
@@ -1225,7 +1338,9 @@ export default function CertificatesDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6">
-              <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+              <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
+                <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+              </div>
             </CardContent>
           </Card>
 

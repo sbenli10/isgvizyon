@@ -8,10 +8,17 @@
     "https://isgkatip.csgb.gov.tr/*",
     "https://elmdzekyyoepdrpnfppn.supabase.co/*",
     "https://www.isgvizyon.com/*",
-    "https://isgvizyon.com/*"
+    "https://isgvizyon.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "externally_connectable": {
-    "matches": ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"]
+    "matches": [
+      "https://www.isgvizyon.com/*",
+      "https://isgvizyon.com/*",
+      "http://localhost/*",
+      "http://127.0.0.1/*"
+    ]
   },
   "content_scripts": [
     {
@@ -21,7 +28,7 @@
       "all_frames": false
     },
     {
-      "matches": ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*"],
+      "matches": ["https://www.isgvizyon.com/*", "https://isgvizyon.com/*", "http://localhost/*", "http://127.0.0.1/*"],
       "js": ["content-scripts/auth-listener.js"],
       "run_at": "document_start",
       "all_frames": false

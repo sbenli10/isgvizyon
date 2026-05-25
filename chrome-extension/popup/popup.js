@@ -8,7 +8,7 @@ import {
 } from "../config/defaults.js";
 import { assertExtensionApi } from "../shared/extension-api.js";
 
-const POPUP_DEBUG = true;
+const POPUP_DEBUG = false;
 const POPUP_LOG_PREFIX = "[Denetron Popup]";
 const WEB_APP_URL = "https://www.isgvizyon.com";
 const ISGKATIP_URL = "https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim";

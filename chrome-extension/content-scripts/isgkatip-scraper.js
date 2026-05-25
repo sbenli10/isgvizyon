@@ -1,8 +1,9 @@
 const CONFIG = {
-  debug: true,
+  debug: false,
   minDelayMs: 1500,
   tableWaitMs: 12000,
   previewLimit: 10,
+  pilotApplyLimit: 3,
 };
 
 const PANEL_ID = "isgvizyon-sync-panel";
@@ -61,6 +62,71 @@ let previewState = {
 function log(...args) {
   if (CONFIG.debug) console.log("[ISGVizyon Scraper]", ...args);
 }
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "ISGVIZYON_ISGKATIP_STATUS") {
+    sendResponse({
+      success: true,
+      isLoggedIn: isLoggedIn(),
+      isTargetPage: isTargetPage(),
+      hasPanel: Boolean(document.getElementById(PANEL_ID)),
+      hasPreview: previewState.rowsParsed > 0,
+      currentUrl: window.location.href,
+    });
+
+    return true;
+  }
+
+  if (message?.type === "ISGVIZYON_MULTI_ASSIGNMENT_APPLY_REQUEST") {
+    void handlePilotApplyV2("multi_assignment_apply", message?.payload || {})
+      .then(sendResponse)
+      .catch((error) =>
+        sendResponse({
+          success: false,
+          error: error?.message || "Çoklu atama pilot işlemi başarısız oldu.",
+        }),
+      );
+    return true;
+  }
+
+  if (message?.type === "ISGVIZYON_VALIDATE_ASSIGNMENT_SURFACE_REQUEST") {
+    void validateSurface("multi_assignment_apply", message?.payload || {})
+      .then(sendResponse)
+      .catch((error) =>
+        sendResponse({
+          success: false,
+          error: error?.message || "Atama formu dogrulanamadi.",
+        }),
+      );
+    return true;
+  }
+
+  if (message?.type === "ISGVIZYON_VALIDATE_DURATION_SURFACE_REQUEST") {
+    void validateSurface("excess_duration_update_apply", message?.payload || {})
+      .then(sendResponse)
+      .catch((error) =>
+        sendResponse({
+          success: false,
+          error: error?.message || "Sure guncelleme formu dogrulanamadi.",
+        }),
+      );
+    return true;
+  }
+
+  if (message?.type === "ISGVIZYON_EXCESS_DURATION_APPLY_REQUEST") {
+    void handlePilotApplyV2("excess_duration_update_apply", message?.payload || {})
+      .then(sendResponse)
+      .catch((error) =>
+        sendResponse({
+          success: false,
+          error: error?.message || "Fazla süre pilot işlemi başarısız oldu.",
+        }),
+      );
+    return true;
+  }
+
+  return false;
+});
 
 function normalizeText(value) {
   return String(value ?? "")
@@ -621,6 +687,492 @@ function showNotification(message, type = "info") {
   setTimeout(() => {
     toast.remove();
   }, 4200);
+}
+
+function safeMask(value) {
+  const normalized = String(value || "").replace(/\D/g, "");
+  if (!normalized) return "-";
+  if (normalized.length <= 4) return normalized;
+  return `${normalized.slice(0, 3)}***${normalized.slice(-2)}`;
+}
+
+function isVisibleElement(element) {
+  if (!(element instanceof HTMLElement)) return false;
+  const style = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+}
+
+async function waitForStableDom(durationMs = 400, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    let lastMutationAt = Date.now();
+    const observer = new MutationObserver(() => {
+      lastMutationAt = Date.now();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+
+    const tick = () => {
+      const now = Date.now();
+      if (now - lastMutationAt >= durationMs || now - start >= timeoutMs) {
+        observer.disconnect();
+        resolve();
+        return;
+      }
+      window.setTimeout(tick, 120);
+    };
+
+    tick();
+  });
+}
+
+function findElementsByPredicates(predicates, selector) {
+  const controls = Array.from(document.querySelectorAll(selector)).filter(isVisibleElement);
+  const ranked = [];
+
+  controls.forEach((element) => {
+    let score = 0;
+    const labelText = normalizeText(element.getAttribute("aria-label") || "");
+    const placeholderText = normalizeText(element.getAttribute("placeholder") || "");
+    const nameText = normalizeText(element.getAttribute("name") || "");
+    const idText = normalizeText(element.getAttribute("id") || "");
+    const valueText = normalizeText(element.value || "");
+    const buttonText = normalizeText(textContentOf(element));
+
+    predicates.forEach((predicate) => {
+      if (labelText.includes(predicate)) score += 3;
+      if (placeholderText.includes(predicate)) score += 2;
+      if (nameText.includes(predicate) || idText.includes(predicate)) score += 2;
+      if (buttonText.includes(predicate) || valueText.includes(predicate)) score += 2;
+    });
+
+    if (idText) {
+      const linkedLabels = Array.from(document.querySelectorAll(`label[for="${CSS.escape(element.id)}"]`));
+      if (linkedLabels.some((label) => predicates.some((predicate) => normalizeText(textContentOf(label)).includes(predicate)))) {
+        score += 4;
+      }
+    }
+
+    const closestField = element.closest("label, .form-group, .form-item, .field, td, tr, div");
+    if (closestField) {
+      const fieldText = normalizeText(textContentOf(closestField));
+      if (predicates.some((predicate) => fieldText.includes(predicate))) {
+        score += 2;
+      }
+    }
+
+    if (score > 0) ranked.push({ element, score });
+  });
+
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked;
+}
+
+function findInputByLabelText(labelTexts) {
+  const predicates = labelTexts.map(normalizeText);
+  const ranked = findElementsByPredicates(predicates, "input, textarea");
+  return ranked[0] || null;
+}
+
+function findSelectByLabelText(labelTexts) {
+  const predicates = labelTexts.map(normalizeText);
+  const ranked = findElementsByPredicates(predicates, "select, [role='combobox']");
+  return ranked[0] || null;
+}
+
+function findButtonByText(buttonTexts) {
+  const predicates = buttonTexts.map(normalizeText);
+  const ranked = findElementsByPredicates(predicates, "button, a, [role='button'], input[type='button'], input[type='submit']");
+  return ranked[0] || null;
+}
+
+function scoreToConfidence(score) {
+  if (score >= 6) return "high";
+  if (score >= 3) return "medium";
+  if (score >= 1) return "low";
+  return "not_found";
+}
+
+function detectKatipPageContext() {
+  const headings = Array.from(document.querySelectorAll("h1, h2, h3, .page-title, .title, .breadcrumb, [role='heading']"))
+    .map((element) => textContentOf(element))
+    .filter(Boolean)
+    .slice(0, 8);
+  const bodyText = normalizeText(document.body?.innerText || "");
+
+  let detectedModule = "unknown";
+  let confidence = "low";
+
+  if (bodyText.includes("isg hizmet sozlesmeleri") || headings.some((heading) => normalizeText(heading).includes("isg hizmet sozlesmeleri"))) {
+    detectedModule = "contract_list";
+    confidence = "high";
+  } else if (bodyText.includes("sozlesme") || bodyText.includes("gorevlendirme")) {
+    detectedModule = "contract_related";
+    confidence = "medium";
+  }
+
+  return {
+    url: window.location.href,
+    title: document.title || null,
+    path: window.location.pathname || null,
+    activeTab: headings[0] || null,
+    detectedModule,
+    visibleHeadings: headings,
+    formCount: document.querySelectorAll("form").length,
+    inputCount: document.querySelectorAll("input, textarea").length,
+    selectCount: document.querySelectorAll("select, [role='combobox']").length,
+    buttonCount: document.querySelectorAll("button, a, [role='button']").length,
+    confidence,
+  };
+}
+
+function detectAssignmentFormSurface() {
+  const fields = {
+    sgkField: findInputByLabelText(["SGK Sicil No", "Işyeri Sicil No", "SGK No", "Sicil No"]),
+    personField: findInputByLabelText(["T.C. Kimlik No", "Personel"]) || findSelectByLabelText(["Personel"]),
+    roleField: findInputByLabelText(["Görev", "Rol"]) || findSelectByLabelText(["Görev", "Rol"]),
+    contractTypeField: findSelectByLabelText(["Sözleşme Türü", "Sözleşme Tipi"]),
+    minutesField: findInputByLabelText(["Süre", "Dakika"]),
+    submitButton: findButtonByText(["Ata", "Görevlendir", "Yeni Sözleşme", "Kaydet", "Onayla"]),
+  };
+
+  const requiredKeys = ["sgkField", "personField", "submitButton"];
+  const missing = requiredKeys.filter((key) => !fields[key]);
+  const scores = Object.values(fields).filter(Boolean).map((entry) => entry.score);
+  const score = scores.length ? Math.max(...scores) : 0;
+
+  return {
+    found: missing.length === 0,
+    requiredFieldsFound: requiredKeys.length - missing.length,
+    requiredFieldsMissing: missing,
+    confidence: scoreToConfidence(score),
+    fields,
+  };
+}
+
+function detectDurationUpdateSurface() {
+  const fields = {
+    currentMinutesField: findInputByLabelText(["Mevcut Süre", "Atanan Süre", "Çalışma Süresi"]),
+    newMinutesField: findInputByLabelText(["Yeni Süre", "Dakika", "Güncel Süre"]),
+    contractTypeField: findSelectByLabelText(["Sözleşme Türü", "Sözleşme Tipi"]),
+    submitButton: findButtonByText(["Güncelle", "Kaydet", "Süre Güncelle", "Düzenle"]),
+  };
+
+  const requiredKeys = ["newMinutesField", "submitButton"];
+  const missing = requiredKeys.filter((key) => !fields[key]);
+  const scores = Object.values(fields).filter(Boolean).map((entry) => entry.score);
+  const score = scores.length ? Math.max(...scores) : 0;
+
+  return {
+    found: missing.length === 0,
+    requiredFieldsFound: requiredKeys.length - missing.length,
+    requiredFieldsMissing: missing,
+    confidence: scoreToConfidence(score),
+    fields,
+  };
+}
+
+function validateRequiredFormFields(formSurface) {
+  const blockingReasons = [];
+  if (!formSurface.found) blockingReasons.push("Gerekli form alanlarının bir kısmı bulunamadı.");
+  if (formSurface.confidence === "low" || formSurface.confidence === "not_found") {
+    blockingReasons.push("Selector güven skoru düşük.");
+  }
+  if (formSurface.requiredFieldsMissing.length > 0) {
+    blockingReasons.push(`Eksik alanlar: ${formSurface.requiredFieldsMissing.join(", ")}`);
+  }
+  return blockingReasons;
+}
+
+async function validateSurface(operationType, payload) {
+  await waitForStableDom();
+  const pageContext = detectKatipPageContext();
+  const formSurface =
+    operationType === "multi_assignment_apply" ? detectAssignmentFormSurface() : detectDurationUpdateSurface();
+  const blockingReasons = [];
+
+  if (!isLoggedIn()) blockingReasons.push("İSG-KATİP oturumu bulunamadı.");
+  if (!isTargetPage()) {
+    blockingReasons.push("İşlem için uygun İSG-KATİP ekranı bulunamadı. Lütfen ilgili atama/sözleşme ekranını açıp tekrar deneyin.");
+  }
+  blockingReasons.push(...validateRequiredFormFields(formSurface));
+
+  return {
+    success: blockingReasons.length === 0,
+    error: blockingReasons.length > 0 ? blockingReasons[0] : null,
+    validation: {
+      pageContext,
+      formSurface: {
+        found: formSurface.found,
+        requiredFieldsFound: formSurface.requiredFieldsFound,
+        requiredFieldsMissing: formSurface.requiredFieldsMissing,
+        confidence: formSurface.confidence,
+      },
+      canApply: blockingReasons.length === 0,
+      blockingReasons,
+      recordCount: Array.isArray(payload?.records) ? payload.records.length : 0,
+    },
+  };
+}
+
+function setNativeInputValue(input, value) {
+  const prototype = Object.getPrototypeOf(input);
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+  if (descriptor?.set) {
+    descriptor.set.call(input, value);
+  } else {
+    input.value = value;
+  }
+}
+
+function dispatchInputEvents(element) {
+  ["input", "change", "blur"].forEach((eventName) => {
+    element.dispatchEvent(new Event(eventName, { bubbles: true }));
+  });
+}
+
+function verifyInputValue(element, expectedValue) {
+  return normalizeText(element.value || textContentOf(element)) === normalizeText(expectedValue);
+}
+
+function buildRowResult(record, operationType, status, message, extra = {}) {
+  return {
+    id: record.id || `${operationType}-${Date.now()}`,
+    recordId: record.id || null,
+    companyName: record.companyName || "Firma",
+    sgkNo: safeMask(record.sgkNumber || record.sgkNo || "-"),
+    status,
+    reason: message,
+    stage: extra.stage || null,
+    selectorConfidence: extra.selectorConfidence || null,
+    beforeValues: extra.beforeValues || null,
+    afterValues: extra.afterValues || null,
+    verificationStatus: extra.verificationStatus || null,
+    durationMs: extra.durationMs || null,
+    processedAt: new Date().toISOString(),
+  };
+}
+
+async function executeSubmitFlow(operationType, record, formSurface) {
+  const startedAt = Date.now();
+  const beforeValues = {
+    sgkNo: safeMask(record.sgkNumber || record.sgkNo || "-"),
+    assignedMinutes: record.assignedMinutes || record.currentAssignedMinutes || null,
+    newAssignedMinutes: record.newAssignedMinutes || record.assignedMinutes || null,
+  };
+
+  if (operationType === "excess_duration_update_apply" && formSurface.fields.newMinutesField?.element) {
+    const targetValue = String(record.newAssignedMinutes ?? record.requiredMinutes ?? "");
+    setNativeInputValue(formSurface.fields.newMinutesField.element, targetValue);
+    dispatchInputEvents(formSurface.fields.newMinutesField.element);
+    await wait(250);
+    if (!verifyInputValue(formSurface.fields.newMinutesField.element, targetValue)) {
+      return buildRowResult(record, operationType, "failed", "Alan değeri yazılamadı veya doğrulanamadı.", {
+        stage: "input_verification",
+        selectorConfidence: formSurface.confidence,
+        beforeValues,
+        afterValues: { attemptedMinutes: targetValue },
+        verificationStatus: "failed",
+        durationMs: Date.now() - startedAt,
+      });
+    }
+  }
+
+  if (!formSurface.fields.submitButton?.element) {
+    return buildRowResult(record, operationType, "failed", "Submit butonu bulunamadı.", {
+      stage: "submit_lookup",
+      selectorConfidence: formSurface.confidence,
+      beforeValues,
+      verificationStatus: "failed",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  formSurface.fields.submitButton.element.scrollIntoView({ behavior: "smooth", block: "center" });
+  await wait(250);
+  formSurface.fields.submitButton.element.click();
+  await waitForStableDom(600, 5000);
+
+  const bodyText = normalizeText(document.body?.innerText || "");
+  const successDetected =
+    bodyText.includes("basarili") ||
+    bodyText.includes("kaydedildi") ||
+    bodyText.includes("guncellendi") ||
+    bodyText.includes("onaylandi");
+  const errorDetected =
+    bodyText.includes("hata") ||
+    bodyText.includes("basarisiz") ||
+    bodyText.includes("zorunlu alan") ||
+    bodyText.includes("gecersiz");
+
+  const afterValues = {
+    visibleTextSample: textContentOf(document.body).slice(0, 200),
+  };
+
+  if (errorDetected) {
+    return buildRowResult(record, operationType, "failed", "İSG-KATİP hata mesajı gösterdi.", {
+      stage: "submit_result",
+      selectorConfidence: formSurface.confidence,
+      beforeValues,
+      afterValues,
+      verificationStatus: "failed",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  if (successDetected) {
+    return buildRowResult(record, operationType, "success_verified", "Doğrulanmış başarı: İSG-KATİP ekranında sonuç teyit edildi.", {
+      stage: "submit_result",
+      selectorConfidence: formSurface.confidence,
+      beforeValues,
+      afterValues,
+      verificationStatus: "verified",
+      durationMs: Date.now() - startedAt,
+    });
+  }
+
+  return buildRowResult(record, operationType, "success_unverified", "Doğrulanamayan başarı: İşlem gönderildi ancak ekranda sonuç teyit edilemedi.", {
+    stage: "submit_result",
+    selectorConfidence: formSurface.confidence,
+    beforeValues,
+    afterValues,
+    verificationStatus: "unverified",
+    durationMs: Date.now() - startedAt,
+  });
+}
+
+async function handlePilotApplyV2(operationType, payload) {
+  if (!isLoggedIn()) {
+    throw new Error("İSG-KATİP oturumu bulunamadı.");
+  }
+
+  if (!isTargetPage()) {
+    throw new Error("İSG-KATİP hedef sayfası açık değil.");
+  }
+
+  const records = Array.isArray(payload?.records) ? payload.records.slice(0, CONFIG.pilotApplyLimit) : [];
+  if (!records.length) {
+    throw new Error("İşlem yapılacak kayıt seçilmedi.");
+  }
+
+  const validationResponse =
+    payload?.validation && typeof payload.validation === "object"
+      ? { success: !payload.validation.blockingReasons?.length, validation: payload.validation, error: payload.validation.blockingReasons?.[0] || null }
+      : await validateSurface(operationType, payload);
+
+  if (!validationResponse?.success) {
+    return {
+      success: false,
+      error: validationResponse?.error || "İSG-KATİP form yüzeyi doğrulanamadı. Sayfa yapısı değişmiş olabilir.",
+      validation: validationResponse?.validation || null,
+      results: records.map((record) =>
+        buildRowResult(record, operationType, "failed", validationResponse?.error || "Form yüzeyi doğrulanmadıysa işlem başlatılamaz.", {
+          stage: "surface_validation",
+          selectorConfidence: validationResponse?.validation?.formSurface?.confidence || "not_found",
+          verificationStatus: "failed",
+        }),
+      ),
+    };
+  }
+
+  const formSurface =
+    operationType === "multi_assignment_apply" ? detectAssignmentFormSurface() : detectDurationUpdateSurface();
+  const results = [];
+
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    try {
+      results.push(await executeSubmitFlow(operationType, record, formSurface));
+    } catch (error) {
+      results.push(
+        buildRowResult(record, operationType, "failed", error?.message || "İşlem yüzeyi tetiklenemedi.", {
+          stage: "unexpected_error",
+          selectorConfidence: formSurface.confidence,
+          verificationStatus: "failed",
+        }),
+      );
+    }
+  }
+
+  return {
+    success: results.some((item) => item.status === "success_verified" || item.status === "success_unverified"),
+    validation: validationResponse.validation,
+    results,
+  };
+}
+
+async function handlePilotApply(operationType, payload) {
+  if (!isLoggedIn()) {
+    throw new Error("İSG-KATİP oturumu bulunamadı.");
+  }
+
+  if (!isTargetPage()) {
+    throw new Error("İSG-KATİP hedef sayfası açık değil.");
+  }
+
+  const records = Array.isArray(payload?.records) ? payload.records.slice(0, CONFIG.pilotApplyLimit) : [];
+  if (!records.length) {
+    throw new Error("İşlem yapılacak kayıt seçilmedi.");
+  }
+
+  const actionSurface = tryFindInteractiveSurface(operationType);
+  if (!actionSurface) {
+    return {
+      success: false,
+      error: "İSG-KATİP form alanları bulunamadı. Sayfa yapısı değişmiş olabilir.",
+      results: records.map((record, index) => ({
+        id: record.id || `${operationType}-${index + 1}`,
+        companyName: record.companyName || "Firma",
+        sgkNo: record.sgkNumber || record.sgkNo || "-",
+        status: "failed",
+        reason: "İSG-KATİP form alanları bulunamadı. Sayfa yapısı değişmiş olabilir.",
+        processedAt: new Date().toISOString(),
+      })),
+    };
+  }
+
+  const results = [];
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    try {
+      actionSurface.scrollIntoView({ behavior: "smooth", block: "center" });
+      await wait(250);
+      actionSurface.click();
+      await wait(350);
+
+      results.push({
+        id: record.id || `${operationType}-${index + 1}`,
+        companyName: record.companyName || "Firma",
+        sgkNo: record.sgkNumber || record.sgkNo || "-",
+        status: "success",
+        reason:
+          operationType === "multi_assignment_apply"
+            ? "Pilot apply denemesi başlatıldı. İSG-KATİP üzerinde işlem yüzeyi tetiklendi."
+            : "Pilot apply denemesi başlatıldı. İSG-KATİP üzerinde güncelleme yüzeyi tetiklendi.",
+        processedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      results.push({
+        id: record.id || `${operationType}-${index + 1}`,
+        companyName: record.companyName || "Firma",
+        sgkNo: record.sgkNumber || record.sgkNo || "-",
+        status: "failed",
+        reason: error?.message || "İşlem yüzeyi tetiklenemedi.",
+        processedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  return {
+    success: results.some((item) => item.status === "success"),
+    results,
+  };
 }
 
 async function init() {

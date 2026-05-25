@@ -248,7 +248,6 @@ export function AppSidebar() {
   const location = useLocation();
 
   const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([
-    "OSGB Modülü",
     "Kroki Editörü",
   ]);
 
@@ -295,262 +294,284 @@ export function AppSidebar() {
   };
 
   const menuGroups: MenuGroup[] = useMemo(
-    () => [
-      {
-        label: "Sık Kullanılanlar",
-        icon: Star,
-        items: [
-          { title: "Risk Sihirbazı", url: "/risk-wizard", icon: TrendingUp, badge: "AI" },
-          { title: "Acil Durum Planı", url: "/adep-wizard", icon: Flame, badge: null },
-        ],
-      },
-      {
-        label: "Genel",
-        icon: LayoutDashboard,
-        items: [
-          { title: "Ana Panel", url: "/", icon: LayoutDashboard, badge: null },
-          { title: "Profilim", url: "/profile", icon: User, badge: null },
-          { title: "E-posta Arşivi", url: "/email-history", icon: Mail, badge: null },
-        ],
-      },
-      {
-        label: "Operasyonlar",
-        icon: Briefcase,
-        items: [
-          { title: "DÖF Yönetimi", url: "/inspections", icon: ClipboardCheck, badge: null },
-          {
-            title: "Kurul Toplantıları",
-            url: "/board-meetings",
-            icon: Users,
-            badge: draftMeetingsCount > 0 ? draftMeetingsCount : null,
-          },
-          { title: "İSG FORMLARI", url: "/assignment-letters", icon: FileText, badge: null },
-          { title: "İş Kazası / Ramak Kala", url: "/incidents", icon: ShieldAlert, badge: "NEW" },
-          {
-            title: "Periyodik Kontrol",
-            url: "/periodic-controls",
-            icon: CalendarClock,
-            badge: "NEW",
-          },
-        ],
-      },
-      {
-        label: "Firma & Kadro",
-        icon: Building2,
-        items: [
-          { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
-          { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
-          { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
-          {
-            title: "Sağlık Gözetimi",
-            url: "/health-surveillance",
-            icon: HeartPulse,
-            badge: "NEW",
-          },
-          canAccessOsgbModule
-            ? {
-                title: "OSGB Modülü",
-                url: "/osgb",
+    () => {
+      const osgbChildren: MenuItem[] = [
+        {
+          title: "OSGB Başlangıç",
+          url: "/osgb/dashboard",
+          icon: LayoutDashboard,
+          badge: null,
+        },
+        {
+          title: "Nasıl Kullanılır",
+          url: "/osgb/how-to",
+          icon: CircleHelp,
+          badge: null,
+        },
+        canViewCompanyHub
+          ? {
+              title: "Firma Havuzu",
+              url: "/osgb/company-tracking",
+              icon: Building2,
+              badge: null,
+            }
+          : null,
+        canViewPeople
+          ? {
+              title: "Personel ve Atamalar",
+              url: "/osgb/assignments",
+              icon: Briefcase,
+              badge: null,
+            }
+          : null,
+        canViewPeople
+          ? {
+              title: "Dakika ve Kapasite",
+              url: "/osgb/capacity",
+              icon: TrendingUp,
+              badge: null,
+            }
+          : null,
+        canViewPeople
+          ? {
+              title: "Saha Operasyonu",
+              url: "/osgb/field-visits",
+              icon: MapPinned,
+              badge: "NEW",
+            }
+          : null,
+        canViewDocuments
+          ? {
+              title: "Yasal Evraklar",
+              url: "/osgb/documents",
+              icon: FileSearch,
+              badge: null,
+            }
+          : null,
+        canViewKatip
+          ? {
+              title: "ISG-KATIP Merkezi",
+              url: "/osgb/isgkatip",
+              icon: Link2,
+              badge: "NEW",
+            }
+          : null,
+        canViewAutomation
+          ? {
+              title: "Otomasyon Merkezi",
+              url: "/osgb/automation",
+              icon: Bot,
+              badge: "NEW",
+            }
+          : null,
+        canViewPortal
+          ? {
+              title: "Müşteri Portalı",
+              url: "/osgb/client-portal",
+              icon: Globe2,
+              badge: "NEW",
+            }
+          : null,
+        canViewFinance
+          ? {
+              title: "Finans ve Karlılık",
+              url: "/osgb/finance",
+              icon: FileText,
+              badge: null,
+            }
+          : null,
+        canViewAnalytics
+          ? {
+              title: "Trend Analizi",
+              url: "/osgb/analytics",
+              icon: TrendingUp,
+              badge: null,
+            }
+          : null,
+      ].filter((item): item is NonNullable<typeof item> => item !== null);
+
+      return [
+        {
+          label: "Öne Çıkanlar",
+          icon: Star,
+          items: [
+            {
+              title: "İSGBot",
+              url: canAccessIsgBot ? "/isg-bot" : "/settings?tab=billing&upgrade=1",
+              icon: Bot,
+              badge: canAccessIsgBot ? "AI" : "Kilitli",
+            },
+            { title: "Risk Sihirbazı", url: "/risk-wizard", icon: TrendingUp, badge: "AI" },
+            {
+              title: "Sertifika Merkezi",
+              url: "/dashboard/certificates",
+              icon: Award,
+              badge: "NEW",
+            },
+            { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
+            canAccessOsgbModule
+              ? {
+                  title: "OSGB Modülü",
+                  url: "/osgb",
+                  icon: Briefcase,
+                  badge: "NEW",
+                  children: osgbChildren,
+                }
+              : null,
+          ].filter((item): item is NonNullable<typeof item> => item !== null),
+        },
+        {
+          label: "Yapay Zeka & Otomasyon",
+          icon: Brain,
+          items: [
+            { title: "Yapay Zeka Raporları", url: "/reports", icon: Brain, badge: "Beta" },
+            { title: "AI Kroki Analizi", url: "/blueprint-analyzer", icon: Search, badge: "AI" },
+            { title: "NACE Kod Sorgulama", url: "/nace-query", icon: Shield, badge: "AI" },
+          ],
+        },
+        {
+          label: "Risk & Acil Durum",
+          icon: ShieldAlert,
+          items: [
+            { title: "Risk Sihirbazı", url: "/risk-wizard", icon: TrendingUp, badge: "AI" },
+            {
+              title: "Klasik Risk Editörü",
+              url: "/risk-editor",
+              icon: FileSearch,
+              badge: "NEW",
+            },
+            { title: "Acil Durum Planı", url: "/adep-wizard", icon: Flame, badge: null },
+            { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
+            {
+              title: "Kroki Editörü",
+              url: "/evacuation-editor",
+              icon: MapPinned,
+              badge: "NEW",
+              children: [
+                {
+                  title: "Tahliye Kroki",
+                  url: "/evacuation-editor",
+                  icon: MapPinned,
+                  badge: "NEW",
+                },
+                {
+                  title: "Kroki Geçmişleri",
+                  url: "/evacuation-editor/history",
+                  icon: History,
+                  badge: null,
+                },
+                {
+                  title: "AI Kroki Analizi",
+                  url: "/blueprint-analyzer",
+                  icon: Search,
+                  badge: "AI",
+                },
+                {
+                  title: "Kroki Kullanım Rehberi",
+                  url: "/blueprint-analyzer/how-to",
+                  icon: CircleHelp,
+                  badge: null,
+                },
+              ],
+            },
+            { title: "İş Kazası / Ramak Kala", url: "/incidents", icon: ShieldAlert, badge: "NEW" },
+          ],
+        },
+        {
+          label: "Firma & Çalışan Yönetimi",
+          icon: Building2,
+          items: [
+            { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
+            { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
+            { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
+            {
+              title: "Sağlık Gözetimi",
+              url: "/health-surveillance",
+              icon: HeartPulse,
+              badge: "NEW",
+            },
+          ],
+        },
+        ...(canAccessOsgbModule
+          ? [
+              {
+                label: "OSGB Yönetimi",
                 icon: Briefcase,
-                badge: "NEW",
-                children: [
-                  {
-                    title: "OSGB Başlangıç",
-                    url: "/osgb/dashboard",
-                    icon: LayoutDashboard,
-                    badge: null,
-                  },
-                  {
-                    title: "Nasıl Kullanılır",
-                    url: "/osgb/how-to",
-                    icon: CircleHelp,
-                    badge: null,
-                  },
-                  canViewCompanyHub
-                    ? {
-                        title: "Firma Havuzu",
-                        url: "/osgb/company-tracking",
-                        icon: Building2,
-                        badge: null,
-                      }
-                    : null,
-                  canViewPeople
-                    ? {
-                        title: "Personel ve Atamalar",
-                        url: "/osgb/assignments",
-                        icon: Briefcase,
-                        badge: null,
-                      }
-                    : null,
-                  canViewPeople
-                    ? {
-                        title: "Dakika ve Kapasite",
-                        url: "/osgb/capacity",
-                        icon: TrendingUp,
-                        badge: null,
-                      }
-                    : null,
-                  canViewPeople
-                    ? {
-                        title: "Saha Operasyonu",
-                        url: "/osgb/field-visits",
-                        icon: MapPinned,
-                        badge: "NEW",
-                      }
-                    : null,
-                  canViewDocuments
-                    ? {
-                        title: "Yasal Evraklar",
-                        url: "/osgb/documents",
-                        icon: FileSearch,
-                        badge: null,
-                      }
-                    : null,
-                  canViewFinance
-                    ? {
-                        title: "Finans ve Karlılık",
-                        url: "/osgb/finance",
-                        icon: FileText,
-                        badge: null,
-                      }
-                    : null,
-                  canViewAutomation
-                    ? {
-                        title: "Otomasyon Merkezi",
-                        url: "/osgb/automation",
-                        icon: Bot,
-                        badge: "NEW",
-                      }
-                    : null,
-                  canViewKatip
-                    ? {
-                        title: "ISG-KATIP Merkezi",
-                        url: "/osgb/isgkatip",
-                        icon: Link2,
-                        badge: "NEW",
-                      }
-                    : null,
-                  canViewPortal
-                    ? {
-                        title: "Müşteri Portalı",
-                        url: "/osgb/client-portal",
-                        icon: Globe2,
-                        badge: "NEW",
-                      }
-                    : null,
-                  canViewAnalytics
-                    ? {
-                        title: "Trend Analizi",
-                        url: "/osgb/analytics",
-                        icon: TrendingUp,
-                        badge: null,
-                      }
-                    : null,
-                ].filter((item): item is NonNullable<typeof item> => item !== null),
-              }
-            : null,
-        ].filter((item): item is NonNullable<typeof item> => item !== null),
-      },
-      {
-        label: "Belge Yönetimi",
-        icon: Award,
-        items: [
-          {
-            title: "Sertifika Merkezi",
-            url: "/dashboard/certificates",
-            icon: Award,
-            badge: "NEW",
-          },
-          {
-            title: "Sertifika Geçmişi",
-            url: "/dashboard/certificates/history",
-            icon: History,
-            badge: null,
-          },
-          { title: "İSG Kütüphanesi", url: "/safety-library", icon: BookOpen, badge: null },
-          {
-            title: "Çalışma Talimatları",
-            url: "/work-instructions",
-            icon: ClipboardList,
-            badge: "NEW",
-          },
-        ],
-      },
-      {
-        label: "Risk & Güvenlik",
-        icon: ShieldAlert,
-        items: [
-          {
-            title: "Klasik Risk Editörü",
-            url: "/risk-editor",
-            icon: FileSearch,
-            badge: "NEW",
-          },
-          { title: "Denetimler", url: "/capa", icon: ShieldAlert, badge: null },
-          { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
-          { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
-          {
-            title: "Kroki Editörü",
-            url: "/evacuation-editor",
-            icon: MapPinned,
-            badge: "NEW",
-            children: [
-              {
-                title: "Tahliye Kroki",
-                url: "/evacuation-editor",
-                icon: MapPinned,
-                badge: "NEW",
-              },
-              {
-                title: "Kroki Geçmişleri",
-                url: "/evacuation-editor/history",
-                icon: History,
-                badge: null,
-              },
-              {
-                title: "AI Kroki Analizi",
-                url: "/blueprint-analyzer",
-                icon: Search,
-                badge: "AI",
-              },
-              {
-                title: "Kroki Kullanım Rehberi",
-                url: "/blueprint-analyzer/how-to",
-                icon: CircleHelp,
-                badge: null,
-              },
-            ],
-          },
-        ],
-      },
-      {
-        label: "Planlama",
-        icon: Calendar,
-        items: [
-          { title: "Yıllık Planlar", url: "/annual-plans", icon: Calendar, badge: null },
-          { title: "NACE Kod Sorgulama", url: "/nace-query", icon: Shield, badge: "AI" },
-          {
-            title: "NACE Sektör Listesi",
-            url: "/nace-query/sectors",
-            icon: BookOpen,
-            badge: null,
-          },
-        ],
-      },
-      {
-        label: "Yapay Zeka & Otomasyon",
-        icon: Brain,
-        items: [
-          { title: "Yapay Zeka Raporları", url: "/reports", icon: Brain, badge: "Beta" },
-          {
-            title: "İSGBot",
-            url: canAccessIsgBot ? "/isg-bot" : "/settings?tab=billing&upgrade=1",
-            icon: Bot,
-            badge: canAccessIsgBot ? "NEW" : "Kilitli",
-          },
-        ],
-      },
-    ],
+                items: osgbChildren,
+              } satisfies MenuGroup,
+            ]
+          : []),
+        {
+          label: "Eğitim & Belge Yönetimi",
+          icon: Award,
+          items: [
+            {
+              title: "Sertifika Merkezi",
+              url: "/dashboard/certificates",
+              icon: Award,
+              badge: "NEW",
+            },
+            {
+              title: "Sertifika Geçmişi",
+              url: "/dashboard/certificates/history",
+              icon: History,
+              badge: null,
+            },
+            { title: "İSG Kütüphanesi", url: "/safety-library", icon: BookOpen, badge: null },
+            {
+              title: "Çalışma Talimatları",
+              url: "/work-instructions",
+              icon: ClipboardList,
+              badge: "NEW",
+            },
+            { title: "İSG FORMLARI", url: "/assignment-letters", icon: FileText, badge: null },
+          ],
+        },
+        {
+          label: "Operasyon Takibi",
+          icon: Briefcase,
+          items: [
+            { title: "DÖF Yönetimi", url: "/inspections", icon: ClipboardCheck, badge: null },
+            {
+              title: "Kurul Toplantıları",
+              url: "/board-meetings",
+              icon: Users,
+              badge: draftMeetingsCount > 0 ? draftMeetingsCount : null,
+            },
+            { title: "Denetimler", url: "/capa", icon: ShieldAlert, badge: null },
+            { title: "DÖF Oluştur", url: "/bulk-capa", icon: ShieldPlus, badge: null },
+            {
+              title: "Periyodik Kontrol",
+              url: "/periodic-controls",
+              icon: CalendarClock,
+              badge: "NEW",
+            },
+          ],
+        },
+        {
+          label: "Planlama & Sorgulama",
+          icon: Calendar,
+          items: [
+            { title: "Yıllık Planlar", url: "/annual-plans", icon: Calendar, badge: null },
+            {
+              title: "NACE Sektör Listesi",
+              url: "/nace-query/sectors",
+              icon: BookOpen,
+              badge: null,
+            },
+          ],
+        },
+        {
+          label: "Genel",
+          icon: LayoutDashboard,
+          items: [
+            { title: "Ana Panel", url: "/", icon: LayoutDashboard, badge: null },
+            { title: "Profilim", url: "/profile", icon: User, badge: null },
+            { title: "E-posta Arşivi", url: "/email-history", icon: Mail, badge: null },
+          ],
+        },
+      ];
+    },
     [
       canViewAnalytics,
       canViewAutomation,
@@ -611,7 +632,7 @@ export function AppSidebar() {
 
   const menuGroupsWithFavorites = useMemo(() => {
     return menuGroups.map((group) => {
-      if (group.label !== "Sık Kullanılanlar") return group;
+      if (group.label !== "Öne Çıkanlar") return group;
 
       const defaultItems = group.items.filter((item) => !favoriteUrls.includes(item.url));
 

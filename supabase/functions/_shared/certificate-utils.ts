@@ -8,8 +8,16 @@ const ALLOWED_ORIGINS = [
   Deno.env.get("SITE_URL"),
 ].filter(Boolean);
 
+function isAllowedOrigin(origin: string) {
+  return (
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^http:\/\/localhost(?::\d+)?$/.test(origin) ||
+    /^http:\/\/127\.0\.0\.1(?::\d+)?$/.test(origin)
+  );
+}
+
 export function getCorsHeaders(origin: string | null) {
-  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0] ?? "";
+  const allowOrigin = origin && isAllowedOrigin(origin) ? origin : ALLOWED_ORIGINS[0] ?? "";
   return {
     "Access-Control-Allow-Origin": allowOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",

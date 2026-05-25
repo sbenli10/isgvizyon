@@ -41,9 +41,19 @@ interface StatusError extends Error {
   status?: number;
 }
 
+type OperationStatus = "started" | "success" | "partial" | "failed";
+
+interface OperationContext {
+  id: string | null;
+  startedAt: number;
+}
+
 serve(async (req: Request) => {
   const requestUrl = req.url;
   const requestMethod = req.method;
+  let serviceClient: SupabaseClient | null = null;
+  let action = "UNKNOWN";
+  let operation: OperationContext | null = null;
   
   console.log(`[ISG-KATIP-SYNC] [REQUEST_START] Metot: ${requestMethod} | URL: ${requestUrl}`);
 
@@ -59,45 +69,58 @@ serve(async (req: Request) => {
 
     console.log("[ISG-KATIP-SYNC] [ENV_CHECK] Ortam değişkenleri başarıyla okundu.");
 
-    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+    serviceClient = createClient(supabaseUrl, serviceRoleKey);
     
     // Yetkilendirme bağlamını doğrula ve logla
     console.log("[ISG-KATIP-SYNC] [AUTH_INIT] Kullanıcı kimlik doğrulama adımı başlatılıyor...");
     const authContext = await requireAuthContext(req, supabaseUrl, anonKey, serviceClient);
-    console.log(`[ISG-KATIP-SYNC] [AUTH_SUCCESS] Kullanıcı doğrulandı. UserID: ${authContext.userId} | OrgID: ${authContext.organizationId}`);
+    console.log("[ISG-KATIP-SYNC] [AUTH_SUCCESS] Kullanıcı doğrulandı.");
 
     // Gelen JSON gövdesini oku
-    const body = await req.json();
-    const { action, data } = body;
+    const body = (await req.json()) as { action?: string; data?: Record<string, unknown> };
+    const data = body.data ?? {};
+    action = String(body?.action || "UNKNOWN");
     console.log(`[ISG-KATIP-SYNC] [ACTION_RECEIVED] Tetiklenen Aksiyon: "${action}"`);
+
+    operation = await startOperationLog(serviceClient, authContext, {
+      operationType: action.toLowerCase(),
+      operationTitle: getOperationTitle(action),
+      source: String(data?.source || "isgkatip-sync"),
+      inputSummary: summarizeInput(action, data),
+    });
 
     let response;
     switch (action) {
       case "SYNC_COMPANY":
         console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
-        response = await syncCompany(serviceClient, authContext, data);
+        response = await syncCompany(serviceClient, authContext, data as unknown as CompanyData);
         break;
       case "BATCH_SYNC":
-        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor. Firma adedi: " + (data?.companies?.length || 0));
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor. Firma adedi: " + (Array.isArray(data.companies) ? data.companies.length : 0));
         response = await batchSyncCompanies(serviceClient, authContext, data);
         break;
       case "GET_COMPANIES":
         console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
-        response = await getCompanies(serviceClient, authContext, data?.filters || {});
+        response = await getCompanies(serviceClient, authContext, (data.filters as Record<string, unknown> | undefined) || {});
         break;
       case "PULL_REMOTE_AND_SYNC":
         console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
-        response = await pullRemoteAndSync(serviceClient, authContext, data || {});
+        response = await pullRemoteAndSync(serviceClient, authContext, data);
         break;
       case "GET_CHANGE_TRACKING":
         console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
         response = await getChangeTracking(serviceClient, authContext);
+        break;
+      case "GET_OPERATION_HISTORY":
+        console.log("[ISG-KATIP-SYNC] [ROUTING] " + action + " işlemine yönlendiriliyor.");
+        response = await getOperationHistory(serviceClient, authContext, data);
         break;
       default:
         console.error(`[ISG-KATIP-SYNC] [ROUTING_ERROR] Bilinmeyen aksiyon talebi: ${action}`);
         throw new Error(`Unknown action: ${action}`);
     }
 
+    await finishOperationLog(serviceClient, operation, "success", summarizeOutput(action, response as Record<string, unknown> | undefined));
     console.log(`[ISG-KATIP-SYNC] [REQUEST_SUCCESS] Aksiyon "${action}" başarıyla tamamlandı. Yanıt gönderiliyor.`);
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -105,6 +128,9 @@ serve(async (req: Request) => {
   } catch (error) {
     const err = error as StatusError;
     console.error(`[ISG-KATIP-SYNC] [CRITICAL_EXCEPTION] Hata Yakalandı! Mesaj: ${err.message} | HTTP Status: ${err?.status || 500}`);
+    if (serviceClient && operation) {
+      await finishOperationLog(serviceClient, operation, "failed", null, maskErrorMessage(err.message), String(err.status || "FUNCTION_ERROR"));
+    }
     
     return new Response(
       JSON.stringify({
@@ -118,6 +144,120 @@ serve(async (req: Request) => {
     );
   }
 });
+
+function getOperationTitle(action: string): string {
+  const titles: Record<string, string> = {
+    SYNC_COMPANY: "Tek Firma Senkronizasyonu",
+    BATCH_SYNC: "İSG-KATİP Toplu Firma Senkronizasyonu",
+    GET_COMPANIES: "Son Senkron Firma Listesi",
+    PULL_REMOTE_AND_SYNC: "Dış Kaynaktan Senkronizasyon",
+    GET_CHANGE_TRACKING: "İSG-KATİP Değişiklik Takibi",
+    GET_OPERATION_HISTORY: "İSGBot İşlem Geçmişi",
+  };
+  return titles[action] || action;
+}
+
+function summarizeInput(action: string, data: Record<string, unknown> | undefined) {
+  if (!data) return { action };
+  if (action === "BATCH_SYNC") {
+    return {
+      action,
+      company_count: Array.isArray(data.companies) ? data.companies.length : 0,
+      source: data.source || null,
+    };
+  }
+  return {
+    action,
+    source: data.source || null,
+    filter_count: typeof data.filters === "object" && data.filters ? Object.keys(data.filters as Record<string, unknown>).length : 0,
+  };
+}
+
+function summarizeOutput(action: string, response: Record<string, unknown> | undefined) {
+  if (!response) return { action };
+  const summary = response.summary as SyncSummary | undefined;
+  const result = response.result as Record<string, unknown> | undefined;
+  return {
+    action,
+    count: response.count || (Array.isArray(response.companies) ? response.companies.length : undefined),
+    total: summary?.total,
+    inserted: summary?.inserted,
+    updated: summary?.updated,
+    skipped: summary?.skipped,
+    errors: summary?.errors,
+    changes: Array.isArray(result?.changes) ? result?.changes.length : undefined,
+    hasBaseline: result?.hasBaseline,
+  };
+}
+
+function maskErrorMessage(message?: string) {
+  return String(message || "Beklenmeyen işlem hatası.")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer [masked]")
+    .replace(/eyJ[A-Za-z0-9._~+/=-]+/g, "[masked-token]")
+    .slice(0, 800);
+}
+
+async function startOperationLog(
+  supabase: SupabaseClient,
+  authContext: AuthContext,
+  input: {
+    operationType: string;
+    operationTitle: string;
+    source: string;
+    inputSummary: Record<string, unknown>;
+  },
+): Promise<OperationContext> {
+  const startedAt = Date.now();
+  const { data, error } = await supabase
+    .from("isgbot_operations")
+    .insert({
+      organization_id: authContext.organizationId,
+      user_id: authContext.userId,
+      operation_type: input.operationType,
+      operation_title: input.operationTitle,
+      status: "started",
+      source: input.source,
+      started_at: new Date(startedAt).toISOString(),
+      input_summary: input.inputSummary,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[ISG-KATIP-SYNC] [OPERATION_LOG_START_ERROR]", error.message);
+    return { id: null, startedAt };
+  }
+
+  return { id: data?.id || null, startedAt };
+}
+
+async function finishOperationLog(
+  supabase: SupabaseClient,
+  operation: OperationContext | null,
+  status: OperationStatus,
+  resultSummary?: Record<string, unknown> | null,
+  errorMessage?: string | null,
+  errorCode?: string | null,
+) {
+  if (!operation?.id) return;
+
+  const finishedAt = Date.now();
+  const { error } = await supabase
+    .from("isgbot_operations")
+    .update({
+      status,
+      finished_at: new Date(finishedAt).toISOString(),
+      duration_ms: Math.max(0, finishedAt - operation.startedAt),
+      result_summary: resultSummary || null,
+      error_message: errorMessage || null,
+      error_code: errorCode || null,
+    })
+    .eq("id", operation.id);
+
+  if (error) {
+    console.error("[ISG-KATIP-SYNC] [OPERATION_LOG_FINISH_ERROR]", error.message);
+  }
+}
 
 async function requireAuthContext(
   req: Request, 
@@ -136,7 +276,7 @@ async function requireAuthContext(
   }
 
   if (!authHeader.startsWith("Bearer ")) {
-    console.error(`[ISG-KATIP-SYNC] [AUTH_FAIL] Authorization başlığı 'Bearer ' ile başlamıyor! Gelen değer: "${authHeader.substring(0, 15)}..."`);
+    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] Authorization başlığı 'Bearer ' ile başlamıyor.");
     const error = new Error("Yetkisiz istek. Geçersiz token formatı.") as StatusError;
     error.status = 401;
     throw error;
@@ -146,8 +286,8 @@ async function requireAuthContext(
 
   const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!accessToken) {
-    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] Bearer token boÅŸ geldi.");
-    const error = new Error("Yetkisiz istek. Token boÅŸ.") as StatusError;
+    console.error("[ISG-KATIP-SYNC] [AUTH_FAIL] Bearer token boş geldi.");
+    const error = new Error("Yetkisiz istek. Token boş.") as StatusError;
     error.status = 401;
     throw error;
   }
@@ -164,7 +304,7 @@ async function requireAuthContext(
     throw error;
   }
 
-  console.log(`[ISG-KATIP-SYNC] [AUTH_USER_OK] Kullanıcı oturumu geçerli. UID: ${user.id}. Profil organizasyon verisi sorgulanıyor...`);
+  console.log("[ISG-KATIP-SYNC] [AUTH_USER_OK] Kullanıcı oturumu geçerli. Profil organizasyon verisi sorgulanıyor...");
 
   const { data: profile, error: profileError } = await serviceClient
     .from("profiles")
@@ -415,6 +555,8 @@ async function batchSyncCompanies(supabase: SupabaseClient, authContext: AuthCon
     throw new Error("Aktarılacak firma listesi boş.");
   }
 
+  const snapshot = await snapshotCurrentCompanies(supabase, authContext);
+
   const results = [];
   const summary: SyncSummary = {
     total: companies.length,
@@ -462,6 +604,8 @@ async function batchSyncCompanies(supabase: SupabaseClient, authContext: AuthCon
       inserted: summary.inserted,
       updated: summary.updated,
       skipped: summary.skipped,
+      previousSnapshotId: snapshot.snapshotId,
+      previousSnapshotCount: snapshot.count,
       previewSummary: (data?.metadata as Record<string, unknown> | undefined)?.previewSummary || null,
     },
     status: summary.errors > 0 ? "PARTIAL" : "SUCCESS",
@@ -476,7 +620,68 @@ async function batchSyncCompanies(supabase: SupabaseClient, authContext: AuthCon
   return {
     success: true,
     results,
-    summary,
+    summary: {
+      ...summary,
+      previousSnapshotId: snapshot.snapshotId,
+      previousSnapshotCount: snapshot.count,
+    },
+  };
+}
+
+async function snapshotCurrentCompanies(supabase: SupabaseClient, authContext: AuthContext) {
+  const snapshotId = crypto.randomUUID();
+  const snapshotAt = new Date().toISOString();
+
+  const { data: currentRows, error: readError } = await supabase
+    .from("isgkatip_companies")
+    .select("id, org_id, sgk_no, company_name, employee_count, hazard_class, nace_code, contract_start, contract_end, contract_status, assigned_minutes, required_minutes, compliance_status, risk_score, last_synced_at, created_at, updated_at, is_deleted")
+    .eq("org_id", authContext.organizationId);
+
+  if (readError) throw readError;
+
+  const { error: deleteError } = await supabase
+    .from("isgkatip_companies_backup")
+    .delete()
+    .eq("org_id", authContext.organizationId);
+
+  if (deleteError) throw deleteError;
+
+  const rows = (currentRows || []).map((row: Record<string, unknown>) => ({
+    id: row.id || null,
+    org_id: authContext.organizationId,
+    snapshot_id: snapshotId,
+    snapshot_at: snapshotAt,
+    company_identifier: String(row.sgk_no || row.id || "").trim(),
+    sgk_no: row.sgk_no || null,
+    company_name: row.company_name || null,
+    employee_count: row.employee_count || 0,
+    hazard_class: row.hazard_class || null,
+    nace_code: row.nace_code || null,
+    contract_start: row.contract_start || null,
+    contract_end: row.contract_end || null,
+    contract_status: row.contract_status || null,
+    assigned_minutes: row.assigned_minutes || 0,
+    required_minutes: row.required_minutes || 0,
+    compliance_status: row.compliance_status || null,
+    risk_score: row.risk_score || 0,
+    last_synced_at: row.last_synced_at || null,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    is_deleted: row.is_deleted || false,
+  }));
+
+  if (rows.length > 0) {
+    const { error: insertError } = await supabase
+      .from("isgkatip_companies_backup")
+      .insert(rows);
+
+    if (insertError) throw insertError;
+  }
+
+  return {
+    snapshotId,
+    snapshotAt,
+    count: rows.length,
   };
 }
 
@@ -536,14 +741,15 @@ function compareCompanySnapshots(currentRows: Array<Record<string, unknown>>, ba
   );
 
   const watchedFields = [
-    { key: "company_name", label: "Firma adı" },
-    { key: "employee_count", label: "Çalışan sayısı" },
-    { key: "hazard_class", label: "Tehlike sınıfı" },
-    { key: "contract_start", label: "Sözleşme başlangıcı" },
-    { key: "contract_end", label: "Sözleşme bitişi" },
-    { key: "assigned_minutes", label: "Atanan süre" },
-    { key: "required_minutes", label: "Gerekli süre" },
-    { key: "nace_code", label: "NACE kodu" },
+    { key: "company_name", label: "Firma adı", category: "Firma bilgisi değişenler" },
+    { key: "employee_count", label: "Çalışan sayısı", category: "Çalışan sayısı değişenler" },
+    { key: "hazard_class", label: "Tehlike sınıfı", category: "Tehlike sınıfı değişenler" },
+    { key: "contract_status", label: "Sözleşme durumu", category: "Sözleşme durumu değişenler" },
+    { key: "contract_start", label: "Sözleşme başlangıcı", category: "Sözleşme tarihi değişenler" },
+    { key: "contract_end", label: "Sözleşme bitişi", category: "Sözleşme tarihi değişenler" },
+    { key: "assigned_minutes", label: "Atanan süre", category: "Atama süresi değişenler" },
+    { key: "required_minutes", label: "Gerekli süre", category: "Atama süresi değişenler" },
+    { key: "nace_code", label: "NACE kodu", category: "Firma bilgisi değişenler" },
   ];
 
   const changes = [];
@@ -566,21 +772,22 @@ function compareCompanySnapshots(currentRows: Array<Record<string, unknown>>, ba
       continue;
     }
 
-    const details = watchedFields
+    const changedFields = watchedFields
       .map((field) => {
         const before = getComparableValue(previous, field.key);
         const after = getComparableValue(row, field.key);
-        return before !== after ? `${field.label}: ${before} → ${after}` : null;
+        return before !== after ? { detail: `${field.label}: ${before} → ${after}`, category: field.category } : null;
       })
       .filter(Boolean);
 
-    if (details.length > 0) {
+    if (changedFields.length > 0) {
       changes.push({
         id: String(row.id || key),
         companyName: String(row.company_name || "Firma"),
         type: "updated",
-        summary: `${details.length} alanda değişiklik var`,
-        details,
+        summary: `${changedFields.length} alanda değişiklik var`,
+        changeCategories: [...new Set(changedFields.map((item) => item?.category).filter(Boolean))],
+        details: changedFields.map((item) => item?.detail).filter(Boolean),
       });
     }
   }
@@ -631,6 +838,24 @@ async function getChangeTracking(supabase: SupabaseClient, authContext: AuthCont
     success: true,
     result: compareCompanySnapshots(companies || [], backups || []),
     companies: companies || [],
+  };
+}
+
+async function getOperationHistory(supabase: SupabaseClient, authContext: AuthContext, data: Record<string, unknown>) {
+  const limit = Math.min(Math.max(normalizeInteger(data?.limit, 12), 1), 50);
+  const { data: operations, error } = await supabase
+    .from("isgbot_operations")
+    .select("id, operation_type, operation_title, status, source, started_at, finished_at, duration_ms, input_summary, result_summary, error_message, error_code, created_at")
+    .eq("organization_id", authContext.organizationId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return {
+    success: true,
+    operations: operations || [],
+    count: (operations || []).length,
   };
 }
 

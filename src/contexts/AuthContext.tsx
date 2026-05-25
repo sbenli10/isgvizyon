@@ -46,7 +46,7 @@ export const useAuth = () => useContext(AuthContext);
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const EXTENSION_ID = "hgcbdpekhlgfnfofogfkhjccnkpbmlcj";
+const EXTENSION_ID = "ombgdbjkinmfbkpenjihlakgdppkcdbj";
 
 function isExtensionCallback() {
   if (typeof window === "undefined") return false;

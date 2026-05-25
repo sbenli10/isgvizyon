@@ -145,6 +145,14 @@ export async function getCertificateDownload(certificateId: string) {
   return await callFunction<CertificateJobRecord>("certificates-download", { method: "GET" }, { certificateId });
 }
 
+export async function getCertificateItemDownload(itemId: string) {
+  return await callFunction<{ downloadUrl: string; pdfPath: string; regenerated: boolean }>(
+    "certificates-download-item",
+    { method: "GET" },
+    { itemId },
+  );
+}
+
 export async function getCertificateVerification(code: string) {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const url = new URL(`${supabaseUrl}/functions/v1/certificates-verify`);

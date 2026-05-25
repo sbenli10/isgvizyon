@@ -9,10 +9,26 @@ const MESSAGE_TYPES = {
   authSessionUpdated: "AUTH_SESSION_UPDATED",
   authPing: "DENETRON_AUTH_PING",
   authSuccess: "DENETRON_AUTH_SUCCESS",
+  extensionStatus: "ISGVIZYON_EXTENSION_STATUS",
+  validateAssignmentSurface: "ISGVIZYON_VALIDATE_ASSIGNMENT_SURFACE",
+  validateDurationSurface: "ISGVIZYON_VALIDATE_DURATION_SURFACE",
+  multiAssignmentApply: "ISGVIZYON_MULTI_ASSIGNMENT_APPLY",
+  excessDurationApply: "ISGVIZYON_EXCESS_DURATION_APPLY",
+  isgKatipStatus: "ISGVIZYON_ISGKATIP_STATUS",
+  validateAssignmentSurfaceRequest: "ISGVIZYON_VALIDATE_ASSIGNMENT_SURFACE_REQUEST",
+  validateDurationSurfaceRequest: "ISGVIZYON_VALIDATE_DURATION_SURFACE_REQUEST",
+  multiAssignmentApplyRequest: "ISGVIZYON_MULTI_ASSIGNMENT_APPLY_REQUEST",
+  excessDurationApplyRequest: "ISGVIZYON_EXCESS_DURATION_APPLY_REQUEST",
   configUpdated: "CONFIG_UPDATED",
   getConfig: "GET_CONFIG",
   syncSubmit: "ISGKATIP_SYNC_SUBMIT",
   syncNow: "SYNC_NOW",
+};
+
+const DEBUG_EXTENSION_STATUS = false;
+
+const debugExtensionStatus = (...args) => {
+  if (DEBUG_EXTENSION_STATUS) console.debug(...args);
 };
 
 class BackgroundService {
@@ -30,7 +46,7 @@ class BackgroundService {
     await this.authHandler.init();
     await this.loadConfig();
     this.setupListeners();
-    console.log("[ISGVizyon Background] hazır");
+    // Keep the service worker quiet in production; errors are still reported explicitly.
   }
 
   async ensureDefaults() {
@@ -118,8 +134,16 @@ class BackgroundService {
     return (
       senderUrl.startsWith("https://www.isgvizyon.com/") ||
       senderUrl.startsWith("https://isgvizyon.com/") ||
+      senderUrl.startsWith("http://localhost/") ||
+      senderUrl.startsWith("http://localhost:") ||
+      senderUrl.startsWith("http://127.0.0.1/") ||
+      senderUrl.startsWith("http://127.0.0.1:") ||
       senderOrigin === "https://www.isgvizyon.com" ||
-      senderOrigin === "https://isgvizyon.com"
+      senderOrigin === "https://isgvizyon.com" ||
+      senderOrigin === "http://localhost" ||
+      senderOrigin.startsWith("http://localhost:") ||
+      senderOrigin === "http://127.0.0.1" ||
+      senderOrigin.startsWith("http://127.0.0.1:")
     );
   }
 
@@ -128,8 +152,8 @@ class BackgroundService {
       return { ok: false, success: false, error: "INVALID_SENDER" };
     }
 
-    if (message?.type === MESSAGE_TYPES.authPing) {
-      return { ok: true, success: true, pong: true };
+    if (message?.type === MESSAGE_TYPES.authPing || message?.type === MESSAGE_TYPES.extensionStatus) {
+      return this.getExtensionStatus();
     }
 
     if (message?.type !== MESSAGE_TYPES.authSuccess) {
@@ -143,6 +167,10 @@ class BackgroundService {
     switch (message?.type) {
       case MESSAGE_TYPES.authSessionUpdated:
         return this.persistAuthSession(message.data);
+
+      case MESSAGE_TYPES.authPing:
+      case MESSAGE_TYPES.extensionStatus:
+        return this.getExtensionStatus();
 
       case MESSAGE_TYPES.getConfig:
         return {
@@ -160,8 +188,281 @@ class BackgroundService {
         await this.loadStats();
         return { success: true };
 
+      case MESSAGE_TYPES.multiAssignmentApply:
+        return this.handlePilotApply("multi_assignment_apply", MESSAGE_TYPES.multiAssignmentApplyRequest, message.data || {});
+
+      case MESSAGE_TYPES.excessDurationApply:
+        return this.handlePilotApply("excess_duration_update_apply", MESSAGE_TYPES.excessDurationApplyRequest, message.data || {});
+
+      case MESSAGE_TYPES.validateAssignmentSurface:
+        return this.handleSurfaceValidation(MESSAGE_TYPES.validateAssignmentSurfaceRequest, message.data || {});
+
+      case MESSAGE_TYPES.validateDurationSurface:
+        return this.handleSurfaceValidation(MESSAGE_TYPES.validateDurationSurfaceRequest, message.data || {});
+
       default:
         return { success: false, error: "Unknown message type" };
+    }
+  }
+
+  async getIsgKatipTabStatus() {
+    const tabs = await this.extension.tabs.query({
+      url: "https://isgkatip.csgb.gov.tr/*",
+    });
+
+    if (!tabs.length) {
+      return {
+        state: "not_open",
+        hasTab: false,
+        isLoggedIn: false,
+        isTargetPage: false,
+      };
+    }
+
+    const tab = tabs[0];
+    const status = {
+      state: "open",
+      hasTab: true,
+      isLoggedIn: false,
+      isTargetPage: Boolean(tab.url?.includes("/kisi-kurum/kisi-karti/kisi-kartim")),
+      url: tab.url || null,
+    };
+
+    if (!tab.id) return status;
+
+    try {
+      const contentStatus = await this.extension.tabs.sendMessage(tab.id, {
+        type: MESSAGE_TYPES.isgKatipStatus,
+      });
+      const isReady = Boolean(contentStatus?.isLoggedIn && contentStatus?.isTargetPage);
+
+      return {
+        ...status,
+        ...contentStatus,
+        state: isReady ? "ready" : "login_required",
+      };
+    } catch (_error) {
+      return status;
+    }
+  }
+
+  async getExtensionStatus() {
+    debugExtensionStatus("[ServiceWorker] status request received");
+    await this.authHandler.init();
+    const config = await this.loadConfig();
+    const isAuthenticated = await this.authHandler.isAuthenticated();
+    const isgKatip = await this.getIsgKatipTabStatus();
+    const manifest = this.extension.runtime.getManifest?.();
+    const cached = await this.extension.storage.local.get([
+      "stats",
+      "companiesPreview",
+      "extensionLastSyncedAt",
+      "extensionLastSyncSummary",
+      "serviceHealth",
+      "systemStatus",
+    ]);
+    const totalCompanies =
+      typeof cached.stats?.totalCompanies === "number"
+        ? cached.stats.totalCompanies
+        : Array.isArray(cached.companiesPreview)
+          ? cached.companiesPreview.length
+          : 0;
+    const isKatipSessionActive = Boolean(
+      isgKatip?.state === "ready" ||
+        (isgKatip?.isLoggedIn && isgKatip?.isTargetPage),
+    );
+    const isReady = Boolean(isAuthenticated && isKatipSessionActive);
+
+    return {
+      type: "ISGVIZYON_EXTENSION_STATUS_RESPONSE",
+      ok: true,
+      success: true,
+      pong: true,
+      installed: true,
+      source: "extension",
+      authenticated: Boolean(isAuthenticated),
+      isAuthenticated: Boolean(isAuthenticated),
+      userId: config.userId || null,
+      orgId: config.orgId || null,
+      organizationName: config.organizationName || null,
+      isgKatip,
+      isKatipSessionActive,
+      isReady,
+      lastSyncAt: cached.extensionLastSyncedAt || null,
+      extensionLastSyncedAt: cached.extensionLastSyncedAt || null,
+      totalCompanies,
+      systemStatus: cached.systemStatus || (isReady ? "Hazır" : "Kontrol gerekli"),
+      serviceHealth: cached.serviceHealth || null,
+      lastSyncSummary: cached.extensionLastSyncSummary || null,
+      version: manifest?.version || null,
+      extensionVersion: manifest?.version || null,
+    };
+  }
+
+  maskSgkNo(value) {
+    const normalized = String(value || "").replace(/\D/g, "");
+    if (normalized.length <= 4) return normalized || "-";
+    return `${normalized.slice(0, 3)}***${normalized.slice(-2)}`;
+  }
+
+  buildApplySummary(operationType, results, planHash) {
+    return {
+      operation_type: operationType,
+      total_count: results.length,
+      success_count: results.filter((item) => item.status === "success" || item.status === "success_verified" || item.status === "success_unverified").length,
+      success_verified_count: results.filter((item) => item.status === "success_verified").length,
+      success_unverified_count: results.filter((item) => item.status === "success_unverified").length,
+      failed_count: results.filter((item) => item.status === "failed").length,
+      skipped_count: results.filter((item) => item.status === "skipped").length,
+      plan_hash: planHash,
+      selector_low_confidence_count: results.filter((item) => item.selectorConfidence === "low").length,
+      rows: results.map((item) => ({
+        id: item.id || null,
+        companyName: item.companyName || null,
+        sgkNo: this.maskSgkNo(item.sgkNo),
+        status: item.status || "failed",
+        reason: item.reason || null,
+        stage: item.stage || null,
+        selectorConfidence: item.selectorConfidence || null,
+        verificationStatus: item.verificationStatus || null,
+      })),
+    };
+  }
+
+  async handleSurfaceValidation(requestType, payload) {
+    const isgKatip = await this.getIsgKatipTabStatus();
+    if (!(isgKatip?.state === "ready" || (isgKatip?.isLoggedIn && isgKatip?.isTargetPage))) {
+      return {
+        success: false,
+        error: "İşlem için uygun İSG-KATİP ekranı bulunamadı. Lütfen ilgili atama/sözleşme ekranını açıp tekrar deneyin.",
+        validation: {
+          pageContext: {
+            url: isgKatip?.url || null,
+            title: null,
+            detectedModule: "unknown",
+            confidence: "low",
+          },
+          formSurface: {
+            found: false,
+            requiredFieldsFound: 0,
+            requiredFieldsMissing: ["İSG-KATİP hedef sayfası"],
+            confidence: "low",
+          },
+          canApply: false,
+          blockingReasons: ["İSG-KATİP oturumu hazır değil."],
+        },
+      };
+    }
+
+    const tab = await this.findReadyKatipTab();
+    if (!tab?.id) {
+      return {
+        success: false,
+        error: "İSG-KATİP sekmesi bulunamadı.",
+      };
+    }
+
+    try {
+      const response = await this.extension.tabs.sendMessage(tab.id, {
+        type: requestType,
+        payload,
+      });
+      return response;
+    } catch (error) {
+      return {
+        success: false,
+        error: error?.message || "Form yüzeyi doğrulanamadı.",
+      };
+    }
+  }
+
+  async findReadyKatipTab() {
+    const tabs = await this.extension.tabs.query({
+      url: "https://isgkatip.csgb.gov.tr/*",
+    });
+    const preferredTab = tabs.find((tab) => tab.url?.includes("/kisi-kurum/kisi-karti/kisi-kartim")) || tabs[0] || null;
+    return preferredTab;
+  }
+
+  async handlePilotApply(operationType, requestType, payload) {
+    await this.authHandler.init();
+    const isAuthenticated = await this.authHandler.isAuthenticated();
+    if (!isAuthenticated) {
+      return { success: false, error: "İSGVizyon oturumu bulunamadı." };
+    }
+
+    const planHash = payload?.planHash || null;
+    const operationId = payload?.operationId || null;
+    const records = Array.isArray(payload?.records) ? payload.records.slice(0, 3) : [];
+
+    if (!planHash) {
+      return { success: false, error: "Plan doğrulaması başarısız oldu. Lütfen önizlemeyi yeniden oluşturun." };
+    }
+
+    if (!records.length) {
+      return { success: false, error: "İşlem yapılacak kayıt seçilmedi." };
+    }
+
+    if (records.length > 3) {
+      return { success: false, error: "Pilot modda en fazla 3 kayıt işlenebilir." };
+    }
+
+    const isgKatip = await this.getIsgKatipTabStatus();
+    if (!(isgKatip?.state === "ready" || (isgKatip?.isLoggedIn && isgKatip?.isTargetPage))) {
+      return { success: false, error: "İSG-KATİP oturumu bulunamadı veya hedef sayfa hazır değil." };
+    }
+
+    const tab = await this.findReadyKatipTab();
+    if (!tab?.id) {
+      return { success: false, error: "İSG-KATİP sekmesi bulunamadı." };
+    }
+
+    try {
+      const validationRequestType =
+        operationType === "multi_assignment_apply"
+          ? MESSAGE_TYPES.validateAssignmentSurfaceRequest
+          : MESSAGE_TYPES.validateDurationSurfaceRequest;
+      const validation = await this.extension.tabs.sendMessage(tab.id, {
+        type: validationRequestType,
+        payload: {
+          records,
+        },
+      });
+
+      if (!validation?.success || !validation?.validation?.canApply) {
+        return {
+          success: false,
+          error:
+            validation?.error ||
+            "Form yüzeyi doğrulanmadıysa işlem başlatılamaz.",
+          validation: validation?.validation || null,
+        };
+      }
+
+      const response = await this.extension.tabs.sendMessage(tab.id, {
+        type: requestType,
+        payload: {
+          operationId,
+          planHash,
+          records,
+          pilotLimit: 3,
+          validation: validation.validation,
+        },
+      });
+
+      const results = Array.isArray(response?.results) ? response.results : [];
+      return {
+        success: Boolean(response?.success),
+        summary: this.buildApplySummary(operationType, results, planHash),
+        results,
+        error: response?.error || null,
+        validation: validation.validation || null,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error?.message || "İSG-KATİP form alanları bulunamadı. Sayfa yapısı değişmiş olabilir.",
+      };
     }
   }
 
@@ -292,6 +593,8 @@ class BackgroundService {
     await this.extension.storage.local.set({
       extensionLastSyncedAt: new Date().toISOString(),
       extensionLastSyncSummary: summary,
+      systemStatus: summary.errors > 0 ? "Sunucu senkronu kontrol edilmeli" : "Hazır",
+      serviceHealth: summary.errors > 0 ? "Kontrol gerekli" : "Hazır",
     });
 
     await this.extension.action.setBadgeText({
@@ -355,6 +658,8 @@ class BackgroundService {
       },
       companiesPreview: companies.slice(0, 50),
       extensionLastSyncedAt: lastSyncedAt,
+      systemStatus: companies.length > 0 ? "Hazır" : "Firma verisi bekleniyor",
+      serviceHealth: "Hazır",
     });
   }
 }

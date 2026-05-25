@@ -419,6 +419,183 @@ async function drawSignatureAssets(pdfDoc: any, page: any, signatures: Array<{ i
   }
 }
 
+function fitText(value: string, maxChars: number) {
+  const normalized = normalizeText(value);
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+}
+
+function drawCorporateLogoMark(page: any) {
+  page.drawCircle({ x: 82, y: 512, size: 55, color: rgb(1, 1, 1), opacity: 0.08 });
+  page.drawCircle({ x: 82, y: 512, size: 52, borderWidth: 4, borderColor: rgb(1, 1, 1) });
+  page.drawCircle({ x: 82, y: 512, size: 36, borderWidth: 1.4, borderColor: rgb(1, 1, 1), opacity: 0.88 });
+  page.drawLine({ start: { x: 82, y: 480 }, end: { x: 82, y: 546 }, thickness: 3, color: rgb(1, 1, 1) });
+  page.drawLine({ start: { x: 82, y: 505 }, end: { x: 58, y: 532 }, thickness: 3, color: rgb(1, 1, 1) });
+  page.drawLine({ start: { x: 82, y: 505 }, end: { x: 106, y: 532 }, thickness: 3, color: rgb(1, 1, 1) });
+}
+
+function drawCorporateFieldRows(page: any, titleFont: any, bodyFont: any, rows: Array<[string, string, boolean?]>) {
+  let y = 375;
+  rows.forEach(([label, value, highlight]) => {
+    page.drawText(label, { x: 112, y, size: 11.3, font: titleFont, color: rgb(0, 0.32, 0.56) });
+    page.drawText(":", { x: 205, y, size: 11.3, font: titleFont, color: rgb(0, 0.32, 0.56) });
+    page.drawText(fitText(value, highlight ? 34 : 58), {
+      x: 224,
+      y,
+      size: highlight ? 13.5 : 10.8,
+      font: highlight ? titleFont : bodyFont,
+      color: highlight ? rgb(0, 0.25, 0.48) : rgb(0.07, 0.22, 0.36),
+      maxWidth: 250,
+    });
+    y -= highlight ? 23 : 19;
+  });
+}
+
+function drawCorporateTopics(page: any, titleFont: any, bodyFont: any, topics: string[]) {
+  page.drawRectangle({
+    x: 72,
+    y: 72,
+    width: 305,
+    height: 100,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.72, 0.82, 0.9),
+    borderWidth: 1,
+    opacity: 0.82,
+  });
+  page.drawText("Eğitim Konuları", { x: 88, y: 151, size: 11.5, font: titleFont, color: rgb(0, 0.35, 0.62) });
+
+  const safeTopics = topics.length > 0 ? topics.slice(0, 10) : ["Konu bilgisi bulunmamaktadır."];
+  const midpoint = Math.ceil(safeTopics.length / 2);
+  const columns = [safeTopics.slice(0, midpoint), safeTopics.slice(midpoint)];
+
+  columns.forEach((column, columnIndex) => {
+    let y = 132;
+    const x = columnIndex === 0 ? 88 : 232;
+    column.forEach((topic) => {
+      page.drawText(`• ${fitText(topic, 34)}`, {
+        x,
+        y,
+        size: 7.8,
+        font: bodyFont,
+        color: rgb(0, 0.39, 0.68),
+        maxWidth: 132,
+      });
+      y -= 12;
+    });
+  });
+}
+
+async function drawCorporateTrainingCertificate(pdfDoc: PDFDocument, page: any, options: {
+  bodyFont: any;
+  titleFont: any;
+  certificate: CertificateRecord;
+  participant: CertificateParticipant;
+  participantName: string;
+  certificateNumber: string;
+  companyLabel: string;
+  description: string;
+  design: ReturnType<typeof normalizeDesignConfig>;
+  curriculum: ReturnType<typeof parseCurriculumColumns>;
+}) {
+  const { bodyFont, titleFont, certificate, participant, participantName, certificateNumber, companyLabel, description, design, curriculum } = options;
+  const { width, height } = page.getSize();
+  const darkBlue = rgb(0, 0.3, 0.55);
+  const midBlue = rgb(0.02, 0.54, 0.78);
+  const textBlue = rgb(0, 0.33, 0.58);
+
+  page.drawRectangle({ x: 0, y: 0, width, height, color: darkBlue });
+  page.drawRectangle({ x: 14, y: 14, width: width - 28, height: height - 28, color: rgb(0.97, 0.985, 0.995) });
+  page.drawRectangle({ x: 27, y: 27, width: width - 54, height: height - 54, borderWidth: 8, borderColor: rgb(0.8, 0.86, 0.91) });
+  page.drawRectangle({ x: 40, y: 40, width: width - 80, height: height - 80, color: rgb(0.985, 0.99, 1), opacity: 0.96 });
+
+  page.drawSvgPath(`M 0 ${height} L 305 ${height} L 0 360 Z`, { color: midBlue });
+  page.drawSvgPath(`M 0 ${height} L 290 ${height} L 0 376 Z`, { color: rgb(0, 0.39, 0.68), opacity: 0.74 });
+  drawCorporateLogoMark(page);
+  await drawLogo(pdfDoc, page, certificate.logo_url, 48, 478);
+
+  page.drawCircle({ x: 690, y: 264, size: 166, borderWidth: 38, borderColor: rgb(0.01, 0.29, 0.52), opacity: 0.04 });
+  page.drawText("İSGVİZYON", { x: 552, y: 282, size: 46, font: titleFont, color: rgb(0.01, 0.29, 0.52), opacity: 0.045 });
+
+  page.drawText(fitText(companyLabel, 42).toLocaleUpperCase("tr-TR"), {
+    x: 305,
+    y: 505,
+    size: 13,
+    font: titleFont,
+    color: textBlue,
+    maxWidth: 300,
+  });
+  page.drawText("EĞİTİM VE BELGELENDİRME BİRİMİ", { x: 320, y: 486, size: 10.5, font: titleFont, color: textBlue });
+
+  const heading = design.titleText || (
+    normalizeText(certificate.training_name).toLocaleLowerCase("tr-TR").includes("iş sağlığı")
+      ? "İŞ SAĞLIĞI VE GÜVENLİĞİ EĞİTİM SERTİFİKASI"
+      : "EĞİTİM KATILIM BELGESİ"
+  );
+  page.drawText(heading.toLocaleUpperCase("tr-TR"), { x: 144, y: 455, size: 22, font: titleFont, color: textBlue, maxWidth: 600 });
+
+  const trainerNames = normalizeStringArray(certificate.trainer_names).join(", ") || "Belirtilmedi";
+  drawCorporateFieldRows(page, titleFont, bodyFont, [
+    ["Katılımcı", participantName, true],
+    ["Görev", normalizeText(participant.job_title, "Belirtilmedi")],
+    ["Eğitim", normalizeText(certificate.training_name, "Eğitim Bilgisi Girilmedi")],
+    ["Tarih", normalizeText(certificate.training_date, "Belirtilmedi")],
+    ["Süre", normalizeText(certificate.training_duration, "Belirtilmedi")],
+    ["Geçerlilik", normalizeText(certificate.validity_date, "Süresiz")],
+    ["Sertifika No", certificateNumber],
+    ["Firma", normalizeText(companyLabel, "Firma Bilgisi Girilmedi")],
+    ["Adres", normalizeText(certificate.company_address, "Adres bilgisi girilmedi")],
+    ["Eğitmenler", trainerNames],
+  ]);
+
+  page.drawRectangle({
+    x: 430,
+    y: 262,
+    width: 318,
+    height: 112,
+    color: rgb(1, 1, 1),
+    borderColor: rgb(0.79, 0.86, 0.92),
+    borderWidth: 1,
+    opacity: 0.86,
+  });
+  page.drawText(description, {
+    x: 450,
+    y: 340,
+    size: 11.6,
+    font: bodyFont,
+    color: rgb(0.05, 0.24, 0.38),
+    maxWidth: 280,
+    lineHeight: 15,
+  });
+
+  drawCorporateTopics(page, titleFont, bodyFont, curriculum.hasCurriculum ? [...curriculum.left, ...curriculum.right] : []);
+  drawQr(page, bodyFont, normalizeText(participant.verification_code), 88, 12);
+  page.drawText("Doğrulama Kodu", { x: 186, y: 42, size: 8, font: titleFont, color: textBlue });
+  page.drawText(fitText(normalizeText(participant.verification_code, "Üretimde oluşur"), 24), { x: 186, y: 29, size: 8, font: bodyFont, color: rgb(0.08, 0.24, 0.36) });
+  page.drawText("Düzenlenme Tarihi", { x: 284, y: 42, size: 8, font: titleFont, color: textBlue });
+  page.drawText(new Date().toLocaleDateString("tr-TR"), { x: 284, y: 29, size: 8, font: bodyFont, color: rgb(0.08, 0.24, 0.36) });
+
+  const signatures = design.signatures.slice(0, Math.min(2, design.signatureCount || 2));
+  const signatureX = [500, 650];
+  for (let index = 0; index < signatures.length; index += 1) {
+    const signature = signatures[index];
+    const x = signatureX[index] || 500 + index * 150;
+    await drawImageAsset(pdfDoc, page, signature.imageUrl, { x: x + 12, y: 92, width: 95, height: 34 });
+    page.drawLine({ start: { x, y: 84 }, end: { x: x + 124, y: 84 }, thickness: 1, color: textBlue });
+    page.drawText(fitText(signature.name || (index === 0 ? trainerNames : "Yetkili"), 24), { x: x + 10, y: 68, size: 10.5, font: titleFont, color: textBlue, maxWidth: 110 });
+    page.drawText(fitText(signature.title || (index === 0 ? "Eğitmen" : "Yetkili"), 26), { x: x + 10, y: 54, size: 8.8, font: titleFont, color: textBlue, maxWidth: 110 });
+  }
+
+  page.drawLine({ start: { x: 72, y: 56 }, end: { x: 770, y: 56 }, thickness: 0.6, color: rgb(0.72, 0.82, 0.9) });
+  page.drawText("Bu belge İSGVİZYON sistemi üzerinden dijital doğrulama kaydıyla oluşturulmuştur.", {
+    x: 210,
+    y: 14,
+    size: 7.2,
+    font: bodyFont,
+    color: rgb(0.16, 0.34, 0.48),
+    maxWidth: 430,
+  });
+}
+
 export async function generateCertificatePdf(options: {
   certificate: CertificateRecord;
   participant: CertificateParticipant;
@@ -448,45 +625,18 @@ export async function generateCertificatePdf(options: {
     );
 
     if (certificate.template_type === "academy") {
-      drawAcademyTheme(page, primary, width, height, design.showSeal);
-      await drawLogo(pdfDoc, page, certificate.logo_url, 626, 490);
-      await drawImageAsset(pdfDoc, page, design.osgbLogoUrl, { x: 624, y: 440, width: 140, height: 42 });
-      page.drawText(normalizeText(companyLabel, "Firma Logo"), {
-        x: 540,
-        y: 540,
-        size: 30,
-        font: titleFont,
-        color: design.primaryColor,
+      await drawCorporateTrainingCertificate(pdfDoc, page, {
+        bodyFont,
+        titleFont,
+        certificate,
+        participant,
+        participantName,
+        certificateNumber,
+        companyLabel,
+        description: resolvedDescription,
+        design,
+        curriculum,
       });
-      if (design.showBadge) {
-        page.drawText("RESMİ EĞİTİM BELGESİ", { x: 96, y: 548, size: 12, font: bodyFont, color: design.primaryColor });
-      }
-      page.drawText(design.titleText || "Temel Eğitim Sertifikası", { x: 204, y: 418, size: 31, font: titleFont, color: rgb(0.12, 0.12, 0.12) });
-      page.drawLine({ start: { x: 205, y: 388 }, end: { x: 656, y: 388 }, thickness: 1.9, color: rgb(0.16, 0.16, 0.16) });
-      page.drawText(resolvedDescription, { x: 74, y: 324, size: 12.5, font: bodyFont, color: rgb(0.22, 0.22, 0.22), maxWidth: 690, lineHeight: 17 });
-      page.drawText(`Katılımcı ve TCKN No : ${participantName} / ${normalizeText(participant.tc_no, "Belirtilmedi")}`, { x: 76, y: 266, size: 11.5, font: titleFont, color: rgb(0.22, 0.22, 0.22) });
-      page.drawText(`İşyeri Görev Tanımı : ${normalizeText(participant.job_title, "Belirtilmedi")}`, { x: 76, y: 246, size: 11.5, font: bodyFont, color: rgb(0.28, 0.28, 0.28) });
-      page.drawText(`Eğitim Tamamlama Tarihi : ${normalizeText(certificate.training_date, "Belirtilmedi")}`, { x: 76, y: 226, size: 11.5, font: bodyFont, color: rgb(0.28, 0.28, 0.28) });
-      page.drawText(`Toplam Kurs Süresi : ${normalizeText(certificate.training_duration, "Belirtilmedi")}`, { x: 76, y: 206, size: 11.5, font: bodyFont, color: rgb(0.28, 0.28, 0.28) });
-      if (curriculum.hasCurriculum) {
-        drawCurriculumPanel(page, titleFont, bodyFont, {
-          x: 74,
-          y: 64,
-          width: 244,
-          height: 118,
-          title: "Eğitim Konuları",
-          left: curriculum.left,
-          right: curriculum.right,
-          accent: { r: 0.18, g: 0.32, b: 0.28 },
-        });
-      }
-      page.drawText(normalizeText(companyLabel, "Firma & OSGB"), { x: 462, y: 166, size: 20, font: titleFont, color: rgb(0.2, 0.2, 0.2) });
-      page.drawText(`Kurs No : ${certificateNumber}`, { x: 76, y: 48, size: 9.5, font: bodyFont, color: rgb(0.25, 0.25, 0.25) });
-      drawSignatureGrid(page, bodyFont, design.signatures.slice(0, design.signatureCount).map((signature, index) => ({
-        label: signature.name || (index === 2 ? normalizeText(companyLabel, "Firma Yetkilisi") : "Ad Soyad"),
-        subtitle: signature.title || (index === 0 ? "İSG Uzmanı" : index === 1 ? "İşyeri Hekimi" : index === 2 ? "İşveren Vekili" : "Düzenleyen Kurum"),
-      })));
-      await drawSignatureAssets(pdfDoc, page, design.signatures.slice(0, design.signatureCount));
     } else if (certificate.template_type === "executive") {
       drawExecutiveTheme(page, primary, width, height);
       await drawLogo(pdfDoc, page, certificate.logo_url, 630, 470);

@@ -6,7 +6,7 @@ import {
 } from "../config/defaults.js";
 import { assertExtensionApi } from "../shared/extension-api.js";
 
-const AUTH_DEBUG = true;
+const AUTH_DEBUG = false;
 const AUTH_LOG_PREFIX = "[Denetron AuthHandler]";
 
 function maskValue(value, visibleStart = 6, visibleEnd = 4) {
