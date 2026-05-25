@@ -49,6 +49,67 @@ function upperTr(value: string) {
 function split(doc: jsPDF, text: string, width: number) {
   return doc.splitTextToSize(text, width) as string[];
 }
+function truncateLines(lines: string[], maxLines: number) {
+  if (lines.length <= maxLines) return lines;
+  const nextLines = lines.slice(0, maxLines);
+  const lastLine = nextLines[maxLines - 1] || "";
+  nextLines[maxLines - 1] = `${lastLine.replace(/[. ]+$/g, "").slice(0, Math.max(0, lastLine.length - 3)).trimEnd()}...`;
+  return nextLines;
+}
+function fitTextToWidth(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number,
+  options?: { startFontSize?: number; minFontSize?: number; maxLines?: number }
+) {
+  const startFontSize = options?.startFontSize ?? 24;
+  const minFontSize = options?.minFontSize ?? 12;
+  const maxLines = options?.maxLines ?? 3;
+  let fontSize = startFontSize;
+  let lines: string[] = [];
+
+  while (fontSize >= minFontSize) {
+    doc.setFontSize(fontSize);
+    lines = split(doc, text, maxWidth);
+    if (lines.length <= maxLines) {
+      return { fontSize, lines };
+    }
+    fontSize -= 1;
+  }
+
+  doc.setFontSize(minFontSize);
+  return {
+    fontSize: minFontSize,
+    lines: truncateLines(split(doc, text, maxWidth), maxLines),
+  };
+}
+function drawWrappedCenteredText(
+  doc: jsPDF,
+  text: string,
+  centerX: number,
+  startY: number,
+  maxWidth: number,
+  options?: {
+    startFontSize?: number;
+    minFontSize?: number;
+    maxLines?: number;
+    lineHeight?: number;
+    weight?: "normal" | "bold";
+    color?: readonly [number, number, number];
+  }
+) {
+  const { fontSize, lines } = fitTextToWidth(doc, text, maxWidth, {
+    startFontSize: options?.startFontSize,
+    minFontSize: options?.minFontSize,
+    maxLines: options?.maxLines,
+  });
+  const lineHeight = options?.lineHeight ?? Math.max(6, fontSize * 0.48);
+  doc.setFontSize(fontSize);
+  setFont(doc, options?.weight ?? "normal");
+  setText(doc, options?.color ?? COLORS.ink);
+  doc.text(lines, centerX, startY, { align: "center", baseline: "top" });
+  return { fontSize, lines, height: lines.length * lineHeight };
+}
 function getImageFormat(dataUrl: string): "PNG" | "JPEG" {
   return dataUrl.includes("image/png") ? "PNG" : "JPEG";
 }
@@ -229,6 +290,120 @@ function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl
 
   const tableX = pageWidth / 2 - 48;
   const tableY = innerY + 136;
+  const leftW = 30;
+  const labelW = 38;
+  const valueW = 28;
+  const rowH = 12;
+
+  setDraw(doc, [140, 140, 140]);
+  doc.setLineWidth(0.25);
+  doc.rect(tableX, tableY, leftW + labelW + valueW, rowH * 3);
+  doc.line(tableX + leftW, tableY, tableX + leftW, tableY + rowH * 3);
+  doc.line(tableX + leftW + labelW, tableY, tableX + leftW + labelW, tableY + rowH * 3);
+  doc.line(tableX + leftW, tableY + rowH, tableX + leftW + labelW + valueW, tableY + rowH);
+  doc.line(tableX + leftW, tableY + rowH * 2, tableX + leftW + labelW + valueW, tableY + rowH * 2);
+
+  setFont(doc, "bold");
+  doc.setFontSize(8);
+  setText(doc, [0, 0, 0]);
+  doc.text("RİSK\nDEĞERLENDİRMESİNİN", tableX + leftW / 2, tableY + 13, { align: "center", baseline: "middle" });
+  doc.text("YAPILDIĞI TARİH", tableX + leftW + labelW / 2, tableY + 7.8, { align: "center" });
+  doc.text("GEÇERLİLİK TARİHİ", tableX + leftW + labelW / 2, tableY + rowH + 7.8, { align: "center" });
+  doc.text("REVİZYON NO / TARİHİ", tableX + leftW + labelW / 2, tableY + rowH * 2 + 7.8, { align: "center" });
+
+  setFont(doc, "normal");
+  doc.text(reportDate, tableX + leftW + labelW + valueW / 2, tableY + 7.8, { align: "center" });
+  doc.text(validityDate, tableX + leftW + labelW + valueW / 2, tableY + rowH + 7.8, { align: "center" });
+  doc.text(`Rev.${args.assessment.version ?? 0} / ${reportDate}`, tableX + leftW + labelW + valueW / 2, tableY + rowH * 2 + 7.8, {
+    align: "center",
+  });
+}
+
+function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl: string | null) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const companyName = args.company?.name?.trim() || "FİRMA";
+  const companyUpper = upperTr(companyName);
+  const reportDate = format(new Date(args.assessment.assessment_date), "dd.MM.yyyy", { locale: tr });
+  const validityDate = args.assessment.next_review_date
+    ? format(new Date(args.assessment.next_review_date), "dd.MM.yyyy", { locale: tr })
+    : format(
+        new Date(new Date(args.assessment.assessment_date).setFullYear(new Date(args.assessment.assessment_date).getFullYear() + 2)),
+        "dd.MM.yyyy",
+        { locale: tr }
+      );
+
+  setFill(doc, [24, 36, 56]);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+  const innerX = 16;
+  const innerY = 16;
+  const innerW = pageWidth - 32;
+  const innerH = pageHeight - 32;
+
+  setFill(doc, [250, 247, 242]);
+  setDraw(doc, [250, 247, 242]);
+  doc.rect(innerX, innerY, innerW, innerH, "FD");
+
+  setDraw(doc, [184, 129, 96]);
+  doc.setLineWidth(0.9);
+  doc.rect(innerX + 4, innerY + 4, innerW - 8, innerH - 8);
+
+  if (logoDataUrl) {
+    doc.addImage(logoDataUrl, getImageFormat(logoDataUrl), pageWidth / 2 - 16, innerY + 12, 32, 20, undefined, "FAST");
+  }
+
+  const companyTitle = drawWrappedCenteredText(doc, companyUpper, pageWidth / 2, innerY + 38, innerW - 40, {
+    startFontSize: 23,
+    minFontSize: 14,
+    maxLines: 3,
+    lineHeight: 7.2,
+    weight: "bold",
+    color: [12, 18, 30],
+  });
+  const subtitleY = innerY + 38 + companyTitle.height + 7;
+
+  doc.setFontSize(10);
+  setFont(doc, "normal");
+  setText(doc, [12, 18, 30]);
+  doc.text("GAZİANTEP", pageWidth / 2, subtitleY, { align: "center" });
+
+  const headingY = subtitleY + 18;
+  doc.setFontSize(12);
+  setFont(doc, "bold");
+  doc.text("İŞ SAĞLIĞI VE GÜVENLİĞİ", pageWidth / 2, headingY, { align: "center" });
+
+  const procedureTitle = drawWrappedCenteredText(
+    doc,
+    "TEHLİKE TANIMLAMA VE RİSK DEĞERLENDİRMESİ PROSEDÜRÜ",
+    pageWidth / 2,
+    headingY + 9,
+    innerW - 44,
+    {
+      startFontSize: 12,
+      minFontSize: 10,
+      maxLines: 2,
+      lineHeight: 5.6,
+      weight: "bold",
+      color: [12, 18, 30],
+    }
+  );
+
+  const separatorY = headingY + 9 + procedureTitle.height + 3;
+  setDraw(doc, [113, 120, 135]);
+  doc.setLineWidth(0.2);
+  doc.line(pageWidth / 2 - 60, separatorY, pageWidth / 2 + 60, separatorY);
+
+  drawWrappedCenteredText(doc, `${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 10.8, pageWidth - 38, {
+    startFontSize: 9,
+    minFontSize: 7,
+    maxLines: 2,
+    lineHeight: 3.8,
+    color: COLORS.slate,
+  });
+
+  const tableX = pageWidth / 2 - 48;
+  const tableY = Math.max(innerY + 136, separatorY + 44);
   const leftW = 30;
   const labelW = 38;
   const valueW = 28;
@@ -989,7 +1164,7 @@ export async function buildRiskAssessmentPdf(args: BuildRiskAssessmentPdfArgs) {
   const photoItems = photoEntries.filter(Boolean) as Array<{ item: RiskItem; image: string }>;
   const photoMap = new Map(photoItems.map((entry) => [entry.item.id, entry.image]));
 
-  drawCoverPage(doc, args, logoDataUrl);
+  drawCoverPageV2(doc, args, logoDataUrl);
   doc.addPage("a4", "portrait");
   addIntroPages(doc, args);
   addTeamPage(doc, args);

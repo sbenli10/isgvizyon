@@ -192,7 +192,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "İnşaat Sektörü",
     aliases: ["İnşaat", "Şantiye", "Yapı", "Altyapı"],
     icon: HardHat,
-    description: "50+ inşaat risk maddesi",
+    description: "60+ inşaat ve şantiye risk maddesi",
     color: "text-orange-600 bg-orange-50 border-orange-200"
   },
   {
@@ -201,7 +201,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Ofis Ortamı",
     aliases: ["Ofis", "Büro", "İdari Birim", "Çağrı Merkezi"],
     icon: Briefcase,
-    description: "50+ ofis risk maddesi",
+    description: "35+ ofis ve idari alan risk maddesi",
     color: "text-blue-600 bg-blue-50 border-blue-200"
   },
   {
@@ -210,7 +210,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Üretim Tesisi",
     aliases: ["Üretim", "İmalat", "Fabrika", "Atölye"],
     icon: Factory,
-    description: "50+ üretim risk maddesi",
+    description: "60+ fabrika ve atölye risk maddesi",
     color: "text-purple-600 bg-purple-50 border-purple-200"
   },
   {
@@ -219,7 +219,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Depo ve Lojistik",
     aliases: ["Depo", "Lojistik", "Sevkiyat", "Stok Alanı"],
     icon: Warehouse,
-    description: "50+ depolama ve sevkiyat risk maddesi",
+    description: "50+ depo ve lojistik risk maddesi",
     color: "text-amber-700 bg-amber-50 border-amber-200"
   },
   {
@@ -228,7 +228,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Sağlık Kuruluşu",
     aliases: ["Sağlık", "Hastane", "Klinik", "Poliklinik", "Laboratuvar"],
     icon: HeartPulse,
-    description: "50+ sağlık hizmeti ve biyolojik risk maddesi",
+    description: "45+ sağlık hizmeti ve biyolojik risk maddesi",
     color: "text-rose-700 bg-rose-50 border-rose-200"
   },
   {
@@ -237,7 +237,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Eğitim Kurumu",
     aliases: ["Okul", "Eğitim", "Kurs", "Üniversite", "Yurt"],
     icon: GraduationCap,
-    description: "50+ eğitim ortamı ve kampüs risk maddesi",
+    description: "40+ eğitim ortamı ve kampüs risk maddesi",
     color: "text-indigo-700 bg-indigo-50 border-indigo-200"
   },
   {
@@ -246,7 +246,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Mağaza ve Perakende",
     aliases: ["Mağaza", "Perakende", "Market", "AVM", "Satış Alanı"],
     icon: ShoppingCart,
-    description: "50+ müşteri alanı ve perakende risk maddesi",
+    description: "40+ müşteri alanı ve perakende risk maddesi",
     color: "text-cyan-700 bg-cyan-50 border-cyan-200"
   },
   {
@@ -255,7 +255,7 @@ const SECTOR_TEMPLATES = [
     industrySector: "Yeme İçme ve Mutfak",
     aliases: ["Restoran", "Kafe", "Mutfak", "Gıda", "Yemekhane"],
     icon: UtensilsCrossed,
-    description: "50+ mutfak, hijyen ve sıcak yüzey risk maddesi",
+    description: "45+ mutfak, hijyen ve sıcak yüzey risk maddesi",
     color: "text-red-700 bg-red-50 border-red-200"
   },
   {
@@ -1998,8 +1998,8 @@ export default function CompanyManager() {
           <div className="space-y-6 rounded-[28px] border border-white/10 bg-white/[0.04] p-5 shadow-[0_18px_45px_rgba(2,6,23,0.25)]">
             <div className="rounded-2xl border border-indigo-400/15 bg-indigo-500/5 p-4">
               <p className="text-sm text-slate-200">
-                <strong className="text-indigo-200">Zeki Özellik:</strong> Sektörünüze uygun risk şablonunu seçin. 
-                Otomatik olarak 50+ risk maddesi firmaya atanacaktır.
+                <strong className="text-indigo-200">Zeki Özellik:</strong> Sektörünüze uygun risk şablonunu seçin.
+                Sektöre göre önerilen minimum risk maddesi otomatik olarak firmaya atanacaktır.
               </p>
             </div>
 

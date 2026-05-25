@@ -185,7 +185,7 @@ export const RISK_SECTORS = RISK_SECTOR_CATALOG.map((sector) => ({
   name: sector.name,
   icon: sector.icon,
   keywords: [sector.name.toLocaleLowerCase("tr-TR"), sector.group.toLocaleLowerCase("tr-TR")],
-  itemCount: Math.max(sector.itemCount, 40),
+  itemCount: sector.itemCount,
   group: sector.group,
 })) as const;
 

@@ -8,6 +8,7 @@ import { generateRisksWithGemini } from "@/services/geminiService";
 import type { GeminiRiskResult } from "@/services/geminiService";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { generateSectorRiskTemplates } from "@/lib/risk/sectorRiskTemplates";
 import {
   Building2,
   Plus,
@@ -76,7 +77,14 @@ import {
 } from "@/types/risk-assessment";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { RISK_SECTOR_CATALOG, buildCatalogKey } from "@/lib/riskSectorCatalog";
+import {
+  RISK_SECTOR_CATALOG,
+  buildCatalogKey,
+  doesRiskSectorMatch,
+  getRiskSectorTemplateConfig,
+  getSectorMinimumRiskItemCount,
+} from "@/lib/riskSectorCatalog";
+import { normalizeRiskSectorKey as normalizeSectorKey } from "@/lib/risk/riskTemplateConfig";
 import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef, parseStorageObjectRef, resolveStorageObjectUrl } from "@/lib/storageObject";
 import {
@@ -103,11 +111,13 @@ const loadRiskAssessmentPdfExport = () => import("@/lib/riskAssessmentPdfExport"
 const SECTOR_UI_META: Record<string, { accent: string; hint: string }> = {
   otomotiv: { accent: "from-sky-500/20 to-cyan-500/10", hint: "Montaj, pres ve araç hattı riskleri" },
   insaat: { accent: "from-amber-500/20 to-orange-500/10", hint: "Yüksekte çalışma ve saha operasyon riskleri" },
+  fabrika: { accent: "from-violet-500/20 to-fuchsia-500/10", hint: "Makine, enerji izolasyonu ve üretim hattı riskleri" },
   gida: { accent: "from-emerald-500/20 to-lime-500/10", hint: "Hijyen, sıcak yüzey ve üretim akışı riskleri" },
   metal: { accent: "from-cyan-500/20 to-blue-500/10", hint: "Kesme, taşlama, kaynak ve pres riskleri" },
   tekstil: { accent: "from-pink-500/20 to-rose-500/10", hint: "Makine, ergonomi ve lif maruziyeti riskleri" },
   kimya: { accent: "from-fuchsia-500/20 to-violet-500/10", hint: "Kimyasal maruziyet ve reaksiyon riskleri" },
   lojistik: { accent: "from-indigo-500/20 to-violet-500/10", hint: "Yükleme, istifleme ve sevkiyat riskleri" },
+  depo: { accent: "from-indigo-500/20 to-violet-500/10", hint: "Raf, forklift ve yükleme operasyon riskleri" },
   enerji: { accent: "from-yellow-500/20 to-amber-500/10", hint: "Elektrik, saha ve bakım operasyon riskleri" },
   maden: { accent: "from-stone-500/20 to-zinc-500/10", hint: "Toz, göçük ve ağır ekipman riskleri" },
   saglik: { accent: "from-red-500/20 to-rose-500/10", hint: "Biyolojik, kesici-delici ve vardiya riskleri" },
@@ -115,7 +125,10 @@ const SECTOR_UI_META: Record<string, { accent: string; hint: string }> = {
   ofis: { accent: "from-slate-400/20 to-slate-500/10", hint: "Ergonomi ve ekranlı araç riskleri" },
   tarim: { accent: "from-lime-500/20 to-green-500/10", hint: "Makine, ilaçlama ve açık alan riskleri" },
   turizm: { accent: "from-teal-500/20 to-emerald-500/10", hint: "Konaklama, mutfak ve servis riskleri" },
+  otel: { accent: "from-teal-500/20 to-emerald-500/10", hint: "Konaklama, servis ve ortak alan riskleri" },
+  restoran: { accent: "from-red-500/20 to-orange-500/10", hint: "Sıcak yüzey, hijyen ve mutfak operasyon riskleri" },
   perakende: { accent: "from-orange-500/20 to-amber-500/10", hint: "Raf, müşteri alanı ve kasa operasyon riskleri" },
+  market: { accent: "from-orange-500/20 to-amber-500/10", hint: "Raf, depo arkası ve müşteri alanı riskleri" },
   ahsap: { accent: "from-amber-600/20 to-yellow-600/10", hint: "Ahşap tozu, kesici makineler ve mobilya riskleri" },
   plastik: { accent: "from-violet-500/20 to-fuchsia-500/10", hint: "Enjeksiyon, sıcak yüzey ve kalıp değişim riskleri" },
   kagit: { accent: "from-slate-300/20 to-slate-500/10", hint: "Oluklu hat, kesme ve toz yükü riskleri" },
@@ -133,43 +146,14 @@ const SECTOR_UI_META: Record<string, { accent: string; hint: string }> = {
   guvenlik: { accent: "from-violet-500/20 to-purple-500/10", hint: "Devriye, gece vardiyası ve müdahale riskleri" },
   temizlik: { accent: "from-cyan-500/20 to-teal-500/10", hint: "Kimyasal, kaygan zemin ve ekipman riskleri" },
   cagri_merkezi: { accent: "from-slate-500/20 to-blue-500/10", hint: "Headset, vardiya ve stres yönetimi riskleri" },
-};
-
-const SECTOR_ALIAS_MAP: Record<string, string> = {
-  "metal işleme": "metal",
-  "lojistik & depo": "lojistik",
-  "maden & taş ocağı": "maden",
-  "ofis & hizmet": "ofis",
-  "tarım & hayvancılık": "tarim",
-  "turizm & otel": "turizm",
-  "ahşap & mobilya": "ahsap",
-  "plastik & enjeksiyon": "plastik",
-  "çağrı merkezi": "cagri_merkezi",
-  "özel güvenlik": "guvenlik",
-  "atık yönetimi": "atik",
-  "ilaç & medikal": "ilac",
-  "çimento & beton": "cimento",
-  "seramik & cam": "seramik",
-  "liman & terminal": "liman",
-  "akaryakıt & lpg": "akaryakit",
-  "belediye hizmetleri": "belediye",
-  "sağlık": "saglik",
-  "eğitim": "egitim",
-  "kimya": "kimya",
-  "lojistik": "lojistik",
-  "inşaat": "insaat",
-  "gıda": "gida",
-  "tekstil": "tekstil",
-  "ofis": "ofis",
-  "tarım": "tarim",
-  "havacılık": "havacilik",
-  "denizcilik": "denizcilik",
-  "depoculuk": "depoculuk",
-};
-
-const normalizeSectorKey = (value: string) => {
-  const normalized = value.trim().toLowerCase();
-  return SECTOR_ALIAS_MAP[normalized] || normalized;
+  kimyasal: { accent: "from-fuchsia-500/20 to-violet-500/10", hint: "Yanıcı ortam, SDS ve kimyasal depolama riskleri" },
+  teknik_servis: { accent: "from-yellow-500/20 to-amber-500/10", hint: "Elektrik, bakım-onarım ve el aleti riskleri" },
+  kuafor: { accent: "from-pink-500/20 to-rose-500/10", hint: "Kesici alet, kimyasal ürün ve ergonomi riskleri" },
+  oto_servis: { accent: "from-sky-500/20 to-cyan-500/10", hint: "Lift, akü, taşlama ve araç bakım riskleri" },
+  soguk_hava: { accent: "from-cyan-400/20 to-sky-500/10", hint: "Soğuk maruziyet, buzlanma ve mahsur kalma riskleri" },
+  yuksekte_calisma: { accent: "from-amber-500/20 to-orange-500/10", hint: "Yaşam hattı, platform ve düşme önleme riskleri" },
+  kapali_alan: { accent: "from-zinc-500/20 to-slate-600/10", hint: "Gaz ölçümü, kurtarma ve izinli çalışma riskleri" },
+  genel: { accent: "from-slate-500/20 to-slate-700/10", hint: "Temel iş güvenliği başlıklarını kapsayan karma analiz" },
 };
 
 type AssessmentMethod = "fine_kinney" | "l_matrix";
@@ -536,6 +520,10 @@ export default function RiskAssessmentEditor() {
         : null,
     [selectedSectorOption]
   );
+  const selectedSectorTemplateConfig = useMemo(
+    () => getRiskSectorTemplateConfig(selectedSectorOption?.name || aiSector || ""),
+    [selectedSectorOption, aiSector]
+  );
   const selectedSectorRiskPreview = useMemo(() => {
     if (!selectedSectorOption) return [];
     return generateMockRisksForSector(selectedSectorOption.name);
@@ -774,11 +762,9 @@ useEffect(() => {
       
       // Risk Paketlerini Oluştur (katalog + yerleşik fallback)
       const packages = RISK_SECTOR_CATALOG.map((sectorDef) => {
-        const targetCount = Math.max(sectorDef.itemCount, 40);
+        const targetCount = getSectorMinimumRiskItemCount(sectorDef.name, sectorDef.itemCount);
         const items = (data || []).filter((item) => {
-          const itemSector = buildCatalogKey(item.sector || "");
-          const sectorName = buildCatalogKey(sectorDef.name);
-          return itemSector.includes(sectorName) || itemSector === sectorName;
+          return doesRiskSectorMatch(item.sector || item.category || "", sectorDef.name);
         });
 
       const fallbackItems = generateMockRisksForSector(sectorDef.name).map((item, index) => ({
@@ -1405,6 +1391,7 @@ useEffect(() => {
     try {
       const company = companies.find(c => c.id === assessment.company_id);
       const sectorLabel = selectedSectorOption?.name || sector;
+      const targetCount = getSectorMinimumRiskItemCount(sectorLabel, 40);
 
       // Gerçek Gemini API çağrısı
       const geminiRisks = await generateRisksWithGemini(
@@ -1444,10 +1431,10 @@ useEffect(() => {
           id: `ai-fallback-${Date.now()}-${dedupedRisks.length}`,
         });
         existingKeys.add(riskKey);
-        if (dedupedRisks.length >= 40) break;
+        if (dedupedRisks.length >= targetCount) break;
       }
 
-      const completedRiskSet = ensureMinimumCount(dedupedRisks.slice(0, 40), 40, (index) => {
+      const completedRiskSet = ensureMinimumCount(dedupedRisks.slice(0, targetCount), targetCount, (index) => {
         const fallbackRisk = fallbackRisks[index % fallbackRisks.length];
         return {
           ...fallbackRisk,
@@ -1460,7 +1447,7 @@ useEffect(() => {
       setShowAiDialog(true);
 
       toast.success(`${completedRiskSet.length} risk maddesi oluşturuldu`, {
-        description: "Sunucu tarafinda guvenli AI analizi ile olusturuldu",
+        description: "Sunucu tarafında güvenli AI analizi ile oluşturuldu.",
         duration: 5000
       });
     } catch (error: any) {
@@ -1470,8 +1457,8 @@ useEffect(() => {
       let errorDescription = error.message || "Bilinmeyen hata";
 
       if (error.message?.includes("API key")) {
-        errorMessage = "AI Servis Yapilandirma Hatasi";
-        errorDescription = "Sunucu tarafindaki AI secret ayarlarini kontrol edin.";
+        errorMessage = "AI Servis Yapılandırma Hatası";
+        errorDescription = "Sunucu tarafındaki AI secret ayarlarını kontrol edin.";
       } else if (error.message?.includes("quota")) {
         errorMessage = "Kota Aşıldı";
         errorDescription = "Günlük istek limitine ulaşıldı";
@@ -1499,445 +1486,7 @@ useEffect(() => {
   };
   // Mock risk generator (gerçekte OpenAI kullanacağız)
   function generateMockRisksForSector(sector: string): typeof aiRisks {
-    const sectorLower = sector.toLowerCase();
-    const catalogSector = RISK_SECTOR_CATALOG.find((item) => buildCatalogKey(item.name) === buildCatalogKey(sector));
-    const targetCount = Math.max(catalogSector?.itemCount ?? 15, 40);
-    
-    // Sektöre özel risk templates
-    const templates: Record<string, Array<{
-      hazard: string;
-      risk: string;
-      category: string;
-      o: number;
-      f: number;
-      s: number;
-      controls: string[];
-    }>> = {
-      'otomotiv': [
-        {
-          hazard: "Forklift ve Yaya Etkileşimi",
-          risk: "Forkliftin fabrika içinde hızlı kullanılması, kör noktalar ve yaya yollarının belirsizliği.",
-          category: "Araç Güvenliği",
-          o: 6, f: 6, s: 7,
-          controls: ["Çarpışma, ezilme, uzuv kayıpları, ölüm", "Kalıcı işitme kaybı, stres, iletişim kazaları"]
-        },
-        {
-          hazard: "Manuel Taşıma",
-          risk: "Üretim hattında sürekli olarak 25kg üzeri malzemelerin elle taşınması.",
-          category: "Ergonomi",
-          o: 10, f: 10, s: 3,
-          controls: ["Bel fıtığı, kas-iskelet sistemi hastalıkları", "Transpalet, vinç veya miknatıslı kaldırıcılar kullanılmalı"]
-        },
-        {
-          hazard: "Üretim Makineleri",
-          risk: "Presler, kompresörler ve motorların 85 dB(A) üzerinde gürültü yapması.",
-          category: "Fiziksel Etkenler",
-          o: 10, f: 10, s: 7,
-          controls: ["Kalıcı işitme kaybı, stres, iletişim kazaları", "Kulaklık veya kulak tıkacı zorunlu, gürültü seviyesi ölçümleri"]
-        },
-        {
-          hazard: "Yağ ve Su Sızıntıları",
-          risk: "Makinelerden sızan yağların zemini kayganlaştırması.",
-          category: "İş Sağlığı",
-          o: 6, f: 6, s: 15,
-          controls: ["Kayma, düşme, kırık, ezilme", "Düzenli temizlik, absorbent matlar, kaymaz ayakkabı"]
-        },
-        {
-          hazard: "KKD Kullanımı",
-          risk: "Çalışanların iş ayakkabısı, gözlük veya baret kullanmaması.",
-          category: "Kişisel Koruyucu Donanım",
-          o: 6, f: 10, s: 15,
-          controls: ["Ayak ezilmesi, göz kayıtı, kafa travması", "KKE kullanımı zorunlu, eğitim ve denetim"]
-        },
-        {
-          hazard: "Arızalı Alet Kullanımı",
-          risk: "Çekiç saplarının gevşek, anahtar ağızlarının bozuk olması.",
-          category: "El Aletleri",
-          o: 3, f: 6, s: 7,
-          controls: ["El ve parmak yaralanmaları", "Aylık kontrol, arızalı aletlerin imhası"]
-        },
-        {
-          hazard: "Elektrik Panoları",
-          risk: "Açık elektrik panolarına yetkisiz erişim.",
-          category: "Elektrik",
-          o: 1, f: 0.5, s: 100,
-          controls: ["Elektrik çarpması, yanık, ölüm", "Panoların kilitli tutulması, yetkilendirme sistemi"]
-        },
-        {
-          hazard: "Kaynak İşleri",
-          risk: "Kapalı alanlarda kaynak dumanı solunması, UV ışınlarına maruziyet.",
-          category: "Kimyasal/Fiziksel",
-          o: 6, f: 6, s: 15,
-          controls: ["Solunum yolu hastalıkları, cilt kanseri, göz yanıkları", "Havalandırma, FFP3 maske, kaynak gözlüğü/baretli"]
-        },
-        {
-          hazard: "Yangın",
-          risk: "Boya kabininde veya yağ deposunda yangın çıkma riski.",
-          category: "Yangın",
-          o: 1, f: 0.5, s: 40,
-          controls: ["Maddi hasar, yaralanma, ölüm", "Yangın algılama sistemi, sprinkler, personel eğitimi"]
-        },
-        {
-          hazard: "Kimyasal Maruziyeti",
-          risk: "Solvent, tiner, boya gibi kimyasalların güvenlik bilgi formu olmadan kullanılması.",
-          category: "Kimyasal",
-          o: 6, f: 10, s: 7,
-          controls: ["Zehirlenme, solunum problemleri, cilt tahrişi", "GBF sağlanmalı, havalandırma, eldiven ve maske"]
-        }
-      ],
-      'inşaat': [
-        {
-          hazard: "Yüksekten Düşme",
-          risk: "İskelelerde ve çatı kenarlarında korkuluk olmaması.",
-          category: "Düşme",
-          o: 6, f: 6, s: 100,
-          controls: ["Ölüm, ağır yaralanma, felç", "Korkuluk, güvenlik ağı, emniyet kemeri kullanımı"]
-        },
-        {
-          hazard: "Vinç Operasyonu",
-          risk: "Vinç operatörünün yetkisiz veya eğitimsiz olması.",
-          category: "Makine",
-          o: 3, f: 6, s: 40,
-          controls: ["Malzeme düşmesi, ezilme, ölüm", "Operatör sertifikası, periyodik bakım"]
-        },
-        {
-          hazard: "Elektrik Hattı",
-          risk: "Şantiyede açık elektrik kablolarının bulunması.",
-          category: "Elektrik",
-          o: 3, f: 3, s: 100,
-          controls: ["Elektrik çarpması, ölüm", "Kabloların yalıtımı, RCD kullanımı"]
-        },
-        {
-          hazard: "Göçük",
-          risk: "Kazı çalışmalarında şev açısının yanlış hesaplanması.",
-          category: "Yapısal",
-          o: 1, f: 0.5, s: 100,
-          controls: ["Gömülme, ölüm", "Şev hesabı, destek sistemi, kontrollü kazı"]
-        },
-        {
-          hazard: "Toz Maruziyeti",
-          risk: "Kesme ve delme işlerinde silika tozu solunması.",
-          category: "Sağlık",
-          o: 10, f: 10, s: 15,
-          controls: ["Silikoz, akciğer hastalıkları", "Sulama, FFP3 maske, havalandırma"]
-        }
-      ],
-      'gıda': [
-        {
-          hazard: "Kaygan Zemin",
-          risk: "Üretim alanında su, yağ ve gıda artıklarının birikmesi.",
-          category: "Kayma/Düşme",
-          o: 10, f: 10, s: 7,
-          controls: ["Düşme, kırık, bel yaralanması", "Sürekli temizlik, kaymaz zemin, iş ayakkabısı"]
-        },
-        {
-          hazard: "Kesici Aletler",
-          risk: "Et işleme bıçaklarının korumasız kullanılması.",
-          category: "Kesme",
-          o: 6, f: 10, s: 7,
-          controls: ["Kesik, uzuv kaybı", "Cut Level 5 eldiven, koruyucu çelik mesh önlük"]
-        },
-        {
-          hazard: "Sıcak Yüzeyler",
-          risk: "Fırın, kazanlar ve buhar hatlarına temas.",
-          category: "Yanık",
-          o: 6, f: 6, s: 15,
-          controls: ["Yanık, haşlanma", "Isıya dayanıklı eldiven, yalıtım, uyarı levhaları"]
-        },
-        {
-          hazard: "Soğuk Hava Deposu",
-          risk: "-25°C soğuk hava deposunda uzun süre çalışma.",
-          category: "Termal",
-          o: 6, f: 6, s: 7,
-          controls: ["Hipotermi, donma", "Termal giysi, çalışma süre kısıtlaması, ısınma molası"]
-        },
-        {
-          hazard: "Mikrobiyolojik",
-          risk: "Hijyen kurallarına uyulmaması, çapraz kontaminasyon.",
-          category: "Biyolojik",
-          o: 6, f: 10, s: 3,
-          controls: ["Gıda zehirlenmesi, hastalık yayılması", "El yıkama, sterilizasyon, HACCP uygulaması"]
-        }
-      ],
-      'metal': [
-        {
-          hazard: "Taşlama ve Çapak Sıçraması",
-          risk: "Metal işleme alanında koruyucusuz taşlama yapılması ve sıcak çapakların yayılması.",
-          category: "Mekanik",
-          o: 6, f: 6, s: 15,
-          controls: ["Göz yaralanmaları, yanık, yüz travmaları", "Yüz siperi, gözlük ve kıvılcım perdesi kullanılmalı"]
-        },
-        {
-          hazard: "Kaynak Dumanı",
-          risk: "Kaynak yapılan alanlarda yetersiz havalandırma nedeniyle duman ve gaz maruziyeti oluşması.",
-          category: "Kimyasal/Fiziksel",
-          o: 6, f: 10, s: 7,
-          controls: ["Solunum yolu irritasyonu, kronik maruziyet", "Lokal emiş sistemi, maske ve alan havalandırması"]
-        }
-      ],
-      'tekstil': [
-        {
-          hazard: "Hareketli Makine Aksamı",
-          risk: "Dikiş ve dokuma makinelerinde koruyucusuz kayış, kasnak ve iğne bölgelerine temas.",
-          category: "Makine",
-          o: 6, f: 6, s: 7,
-          controls: ["El-parmak yaralanmaları, sıkışma", "Makine koruyucuları ve LOTO prosedürü uygulanmalı"]
-        },
-        {
-          hazard: "Pamuk ve Elyaf Tozu",
-          risk: "Üretim hattında biriken elyaf tozunun solunması ve havada asılı kalması.",
-          category: "Toz Maruziyeti",
-          o: 10, f: 6, s: 7,
-          controls: ["Solunum yolu irritasyonu, astım", "Toz emiş sistemi ve düzenli temizlik planı uygulanmalı"]
-        }
-      ],
-      'kimya': [
-        {
-          hazard: "Kimyasal Sıçrama",
-          risk: "Transfer ve dolum sırasında kimyasalların çalışan cildine ve gözüne temas etmesi.",
-          category: "Kimyasal",
-          o: 6, f: 6, s: 15,
-          controls: ["Yanık, tahriş, görme kaybı", "Siperlik, kimyasal göz duşu ve uygun eldiven kullanılmalı"]
-        },
-        {
-          hazard: "Reaktif Maddenin Karışması",
-          risk: "Uygunsuz depolama nedeniyle birbirine uyumsuz kimyasalların yan yana bulundurulması.",
-          category: "Proses Güvenliği",
-          o: 3, f: 3, s: 40,
-          controls: ["Yangın, patlama, toksik gaz çıkışı", "Kimyasal uyumluluk matrisi ve ayrı depolama uygulanmalı"]
-        }
-      ],
-      'lojistik': [
-        {
-          hazard: "Yüksek İstif",
-          risk: "Depo raflarında dengesiz veya kapasite üstü istifleme yapılması.",
-          category: "İstifleme",
-          o: 6, f: 6, s: 15,
-          controls: ["Malzeme düşmesi, ezilme", "Raf etiketleri, yük limitleri ve periyodik kontrol uygulanmalı"]
-        },
-        {
-          hazard: "Sevkiyat Alanı Trafiği",
-          risk: "Yaya yolları ile araç yollarının ayrışmaması nedeniyle çarpışma riski oluşması.",
-          category: "Araç Güvenliği",
-          o: 6, f: 10, s: 15,
-          controls: ["Çarpışma, ezilme, ölüm", "Yaya bariyerleri, hız limiti ve saha yönlendirmesi yapılmalı"]
-        }
-      ],
-      'saglik': [
-        {
-          hazard: "Kesici-Delici Alet Yaralanması",
-          risk: "Enjektör ve bistüri gibi aletlerin uygunsuz toplanması nedeniyle yaralanma oluşması.",
-          category: "Biyolojik",
-          o: 6, f: 6, s: 15,
-          controls: ["Enfeksiyon, kan yoluyla bulaş", "Kesici-delici kutuları ve eğitim uygulanmalı"]
-        },
-        {
-          hazard: "Hasta Transferi",
-          risk: "Yetersiz ekipmanla hasta kaldırma ve taşıma yapılması.",
-          category: "Ergonomi",
-          o: 10, f: 6, s: 7,
-          controls: ["Bel-boyun yaralanmaları", "Transfer ekipmanları ve iki kişi kuralı uygulanmalı"]
-        }
-      ],
-      'ofis': [
-        {
-          hazard: "Uzun Süre Ekranlı Çalışma",
-          risk: "Monitör, sandalye ve masa düzeninin ergonomik olmaması.",
-          category: "Ergonomi",
-          o: 10, f: 10, s: 3,
-          controls: ["Boyun-sırt ağrısı, göz yorgunluğu", "Ergonomik ekipman ve mola planı uygulanmalı"]
-        },
-        {
-          hazard: "Elektrik Priz Yüklemesi",
-          risk: "Çoklu prizlere yüksek yük bağlanması ve kablo karmaşası oluşması.",
-          category: "Elektrik",
-          o: 3, f: 3, s: 15,
-          controls: ["Yangın, elektrik çarpması", "Yetkili tesisat kontrolü ve kablo düzeni sağlanmalı"]
-        }
-      ],
-      'tarim': [
-        {
-          hazard: "Tarım Makinesi Kullanımı",
-          risk: "Koruyucusuz PTO ve döner ekipmanlarla çalışılması.",
-          category: "Makine",
-          o: 6, f: 6, s: 40,
-          controls: ["Uzuv kaptırma, ezilme", "Koruyucu muhafaza ve yetkili operatör uygulaması"]
-        },
-        {
-          hazard: "Pestisit Uygulaması",
-          risk: "İlaçlama sırasında uygun maske ve kıyafet olmadan çalışma yapılması.",
-          category: "Kimyasal",
-          o: 6, f: 6, s: 15,
-          controls: ["Zehirlenme, cilt ve solunum maruziyeti", "Kimyasal KKD ve rüzgar yönü kontrolü uygulanmalı"]
-        }
-      ],
-      'turizm': [
-        {
-          hazard: "Mutfak Sıcak Yüzeyleri",
-          risk: "Yoğun mutfak akışında kızgın yağ ve sıcak ekipmana temas edilmesi.",
-          category: "Yanık",
-          o: 6, f: 6, s: 15,
-          controls: ["Yanık ve haşlanma", "Isıya dayanıklı eldiven ve servis akış planı uygulanmalı"]
-        },
-        {
-          hazard: "Islak Zemin",
-          risk: "Otel ve restoran alanlarında hızlı temizlik sonrası zeminin kaygan kalması.",
-          category: "Kayma/Düşme",
-          o: 10, f: 6, s: 7,
-          controls: ["Kayma, düşme ve kırık", "Uyarı levhası ve hızlı kurutma prosedürü uygulanmalı"]
-        }
-      ],
-      'perakende': [
-        {
-          hazard: "Raflardan Ürün Düşmesi",
-          risk: "Aşırı yükleme ve uygunsuz raf düzeni nedeniyle ürünlerin düşmesi.",
-          category: "İstifleme",
-          o: 6, f: 6, s: 7,
-          controls: ["Baş ve omuz yaralanmaları", "Raf limitleri ve güvenli yerleşim uygulanmalı"]
-        },
-        {
-          hazard: "Kasa Alanı Ergonomisi",
-          risk: "Tekrarlı hareket ve ayakta uzun süre çalışma nedeniyle kas-iskelet zorlanması.",
-          category: "Ergonomi",
-          o: 10, f: 10, s: 3,
-          controls: ["Boyun, bilek ve bel ağrıları", "Mola planı ve ergonomik çalışma düzeni oluşturulmalı"]
-        }
-      ],
-      'ahsap': [
-        {
-          hazard: "Ahşap Tozu",
-          risk: "Kesim ve zımpara işlemleri sırasında yoğun ahşap tozuna maruz kalınması.",
-          category: "Toz Maruziyeti",
-          o: 10, f: 6, s: 7,
-          controls: ["Solunum yolu hastalıkları, yangın yükü", "Toz emiş sistemi ve FFP2 maske uygulanmalı"]
-        },
-        {
-          hazard: "Dairesel Testere",
-          risk: "Geri tepme ve koruyucu devre dışı kullanım nedeniyle ciddi yaralanma riski oluşması.",
-          category: "Makine",
-          o: 3, f: 6, s: 40,
-          controls: ["Kesilme, uzuv kaybı", "Testere koruyucusu ve itme aparatları kullanılmalı"]
-        }
-      ],
-      'plastik': [
-        {
-          hazard: "Enjeksiyon Kalıp Değişimi",
-          risk: "Kalıp sökme-takma sırasında sıkışma ve sıcak yüzeye temas oluşması.",
-          category: "Makine",
-          o: 6, f: 6, s: 15,
-          controls: ["Ezilme, yanık", "LOTO ve kalıp değişim prosedürü uygulanmalı"]
-        },
-        {
-          hazard: "Granül Dökülmesi",
-          risk: "Hammadde granüllerinin zemine dökülmesiyle kayganlık ve düşme riski oluşması.",
-          category: "Kayma/Düşme",
-          o: 10, f: 6, s: 7,
-          controls: ["Kayma ve düşme", "Düzenli süpürme ve alan bariyeri uygulanmalı"]
-        }
-      ],
-      'laboratuvar': [
-        {
-          hazard: "Cam Malzeme Kırılması",
-          risk: "Numune işlemleri sırasında cam kapların kırılması ve kesik oluşması.",
-          category: "Kesici/Delici",
-          o: 6, f: 3, s: 7,
-          controls: ["Kesik ve kontaminasyon", "Dayanıklı ekipman ve kırık cam kutusu kullanılmalı"]
-        },
-        {
-          hazard: "Biyolojik Numune Maruziyeti",
-          risk: "Numune açma ve aktarma sırasında aerosole maruz kalınması.",
-          category: "Biyolojik",
-          o: 3, f: 3, s: 40,
-          controls: ["Enfeksiyon, kontaminasyon", "Biyogüvenlik kabini ve uygun KKD kullanılmalı"]
-        }
-      ],
-      'atik': [
-        {
-          hazard: "Kesici Atık Teması",
-          risk: "Ayrıştırma hattında kesici atıkların uygunsuz ayrılması nedeniyle yaralanma oluşması.",
-          category: "Atık Yönetimi",
-          o: 6, f: 6, s: 15,
-          controls: ["Kesik, enfeksiyon", "Kalın eldiven ve kaynakta doğru ayrıştırma uygulanmalı"]
-        },
-        {
-          hazard: "Biyolojik Atık Sızıntısı",
-          risk: "Sızdıran atık torbaları nedeniyle biyolojik maruziyet oluşması.",
-          category: "Biyolojik",
-          o: 3, f: 3, s: 40,
-          controls: ["Enfeksiyon, kötü koku, yayılım", "Sızdırmaz kap ve taşıma prosedürü uygulanmalı"]
-        }
-      ],
-      'guvenlik': [
-        {
-          hazard: "Gece Devriyesi",
-          risk: "Yetersiz aydınlatma ve tek başına devriye nedeniyle saldırı veya düşme riski oluşması.",
-          category: "Operasyon",
-          o: 6, f: 3, s: 15,
-          controls: ["Yaralanma, travma", "Panik butonu, iletişim cihazı ve aydınlatma kontrolü uygulanmalı"]
-        },
-        {
-          hazard: "Fiziksel Müdahale",
-          risk: "Çatışmalı durumlarda eğitimsiz fiziksel müdahale yapılması.",
-          category: "Davranışsal",
-          o: 3, f: 3, s: 40,
-          controls: ["Darp, ciddi yaralanma", "Müdahale eğitimi ve destek prosedürü uygulanmalı"]
-        }
-      ],
-      'temizlik': [
-        {
-          hazard: "Kimyasal Karışım",
-          risk: "Farklı temizlik kimyasallarının birbirine karıştırılması sonucu toksik gaz çıkması.",
-          category: "Kimyasal",
-          o: 3, f: 3, s: 40,
-          controls: ["Zehirlenme, solunum yolu hasarı", "Etiketleme, eğitim ve ayrı kimyasal depolama uygulanmalı"]
-        },
-        {
-          hazard: "Islak Yüzeyde Çalışma",
-          risk: "Temizlik sonrası zeminde uyarı işareti olmadan çalışma sürmesi.",
-          category: "Kayma/Düşme",
-          o: 10, f: 10, s: 7,
-          controls: ["Düşme, kırık, burkulma", "Islak zemin levhası ve çalışma alanı izolasyonu uygulanmalı"]
-        }
-      ],
-      'cagri merkezi': [
-        {
-          hazard: "Uzun Süre Headset Kullanımı",
-          risk: "Yüksek ses ve sürekli çağrı nedeniyle işitme ve stres yükü oluşması.",
-          category: "Ergonomi/Psikososyal",
-          o: 10, f: 10, s: 3,
-          controls: ["Baş ağrısı, işitme yorgunluğu, stres", "Ses limiti, mola planı ve kaliteli headset sağlanmalı"]
-        },
-        {
-          hazard: "Psikososyal Yük",
-          risk: "Yoğun çağrı, performans baskısı ve vardiyalı çalışma nedeniyle tükenmişlik gelişmesi.",
-          category: "Psikososyal",
-          o: 10, f: 6, s: 7,
-          controls: ["Stres, tükenmişlik, hata artışı", "Mola planı, vardiya dengelemesi ve destek hattı uygulanmalı"]
-        }
-      ]
-    };
-
-    const normalizedSector = normalizeSectorKey(sectorLower);
-    const sectorSpecificRisks = templates[normalizedSector] || templates[sectorLower] || templates["otomotiv"];
-    const baseRisks = [...sectorSpecificRisks, ...COMMON_TEMPLATE_RISKS];
-    const risks = Array.from({ length: targetCount }, (_, index) => {
-      const template = baseRisks[index % baseRisks.length];
-      return {
-        ...template,
-        hazard: `${template.hazard}${index >= baseRisks.length ? ` ${index + 1}` : ""}`,
-      };
-    });
-
-    const normalizedRisks = ensureMinimumCount(risks, targetCount, (index) => {
-      const commonTemplate = COMMON_TEMPLATE_RISKS[index % COMMON_TEMPLATE_RISKS.length];
-      return {
-        ...commonTemplate,
-        hazard: `${commonTemplate.hazard} #${index + 1}`,
-        risk: `${commonTemplate.risk} (${sector})`,
-      };
-    });
-
-    return normalizedRisks.map((r, idx) => {
+    return generateSectorRiskTemplates(sector).map((r, idx) => {
       const score = r.o * r.f * r.s;
       const riskClass = getRiskClass(score);
 
@@ -1952,7 +1501,7 @@ useEffect(() => {
         score: score,
         riskClass: riskClass,
         controls: r.controls,
-        selected: true // Default: tümü seçili
+        selected: true,
       };
     });
   }
@@ -2607,8 +2156,8 @@ useEffect(() => {
                         <span aria-hidden="true">{sector.icon}</span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-slate-100">{sector.id} · {sector.name}</p>
-                        <p className="text-xs text-muted-foreground">{meta.hint}</p>
+                        <p className="text-sm font-semibold text-slate-100">{sector.name}</p>
+                        <p className="text-xs text-muted-foreground">{sector.group} · {meta.hint}</p>
                       </div>
                       <Badge variant="outline" className="border-white/10 bg-white/[0.04] text-[10px] text-cyan-200">
                         {sector.itemCount} Madde
@@ -2632,27 +2181,53 @@ useEffect(() => {
                     ? `${selectedSectorOption.name} sektörüne özel risk havuzu; kategori, olasılık, frekans, şiddet ve önerilen önlemlerle birlikte hazırlanır. Yapay zeka yanıt vermezse bile yerleşik sektör paketiyle üretim devam eder.`
                     : "Oluşturulan riskler sektöre göre kategori, olasılık, frekans, şiddet ve önerilen önlemlerle birlikte gelir. Seçtiğiniz maddeleri tabloya tek seferde ekleyebilirsiniz."}
                 </p>
+                {selectedSectorTemplateConfig ? (
+                  <p className="mt-2 text-[11px] leading-5 text-fuchsia-100/80">
+                    Önerilen detay seviyesi: <strong>{selectedSectorTemplateConfig.detailLevel}</strong> · Minimum öneri:
+                    {" "}
+                    <strong>{selectedSectorTemplateConfig.itemCount} risk maddesi</strong>
+                  </p>
+                ) : null}
               </div>
             </div>
           </div>
 
           {selectedSectorOption ? (
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-red-400/15 bg-red-500/5 p-3">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/70">Kritik Risk</p>
-                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.critical}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Anında aksiyon gerektiren başlıklar</p>
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-red-400/15 bg-red-500/5 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-red-200/70">Kritik Risk</p>
+                  <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.critical}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Anında aksiyon gerektiren başlıklar</p>
+                </div>
+                <div className="rounded-2xl border border-amber-400/15 bg-amber-500/5 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-amber-200/70">Yüksek Risk</p>
+                  <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.high}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Kontrol planı gerektiren başlıklar</p>
+                </div>
+                <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/70">Risk Havuzu</p>
+                  <p className="mt-2 text-lg font-black text-foreground">{selectedSectorRiskPreview.length}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Seçili sektör için hazır öneri havuzu</p>
+                </div>
+                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/5 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/70">Önerilen Minimum</p>
+                  <p className="mt-2 text-lg font-black text-foreground">{selectedSectorTemplateConfig?.itemCount ?? selectedSectorRiskPreview.length}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {selectedSectorTemplateConfig?.detailLevel === "Kapsamlı"
+                      ? "Bu sektör için kapsamlı analiz önerilir."
+                      : "Sektöre göre önerilen minimum madde sayısı"}
+                  </p>
+                </div>
               </div>
-              <div className="rounded-2xl border border-amber-400/15 bg-amber-500/5 p-3">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-amber-200/70">Yüksek Risk</p>
-                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorDistribution.high}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Kontrol planı gerektiren başlıklar</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/5 p-3">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-200/70">Risk Havuzu</p>
-                <p className="mt-2 text-lg font-black text-foreground">{selectedSectorRiskPreview.length}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">Seçili sektör için hazır öneri havuzu</p>
-              </div>
+              {selectedSectorTemplateConfig ? (
+                <div className="rounded-2xl border border-white/10 bg-slate-950/70 p-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Kapsanacak Ana Risk Alanları</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-200">
+                    {selectedSectorTemplateConfig.riskAreas.join(" • ")}
+                  </p>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -3031,10 +2606,9 @@ const AIResultsDialog = () => {
       const matchesSearch = pkg.name.toLowerCase().includes(searchQuery.toLowerCase());
       if (!selectedSectorOption) return matchesSearch;
 
-      const normalizedPackageSector = buildCatalogKey(pkg.sector || "");
       const matchesSector =
-        normalizedPackageSector === buildCatalogKey(selectedSectorOption.name) ||
-        buildCatalogKey(pkg.name).includes(buildCatalogKey(selectedSectorOption.name));
+        doesRiskSectorMatch(pkg.sector || pkg.name, selectedSectorOption.name) ||
+        doesRiskSectorMatch(pkg.name, selectedSectorOption.name);
 
       return matchesSearch && matchesSector;
     });
