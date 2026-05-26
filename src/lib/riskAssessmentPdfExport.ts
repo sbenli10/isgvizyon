@@ -1,4 +1,4 @@
-import jsPDF from "jspdf";
+﻿import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -17,7 +17,7 @@ type BuildRiskAssessmentPdfArgs = {
   company?: CompanyLike | null;
   loadImageAsDataUrl: (url?: string | null) => Promise<string | null>;
 
-  // Dosya yolu (public altından örn: "/assets/xxx.png")
+  // Dosya yolu (public altÄ±ndan Ã¶rn: "/assets/xxx.png")
   fineKinneyTableImageUrl?: string | null;
   processFlowImageUrl?: string | null;
 };
@@ -28,7 +28,7 @@ const COLORS = {
   slate: [71, 85, 105] as const,
   line: [203, 213, 225] as const,
   soft: [248, 250, 252] as const,
-  rose: [220, 38, 38] as const, // <-- EKLE (fallback error text için)
+  rose: [220, 38, 38] as const, // <-- EKLE (fallback error text iÃ§in)
 } as const;
 
 function setFont(doc: jsPDF, weight: "normal" | "bold" = "normal") {
@@ -44,10 +44,32 @@ function setDraw(doc: jsPDF, color: readonly [number, number, number]) {
   doc.setDrawColor(color[0], color[1], color[2]);
 }
 function upperTr(value: string) {
-  return value.toLocaleUpperCase("tr-TR");
+  return normalizePdfText(value).toLocaleUpperCase("tr-TR");
+}
+function normalizePdfText(value: string) {
+  return value
+    .replace(/Ä°/g, "İ")
+    .replace(/Ä±/g, "ı")
+    .replace(/Åž/g, "Ş")
+    .replace(/ÅŸ/g, "ş")
+    .replace(/Äž/g, "Ğ")
+    .replace(/ÄŸ/g, "ğ")
+    .replace(/Ãœ/g, "Ü")
+    .replace(/Ã¼/g, "ü")
+    .replace(/Ã–/g, "Ö")
+    .replace(/Ã¶/g, "ö")
+    .replace(/Ã‡/g, "Ç")
+    .replace(/Ã§/g, "ç")
+    .replace(/â€¢/g, "•")
+    .replace(/â€”/g, "—")
+    .replace(/â€“/g, "–")
+    .replace(/â€œ/g, "“")
+    .replace(/â€/g, "”")
+    .replace(/Â°/g, "°")
+    .replace(/B\?\?LG\?\? SAH\?\?B\?\? \?\?ALI\?\?AN/g, "BİLGİ SAHİBİ ÇALIŞAN");
 }
 function split(doc: jsPDF, text: string, width: number) {
-  return doc.splitTextToSize(text, width) as string[];
+  return doc.splitTextToSize(normalizePdfText(text), width) as string[];
 }
 function truncateLines(lines: string[], maxLines: number) {
   if (lines.length <= maxLines) return lines;
@@ -176,16 +198,16 @@ function drawProcedurePageHeader(doc: jsPDF, pageLabel: string) {
   setText(doc, [0, 0, 0]);
   setFont(doc, "bold");
   doc.setFontSize(8);
-  doc.text("TEHLİKE TANIMLAMA VE RİSK DEĞERLENDİRMESİ\nPROSEDÜRÜ", pageWidth / 2, 18.6, {
+  doc.text("TEHLÄ°KE TANIMLAMA VE RÄ°SK DEÄžERLENDÄ°RMESÄ°\nPROSEDÃœRÃœ", pageWidth / 2, 18.6, {
     align: "center",
     baseline: "middle",
   });
 
   setFont(doc, "normal");
   doc.setFontSize(6);
-  doc.text("Doküman No", pageWidth - 54, 14.5);
-  doc.text("İSG.PR.002", pageWidth - 36, 14.5);
-  doc.text("Yayın Tarihi", pageWidth - 54, 18.3);
+  doc.text("DokÃ¼man No", pageWidth - 54, 14.5);
+  doc.text("Ä°SG.PR.002", pageWidth - 36, 14.5);
+  doc.text("YayÄ±n Tarihi", pageWidth - 54, 18.3);
   doc.text("01.01.2026", pageWidth - 36, 18.3);
   doc.text("Revizyon Tarihi", pageWidth - 54, 22.1);
   doc.text("-", pageWidth - 36, 22.1);
@@ -195,7 +217,7 @@ function drawProcedurePageHeader(doc: jsPDF, pageLabel: string) {
   doc.text(pageLabel, pageWidth - 36, 29.7);
 }
 
-/** Browser ortamında dataURL görselinin doğal boyutlarını okur. */
+/** Browser ortamÄ±nda dataURL gÃ¶rselinin doÄŸal boyutlarÄ±nÄ± okur. */
 function getImageNaturalSize(dataUrl: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -211,8 +233,8 @@ function getContainedRect(containerW: number, containerH: number, contentW: numb
 }
 
 /**
- * Verilen dataUrl görselini belirtilen alana ORANI BOZMADAN (contain) sığdırır ve ortalar.
- * Taşma olmaz.
+ * Verilen dataUrl gÃ¶rselini belirtilen alana ORANI BOZMADAN (contain) sÄ±ÄŸdÄ±rÄ±r ve ortalar.
+ * TaÅŸma olmaz.
  */
 async function drawImageContain(
   doc: jsPDF,
@@ -234,7 +256,7 @@ async function drawImageContain(
 function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl: string | null) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const companyName = args.company?.name?.trim() || "FİRMA";
+  const companyName = args.company?.name?.trim() || "FÄ°RMA";
   const companyUpper = upperTr(companyName);
   const reportDate = format(new Date(args.assessment.assessment_date), "dd.MM.yyyy", { locale: tr });
   const validityDate = args.assessment.next_review_date
@@ -272,12 +294,12 @@ function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl
 
   setFont(doc, "normal");
   doc.setFontSize(10);
-  doc.text("GAZİANTEP", pageWidth / 2, innerY + 52, { align: "center" });
+  doc.text("GAZÄ°ANTEP", pageWidth / 2, innerY + 52, { align: "center" });
 
   setFont(doc, "bold");
   doc.setFontSize(12);
-  doc.text("İŞ SAĞLIĞI VE GÜVENLİĞİ", pageWidth / 2, innerY + 70, { align: "center" });
-  doc.text("TEHLİKE TANIMLAMA VE RİSK DEĞERLENDİRMESİ PROSEDÜRÜ", pageWidth / 2, innerY + 86, { align: "center" });
+  doc.text("Ä°Åž SAÄžLIÄžI VE GÃœVENLÄ°ÄžÄ°", pageWidth / 2, innerY + 70, { align: "center" });
+  doc.text("TEHLÄ°KE TANIMLAMA VE RÄ°SK DEÄžERLENDÄ°RMESÄ° PROSEDÃœRÃœ", pageWidth / 2, innerY + 86, { align: "center" });
 
   setDraw(doc, [113, 120, 135]);
   doc.setLineWidth(0.2);
@@ -286,7 +308,7 @@ function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl
   setFont(doc, "normal");
   doc.setFontSize(9);
   setText(doc, COLORS.slate);
-  doc.text(`${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
+  doc.text(`${upperTr(companyName)} â€¢ Fine-Kinney Risk DeÄŸerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
 
   const tableX = pageWidth / 2 - 48;
   const tableY = innerY + 136;
@@ -306,10 +328,10 @@ function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl
   setFont(doc, "bold");
   doc.setFontSize(8);
   setText(doc, [0, 0, 0]);
-  doc.text("RİSK\nDEĞERLENDİRMESİNİN", tableX + leftW / 2, tableY + 13, { align: "center", baseline: "middle" });
-  doc.text("YAPILDIĞI TARİH", tableX + leftW + labelW / 2, tableY + 7.8, { align: "center" });
-  doc.text("GEÇERLİLİK TARİHİ", tableX + leftW + labelW / 2, tableY + rowH + 7.8, { align: "center" });
-  doc.text("REVİZYON NO / TARİHİ", tableX + leftW + labelW / 2, tableY + rowH * 2 + 7.8, { align: "center" });
+  doc.text("RÄ°SK\nDEÄžERLENDÄ°RMESÄ°NÄ°N", tableX + leftW / 2, tableY + 13, { align: "center", baseline: "middle" });
+  doc.text("YAPILDIÄžI TARÄ°H", tableX + leftW + labelW / 2, tableY + 7.8, { align: "center" });
+  doc.text("GEÃ‡ERLÄ°LÄ°K TARÄ°HÄ°", tableX + leftW + labelW / 2, tableY + rowH + 7.8, { align: "center" });
+  doc.text("REVÄ°ZYON NO / TARÄ°HÄ°", tableX + leftW + labelW / 2, tableY + rowH * 2 + 7.8, { align: "center" });
 
   setFont(doc, "normal");
   doc.text(reportDate, tableX + leftW + labelW + valueW / 2, tableY + 7.8, { align: "center" });
@@ -322,7 +344,7 @@ function drawCoverPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl
 function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataUrl: string | null) {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const companyName = args.company?.name?.trim() || "FİRMA";
+  const companyName = args.company?.name?.trim() || "FÄ°RMA";
   const companyUpper = upperTr(companyName);
   const reportDate = format(new Date(args.assessment.assessment_date), "dd.MM.yyyy", { locale: tr });
   const validityDate = args.assessment.next_review_date
@@ -349,11 +371,15 @@ function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataU
   doc.setLineWidth(0.9);
   doc.rect(innerX + 4, innerY + 4, innerW - 8, innerH - 8);
 
+  const logoWidth = 34;
+  const logoHeight = 20;
+  const logoX = innerX + innerW - logoWidth - 12;
+  const logoY = innerY + 10;
   if (logoDataUrl) {
-    doc.addImage(logoDataUrl, getImageFormat(logoDataUrl), pageWidth / 2 - 16, innerY + 12, 32, 20, undefined, "FAST");
+    doc.addImage(logoDataUrl, getImageFormat(logoDataUrl), logoX, logoY, logoWidth, logoHeight, undefined, "FAST");
   }
 
-  const companyTitle = drawWrappedCenteredText(doc, companyUpper, pageWidth / 2, innerY + 38, innerW - 40, {
+  const companyTitle = drawWrappedCenteredText(doc, companyUpper, pageWidth / 2, innerY + 42, logoDataUrl ? innerW - 64 : innerW - 40, {
     startFontSize: 23,
     minFontSize: 14,
     maxLines: 3,
@@ -366,16 +392,16 @@ function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataU
   doc.setFontSize(10);
   setFont(doc, "normal");
   setText(doc, [12, 18, 30]);
-  doc.text("GAZİANTEP", pageWidth / 2, subtitleY, { align: "center" });
+  doc.text("GAZÄ°ANTEP", pageWidth / 2, subtitleY, { align: "center" });
 
   const headingY = subtitleY + 18;
   doc.setFontSize(12);
   setFont(doc, "bold");
-  doc.text("İŞ SAĞLIĞI VE GÜVENLİĞİ", pageWidth / 2, headingY, { align: "center" });
+  doc.text("Ä°Åž SAÄžLIÄžI VE GÃœVENLÄ°ÄžÄ°", pageWidth / 2, headingY, { align: "center" });
 
   const procedureTitle = drawWrappedCenteredText(
     doc,
-    "TEHLİKE TANIMLAMA VE RİSK DEĞERLENDİRMESİ PROSEDÜRÜ",
+    "TEHLÄ°KE TANIMLAMA VE RÄ°SK DEÄžERLENDÄ°RMESÄ° PROSEDÃœRÃœ",
     pageWidth / 2,
     headingY + 9,
     innerW - 44,
@@ -394,7 +420,7 @@ function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataU
   doc.setLineWidth(0.2);
   doc.line(pageWidth / 2 - 60, separatorY, pageWidth / 2 + 60, separatorY);
 
-  drawWrappedCenteredText(doc, `${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 10.8, pageWidth - 38, {
+  drawWrappedCenteredText(doc, `${upperTr(companyName)} â€¢ Fine-Kinney Risk DeÄŸerlendirme Tablosu`, pageWidth / 2, 10.8, pageWidth - 38, {
     startFontSize: 9,
     minFontSize: 7,
     maxLines: 2,
@@ -420,10 +446,10 @@ function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataU
   setFont(doc, "bold");
   doc.setFontSize(8);
   setText(doc, [0, 0, 0]);
-  doc.text("RİSK\nDEĞERLENDİRMESİNİN", tableX + leftW / 2, tableY + 13, { align: "center", baseline: "middle" });
-  doc.text("YAPILDIĞI TARİH", tableX + leftW + labelW / 2, tableY + 7.8, { align: "center" });
-  doc.text("GEÇERLİLİK TARİHİ", tableX + leftW + labelW / 2, tableY + rowH + 7.8, { align: "center" });
-  doc.text("REVİZYON NO / TARİHİ", tableX + leftW + labelW / 2, tableY + rowH * 2 + 7.8, { align: "center" });
+  doc.text("RÄ°SK\nDEÄžERLENDÄ°RMESÄ°NÄ°N", tableX + leftW / 2, tableY + 13, { align: "center", baseline: "middle" });
+  doc.text("YAPILDIÄžI TARÄ°H", tableX + leftW + labelW / 2, tableY + 7.8, { align: "center" });
+  doc.text("GEÃ‡ERLÄ°LÄ°K TARÄ°HÄ°", tableX + leftW + labelW / 2, tableY + rowH + 7.8, { align: "center" });
+  doc.text("REVÄ°ZYON NO / TARÄ°HÄ°", tableX + leftW + labelW / 2, tableY + rowH * 2 + 7.8, { align: "center" });
 
   setFont(doc, "normal");
   doc.text(reportDate, tableX + leftW + labelW + valueW / 2, tableY + 7.8, { align: "center" });
@@ -435,163 +461,163 @@ function drawCoverPageV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, logoDataU
 
 function buildIntroSections(companyName: string, assessment: RiskAssessment) {
   const companyUpper = upperTr(companyName);
-  const assessor = assessment.occupational_safety_specialist_name || assessment.assessor_name || "İş Güvenliği Uzmanı";
-  const doctor = assessment.workplace_doctor_name || "İşyeri Hekimi";
-  const employer = assessment.employer_name || assessment.employer_representative_name || "İşveren / İşveren Vekili";
-  const employeeRep = assessment.employee_representative_name || "Çalışan Temsilcisi";
-  const support = assessment.support_personnel_name || "Destek Elemanı";
+  const assessor = assessment.occupational_safety_specialist_name || assessment.assessor_name || "Ä°ÅŸ GÃ¼venliÄŸi UzmanÄ±";
+  const doctor = assessment.workplace_doctor_name || "Ä°ÅŸyeri Hekimi";
+  const employer = assessment.employer_name || assessment.employer_representative_name || "Ä°ÅŸveren / Ä°ÅŸveren Vekili";
+  const employeeRep = assessment.employee_representative_name || "Ã‡alÄ±ÅŸan Temsilcisi";
+  const support = assessment.support_personnel_name || "Destek ElemanÄ±";
 
   return [
     {
-      title: "1. AMAÇ",
+      title: "1. AMAÃ‡",
       paragraphs: [
-        `${companyUpper}'de var olan çalışma koşullarından kaynaklanan her türlü tehlike ve riskin tespiti, mevcut iş sağlığı ve güvenliği yasa ve yönetmeliklerine uygunluğunun değerlendirilmesi ve bu risklerin insan sağlığını etkilemeyen seviyeye düşürülmesi amaçlanmaktadır.`,
-        `Tehlike tanımlama ve risk değerlendirmesi sonucunda ortaya çıkan risk değerlerinin iyileştirilmesi, önerilerde bulunulması, İSG yönetim sisteminin disiplin altına alınması ve yönetim metodunun belirlenmesi hedeflenmektedir.`,
+        `${companyUpper}'de var olan Ã§alÄ±ÅŸma koÅŸullarÄ±ndan kaynaklanan her tÃ¼rlÃ¼ tehlike ve riskin tespiti, mevcut iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi yasa ve yÃ¶netmeliklerine uygunluÄŸunun deÄŸerlendirilmesi ve bu risklerin insan saÄŸlÄ±ÄŸÄ±nÄ± etkilemeyen seviyeye dÃ¼ÅŸÃ¼rÃ¼lmesi amaÃ§lanmaktadÄ±r.`,
+        `Tehlike tanÄ±mlama ve risk deÄŸerlendirmesi sonucunda ortaya Ã§Ä±kan risk deÄŸerlerinin iyileÅŸtirilmesi, Ã¶nerilerde bulunulmasÄ±, Ä°SG yÃ¶netim sisteminin disiplin altÄ±na alÄ±nmasÄ± ve yÃ¶netim metodunun belirlenmesi hedeflenmektedir.`,
       ],
     },
     {
       title: "2. KAPSAM",
       paragraphs: [
-        `Bu rapor ${companyUpper}'de yapılan gözlemlere göre hazırlanmıştır. Çalışma; işyerinde kullanılan tüm makine, tesisat, bina, eklenti ve sosyal tesisleri, çalışan firma sorumlularını, işçileri, ziyaretçileri ve tedarikçileri kapsar.`,
+        `Bu rapor ${companyUpper}'de yapÄ±lan gÃ¶zlemlere gÃ¶re hazÄ±rlanmÄ±ÅŸtÄ±r. Ã‡alÄ±ÅŸma; iÅŸyerinde kullanÄ±lan tÃ¼m makine, tesisat, bina, eklenti ve sosyal tesisleri, Ã§alÄ±ÅŸan firma sorumlularÄ±nÄ±, iÅŸÃ§ileri, ziyaretÃ§ileri ve tedarikÃ§ileri kapsar.`,
       ],
     },
     {
       title: "3. REFERANSLAR",
-      paragraphs: ["OHSAS 18001, İş Sağlığı ve Güvenliği Risk Değerlendirmesi Yönetmeliği, İş Sağlığı ve Güvenliği Kanunu."],
+      paragraphs: ["OHSAS 18001, Ä°ÅŸ SaÄŸlÄ±ÄŸÄ± ve GÃ¼venliÄŸi Risk DeÄŸerlendirmesi YÃ¶netmeliÄŸi, Ä°ÅŸ SaÄŸlÄ±ÄŸÄ± ve GÃ¼venliÄŸi Kanunu."],
     },
     {
       title: "4. TANIMLAR",
       paragraphs: [
-        "Tehlike: İşyerinde var olan ya da dışarıdan gelebilecek, çalışanı veya işyerini etkileyebilecek zarar veya hasar verme potansiyelidir.",
-        "Önleme: İşyerinde yürütülen işlerin bütün safhalarında iş sağlığı ve güvenliği ile ilgili riskleri ortadan kaldırmak veya azaltmak için planlanan ve alınan tedbirlerin tümüdür.",
-        "Ramak kala olay: İşyerinde meydana gelen; çalışan, işyeri ya da iş ekipmanını zarara uğratma potansiyeli olduğu halde zarara uğratmayan olaydır.",
-        "Risk: Tehlikeden kaynaklanacak kayıp, yaralanma ya da başka zararlı sonuç meydana gelme ihtimalidir.",
-        "Risk değerlendirmesi: İşyerinde var olan ya da dışarıdan gelebilecek tehlikelerin belirlenmesi, bu tehlikelerin riske dönüşmesine yol açan faktörler ile tehlikelerden kaynaklanan risklerin analiz edilerek derecelendirilmesi ve kontrol tedbirlerinin kararlaştırılması amacıyla yapılması gerekli çalışmalardır.",
+        "Tehlike: Ä°ÅŸyerinde var olan ya da dÄ±ÅŸarÄ±dan gelebilecek, Ã§alÄ±ÅŸanÄ± veya iÅŸyerini etkileyebilecek zarar veya hasar verme potansiyelidir.",
+        "Ã–nleme: Ä°ÅŸyerinde yÃ¼rÃ¼tÃ¼len iÅŸlerin bÃ¼tÃ¼n safhalarÄ±nda iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi ile ilgili riskleri ortadan kaldÄ±rmak veya azaltmak iÃ§in planlanan ve alÄ±nan tedbirlerin tÃ¼mÃ¼dÃ¼r.",
+        "Ramak kala olay: Ä°ÅŸyerinde meydana gelen; Ã§alÄ±ÅŸan, iÅŸyeri ya da iÅŸ ekipmanÄ±nÄ± zarara uÄŸratma potansiyeli olduÄŸu halde zarara uÄŸratmayan olaydÄ±r.",
+        "Risk: Tehlikeden kaynaklanacak kayÄ±p, yaralanma ya da baÅŸka zararlÄ± sonuÃ§ meydana gelme ihtimalidir.",
+        "Risk deÄŸerlendirmesi: Ä°ÅŸyerinde var olan ya da dÄ±ÅŸarÄ±dan gelebilecek tehlikelerin belirlenmesi, bu tehlikelerin riske dÃ¶nÃ¼ÅŸmesine yol aÃ§an faktÃ¶rler ile tehlikelerden kaynaklanan risklerin analiz edilerek derecelendirilmesi ve kontrol tedbirlerinin kararlaÅŸtÄ±rÄ±lmasÄ± amacÄ±yla yapÄ±lmasÄ± gerekli Ã§alÄ±ÅŸmalardÄ±r.",
       ],
     },
     {
       title: "5. SORUMLULUKLAR VE PERSONEL",
       paragraphs: [
-        `İş kazalarına karşı gerekli önlemlerin alınmasından ${employer}, risk değerlendirmesi çalışmalarının yürütülmesinden risk değerlendirmesi ekibi sorumludur.`,
-        `"İSG.PR.016 Tehlike Tanımlama ve Risk Değerlendirmesi Formu" ${companyUpper} tarafından görevlendirilen risk değerlendirme ekibi tarafından hazırlanacak; ${assessor}, ${companyUpper} çalışan tüm personele iş güvenliği eğitimi kapsamında bilgilendirme yapacak ve tehlike bildirim formlarını göz önüne alarak kontrolleri sürdürecektir.`,
+        `Ä°ÅŸ kazalarÄ±na karÅŸÄ± gerekli Ã¶nlemlerin alÄ±nmasÄ±ndan ${employer}, risk deÄŸerlendirmesi Ã§alÄ±ÅŸmalarÄ±nÄ±n yÃ¼rÃ¼tÃ¼lmesinden risk deÄŸerlendirmesi ekibi sorumludur.`,
+        `"Ä°SG.PR.016 Tehlike TanÄ±mlama ve Risk DeÄŸerlendirmesi Formu" ${companyUpper} tarafÄ±ndan gÃ¶revlendirilen risk deÄŸerlendirme ekibi tarafÄ±ndan hazÄ±rlanacak; ${assessor}, ${companyUpper} Ã§alÄ±ÅŸan tÃ¼m personele iÅŸ gÃ¼venliÄŸi eÄŸitimi kapsamÄ±nda bilgilendirme yapacak ve tehlike bildirim formlarÄ±nÄ± gÃ¶z Ã¶nÃ¼ne alarak kontrolleri sÃ¼rdÃ¼recektir.`,
       ],
     },
     {
-      title: "5.1. İŞ SAĞLIĞI VE GÜVENLİĞİ KONUSUNDA İŞVERENİN GÖREVLERİ",
+      title: "5.1. Ä°Åž SAÄžLIÄžI VE GÃœVENLÄ°ÄžÄ° KONUSUNDA Ä°ÅžVERENÄ°N GÃ–REVLERÄ°",
       paragraphs: [
-        "İşveren, çalışanların işle ilgili sağlık ve güvenliğini sağlamakla yükümlüdür. Bu çerçevede mesleki risklerin önlenmesi, eğitim ve bilgi verilmesi dahil her türlü tedbirin alınması, organizasyonun yapılması, gerekli araç ve gereçlerin sağlanması ve sağlık-güvenlik tedbirlerinin değişen şartlara uygun hale getirilmesi için çalışmalar yürütür.",
-        "İşyerinde alınan iş sağlığı ve güvenliği tedbirlerine uyulup uyulmadığını izler, denetler ve uygunsuzlukların giderilmesini sağlar; risk değerlendirmesi yapar veya yaptırır; görev verirken çalışanın sağlık ve güvenlik yönünden işe uygunluğunu dikkate alır; hayati tehlike bulunan alanlara yetkisiz girişleri engeller.",
-        "İşyeri dışındaki uzman kişi ve kuruluşlardan hizmet alınması işverenin sorumluluklarını ortadan kaldırmaz; iş sağlığı ve güvenliği tedbirlerinin maliyeti çalışanlara yansıtılamaz.",
+        "Ä°ÅŸveren, Ã§alÄ±ÅŸanlarÄ±n iÅŸle ilgili saÄŸlÄ±k ve gÃ¼venliÄŸini saÄŸlamakla yÃ¼kÃ¼mlÃ¼dÃ¼r. Bu Ã§erÃ§evede mesleki risklerin Ã¶nlenmesi, eÄŸitim ve bilgi verilmesi dahil her tÃ¼rlÃ¼ tedbirin alÄ±nmasÄ±, organizasyonun yapÄ±lmasÄ±, gerekli araÃ§ ve gereÃ§lerin saÄŸlanmasÄ± ve saÄŸlÄ±k-gÃ¼venlik tedbirlerinin deÄŸiÅŸen ÅŸartlara uygun hale getirilmesi iÃ§in Ã§alÄ±ÅŸmalar yÃ¼rÃ¼tÃ¼r.",
+        "Ä°ÅŸyerinde alÄ±nan iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi tedbirlerine uyulup uyulmadÄ±ÄŸÄ±nÄ± izler, denetler ve uygunsuzluklarÄ±n giderilmesini saÄŸlar; risk deÄŸerlendirmesi yapar veya yaptÄ±rÄ±r; gÃ¶rev verirken Ã§alÄ±ÅŸanÄ±n saÄŸlÄ±k ve gÃ¼venlik yÃ¶nÃ¼nden iÅŸe uygunluÄŸunu dikkate alÄ±r; hayati tehlike bulunan alanlara yetkisiz giriÅŸleri engeller.",
+        "Ä°ÅŸyeri dÄ±ÅŸÄ±ndaki uzman kiÅŸi ve kuruluÅŸlardan hizmet alÄ±nmasÄ± iÅŸverenin sorumluluklarÄ±nÄ± ortadan kaldÄ±rmaz; iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi tedbirlerinin maliyeti Ã§alÄ±ÅŸanlara yansÄ±tÄ±lamaz.",
       ],
     },
     {
-      title: "5.2. RİSK DEĞERLENDİRME EKİBİ'NİN GÖREVLERİ",
+      title: "5.2. RÄ°SK DEÄžERLENDÄ°RME EKÄ°BÄ°'NÄ°N GÃ–REVLERÄ°",
       paragraphs: [
-        "İş Sağlığı ve Güvenliği Risk Değerlendirmesi Yönetmeliği'ne göre yapılacak çalışmalar için ekip oluşturulmalıdır, risk değerlendirmesi ekibinde söz konusu yönetmeliğin 6. Maddesine göre bulunması gereken kişiler aşağıdaki gibi tanımlanmıştır.",
-        "\"İSG.FR.017.RİSK DEĞERLENDİRME EKİBİ\"'nde görevlendirilen kişiler formu ile kayıt altına alınacak ve \"İSG.EGT.002 RİSK DEĞERLENDİRME EKİBİ EĞİTİMİ\" ve \"İSG.FR.009.RİSK DEĞERLENDİRME EKİBİ EĞİTİM KATILIM FORMU\" ile eğitimi tamamlanacaktır.",
-        "- İşveren veya işveren vekili.",
-        "- İşyerinde sağlık ve güvenlik hizmetini yürüten iş güvenliği uzmanları ile işyeri hekimleri.",
-        "- İşyerindeki çalışan temsilcileri.",
-        "- İşyerindeki destek elemanları.",
-        "- İşyerindeki bütün birimleri temsil edecek şekilde belirlenen ve işyerinde yürütülen çalışmalar, mevcut veya muhtemel tehlike kaynakları ile riskler konusunda bilgi sahibi çalışanlar.",
+        "Ä°ÅŸ SaÄŸlÄ±ÄŸÄ± ve GÃ¼venliÄŸi Risk DeÄŸerlendirmesi YÃ¶netmeliÄŸi'ne gÃ¶re yapÄ±lacak Ã§alÄ±ÅŸmalar iÃ§in ekip oluÅŸturulmalÄ±dÄ±r, risk deÄŸerlendirmesi ekibinde sÃ¶z konusu yÃ¶netmeliÄŸin 6. Maddesine gÃ¶re bulunmasÄ± gereken kiÅŸiler aÅŸaÄŸÄ±daki gibi tanÄ±mlanmÄ±ÅŸtÄ±r.",
+        "\"Ä°SG.FR.017.RÄ°SK DEÄžERLENDÄ°RME EKÄ°BÄ°\"'nde gÃ¶revlendirilen kiÅŸiler formu ile kayÄ±t altÄ±na alÄ±nacak ve \"Ä°SG.EGT.002 RÄ°SK DEÄžERLENDÄ°RME EKÄ°BÄ° EÄžÄ°TÄ°MÄ°\" ve \"Ä°SG.FR.009.RÄ°SK DEÄžERLENDÄ°RME EKÄ°BÄ° EÄžÄ°TÄ°M KATILIM FORMU\" ile eÄŸitimi tamamlanacaktÄ±r.",
+        "- Ä°ÅŸveren veya iÅŸveren vekili.",
+        "- Ä°ÅŸyerinde saÄŸlÄ±k ve gÃ¼venlik hizmetini yÃ¼rÃ¼ten iÅŸ gÃ¼venliÄŸi uzmanlarÄ± ile iÅŸyeri hekimleri.",
+        "- Ä°ÅŸyerindeki Ã§alÄ±ÅŸan temsilcileri.",
+        "- Ä°ÅŸyerindeki destek elemanlarÄ±.",
+        "- Ä°ÅŸyerindeki bÃ¼tÃ¼n birimleri temsil edecek ÅŸekilde belirlenen ve iÅŸyerinde yÃ¼rÃ¼tÃ¼len Ã§alÄ±ÅŸmalar, mevcut veya muhtemel tehlike kaynaklarÄ± ile riskler konusunda bilgi sahibi Ã§alÄ±ÅŸanlar.",
       ],
     },
     {
-      title: "6. RİSK DEĞERLENDİRME SÜRECİ",
+      title: "6. RÄ°SK DEÄžERLENDÄ°RME SÃœRECÄ°",
       paragraphs: [
-        `Risk değerlendirmesi için "İSG.FR.016 Tehlike Tanımlama ve Risk Değerlendirme Formu" kullanılır. Tüm işyerleri için tasarım veya kuruluş aşamasından başlamak üzere tehlikeleri tanımlama, riskleri belirleme ve analiz etme, risk kontrol tedbirlerinin kararlaştırılması, dokümantasyon, yapılan çalışmaların güncellenmesi ve gerektiğinde yenilenmesi aşamaları izlenir.`,
+        `Risk deÄŸerlendirmesi iÃ§in "Ä°SG.FR.016 Tehlike TanÄ±mlama ve Risk DeÄŸerlendirme Formu" kullanÄ±lÄ±r. TÃ¼m iÅŸyerleri iÃ§in tasarÄ±m veya kuruluÅŸ aÅŸamasÄ±ndan baÅŸlamak Ã¼zere tehlikeleri tanÄ±mlama, riskleri belirleme ve analiz etme, risk kontrol tedbirlerinin kararlaÅŸtÄ±rÄ±lmasÄ±, dokÃ¼mantasyon, yapÄ±lan Ã§alÄ±ÅŸmalarÄ±n gÃ¼ncellenmesi ve gerektiÄŸinde yenilenmesi aÅŸamalarÄ± izlenir.`,
       ],
     },
     {
-      title: "6.1. RİSK DEĞERLENDİRMESİ",
+      title: "6.1. RÄ°SK DEÄžERLENDÄ°RMESÄ°",
       paragraphs: [
-        "Çalışanların risk değerlendirmesi çalışması yapılırken ihtiyaç duyulan her aşamada sürece katılarak görüşlerinin alınması sağlanır. Bu süreçte ramak kala ve tehlike bildirim formları kullanılarak çalışan görüşleri kayıt altına alınır.",
+        "Ã‡alÄ±ÅŸanlarÄ±n risk deÄŸerlendirmesi Ã§alÄ±ÅŸmasÄ± yapÄ±lÄ±rken ihtiyaÃ§ duyulan her aÅŸamada sÃ¼rece katÄ±larak gÃ¶rÃ¼ÅŸlerinin alÄ±nmasÄ± saÄŸlanÄ±r. Bu sÃ¼reÃ§te ramak kala ve tehlike bildirim formlarÄ± kullanÄ±larak Ã§alÄ±ÅŸan gÃ¶rÃ¼ÅŸleri kayÄ±t altÄ±na alÄ±nÄ±r.",
       ],
     },
     {
-    title: "6.2. TEHLİKELERİN TANIMLANMASI",
+    title: "6.2. TEHLÄ°KELERÄ°N TANIMLANMASI",
     paragraphs: [
-      "Tehlikeler tanımlanırken çalışma ortamı, çalışanlar ve işyerine ilişkin ilgisine göre asgari olarak aşağıda belirtilen bilgiler toplanır.",
-      "a) İşyeri bina ve eklentileri.",
-      "b) İşyerinde yürütülen faaliyetler ile iş ve işlemler.",
-      "c) Üretim süreç ve teknikleri.",
-      "ç) İş ekipmanları.",
-      "d) Kullanılan maddeler.",
-      "e) Artık ve atıklarla ilgili işlemler.",
-      "f) Organizasyon ve hiyerarşik yapı, görev, yetki ve sorumluluklar.",
-      "g) Çalışanların tecrübe ve düşünceleri.",
-      "ğ) İşe başlamadan önce ilgili mevzuat gereği alınacak çalışma izin belgeleri.",
-      "h) Çalışanların eğitim, yaş, cinsiyet ve benzeri özellikleri ile sağlık gözetimi kayıtları.",
-      "ı) Genç, yaşlı, engelli, gebe veya emziren çalışanlar gibi özel politika gerektiren gruplar ile kadın çalışanların durumu.",
-      "i) İşyerinin teftiş sonuçları.",
-      "j) Meslek hastalığı kayıtları.",
-      "k) İş kazası kayıtları.",
-      "l) İşyerinde meydana gelen ancak yaralanma veya ölüme neden olmadığı halde işyeri ya da iş ekipmanının zarara uğramasına yol açan olaylara ilişkin kayıtlar.",
-      "m) Ramak kala olay kayıtları.",
-      "n) Malzeme güvenlik bilgi formları.",
-      "o) Ortam ve kişisel maruziyet düzeyi ölçüm sonuçları.",
-      "ö) Varsa daha önce yapılmış risk değerlendirmesi çalışmaları.",
-      "p) Acil durum planları.",
-      "r) Sağlık ve güvenlik planı ve patlamadan korunma dokümanı gibi belirli işyerlerinde hazırlanması gereken dokümanlar.",
+      "Tehlikeler tanÄ±mlanÄ±rken Ã§alÄ±ÅŸma ortamÄ±, Ã§alÄ±ÅŸanlar ve iÅŸyerine iliÅŸkin ilgisine gÃ¶re asgari olarak aÅŸaÄŸÄ±da belirtilen bilgiler toplanÄ±r.",
+      "a) Ä°ÅŸyeri bina ve eklentileri.",
+      "b) Ä°ÅŸyerinde yÃ¼rÃ¼tÃ¼len faaliyetler ile iÅŸ ve iÅŸlemler.",
+      "c) Ãœretim sÃ¼reÃ§ ve teknikleri.",
+      "Ã§) Ä°ÅŸ ekipmanlarÄ±.",
+      "d) KullanÄ±lan maddeler.",
+      "e) ArtÄ±k ve atÄ±klarla ilgili iÅŸlemler.",
+      "f) Organizasyon ve hiyerarÅŸik yapÄ±, gÃ¶rev, yetki ve sorumluluklar.",
+      "g) Ã‡alÄ±ÅŸanlarÄ±n tecrÃ¼be ve dÃ¼ÅŸÃ¼nceleri.",
+      "ÄŸ) Ä°ÅŸe baÅŸlamadan Ã¶nce ilgili mevzuat gereÄŸi alÄ±nacak Ã§alÄ±ÅŸma izin belgeleri.",
+      "h) Ã‡alÄ±ÅŸanlarÄ±n eÄŸitim, yaÅŸ, cinsiyet ve benzeri Ã¶zellikleri ile saÄŸlÄ±k gÃ¶zetimi kayÄ±tlarÄ±.",
+      "Ä±) GenÃ§, yaÅŸlÄ±, engelli, gebe veya emziren Ã§alÄ±ÅŸanlar gibi Ã¶zel politika gerektiren gruplar ile kadÄ±n Ã§alÄ±ÅŸanlarÄ±n durumu.",
+      "i) Ä°ÅŸyerinin teftiÅŸ sonuÃ§larÄ±.",
+      "j) Meslek hastalÄ±ÄŸÄ± kayÄ±tlarÄ±.",
+      "k) Ä°ÅŸ kazasÄ± kayÄ±tlarÄ±.",
+      "l) Ä°ÅŸyerinde meydana gelen ancak yaralanma veya Ã¶lÃ¼me neden olmadÄ±ÄŸÄ± halde iÅŸyeri ya da iÅŸ ekipmanÄ±nÄ±n zarara uÄŸramasÄ±na yol aÃ§an olaylara iliÅŸkin kayÄ±tlar.",
+      "m) Ramak kala olay kayÄ±tlarÄ±.",
+      "n) Malzeme gÃ¼venlik bilgi formlarÄ±.",
+      "o) Ortam ve kiÅŸisel maruziyet dÃ¼zeyi Ã¶lÃ§Ã¼m sonuÃ§larÄ±.",
+      "Ã¶) Varsa daha Ã¶nce yapÄ±lmÄ±ÅŸ risk deÄŸerlendirmesi Ã§alÄ±ÅŸmalarÄ±.",
+      "p) Acil durum planlarÄ±.",
+      "r) SaÄŸlÄ±k ve gÃ¼venlik planÄ± ve patlamadan korunma dokÃ¼manÄ± gibi belirli iÅŸyerlerinde hazÄ±rlanmasÄ± gereken dokÃ¼manlar.",
 
-      "Tehlikelere ilişkin bilgiler toplanırken aynı üretim, yöntem ve teknikleri ile üretim yapan benzer işyerlerinde meydana gelen iş kazaları ve ortaya çıkan meslek hastalıkları da değerlendirilebilir. Toplanan bilgiler ışığında; iş sağlığı ve güvenliği ile ilgili mevzuatta yer alan hükümler de dikkate alınarak, çalışma ortamında bulunan fiziksel, kimyasal, biyolojik, psikososyal, ergonomik ve benzeri tehlike kaynaklarından oluşan veya bunların etkileşimi sonucu ortaya çıkabilecek tehlikeler belirlenir ve kayda alınır. Bu belirleme yapılırken aşağıdaki hususlar, bu hususlardan etkilenecekler ve ne şekilde etkilenebilecekleri göz önünde bulundurulur.",
-      "a) İşletmenin yeri nedeniyle ortaya çıkabilecek tehlikeler.",
-      "b) Seçilen alanda, işyeri bina ve eklentilerinin plana uygun yerleştirilmemesi veya planda olmayan ilavelerin yapılmasından kaynaklanabilecek tehlikeler.",
-      "c) İşyeri bina ve eklentilerinin yapı ve yapım tarzı ile seçilen yapı malzemelerinden kaynaklanabilecek tehlikeler.",
-      "ç) Bakım ve onarım işleri de dahil işyerinde yürütülecek her türlü faaliyet esnasında çalışma usulleri, vardiya düzeni, ekip çalışması, organizasyon, nezaret sistemi, hiyerarşik düzen, ziyaretçi veya işyeri çalışanı olmayan diğer kişiler gibi faktörlerden kaynaklanabilecek tehlikeler.",
-      "d) İşin yürütümü, üretim teknikleri, kullanılan maddeler, makine ve ekipman, araç ve gereçler ile bunların çalışanların fiziksel özelliklerine uygun tasarlanmaması veya kullanılmamasından kaynaklanabilecek tehlikeler.",
-      "e) Kuvvetli akım, aydınlatma, paratoner, topraklama gibi elektrik tesisatının bileşenleri ile ısıtma, havalandırma, atmosferik ve çevresel şartlardan korunma, drenaj, arıtma, yangın önleme ve mücadele ekipmanı ile benzeri yardımcı tesisat ve donanımlardan kaynaklanabilecek tehlikeler.",
-      "f) İşyerinde yanma, parlama veya patlama ihtimali olan maddelerin işlenmesi, kullanılması, taşınması, depolanması ya da imha edilmesinden kaynaklanabilecek tehlikeler.",
-      "g) Çalışma ortamına ilişkin hijyen koşulları ile çalışanların kişisel hijyen alışkanlıklarından kaynaklanabilecek tehlikeler.",
-      "ğ) Çalışanın, işyeri içerisindeki ulaşım yollarının kullanımından kaynaklanabilecek tehlikeler.",
-      "h) Çalışanların iş sağlığı ve güvenliği ile ilgili yeterli eğitim almaması, bilgilendirilmemesi, çalışanlara uygun talimat verilmemesi veya çalışma izni prosedürü gereken durumlarda bu izin olmaksızın çalışılmasından kaynaklanabilecek tehlikeler.",
+      "Tehlikelere iliÅŸkin bilgiler toplanÄ±rken aynÄ± Ã¼retim, yÃ¶ntem ve teknikleri ile Ã¼retim yapan benzer iÅŸyerlerinde meydana gelen iÅŸ kazalarÄ± ve ortaya Ã§Ä±kan meslek hastalÄ±klarÄ± da deÄŸerlendirilebilir. Toplanan bilgiler Ä±ÅŸÄ±ÄŸÄ±nda; iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi ile ilgili mevzuatta yer alan hÃ¼kÃ¼mler de dikkate alÄ±narak, Ã§alÄ±ÅŸma ortamÄ±nda bulunan fiziksel, kimyasal, biyolojik, psikososyal, ergonomik ve benzeri tehlike kaynaklarÄ±ndan oluÅŸan veya bunlarÄ±n etkileÅŸimi sonucu ortaya Ã§Ä±kabilecek tehlikeler belirlenir ve kayda alÄ±nÄ±r. Bu belirleme yapÄ±lÄ±rken aÅŸaÄŸÄ±daki hususlar, bu hususlardan etkilenecekler ve ne ÅŸekilde etkilenebilecekleri gÃ¶z Ã¶nÃ¼nde bulundurulur.",
+      "a) Ä°ÅŸletmenin yeri nedeniyle ortaya Ã§Ä±kabilecek tehlikeler.",
+      "b) SeÃ§ilen alanda, iÅŸyeri bina ve eklentilerinin plana uygun yerleÅŸtirilmemesi veya planda olmayan ilavelerin yapÄ±lmasÄ±ndan kaynaklanabilecek tehlikeler.",
+      "c) Ä°ÅŸyeri bina ve eklentilerinin yapÄ± ve yapÄ±m tarzÄ± ile seÃ§ilen yapÄ± malzemelerinden kaynaklanabilecek tehlikeler.",
+      "Ã§) BakÄ±m ve onarÄ±m iÅŸleri de dahil iÅŸyerinde yÃ¼rÃ¼tÃ¼lecek her tÃ¼rlÃ¼ faaliyet esnasÄ±nda Ã§alÄ±ÅŸma usulleri, vardiya dÃ¼zeni, ekip Ã§alÄ±ÅŸmasÄ±, organizasyon, nezaret sistemi, hiyerarÅŸik dÃ¼zen, ziyaretÃ§i veya iÅŸyeri Ã§alÄ±ÅŸanÄ± olmayan diÄŸer kiÅŸiler gibi faktÃ¶rlerden kaynaklanabilecek tehlikeler.",
+      "d) Ä°ÅŸin yÃ¼rÃ¼tÃ¼mÃ¼, Ã¼retim teknikleri, kullanÄ±lan maddeler, makine ve ekipman, araÃ§ ve gereÃ§ler ile bunlarÄ±n Ã§alÄ±ÅŸanlarÄ±n fiziksel Ã¶zelliklerine uygun tasarlanmamasÄ± veya kullanÄ±lmamasÄ±ndan kaynaklanabilecek tehlikeler.",
+      "e) Kuvvetli akÄ±m, aydÄ±nlatma, paratoner, topraklama gibi elektrik tesisatÄ±nÄ±n bileÅŸenleri ile Ä±sÄ±tma, havalandÄ±rma, atmosferik ve Ã§evresel ÅŸartlardan korunma, drenaj, arÄ±tma, yangÄ±n Ã¶nleme ve mÃ¼cadele ekipmanÄ± ile benzeri yardÄ±mcÄ± tesisat ve donanÄ±mlardan kaynaklanabilecek tehlikeler.",
+      "f) Ä°ÅŸyerinde yanma, parlama veya patlama ihtimali olan maddelerin iÅŸlenmesi, kullanÄ±lmasÄ±, taÅŸÄ±nmasÄ±, depolanmasÄ± ya da imha edilmesinden kaynaklanabilecek tehlikeler.",
+      "g) Ã‡alÄ±ÅŸma ortamÄ±na iliÅŸkin hijyen koÅŸullarÄ± ile Ã§alÄ±ÅŸanlarÄ±n kiÅŸisel hijyen alÄ±ÅŸkanlÄ±klarÄ±ndan kaynaklanabilecek tehlikeler.",
+      "ÄŸ) Ã‡alÄ±ÅŸanÄ±n, iÅŸyeri iÃ§erisindeki ulaÅŸÄ±m yollarÄ±nÄ±n kullanÄ±mÄ±ndan kaynaklanabilecek tehlikeler.",
+      "h) Ã‡alÄ±ÅŸanlarÄ±n iÅŸ saÄŸlÄ±ÄŸÄ± ve gÃ¼venliÄŸi ile ilgili yeterli eÄŸitim almamasÄ±, bilgilendirilmemesi, Ã§alÄ±ÅŸanlara uygun talimat verilmemesi veya Ã§alÄ±ÅŸma izni prosedÃ¼rÃ¼ gereken durumlarda bu izin olmaksÄ±zÄ±n Ã§alÄ±ÅŸÄ±lmasÄ±ndan kaynaklanabilecek tehlikeler.",
     ],
   },
   {
-    title: "6.3. RİSK DEĞERLENDİRMESİ KONTROL ADIMLARI",
+    title: "6.3. RÄ°SK DEÄžERLENDÄ°RMESÄ° KONTROL ADIMLARI",
     paragraphs: [
-      "Risk Değerlendirmesi hazırlanırken izlenecek kontrol adımları aşağıdaki maddelerin yapılması ile sürdürülür.",
-      "a) Planlama: Analiz edilerek etkilerinin büyüklüğüne ve önemine göre sıralı hale getirilen risklerin kontrolü amacıyla bir planlama yapılır.",
-      "b) Risk kontrol tedbirlerinin kararlaştırılması: Riskin tamamen bertaraf edilmesi, bu mümkün değil ise riskin kabul edilebilir seviyeye indirilmesi için aşağıdaki adımlar uygulanır.",
-      "1) Tehlike veya tehlike kaynaklarının ortadan kaldırılması.",
-      "2) Tehlikelinin, tehlikeli olmayanla veya daha az tehlikeli olanla değiştirilmesi.",
-      "3) Riskler ile kaynağında mücadele edilmesi.",
-      "c) Risk kontrol tedbirlerinin uygulanması: Kararlaştırılan tedbirlerin iş ve işlem basamakları, işlemi yapacak kişi ya da işyeri bölümü, sorumlu kişi ya da işyeri bölümü, başlama ve bitiş tarihi ile benzeri bilgileri içeren planlar hazırlanır. Bu planlar işverence uygulamaya konulur.",
-      "ç) Uygulamaların izlenmesi: Hazırlanan planların uygulama adımları düzenli olarak izlenir, denetlenir ve aksayan yönler tespit edilerek gerekli düzeltici ve önleyici işlemler tamamlanır.",
-      "Risk kontrol adımları uygulanırken toplu korunma önlemlerine, kişisel korunma önlemlerine göre öncelik verilmesi ve uygulanacak önlemlerin yeni risklere neden olmaması sağlanır.",
+      "Risk DeÄŸerlendirmesi hazÄ±rlanÄ±rken izlenecek kontrol adÄ±mlarÄ± aÅŸaÄŸÄ±daki maddelerin yapÄ±lmasÄ± ile sÃ¼rdÃ¼rÃ¼lÃ¼r.",
+      "a) Planlama: Analiz edilerek etkilerinin bÃ¼yÃ¼klÃ¼ÄŸÃ¼ne ve Ã¶nemine gÃ¶re sÄ±ralÄ± hale getirilen risklerin kontrolÃ¼ amacÄ±yla bir planlama yapÄ±lÄ±r.",
+      "b) Risk kontrol tedbirlerinin kararlaÅŸtÄ±rÄ±lmasÄ±: Riskin tamamen bertaraf edilmesi, bu mÃ¼mkÃ¼n deÄŸil ise riskin kabul edilebilir seviyeye indirilmesi iÃ§in aÅŸaÄŸÄ±daki adÄ±mlar uygulanÄ±r.",
+      "1) Tehlike veya tehlike kaynaklarÄ±nÄ±n ortadan kaldÄ±rÄ±lmasÄ±.",
+      "2) Tehlikelinin, tehlikeli olmayanla veya daha az tehlikeli olanla deÄŸiÅŸtirilmesi.",
+      "3) Riskler ile kaynaÄŸÄ±nda mÃ¼cadele edilmesi.",
+      "c) Risk kontrol tedbirlerinin uygulanmasÄ±: KararlaÅŸtÄ±rÄ±lan tedbirlerin iÅŸ ve iÅŸlem basamaklarÄ±, iÅŸlemi yapacak kiÅŸi ya da iÅŸyeri bÃ¶lÃ¼mÃ¼, sorumlu kiÅŸi ya da iÅŸyeri bÃ¶lÃ¼mÃ¼, baÅŸlama ve bitiÅŸ tarihi ile benzeri bilgileri iÃ§eren planlar hazÄ±rlanÄ±r. Bu planlar iÅŸverence uygulamaya konulur.",
+      "Ã§) UygulamalarÄ±n izlenmesi: HazÄ±rlanan planlarÄ±n uygulama adÄ±mlarÄ± dÃ¼zenli olarak izlenir, denetlenir ve aksayan yÃ¶nler tespit edilerek gerekli dÃ¼zeltici ve Ã¶nleyici iÅŸlemler tamamlanÄ±r.",
+      "Risk kontrol adÄ±mlarÄ± uygulanÄ±rken toplu korunma Ã¶nlemlerine, kiÅŸisel korunma Ã¶nlemlerine gÃ¶re Ã¶ncelik verilmesi ve uygulanacak Ã¶nlemlerin yeni risklere neden olmamasÄ± saÄŸlanÄ±r.",
     ],
   },
     {
-    title: "6.4. RİSK DEĞERLENDİRMESİ AKSİYON PLANI",
+    title: "6.4. RÄ°SK DEÄžERLENDÄ°RMESÄ° AKSÄ°YON PLANI",
     paragraphs: [
-      `${companyUpper} risk değerlendirmesi ekibi tarafından risk değerlendirmesi sonrasında "İSG.FR.019.RİSK DEĞERLENDİRMESİ AKSİYON PLANI" oluşturulur ve aşağıdakilerin maddeler yapılır.`,
-      "a) Belirlenen aksiyonların öncelik derecesine göre aksiyonun kapatılması için planlanan tarih \"hedef tarih\" kolonuna yazılır.",
-      "b) Aksiyonları yerine getirecek sorumlular belirlenerek \"sorumlu\" kolonuna isimleri yazılır.",
-      "c) Aksiyon planını takip edecek ve planın \"Durum\" ve \"Kapatma Tarihi\" kolonlarını dolduracak kişi veya kişiler belirlenir.",
-      "d) \"Durum\" kolonuna aşağıdaki girişler yapılarak aksiyon planı ve performans takip edilir:",
+      `${companyUpper} risk deÄŸerlendirmesi ekibi tarafÄ±ndan risk deÄŸerlendirmesi sonrasÄ±nda "Ä°SG.FR.019.RÄ°SK DEÄžERLENDÄ°RMESÄ° AKSÄ°YON PLANI" oluÅŸturulur ve aÅŸaÄŸÄ±dakilerin maddeler yapÄ±lÄ±r.`,
+      "a) Belirlenen aksiyonlarÄ±n Ã¶ncelik derecesine gÃ¶re aksiyonun kapatÄ±lmasÄ± iÃ§in planlanan tarih \"hedef tarih\" kolonuna yazÄ±lÄ±r.",
+      "b) AksiyonlarÄ± yerine getirecek sorumlular belirlenerek \"sorumlu\" kolonuna isimleri yazÄ±lÄ±r.",
+      "c) Aksiyon planÄ±nÄ± takip edecek ve planÄ±n \"Durum\" ve \"Kapatma Tarihi\" kolonlarÄ±nÄ± dolduracak kiÅŸi veya kiÅŸiler belirlenir.",
+      "d) \"Durum\" kolonuna aÅŸaÄŸÄ±daki giriÅŸler yapÄ±larak aksiyon planÄ± ve performans takip edilir:",
       "- Tamamlanan",
-      "- Hedef Tarihi Geçen",
+      "- Hedef Tarihi GeÃ§en",
       "- Zaman Var",
-      "- Hedef Tarih Verilmemiş",
-      "e) Aksiyonlar kapatıldığında risk değerlendirmesinde bulunan \"Kapatma Tarihi\" kolonu doldurulur.",
-      "f) Aksiyonların belirlenen hedef tarihler içinde kapatılması sağlanır.",
-      "g) Oluşturulan \"Risk Değerlendirmesi Aksiyon Planı\" aksiyonları kapatacak kişiler ile paylaşılır.",
-      "h) Risk Değerlendirme çalışmasının yönetmelik haricinde belirtilen haller dışında yılda bir defa ve uzman değişikliği sonucunda ilk olarak aksiyon planı oluşturularak yıl sonunda risk analizinin revize edilmesi sağlanır.",
-      `i) Risk değerlendirmesi bu konuda eğitim almış ${companyUpper} tarafından görevlendirilmiş personeller tarafından güncellenebilir.`,
+      "- Hedef Tarih VerilmemiÅŸ",
+      "e) Aksiyonlar kapatÄ±ldÄ±ÄŸÄ±nda risk deÄŸerlendirmesinde bulunan \"Kapatma Tarihi\" kolonu doldurulur.",
+      "f) AksiyonlarÄ±n belirlenen hedef tarihler iÃ§inde kapatÄ±lmasÄ± saÄŸlanÄ±r.",
+      "g) OluÅŸturulan \"Risk DeÄŸerlendirmesi Aksiyon PlanÄ±\" aksiyonlarÄ± kapatacak kiÅŸiler ile paylaÅŸÄ±lÄ±r.",
+      "h) Risk DeÄŸerlendirme Ã§alÄ±ÅŸmasÄ±nÄ±n yÃ¶netmelik haricinde belirtilen haller dÄ±ÅŸÄ±nda yÄ±lda bir defa ve uzman deÄŸiÅŸikliÄŸi sonucunda ilk olarak aksiyon planÄ± oluÅŸturularak yÄ±l sonunda risk analizinin revize edilmesi saÄŸlanÄ±r.",
+      `i) Risk deÄŸerlendirmesi bu konuda eÄŸitim almÄ±ÅŸ ${companyUpper} tarafÄ±ndan gÃ¶revlendirilmiÅŸ personeller tarafÄ±ndan gÃ¼ncellenebilir.`,
     ],
   },
     {
-    title: "6.5. FINE – KINNEY METODU",
+    title: "6.5. FINE â€“ KINNEY METODU",
     paragraphs: [
-      "Kaza kontrolü için matematiksel değerlendirme anlamına gelir. Bu yöntem G.F. Kinney and A.D Wiruth tarafından 1976 yılında geliştirilmiştir. Çalışma ortamındaki tehlikelerin kazaya sebebiyet vermeden tespit edilmesini ve risk skoruna göre en öncelikli olandan başlayıp iyileştirilmesini sağlayan bir metottur.",
-      `Bu çalışmada; ${companyUpper}'e ait gerçekleştirilen Kinney Risk Analizi yönetiminin konusu ele alınmıştır. Uygulamayla işletmede iş kazası ve meslek hastalığı oluşturabilecek riskler değerlendirilip, bunların engellenmesine yönelik iyileştirme önerilerinde bulunulmuştur.`,
-      "Analiz edilerek belirlenmiş tehlikeler, aşağıda açıklaması yapılan FINE KINNEY risk yöntemine göre değerlendirilir.",
-      "RİSK = OLASILIK X FREKANS X ŞİDDET formülü kullanılarak hesaplanır.",
-      "Olasılık: Olasılık değerlendirilirken, faaliyet esnasındaki tehlikelerden kaynaklanan zararın gerçekleşme olasılığı sorgulanır ve puanlandırılır.",
-      "Frekans: Frekans değerlendirilirken, faaliyet esnasında tehlikeye maruz kalma sıklığı sorgulanır ve puanlandırılır.",
-      "Şiddet: Şiddet değerlendirilirken, faaliyet esnasındaki tehlikelerden kaynaklanan zararın çalışan ve veya ekipman üzerinde yaratacağı tahmini etki sorgulanır ve puanlandırılır.",
-      "Risk Skoru; Olayın Meydana Gelme İhtimali(O) x Tehlike Maruziyet Sıklığı(F) x Şiddet(Ş)",
-      "Bu yöntem sıkça uygulanmakta olup, işverenlerinde algılayabileceği bir yöntemdir. Sadece olasılık ya da şiddete bağlı kalmayıp firma içinde zarara maruz kalma sıklığı parametre olarak da değerlendirilmesinden dolayı daha etkin sonuçlar alınmaktadır.",
+      "Kaza kontrolÃ¼ iÃ§in matematiksel deÄŸerlendirme anlamÄ±na gelir. Bu yÃ¶ntem G.F. Kinney and A.D Wiruth tarafÄ±ndan 1976 yÄ±lÄ±nda geliÅŸtirilmiÅŸtir. Ã‡alÄ±ÅŸma ortamÄ±ndaki tehlikelerin kazaya sebebiyet vermeden tespit edilmesini ve risk skoruna gÃ¶re en Ã¶ncelikli olandan baÅŸlayÄ±p iyileÅŸtirilmesini saÄŸlayan bir metottur.",
+      `Bu Ã§alÄ±ÅŸmada; ${companyUpper}'e ait gerÃ§ekleÅŸtirilen Kinney Risk Analizi yÃ¶netiminin konusu ele alÄ±nmÄ±ÅŸtÄ±r. Uygulamayla iÅŸletmede iÅŸ kazasÄ± ve meslek hastalÄ±ÄŸÄ± oluÅŸturabilecek riskler deÄŸerlendirilip, bunlarÄ±n engellenmesine yÃ¶nelik iyileÅŸtirme Ã¶nerilerinde bulunulmuÅŸtur.`,
+      "Analiz edilerek belirlenmiÅŸ tehlikeler, aÅŸaÄŸÄ±da aÃ§Ä±klamasÄ± yapÄ±lan FINE KINNEY risk yÃ¶ntemine gÃ¶re deÄŸerlendirilir.",
+      "RÄ°SK = OLASILIK X FREKANS X ÅžÄ°DDET formÃ¼lÃ¼ kullanÄ±larak hesaplanÄ±r.",
+      "OlasÄ±lÄ±k: OlasÄ±lÄ±k deÄŸerlendirilirken, faaliyet esnasÄ±ndaki tehlikelerden kaynaklanan zararÄ±n gerÃ§ekleÅŸme olasÄ±lÄ±ÄŸÄ± sorgulanÄ±r ve puanlandÄ±rÄ±lÄ±r.",
+      "Frekans: Frekans deÄŸerlendirilirken, faaliyet esnasÄ±nda tehlikeye maruz kalma sÄ±klÄ±ÄŸÄ± sorgulanÄ±r ve puanlandÄ±rÄ±lÄ±r.",
+      "Åžiddet: Åžiddet deÄŸerlendirilirken, faaliyet esnasÄ±ndaki tehlikelerden kaynaklanan zararÄ±n Ã§alÄ±ÅŸan ve veya ekipman Ã¼zerinde yaratacaÄŸÄ± tahmini etki sorgulanÄ±r ve puanlandÄ±rÄ±lÄ±r.",
+      "Risk Skoru; OlayÄ±n Meydana Gelme Ä°htimali(O) x Tehlike Maruziyet SÄ±klÄ±ÄŸÄ±(F) x Åžiddet(Åž)",
+      "Bu yÃ¶ntem sÄ±kÃ§a uygulanmakta olup, iÅŸverenlerinde algÄ±layabileceÄŸi bir yÃ¶ntemdir. Sadece olasÄ±lÄ±k ya da ÅŸiddete baÄŸlÄ± kalmayÄ±p firma iÃ§inde zarara maruz kalma sÄ±klÄ±ÄŸÄ± parametre olarak da deÄŸerlendirilmesinden dolayÄ± daha etkin sonuÃ§lar alÄ±nmaktadÄ±r.",
     ],
   },
   ];
@@ -603,12 +629,12 @@ function addIntroPages(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) {
   const pageWidth = () => doc.internal.pageSize.getWidth();
   const pageHeight = () => doc.internal.pageSize.getHeight();
   const marginX = 14;
-  const bottomLimit = () => pageHeight() - 26; // 18 yerine 26: footer + yazı güvenliği
+  const bottomLimit = () => pageHeight() - 26; // 18 yerine 26: footer + yazÄ± gÃ¼venliÄŸi
   drawProcedurePageHeader(doc, formatProcedurePageLabel(doc.getCurrentPageInfo().pageNumber));
   let y = 37;
 
 const ensureSpace = (needed: number, minKeep = 0) => {
-  // minKeep: bu paragraf başlamadan önce sayfada kalmasını istediğimiz minimum boşluk (mm)
+  // minKeep: bu paragraf baÅŸlamadan Ã¶nce sayfada kalmasÄ±nÄ± istediÄŸimiz minimum boÅŸluk (mm)
   if (y + needed <= bottomLimit() && y + minKeep <= bottomLimit()) return;
 
   doc.addPage("a4", "portrait");
@@ -624,7 +650,7 @@ const ensureSpace = (needed: number, minKeep = 0) => {
     section.paragraphs.forEach((paragraph) => {
       const lineHeight = 4.7;
       const lines = split(doc, paragraph, pageWidth() - marginX * 2);
-      const minKeep = 12; // ~ en az 2-3 satır sayfa sonunda kalmadan yeni sayfaya geç
+      const minKeep = 12; // ~ en az 2-3 satÄ±r sayfa sonunda kalmadan yeni sayfaya geÃ§
       ensureSpace(lines.length * lineHeight + 4, minKeep);
 
       drawWrappedText(doc, paragraph, marginX, y, pageWidth() - marginX * 2, {
@@ -648,17 +674,18 @@ function addTeamPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) {
   const doctor = args.assessment.workplace_doctor_name || "";
   const employeeRep = args.assessment.employee_representative_name || "";
   const support = args.assessment.support_personnel_name || "";
+  const informedEmployee = args.assessment.informed_employee_name || "";
 
   setText(doc, COLORS.ink);
   setFont(doc, "bold");
   doc.setFontSize(12);
-  doc.text("7. RİSK DEĞERLENDİRME EKİBİ", 14, 40);
+  doc.text("7. RÄ°SK DEÄžERLENDÄ°RME EKÄ°BÄ°", 14, 40);
   setFont(doc, "normal");
   doc.setFontSize(9);
   doc.text(
     split(
       doc,
-      "29.12.2012 tarihli ve 28512 sayılı Resmi Gazete'de yayımlanan İş Sağlığı ve Güvenliği Risk Değerlendirmesi Yönetmeliği Madde 6'ya göre belirlenen Risk Değerlendirme Ekibi aşağıdaki gibidir.",
+      "29.12.2012 tarihli ve 28512 sayÄ±lÄ± Resmi Gazete'de yayÄ±mlanan Ä°ÅŸ SaÄŸlÄ±ÄŸÄ± ve GÃ¼venliÄŸi Risk DeÄŸerlendirmesi YÃ¶netmeliÄŸi Madde 6'ya gÃ¶re belirlenen Risk DeÄŸerlendirme Ekibi aÅŸaÄŸÄ±daki gibidir.",
       pageWidth - 28
     ),
     14,
@@ -674,12 +701,11 @@ function addTeamPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) {
   const signW = 20;
   const rowH = 12;
   const rows = [
-    ["İŞVEREN / İŞVEREN VEKİLİ", employer],
-    ["İŞ GÜVENLİĞİ UZMANI", assessor],
-    ["İŞ YERİ HEKİMİ", doctor],
-    ["ÇALIŞAN TEMSİLCİSİ", employeeRep],
+    ["Ä°ÅžVEREN / Ä°ÅžVEREN VEKÄ°LÄ°", employer],
+    ["Ä°Åž GÃœVENLÄ°ÄžÄ° UZMANI", assessor],
+    ["Ä°Åž YERÄ° HEKÄ°MÄ°", doctor],
+    ["Ã‡ALIÅžAN TEMSÄ°LCÄ°SÄ°", employeeRep],
     ["DESTEK ELEMANI", support],
-    ["BİLGİ SAHİBİ ÇALIŞAN", ""],
   ];
 
   doc.rect(x, y, leftW + titleW + nameW + signW, rowH * (rows.length + 1));
@@ -693,15 +719,15 @@ function addTeamPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) {
   setFont(doc, "bold");
   doc.text("Unvan", x + leftW + titleW / 2, y + 7.5, { align: "center" });
   doc.text("Ad - Soyad", x + leftW + titleW + nameW / 2, y + 7.5, { align: "center" });
-  doc.text("İmza", x + leftW + titleW + nameW + signW / 2, y + 7.5, { align: "center" });
-  doc.text("RİSK\nDEĞERLENDİRME\nEKİBİ", x + leftW / 2, y + rowH * 4.1, { align: "center", baseline: "middle" });
+  doc.text("Ä°mza", x + leftW + titleW + nameW + signW / 2, y + 7.5, { align: "center" });
+  doc.text("RÄ°SK\nDEÄžERLENDÄ°RME\nEKÄ°BÄ°", x + leftW / 2, y + rowH * 4.1, { align: "center", baseline: "middle" });
 
   setFont(doc, "normal");
   rows.forEach((row, index) => {
     const rowY = y + rowH * (index + 1) + 7.5;
     doc.text(row[0], x + leftW + 2, rowY);
     doc.text(":", x + leftW + titleW - 4, rowY);
-    doc.text(row[1], x + leftW + titleW + 2, rowY);
+    doc.text(split(doc, row[1] || "", nameW - 4), x + leftW + titleW + 2, rowY - 2, { baseline: "top" });
   });
 }
 
@@ -714,7 +740,7 @@ async function addFineKinneyReferencePage(doc: jsPDF, args: BuildRiskAssessmentP
   drawSectionTitle(doc, "FINE-KINNEY REFERANS TABLOSU", 14, 36, pageWidth - 28);
   drawWrappedText(
     doc,
-    "Aşağıdaki referans tablo, olasılık, frekans ve şiddet değerlerinin değerlendirilmesinde ortak bir karar dili oluşturmak amacıyla rapora eklenmiştir.",
+    "AÅŸaÄŸÄ±daki referans tablo, olasÄ±lÄ±k, frekans ve ÅŸiddet deÄŸerlerinin deÄŸerlendirilmesinde ortak bir karar dili oluÅŸturmak amacÄ±yla rapora eklenmiÅŸtir.",
     14,
     50,
     pageWidth - 28,
@@ -728,7 +754,7 @@ async function addFineKinneyReferencePage(doc: jsPDF, args: BuildRiskAssessmentP
     setFont(doc, "bold");
     setText(doc, COLORS.rose);
     doc.setFontSize(10);
-    doc.text("Fine-Kinney tablo görseli yüklenemedi.", 14, 70);
+    doc.text("Fine-Kinney tablo gÃ¶rseli yÃ¼klenemedi.", 14, 70);
     return;
   }
 
@@ -752,11 +778,11 @@ async function addProcessFlowPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) 
   const pageHeight = doc.internal.pageSize.getHeight();
 
   drawProcedurePageHeader(doc, formatProcedurePageLabel(doc.getCurrentPageInfo().pageNumber));
-  drawSectionTitle(doc, "RİSK DEĞERLENDİRME SÜREÇ AKIŞI", 14, 36, pageWidth - 28);
+  drawSectionTitle(doc, "RÄ°SK DEÄžERLENDÄ°RME SÃœREÃ‡ AKIÅžI", 14, 36, pageWidth - 28);
 
   drawWrappedText(
     doc,
-    "Bu akış, faaliyetlerin sınıflandırılmasından kontrol tedbirlerinin izlenmesine kadar risk değerlendirme döngüsünü görsel olarak özetler.",
+    "Bu akÄ±ÅŸ, faaliyetlerin sÄ±nÄ±flandÄ±rÄ±lmasÄ±ndan kontrol tedbirlerinin izlenmesine kadar risk deÄŸerlendirme dÃ¶ngÃ¼sÃ¼nÃ¼ gÃ¶rsel olarak Ã¶zetler.",
     14,
     50,
     pageWidth - 28,
@@ -770,7 +796,7 @@ async function addProcessFlowPage(doc: jsPDF, args: BuildRiskAssessmentPdfArgs) 
     setFont(doc, "bold");
     setText(doc, COLORS.rose);
     doc.setFontSize(10);
-    doc.text("Süreç akış görseli yüklenemedi.", 14, 70);
+    doc.text("SÃ¼reÃ§ akÄ±ÅŸ gÃ¶rseli yÃ¼klenemedi.", 14, 70);
     return;
   }
 
@@ -793,10 +819,10 @@ function addPhotoGalleryPage(doc: jsPDF, itemsWithPhotos: Array<{ item: RiskItem
   doc.addPage("a4", "portrait");
   const pageWidth = doc.internal.pageSize.getWidth();
   drawProcedurePageHeader(doc, formatProcedurePageLabel(doc.getCurrentPageInfo().pageNumber));
-  drawSectionTitle(doc, "ANALİZ EDİLEN FOTOĞRAFLAR", 14, 34, pageWidth - 28);
+  drawSectionTitle(doc, "ANALÄ°Z EDÄ°LEN FOTOÄžRAFLAR", 14, 34, pageWidth - 28);
   drawWrappedText(
     doc,
-    "Sahada tespit edilen risk maddelerine ait görseller aşağıda referans amacıyla sunulmuştur. Bu bölüm, bulguların savunulabilirliğini ve raporun saha kaynağını güçlendirir.",
+    "Sahada tespit edilen risk maddelerine ait gÃ¶rseller aÅŸaÄŸÄ±da referans amacÄ±yla sunulmuÅŸtur. Bu bÃ¶lÃ¼m, bulgularÄ±n savunulabilirliÄŸini ve raporun saha kaynaÄŸÄ±nÄ± gÃ¼Ã§lendirir.",
     14,
     48,
     pageWidth - 28,
@@ -830,7 +856,7 @@ function addPhotoGalleryPage(doc: jsPDF, itemsWithPhotos: Array<{ item: RiskItem
       weight: "bold",
       lineHeight: 3.7,
     });
-    drawWrappedText(doc, item.hazard || "Tehlike açıklaması yok", x + 3, y + 51, cardW - 6, {
+    drawWrappedText(doc, item.hazard || "Tehlike aÃ§Ä±klamasÄ± yok", x + 3, y + 51, cardW - 6, {
       fontSize: 7.1,
       color: COLORS.ink,
       lineHeight: 3.6,
@@ -851,10 +877,10 @@ function addTablePages(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photoMap: M
   setText(doc, [255, 255, 255]);
   setFont(doc, "bold");
   doc.setFontSize(12.5);
-  doc.text("RİSK ANALİZ TABLOSU", pageWidth / 2, 8.7, { align: "center" });
+  doc.text("RÄ°SK ANALÄ°Z TABLOSU", pageWidth / 2, 8.7, { align: "center" });
   setFont(doc, "normal");
   doc.setFontSize(7.5);
-  doc.text(`${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
+  doc.text(`${upperTr(companyName)} â€¢ Fine-Kinney Risk DeÄŸerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
 
   const stats = {
     total: args.riskItems.length,
@@ -870,37 +896,37 @@ function addTablePages(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photoMap: M
   doc.setFontSize(8);
   doc.text(`Toplam Madde: ${stats.total}`, 12, 29);
   doc.text(`Kritik Madde: ${stats.critical}`, 58, 29);
-  doc.text(`Kabul Edilebilir / Olası Kalıntı Risk: ${stats.residualSafe}`, 103, 29);
-  doc.text(`Değerlendirme Tarihi: ${format(new Date(args.assessment.assessment_date), "dd.MM.yyyy", { locale: tr })}`, pageWidth - 12, 29, {
+  doc.text(`Kabul Edilebilir / OlasÄ± KalÄ±ntÄ± Risk: ${stats.residualSafe}`, 103, 29);
+  doc.text(`DeÄŸerlendirme Tarihi: ${format(new Date(args.assessment.assessment_date), "dd.MM.yyyy", { locale: tr })}`, pageWidth - 12, 29, {
     align: "right",
   });
 
   const tableData = args.riskItems.map((item, idx) => [
     String(idx + 1).padStart(2, "0"),
-    item.department || "—",
-    photoMap.has(item.id) ? " " : "—",
-    item.hazard || "—",
-    item.risk || "—",
-    item.affected_people || "—",
+    item.department || "â€”",
+    photoMap.has(item.id) ? " " : "â€”",
+    item.hazard || "â€”",
+    item.risk || "â€”",
+    item.affected_people || "â€”",
     String(item.probability_1),
     String(item.frequency_1),
     String(item.severity_1),
     String(item.score_1),
     getRiskClassLabel(item.risk_class_1),
-    item.proposed_controls || item.existing_controls || "—",
+    item.proposed_controls || item.existing_controls || "â€”",
     String(item.probability_2 ?? 0),
     String(item.frequency_2 ?? 0),
     String(item.severity_2 ?? 0),
     String(item.score_2 ?? 0),
     getRiskClassLabel(item.risk_class_2 || "Kabul Edilebilir"),
-    item.responsible_person || "—",
-    item.deadline ? format(new Date(item.deadline), "dd.MM.yy", { locale: tr }) : "—",
+    item.responsible_person || "â€”",
+    item.deadline ? format(new Date(item.deadline), "dd.MM.yy", { locale: tr }) : "â€”",
   ]);
 
   autoTable(doc, {
     startY: 42,
     margin: { left: 8, right: 8, bottom: 16 },
-    head: [["No", "Bölüm", "Foto", "Tehlike", "Risk", "Etkilenen", "O", "F", "Ş", "Skor", "Sınıf", "Önlemler", "O", "F", "Ş", "Skor", "Sınıf", "Sorumlu", "Termin"]],
+    head: [["No", "BÃ¶lÃ¼m", "Foto", "Tehlike", "Risk", "Etkilenen", "O", "F", "Åž", "Skor", "SÄ±nÄ±f", "Ã–nlemler", "O", "F", "Åž", "Skor", "SÄ±nÄ±f", "Sorumlu", "Termin"]],
     body: tableData,
     theme: "grid",
     styles: {
@@ -970,10 +996,10 @@ function addRiskTablePagesV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photo
   setText(doc, [255, 255, 255]);
   setFont(doc, "bold");
   doc.setFontSize(12.5);
-  doc.text("RİSK ANALİZ TABLOSU", pageWidth / 2, 8.7, { align: "center" });
+  doc.text("RÄ°SK ANALÄ°Z TABLOSU", pageWidth / 2, 8.7, { align: "center" });
   setFont(doc, "normal");
   doc.setFontSize(7.5);
-  doc.text(`${upperTr(companyName)} • Fine-Kinney Risk Değerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
+  doc.text(`${upperTr(companyName)} â€¢ Fine-Kinney Risk DeÄŸerlendirme Tablosu`, pageWidth / 2, 13.4, { align: "center" });
 
   const stats = {
     total: args.riskItems.length,
@@ -989,30 +1015,30 @@ function addRiskTablePagesV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photo
   doc.setFontSize(8);
   doc.text(`Toplam Madde: ${stats.total}`, 12, 29);
   doc.text(`Kritik Madde: ${stats.critical}`, 58, 29);
-  doc.text(`Kabul Edilebilir / Olası Kalıntı Risk: ${stats.residualSafe}`, 103, 29);
-  doc.text(`Değerlendirme Tarihi: ${formatTableDate(args.assessment.assessment_date)}`, pageWidth - 12, 29, { align: "right" });
+  doc.text(`Kabul Edilebilir / OlasÄ± KalÄ±ntÄ± Risk: ${stats.residualSafe}`, 103, 29);
+  doc.text(`DeÄŸerlendirme Tarihi: ${formatTableDate(args.assessment.assessment_date)}`, pageWidth - 12, 29, { align: "right" });
 
   const tableData = args.riskItems.map((item, idx) => [
     String(idx + 1).padStart(2, "0"),
-    item.department || "—",
-    photoMap.has(item.id) ? " " : "—",
-    item.hazard || "—",
-    item.risk || "—",
-    item.existing_controls || "—",
-    item.affected_people || "—",
+    item.department || "â€”",
+    photoMap.has(item.id) ? " " : "â€”",
+    item.hazard || "â€”",
+    item.risk || "â€”",
+    item.existing_controls || "â€”",
+    item.affected_people || "â€”",
     String(item.probability_1),
     String(item.frequency_1),
     String(item.severity_1),
     String(item.score_1),
     getRiskClassLabel(item.risk_class_1),
-    item.proposed_controls || "—",
+    item.proposed_controls || "â€”",
     String(item.probability_2 ?? 0),
     String(item.frequency_2 ?? 0),
     String(item.severity_2 ?? 0),
     String(item.score_2 ?? 0),
     getRiskClassLabel(item.risk_class_2 || "Kabul Edilebilir"),
     formatTableDate(item.deadline),
-    item.responsible_person || "—",
+    item.responsible_person || "â€”",
     formatTableDate(item.completion_date),
     item.completed_activity || (item.status === "completed" ? "Tamamlandı" : "—"),
   ]);
@@ -1027,22 +1053,22 @@ function addRiskTablePagesV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photo
       "Tehlike",
       "Risk",
       "Mevcut Durum",
-      "Olası Sonuç",
+      "OlasÄ± SonuÃ§",
       "O",
       "F",
-      "Ş",
+      "Åž",
       "Skor",
-      "Riskin Tanımı",
-      "Yapılması Gereken DÖF",
+      "Riskin TanÄ±mÄ±",
+      "YapÄ±lmasÄ± Gereken DÃ–F",
       "O",
       "F",
-      "Ş",
+      "Åž",
       "Skor",
-      "Riskin Tanımı",
-      "Termin Süresi",
+      "Riskin TanÄ±mÄ±",
+      "Termin SÃ¼resi",
       "Sorumlu",
-      "Gerçekleşme Tarihi",
-      "Gerçekleşen Faaliyetler",
+      "GerÃ§ekleÅŸme Tarihi",
+      "GerÃ§ekleÅŸen Faaliyetler",
     ]],
     body: tableData,
     theme: "grid",
@@ -1116,7 +1142,7 @@ function addRiskTablePagesV2(doc: jsPDF, args: BuildRiskAssessmentPdfArgs, photo
 
 function addPageFooters(doc: jsPDF, companyName: string) {
   const totalPages = doc.getNumberOfPages();
-  const roles = ["İŞ GÜVENLİĞİ UZMANI", "İŞYERİ HEKİMİ", "ÇALIŞAN TEM.", "DESTEK ELEMANI", "Bilgi Sahibi Çalışan", "İŞVEREN/VEKİLİ"];
+  const roles = ["Ä°Åž GÃœVENLÄ°ÄžÄ° UZMANI", "Ä°ÅžYERÄ° HEKÄ°MÄ°", "Ã‡ALIÅžAN TEM.", "DESTEK ELEMANI","Ä°ÅžVEREN/VEKÄ°LÄ°"];
 
   for (let page = 2; page <= totalPages; page += 1) {
     doc.setPage(page);
@@ -1150,8 +1176,15 @@ export async function buildRiskAssessmentPdf(args: BuildRiskAssessmentPdfArgs) {
 
   addInterFontsToJsPDF(doc);
   setFont(doc, "normal");
+  const originalText = doc.text.bind(doc);
+  doc.text = ((text: string | string[], ...args: unknown[]) => {
+    const normalizedText = Array.isArray(text) ? text.map((line) => normalizePdfText(String(line))) : normalizePdfText(String(text));
+    return (originalText as (...innerArgs: unknown[]) => jsPDF)(normalizedText, ...args);
+  }) as typeof doc.text;
 
-  const logoDataUrl = await args.loadImageAsDataUrl(args.company?.logo_url);
+  const logoDataUrl = await args.loadImageAsDataUrl(
+    args.assessment.risk_assessment_logo_data_url || args.company?.logo_url
+  );
 
   const photoEntries = await Promise.all(
     args.riskItems.map(async (item) => {

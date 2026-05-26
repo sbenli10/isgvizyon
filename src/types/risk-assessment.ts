@@ -76,6 +76,10 @@ export interface RiskAssessment {
   workplace_doctor_name?: string;
   employee_representative_name?: string;
   support_personnel_name?: string;
+  informed_employee_name?: string;
+  risk_assessment_logo_name?: string;
+  risk_assessment_logo_type?: string;
+  risk_assessment_logo_data_url?: string;
   employer_representative_signature_url?: string;
   occupational_safety_specialist_signature_url?: string;
   workplace_doctor_signature_url?: string;

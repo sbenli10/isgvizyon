@@ -14,8 +14,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, Loader2, Send } from "lucide-react";
+import { Mail, Loader2, Send, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { resolveStorageObjectUrl } from "@/lib/storageObject";
 
 interface SendReportModalProps {
   open: boolean;
@@ -35,15 +36,35 @@ export function SendReportModal({
   companyName,
 }: SendReportModalProps) {
   const { user } = useAuth();
-  const [sending, setSending] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [whatsAppSending, setWhatsAppSending] = useState(false);
 
   const [formData, setFormData] = useState({
     recipientEmail: "",
+    recipientPhone: "",
     recipientName: "",
     customMessage: "",
   });
 
-  const handleSend = async () => {
+  const normalizePhoneNumber = (value: string) =>
+    value.replace(/[^\d]/g, "");
+
+  const buildWhatsAppMessage = async () => {
+    const resolvedReportUrl = await resolveStorageObjectUrl(reportUrl, {
+      bucket: "reports",
+      expiresIn: 60 * 60,
+    });
+
+    const recipientName = formData.recipientName?.trim() || "Yetkili";
+    const intro = `${companyName} için hazırlanan ${reportFilename} raporunu paylaşıyorum.`;
+    const custom = formData.customMessage?.trim()
+      ? `\n\nNot: ${formData.customMessage.trim()}`
+      : "";
+
+    return `Merhaba ${recipientName},\n\n${intro}\n\nRapor bağlantısı: ${resolvedReportUrl}${custom}\n\nİSGVİZYON üzerinden gönderilmiştir.`;
+  };
+
+  const handleSendEmail = async () => {
     if (!formData.recipientEmail) {
       toast.error("Lütfen alıcı e-posta adresini girin");
       return;
@@ -54,7 +75,7 @@ export function SendReportModal({
       return;
     }
 
-    setSending(true);
+    setEmailSending(true);
 
     try {
       let senderName = "İSGVizyon Kullanıcısı";
@@ -97,7 +118,7 @@ export function SendReportModal({
         description: `${formData.recipientEmail} adresine iletildi`,
       });
 
-      setFormData({ recipientEmail: "", recipientName: "", customMessage: "" });
+      setFormData({ recipientEmail: "", recipientPhone: "", recipientName: "", customMessage: "" });
       onOpenChange(false);
     } catch (error: any) {
       console.error("Email send error:", error);
@@ -105,7 +126,37 @@ export function SendReportModal({
         description: error.message,
       });
     } finally {
-      setSending(false);
+      setEmailSending(false);
+    }
+  };
+
+  const handleSendWhatsApp = async () => {
+    const normalizedPhone = normalizePhoneNumber(formData.recipientPhone);
+    if (!normalizedPhone) {
+      toast.error("Lütfen WhatsApp alıcı numarasını girin");
+      return;
+    }
+
+    if (normalizedPhone.length < 10) {
+      toast.error("Geçerli bir telefon numarası girin");
+      return;
+    }
+
+    setWhatsAppSending(true);
+    try {
+      const message = await buildWhatsAppMessage();
+      const whatsappUrl = `https://wa.me/${normalizedPhone}?text=${encodeURIComponent(message)}`;
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+      toast.success("WhatsApp paylaşımı hazırlandı", {
+        description: "Rapor bağlantısı WhatsApp penceresinde açıldı.",
+      });
+    } catch (error: any) {
+      console.error("WhatsApp send error:", error);
+      toast.error("WhatsApp gönderimi başlatılamadı", {
+        description: error?.message || "Rapor bağlantısı hazırlanırken bir sorun oluştu.",
+      });
+    } finally {
+      setWhatsAppSending(false);
     }
   };
 
@@ -115,10 +166,10 @@ export function SendReportModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5 text-blue-500" />
-            Raporu E-posta ile Gönder
+            PDF Oluştur ve Gönder
           </DialogTitle>
           <DialogDescription>
-            <strong>{reportFilename}</strong> dosyasını firma yetkilisine gönderin
+            <strong>{reportFilename}</strong> dosyasını e-posta veya WhatsApp ile paylaşın
           </DialogDescription>
         </DialogHeader>
 
@@ -134,6 +185,22 @@ export function SendReportModal({
                 setFormData({ ...formData, recipientEmail: e.target.value })
               }
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="recipientPhone">WhatsApp Numarası</Label>
+            <Input
+              id="recipientPhone"
+              type="tel"
+              placeholder="905XXXXXXXXX"
+              value={formData.recipientPhone}
+              onChange={(e) =>
+                setFormData({ ...formData, recipientPhone: e.target.value })
+              }
+            />
+            <p className="text-xs text-slate-500">
+              Numaranın ülke kodu ile birlikte yazılması önerilir. Örnek: 90532XXXXXXX
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -161,9 +228,9 @@ export function SendReportModal({
             />
           </div>
 
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950">
             <p className="text-blue-700 dark:text-blue-300">
-              ℹ️ E-posta otomatik olarak profesyonel formatta gönderilecektir
+              ℹ️ E-posta profesyonel formatta gönderilir. WhatsApp paylaşımında rapor bağlantısı otomatik olarak mesaja eklenir.
             </p>
           </div>
         </div>
@@ -172,12 +239,31 @@ export function SendReportModal({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            disabled={sending}
+            disabled={emailSending || whatsAppSending}
           >
             İptal
           </Button>
-          <Button onClick={handleSend} disabled={sending} className="gap-2">
-            {sending ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSendWhatsApp}
+            disabled={emailSending || whatsAppSending}
+            className="gap-2 border-green-500/30 text-green-700 hover:bg-green-50 hover:text-green-800 dark:text-green-300 dark:hover:bg-green-950/40"
+          >
+            {whatsAppSending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Hazırlanıyor...
+              </>
+            ) : (
+              <>
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp ile Gönder
+              </>
+            )}
+          </Button>
+          <Button onClick={handleSendEmail} disabled={emailSending || whatsAppSending} className="gap-2">
+            {emailSending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Gönderiliyor...

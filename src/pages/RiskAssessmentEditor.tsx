@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
+import type { ChangeEvent } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -439,6 +440,7 @@ export default function RiskAssessmentEditor() {
   const createdFromWizard = Boolean((location.state as { createdFromWizard?: boolean } | null)?.createdFromWizard);
   const activeCompanyId = searchParams.get("companyId") || "";
   const riskPhotoInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
   // E-posta modal için state'ler
   const [sendModalOpen, setSendModalOpen] = useState(false);
   const [currentReportUrl, setCurrentReportUrl] = useState("");
@@ -456,6 +458,33 @@ export default function RiskAssessmentEditor() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const slugifyReportPart = useCallback((value?: string | null) => {
+    const normalized = (value || "")
+      .trim()
+      .toLocaleLowerCase("tr-TR")
+      .replace(/ı/g, "i")
+      .replace(/ğ/g, "g")
+      .replace(/ü/g, "u")
+      .replace(/ş/g, "s")
+      .replace(/ö/g, "o")
+      .replace(/ç/g, "c")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-");
+
+    return normalized || "firma";
+  }, []);
+
+  const buildRiskReportFileName = useCallback(
+    (companyName?: string | null, assessmentId?: string | null) => {
+      const slug = slugifyReportPart(companyName || assessment?.assessment_name || "risk-analizi");
+      const shortId = (assessmentId || assessment?.id || "rapor").slice(0, 8);
+      const timestamp = format(new Date(), "yyyyMMdd-HHmm", { locale: tr });
+      return `risk-analizi-${slug}-${timestamp}-${shortId}.pdf`;
+    },
+    [assessment?.assessment_name, assessment?.id, slugifyReportPart]
+  );
   const [showHelp, setShowHelp] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const lastScrollLeft = useRef(0); // Scroll pozisyonunu hafızada tutar, render tetiklemez
@@ -537,9 +566,18 @@ export default function RiskAssessmentEditor() {
             method: currentAssessmentMethod,
             notes: assessment.notes,
             department: assessment.department,
-            workplace_title: assessment.workplace_title,
-            workplace_address: assessment.workplace_address,
-          }
+          workplace_title: assessment.workplace_title,
+          workplace_address: assessment.workplace_address,
+          employer_representative_name: assessment.employer_representative_name,
+          occupational_safety_specialist_name: assessment.occupational_safety_specialist_name,
+          workplace_doctor_name: assessment.workplace_doctor_name,
+          employee_representative_name: assessment.employee_representative_name,
+          support_personnel_name: assessment.support_personnel_name,
+          informed_employee_name: assessment.informed_employee_name,
+          risk_assessment_logo_name: assessment.risk_assessment_logo_name,
+          risk_assessment_logo_type: assessment.risk_assessment_logo_type,
+          risk_assessment_logo_data_url: assessment.risk_assessment_logo_data_url,
+        }
         : { method: currentAssessmentMethod },
       items: riskItems.map((item) => ({
         department: item.department,
@@ -848,6 +886,25 @@ useEffect(() => {
     }
   };
 
+  const updateAssessmentFields = async (values: Partial<RiskAssessment>) => {
+    if (!assessment) return;
+
+    try {
+      const { error } = await supabase
+        .from("risk_assessments")
+        .update(values)
+        .eq("id", assessment.id);
+
+      if (error) throw error;
+      setAssessment((prev) => (prev ? { ...prev, ...values } : prev));
+    } catch (error: any) {
+      console.error("Update assessment fields error:", error);
+      toast.error("Değerlendirme güncellenemedi", {
+        description: error.message,
+      });
+    }
+  };
+
   const saveCurrentAsTemplate = async () => {
     if (!user?.id || !profile?.organization_id) {
       toast.error("Şablon kaydetmek için organizasyon bilgisi gerekli");
@@ -962,6 +1019,19 @@ useEffect(() => {
       if (templateAssessment.sector && templateAssessment.sector !== assessment.sector) {
         await updateAssessmentField("sector", templateAssessment.sector);
       }
+
+      const teamAndLogoFields: Partial<RiskAssessment> = {
+        employer_representative_name: templateAssessment.employer_representative_name ?? assessment.employer_representative_name ?? null,
+        occupational_safety_specialist_name: templateAssessment.occupational_safety_specialist_name ?? assessment.occupational_safety_specialist_name ?? null,
+        workplace_doctor_name: templateAssessment.workplace_doctor_name ?? assessment.workplace_doctor_name ?? null,
+        employee_representative_name: templateAssessment.employee_representative_name ?? assessment.employee_representative_name ?? null,
+        support_personnel_name: templateAssessment.support_personnel_name ?? assessment.support_personnel_name ?? null,
+        informed_employee_name: templateAssessment.informed_employee_name ?? assessment.informed_employee_name ?? null,
+        risk_assessment_logo_name: templateAssessment.risk_assessment_logo_name ?? assessment.risk_assessment_logo_name ?? null,
+        risk_assessment_logo_type: templateAssessment.risk_assessment_logo_type ?? assessment.risk_assessment_logo_type ?? null,
+        risk_assessment_logo_data_url: templateAssessment.risk_assessment_logo_data_url ?? assessment.risk_assessment_logo_data_url ?? null,
+      };
+      await updateAssessmentFields(teamAndLogoFields);
 
       setRiskItems((data || []) as RiskItem[]);
       setSelectedTemplateId(template.id);
@@ -1975,6 +2045,7 @@ useEffect(() => {
 
   const loadImageAsDataUrl = async (url?: string | null) => {
     if (!url) return null;
+    if (url.startsWith("data:image/")) return url;
     try {
       const accessUrl = await resolveStorageObjectUrl(url);
       const response = await fetch(accessUrl || url);
@@ -1989,6 +2060,67 @@ useEffect(() => {
       console.warn("Logo yüklenemedi:", error);
       return null;
     }
+  };
+
+  const handleRiskLogoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !assessment) return;
+
+    const allowedTypes = new Set(["image/png", "image/jpeg", "image/jpg"]);
+    if (!allowedTypes.has(file.type)) {
+      toast.error("Sadece PNG veya JPG formatında logo yükleyebilirsiniz.");
+      event.target.value = "";
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo dosyası en fazla 2 MB olabilir.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const payload: Partial<RiskAssessment> = {
+        risk_assessment_logo_name: file.name,
+        risk_assessment_logo_type: file.type,
+        risk_assessment_logo_data_url: dataUrl,
+      };
+
+      setAssessment((prev) => (prev ? { ...prev, ...payload } : prev));
+      await updateAssessmentFields(payload);
+      toast.success("Risk analizi logosu eklendi");
+    } catch (error: any) {
+      console.error("Risk logo upload error:", error);
+      toast.error("Logo yüklenemedi", {
+        description: error?.message || "Bilinmeyen hata",
+      });
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const clearRiskLogo = async () => {
+    if (!assessment) return;
+
+    const payload = {
+      risk_assessment_logo_name: null,
+      risk_assessment_logo_type: null,
+      risk_assessment_logo_data_url: null,
+    } as Partial<RiskAssessment>;
+
+    setAssessment((prev) => (prev ? { ...prev, ...payload } : prev));
+    await updateAssessmentFields(payload);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+    toast.success("Risk analizi logosu kaldırıldı");
   };
 
   useEffect(() => {
@@ -3616,7 +3748,10 @@ const exportToPDFAndShare = async () => {
     }
 
     // 2. SUPABASE STORAGE'A YÜKLE
-    const fileName = `risk-assessment-${assessment.id}-${Date.now()}.pdf`;
+    const fileName = buildRiskReportFileName(
+      company?.name || assessment.assessment_name || "firma",
+      assessment.id
+    );
     const storagePath = `risk-reports/${user?.id}/${fileName}`;
     const pdfFile = new File([pdfBlob], fileName, { type: "application/pdf" });
 
@@ -4438,17 +4573,107 @@ const exportToPDFAndShare = async () => {
               <div className="space-y-6">
                 <Card className="border border-white/10 bg-white/[0.04] shadow-[0_24px_60px_rgba(15,23,42,0.28)]">
                   <CardContent className="p-6">
-                    <p className="text-[11px] uppercase tracking-[0.24em] text-violet-300/80">Risk Kompozisyonu</p>
-                    <div className="mt-4 space-y-3">
-                      <div className="rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-red-100">
-                        Kritik riskler: <span className="font-bold">{riskMetrics.critical}</span>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-violet-300/80">Risk Değerlendirme Ekibi</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                      PDF çıktısındaki mevcut <strong>RİSK DEĞERLENDİRME EKİBİ</strong> tablosunda bu alanlardaki ad soyad bilgileri kullanılır.
+                    </p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">İşveren / İşveren Vekili</Label>
+                        <Input
+                          value={assessment?.employer_representative_name || ""}
+                          placeholder="İşveren / işveren vekili ad soyad"
+                          onChange={(event) => setAssessment((prev) => (prev ? { ...prev, employer_representative_name: event.target.value } : prev))}
+                          onBlur={(event) => void updateAssessmentField("employer_representative_name", event.target.value.trim() || null)}
+                          className="border-white/10 bg-slate-950/70 text-slate-100"
+                        />
                       </div>
-                      <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-amber-100">
-                        Yüksek riskler: <span className="font-bold">{riskMetrics.high}</span>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">İş Güvenliği Uzmanı</Label>
+                        <Input
+                          value={assessment?.occupational_safety_specialist_name || ""}
+                          placeholder="İş güvenliği uzmanı ad soyad"
+                          onChange={(event) => setAssessment((prev) => (prev ? { ...prev, occupational_safety_specialist_name: event.target.value } : prev))}
+                          onBlur={(event) => void updateAssessmentField("occupational_safety_specialist_name", event.target.value.trim() || null)}
+                          className="border-white/10 bg-slate-950/70 text-slate-100"
+                        />
                       </div>
-                      <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 text-cyan-100">
-                        Olası/Önemli: <span className="font-bold">{riskMetrics.notable}</span>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">İş Yeri Hekimi</Label>
+                        <Input
+                          value={assessment?.workplace_doctor_name || ""}
+                          placeholder="İş yeri hekimi ad soyad"
+                          onChange={(event) => setAssessment((prev) => (prev ? { ...prev, workplace_doctor_name: event.target.value } : prev))}
+                          onBlur={(event) => void updateAssessmentField("workplace_doctor_name", event.target.value.trim() || null)}
+                          className="border-white/10 bg-slate-950/70 text-slate-100"
+                        />
                       </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Çalışan Temsilcisi</Label>
+                        <Input
+                          value={assessment?.employee_representative_name || ""}
+                          placeholder="Çalışan temsilcisi ad soyad"
+                          onChange={(event) => setAssessment((prev) => (prev ? { ...prev, employee_representative_name: event.target.value } : prev))}
+                          onBlur={(event) => void updateAssessmentField("employee_representative_name", event.target.value.trim() || null)}
+                          className="border-white/10 bg-slate-950/70 text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Destek Elemanı</Label>
+                        <Input
+                          value={assessment?.support_personnel_name || ""}
+                          placeholder="Destek elemanı ad soyad"
+                          onChange={(event) => setAssessment((prev) => (prev ? { ...prev, support_personnel_name: event.target.value } : prev))}
+                          onBlur={(event) => void updateAssessmentField("support_personnel_name", event.target.value.trim() || null)}
+                          className="border-white/10 bg-slate-950/70 text-slate-100"
+                        />
+                      </div>                      
+                    </div>
+
+                    <div className="mt-6 rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">Risk Analizi Logosu</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-400">
+                            Logo eklerseniz PDF çıktısının üst bölümünde gösterilir.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                            className="hidden"
+                            onChange={(event) => void handleRiskLogoUpload(event)}
+                          />
+                          <Button type="button" variant="outline" className="gap-2" onClick={() => logoInputRef.current?.click()}>
+                            <Upload className="h-4 w-4" />
+                            Logo Yükle
+                          </Button>
+                          {assessment?.risk_assessment_logo_data_url ? (
+                            <Button type="button" variant="ghost" className="gap-2 text-red-300 hover:text-red-200" onClick={() => void clearRiskLogo()}>
+                              <X className="h-4 w-4" />
+                              Logoyu Kaldır
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {assessment?.risk_assessment_logo_data_url ? (
+                        <div className="mt-4 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                          <div className="flex h-20 w-28 items-center justify-center overflow-hidden rounded-xl bg-white p-2">
+                            <img
+                              src={assessment.risk_assessment_logo_data_url}
+                              alt={assessment.risk_assessment_logo_name || "Risk analizi logosu"}
+                              className="max-h-full max-w-full object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-slate-100">{assessment.risk_assessment_logo_name || "Logo"}</p>
+                            <p className="mt-1 text-xs text-slate-400">{assessment.risk_assessment_logo_type || "Görsel dosyası"}</p>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   </CardContent>
                 </Card>

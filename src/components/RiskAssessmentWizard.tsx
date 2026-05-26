@@ -1,670 +1,1557 @@
-﻿import { ChangeEvent, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { 
-  AlertTriangle, Building2, CheckCircle2, ChevronLeft, ChevronRight, 
-  Download, FilePenLine, FileSearch, FileSignature, FileText, 
-  Loader2, ShieldCheck, Upload, Users, X, Info
+﻿import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
+import {
+  AlertTriangle,
+  Building2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Eye,
+  FileDown,
+  FileText,
+  Info,
+  ListChecks,
+  Loader2,
+  PenSquare,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  Users,
+  X,
 } from "lucide-react";
 import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { supabase } from "@/integrations/supabase/client";
-import { uploadFileOptimized } from "@/lib/storageHelper";
-import { buildStorageObjectRef } from "@/lib/storageObject";
-import { cn } from "@/lib/utils";
+import { generateRiskAssessmentOfficialDocx } from "@/lib/riskAssessmentOfficialDocx";
+import type { RiskItem } from "@/types/risk-assessment";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
-type HazardLevel = "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli";
-type RiskMethod = "L Tipi Matris" | "Fine-Kinney" | "5x5 Matris" | "Kontrol Listesi Destekli Matris";
-type SignatureFieldKey =
-  | "employerRepresentativeSignatureUrl"
-  | "occupationalSafetySpecialistSignatureUrl"
-  | "workplaceDoctorSignatureUrl"
-  | "employeeRepresentativeSignatureUrl"
-  | "supportPersonnelSignatureUrl";
+type HazardClass = "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli" | "";
+type RiskMethod = "5x5 Matris" | "Fine-Kinney" | "L Tipi Matris" | "Diğer";
 
-interface WizardStep { id: string; label: string; title: string; description: string; icon: React.ReactNode; }
-interface SignatureRoleConfig {
-  key: SignatureFieldKey;
-  nameKey:
-    | "employerRepresentativeName"
-    | "occupationalSafetySpecialistName"
-    | "workplaceDoctorName"
-    | "employeeRepresentativeName"
-    | "supportPersonnelName";
+type RiskTeamPerson = {
+  fullName: string;
+  tcNo: string;
+  phone: string;
+  certificateNo?: string;
+};
+
+type RiskTeamOsgb = {
   title: string;
-  helper: string;
-  subtitle: string;
-}
-interface FormData {
-  firmName: string; workplaceTitle: string; workplaceAddress: string; employerName: string; department: string;
-  hazardLevel: HazardLevel; method: RiskMethod; reportDate: string; validityDate: string; logo: string | null;
-  employerRepresentativeName: string; occupationalSafetySpecialistName: string; workplaceDoctorName: string;
-  employerRepresentativeSignatureUrl: string | null; occupationalSafetySpecialistSignatureUrl: string | null; workplaceDoctorSignatureUrl: string | null;
-  employeeRepresentativeName: string; supportPersonnelName: string; employeeRepresentativeSignatureUrl: string | null; supportPersonnelSignatureUrl: string | null;
-  hazardSources: string; identifiedRisks: string;
-  controlMeasures: string; responsiblePersons: string; legislationNotes: string; renewalTriggersNote: string;
-}
+  phone: string;
+  email: string;
+  authorizedPerson: string;
+};
+
+type RiskWizardCompanyInfo = {
+  companyTitle: string;
+  address: string;
+  email: string;
+  workplaceRegistryNo: string;
+  hazardClass: HazardClass;
+  employeeCount: string;
+  assessmentDate: string;
+  riskMethod: RiskMethod | "";
+  activityScope: string;
+  note: string;
+};
+
+type RiskWizardTeamInfo = {
+  employer: RiskTeamPerson;
+  employeeRepresentative: RiskTeamPerson;
+  safetyExpert: RiskTeamPerson;
+  workplaceDoctor: RiskTeamPerson;
+  osgb: RiskTeamOsgb;
+};
+
+type RiskWizardScopeInfo = {
+  evaluatedSections: string;
+  assessmentScopeItems: string[];
+};
+
+type RiskWizardTableItem = {
+  id: string;
+  no: number;
+  departmentActivity: string;
+  hazardSource: string;
+  riskConsequence: string;
+  affectedPeople: string;
+  currentMeasure: string;
+  probability: string;
+  severity: string;
+  riskScore: string;
+  riskLevel: string;
+  additionalMeasures: string;
+  responsible: string;
+  deadline: string;
+};
+
+type CorrectivePreventiveAction = {
+  id: string;
+  no: number;
+  finding: string;
+  action: string;
+  responsible: string;
+  deadline: string;
+  status: string;
+};
+
+type SignatureRow = {
+  id: string;
+  fullName: string;
+  role: string;
+  documentOrContact: string;
+};
+
+type RiskWizardConclusionInfo = {
+  generalConclusion: string;
+  conclusionItems: string[];
+  approvalNote: string;
+  preparedBy: string;
+  approvedBy: string;
+  signatureDate: string;
+};
+
+type RiskAssessmentLogo = {
+  name: string;
+  type: string;
+  dataUrl: string;
+} | null;
+
+type WizardStep = {
+  id: string;
+  label: string;
+  title: string;
+  description: string;
+  icon: React.ReactNode;
+};
 
 type RiskAssessmentWizardDraft = {
   currentStep: number;
-  formData: FormData;
+  companyInfo: RiskWizardCompanyInfo;
+  teamInfo: RiskWizardTeamInfo;
+  scopeInfo: RiskWizardScopeInfo;
+  riskItems: RiskWizardTableItem[];
+  correctiveActions: CorrectivePreventiveAction[];
+  conclusionInfo: RiskWizardConclusionInfo;
+  signatureRows: SignatureRow[];
+  logo: RiskAssessmentLogo;
 };
+
+interface RiskAssessmentTemplateRecord {
+  id: string;
+  name: string;
+  sector?: string | null;
+  method: string;
+  payload: {
+    assessment?: Record<string, unknown>;
+    items?: Array<Record<string, unknown>>;
+  };
+  created_at: string;
+}
 
 const today = new Date().toISOString().split("T")[0];
-const steps: WizardStep[] = [
-  { id: "isyeri", label: "İşyeri Bilgileri", title: "Resmî Üst Bilgi Alanları", description: "Unvan, adres, işveren bilgisi ve tehlike sınıfını hazırlayın.", icon: <Building2 className="h-5 w-5" /> },
-  { id: "ekip", label: "Ekip Üyeleri", title: "Risk Değerlendirme Ekibi", description: "İşveren vekili, İSG uzmanı, işyeri hekimi, çalışan temsilcisi ve destek elemanlarını girin.", icon: <Users className="h-5 w-5" /> },
-  { id: "yontem", label: "Yöntem ve Tarihler", title: "Analiz Yöntemi ve Geçerlilik", description: "Risk analiz yöntemi, analiz tarihi ve geçerlilik sürelerini belirleyin.", icon: <FileSearch className="h-5 w-5" /> },
-  { id: "tehlike", label: "Tehlike ve Riskler", title: "Tehlike Kaynakları ve Riskler", description: "Tehlike kaynaklarını ve bunlardan doğabilecek riskleri detaylandırın.", icon: <AlertTriangle className="h-5 w-5" /> },
-  { id: "tedbir", label: "Kontrol Tedbirleri", title: "Önleyici Tedbirler ve Sorumlular", description: "Düzeltici-önleyici faaliyetleri, sorumluları ve mevzuat notlarını tamamlayın.", icon: <ShieldCheck className="h-5 w-5" /> },
-  { id: "onizleme", label: "Önizleme ve PDF", title: "Resmî Rapor Önizleme", description: "Zorunlu içerikleri gözden geçirin, PDF çıktısı alın ve kaydı tamamlayın.", icon: <Download className="h-5 w-5" /> },
+
+const WIZARD_STEPS: WizardStep[] = [
+  {
+    id: "company",
+    label: "Firma ve İşyeri Bilgileri",
+    title: "Firma ve İşyeri Bilgileri",
+    description: "Kapakta ve üst bilgi alanlarında yer alacak temel bilgileri girin.",
+    icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    id: "team",
+    label: "Risk Değerlendirme Ekibi",
+    title: "İşyerine Ait Bilgiler ve Risk Değerlendirme Ekibi",
+    description: "Resmî ekip tablosunda yer alacak ekip üyelerini tanımlayın.",
+    icon: <Users className="h-5 w-5" />,
+  },
+  {
+    id: "scope",
+    label: "Kapsam ve Yöntem",
+    title: "Değerlendirme Kapsamı ve Yöntem",
+    description: "Kapsamı, değerlendirilen faaliyetleri ve puanlama açıklamasını oluşturun.",
+    icon: <ShieldCheck className="h-5 w-5" />,
+  },
+  {
+    id: "risk-table",
+    label: "Risk Değerlendirme Tablosu",
+    title: "Risk Değerlendirme Tablosu",
+    description: "Risk maddelerini editörden aktarın veya manuel olarak ekleyin.",
+    icon: <AlertTriangle className="h-5 w-5" />,
+  },
+  {
+    id: "actions",
+    label: "Faaliyet Planı",
+    title: "Öncelikli Düzeltici / Önleyici Faaliyet Planı",
+    description: "Plan satırlarını yalnızca ihtiyaç duyduğunuz kadar oluşturun.",
+    icon: <ListChecks className="h-5 w-5" />,
+  },
+  {
+    id: "conclusion",
+    label: "Sonuç ve İmzalar",
+    title: "Genel Sonuç, Onay ve İmzalar",
+    description: "Onay metinlerini ve imza tablosunu tamamlayın.",
+    icon: <PenSquare className="h-5 w-5" />,
+  },
+  {
+    id: "preview",
+    label: "Önizleme ve Rapor",
+    title: "Önizleme ve Rapor Oluştur",
+    description: "Özeti kontrol edin, taslağı saklayın ve rapor çıktısını alın.",
+    icon: <Eye className="h-5 w-5" />,
+  },
 ];
 
-const hazardConfig = {
-  "Az Tehlikeli": { years: 6, icon: "🟢", pillClass: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400", bgClass: "bg-emerald-500/5", borderClass: "border-emerald-500/20", textClass: "text-emerald-400", summary: "Az tehlikeli işyerlerinde rapor en geç 6 yılda bir yenilenmelidir.", renewalLabel: "6 yılda bir" },
-  "Tehlikeli": { years: 4, icon: "🟡", pillClass: "border-amber-500/20 bg-amber-500/10 text-amber-400", bgClass: "bg-amber-500/5", borderClass: "border-amber-500/20", textClass: "text-amber-400", summary: "Tehlikeli işyerlerinde rapor en geç 4 yılda bir yenilenmelidir.", renewalLabel: "4 yılda bir" },
-  "Çok Tehlikeli": { years: 2, icon: "🔴", pillClass: "border-rose-500/20 bg-rose-500/10 text-rose-400", bgClass: "bg-rose-500/5", borderClass: "border-rose-500/20", textClass: "text-rose-400", summary: "Çok tehlikeli işyerlerinde rapor en geç 2 yılda bir yenilenmelidir.", renewalLabel: "2 yılda bir" },
-} as const;
-
-const methodOptions: RiskMethod[] = ["L Tipi Matris", "Fine-Kinney", "5x5 Matris", "Kontrol Listesi Destekli Matris"];
-
-const signatureRoleConfigs: SignatureRoleConfig[] = [
-  { key: "employerRepresentativeSignatureUrl", nameKey: "employerRepresentativeName", title: "İşveren / Vekili İmza Alanı", helper: "İşveren veya vekilinin imza ya da onay görselini yükleyin.", subtitle: "İşveren / İşveren Vekili" },
-  { key: "occupationalSafetySpecialistSignatureUrl", nameKey: "occupationalSafetySpecialistName", title: "İSG Uzmanı İmza / Kaşe", helper: "Uzman imzası veya kaşe görselini yükleyin.", subtitle: "İş Güvenliği Uzmanı" },
-  { key: "workplaceDoctorSignatureUrl", nameKey: "workplaceDoctorName", title: "İşyeri Hekimi İmza Alanı", helper: "Hekim imzası veya paraf görseli ekleyin.", subtitle: "İşyeri Hekimi" },
-  { key: "employeeRepresentativeSignatureUrl", nameKey: "employeeRepresentativeName", title: "Çalışan Temsilcisi İmza Alanı", helper: "Temsilci için imza görseli eklenebilir.", subtitle: "Çalışan Temsilcisi" },
-  { key: "supportPersonnelSignatureUrl", nameKey: "supportPersonnelName", title: "Destek Elemanı İmza Alanı", helper: "Destek elemanı için imza ya da onay görseli yükleyin.", subtitle: "Destek Elemanı" },
+const REQUIRED_COMPANY_FIELDS: Array<keyof RiskWizardCompanyInfo> = [
+  "companyTitle",
+  "hazardClass",
+  "employeeCount",
+  "assessmentDate",
+  "activityScope",
+  "riskMethod",
 ];
 
-type SignatureStatusKey =
-  | "employer_representative_approval_status"
-  | "occupational_safety_specialist_approval_status"
-  | "workplace_doctor_approval_status"
-  | "employee_representative_approval_status"
-  | "support_personnel_approval_status";
+const emptyCompanyInfo = (): RiskWizardCompanyInfo => ({
+  companyTitle: "",
+  address: "",
+  email: "",
+  workplaceRegistryNo: "",
+  hazardClass: "",
+  employeeCount: "",
+  assessmentDate: today,
+  riskMethod: "",
+  activityScope: "",
+  note: "",
+});
 
-type SignatureSignedAtKey =
-  | "employer_representative_signed_at"
-  | "occupational_safety_specialist_signed_at"
-  | "workplace_doctor_signed_at"
-  | "employee_representative_signed_at"
-  | "support_personnel_signed_at";
+const emptyTeamPerson = (): RiskTeamPerson => ({
+  fullName: "",
+  tcNo: "",
+  phone: "",
+  certificateNo: "",
+});
 
-type SignatureUrlDbKey =
-  | "employer_representative_signature_url"
-  | "occupational_safety_specialist_signature_url"
-  | "workplace_doctor_signature_url"
-  | "employee_representative_signature_url"
-  | "support_personnel_signature_url";
+const emptyOsgbInfo = (): RiskTeamOsgb => ({
+  title: "",
+  phone: "",
+  email: "",
+  authorizedPerson: "",
+});
 
-type SignatureDbConfig = SignatureRoleConfig & {
-  dbUrlKey: SignatureUrlDbKey;
-  dbStatusKey: SignatureStatusKey;
-  dbSignedAtKey: SignatureSignedAtKey;
+const emptyTeamInfo = (): RiskWizardTeamInfo => ({
+  employer: emptyTeamPerson(),
+  employeeRepresentative: emptyTeamPerson(),
+  safetyExpert: emptyTeamPerson(),
+  workplaceDoctor: emptyTeamPerson(),
+  osgb: emptyOsgbInfo(),
+});
+
+const FIXED_METHOD_DESCRIPTION =
+  "Risk puanı = Olasılık x Şiddet. Risk düzeyleri: 1-4 Düşük, 5-9 Orta, 10-15 Yüksek, 16-25 Çok Yüksek olarak kabul edilmiştir. Kontrol tedbirlerinde öncelik sırası; tehlikeyi ortadan kaldırma, ikame, mühendislik kontrolü, idari kontrol ve kişisel koruyucu donanım şeklindedir.";
+
+const emptyScopeInfo = (): RiskWizardScopeInfo => ({
+  evaluatedSections: "",
+  assessmentScopeItems: [""],
+});
+
+const emptyConclusionInfo = (): RiskWizardConclusionInfo => ({
+  generalConclusion:
+    "Bu risk değerlendirmesi, işyerinde beyan edilen faaliyet kapsamı ve mevcut çalışma koşulları dikkate alınarak hazırlanmıştır. Belirlenen ilave tedbirlerin uygulanması ve tamamlanan faaliyetler sonrası risk seviyelerinin yeniden değerlendirilmesi önerilir.",
+  conclusionItems: [
+    "Bu risk değerlendirmesi, işyerinde beyan edilen faaliyet kapsamı ve mevcut çalışma koşulları dikkate alınarak hazırlanmıştır.",
+    "Belirlenen ilave tedbirlerin uygulanması ve tamamlanan faaliyetler sonrası risk seviyelerinin yeniden değerlendirilmesi önerilir.",
+    "Risk değerlendirmesi, işyerinde önemli değişiklik olması veya mevzuat gereği yenilenmesi gereken durumlarda güncellenmelidir.",
+  ],
+  approvalNote: "",
+  preparedBy: "",
+  approvedBy: "",
+  signatureDate: today,
+});
+
+const cleanText = (value?: string | null) => (value || "").replace(/\s+/g, " ").trim();
+const splitTextToItems = (value?: string | null) =>
+  String(value || "")
+    .split(/\r?\n|•|-/)
+    .map((item) => cleanText(item))
+    .filter(Boolean);
+const asInt = (value?: string) => {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 };
-
-const signatureDbConfigs: SignatureDbConfig[] = [
-  { ...signatureRoleConfigs[0], dbUrlKey: "employer_representative_signature_url", dbStatusKey: "employer_representative_approval_status", dbSignedAtKey: "employer_representative_signed_at" },
-  { ...signatureRoleConfigs[1], dbUrlKey: "occupational_safety_specialist_signature_url", dbStatusKey: "occupational_safety_specialist_approval_status", dbSignedAtKey: "occupational_safety_specialist_signed_at" },
-  { ...signatureRoleConfigs[2], dbUrlKey: "workplace_doctor_signature_url", dbStatusKey: "workplace_doctor_approval_status", dbSignedAtKey: "workplace_doctor_signed_at" },
-  { ...signatureRoleConfigs[3], dbUrlKey: "employee_representative_signature_url", dbStatusKey: "employee_representative_approval_status", dbSignedAtKey: "employee_representative_signed_at" },
-  { ...signatureRoleConfigs[4], dbUrlKey: "support_personnel_signature_url", dbStatusKey: "support_personnel_approval_status", dbSignedAtKey: "support_personnel_signed_at" },
-];
-
-const cleanText = (text?: string | null) => (text || "").replace(/\s+/g, " ").trim();
-const asciiSlug = (value: string) => cleanText(value).toLocaleLowerCase("tr-TR").replace(/ı/g, "i").replace(/ğ/g, "g").replace(/ü/g, "u").replace(/ş/g, "s").replace(/ö/g, "o").replace(/ç/g, "c").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "risk-raporu";
-
-const calculateValidityDate = (reportDate: string, hazardLevel: HazardLevel) => {
-  if (!reportDate) return "";
-  const baseDate = new Date(`${reportDate}T00:00:00`);
-  if (Number.isNaN(baseDate.getTime())) return "";
-  baseDate.setFullYear(baseDate.getFullYear() + hazardConfig[hazardLevel].years);
-  return baseDate.toISOString().split("T")[0];
-};
-
-const defaultRenewalNote = (hazardLevel: HazardLevel) => `${hazardConfig[hazardLevel].summary} İşyerinde iş kazası olması, çalışma yönteminin değişmesi veya yeni makine alınması gibi durumlarda bu süreler beklenmeksizin rapor tamamen veya kısmen yenilenmelidir.`;
 
 const formatDisplayDate = (value?: string) => {
-  if (!value) return "-";
-  const date = value.includes("T") ? new Date(value) : new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(date);
+  if (!value) return "Belirtilmedi";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(parsed);
 };
 
-const buildSignatureMeta = (roleKey: SignatureFieldKey, imageUrl: string | null, timestampIso: string) => {
-  const config = signatureDbConfigs.find((entry) => entry.key === roleKey);
-  if (!config) return null;
+const slugify = (value: string) =>
+  cleanText(value)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "risk-degerlendirme";
+
+const createId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const normalizeLegacyTeamPerson = (value: unknown): RiskTeamPerson => {
+  if (value && typeof value === "object") {
+    const candidate = value as Partial<RiskTeamPerson>;
+    return {
+      fullName: cleanText(candidate.fullName),
+      tcNo: cleanText(candidate.tcNo),
+      phone: cleanText(candidate.phone),
+      certificateNo: cleanText(candidate.certificateNo),
+    };
+  }
   return {
-    dbUrlKey: config.dbUrlKey,
-    dbStatusKey: config.dbStatusKey,
-    dbSignedAtKey: config.dbSignedAtKey,
-    status: imageUrl ? "Hazır" : "Bekliyor",
-    signedAt: imageUrl ? timestampIso : null,
+    ...emptyTeamPerson(),
+    fullName: cleanText(typeof value === "string" ? value : ""),
   };
 };
 
-const createInitialFormData = (): FormData => ({
-  firmName: "", workplaceTitle: "", workplaceAddress: "", employerName: "", department: "", hazardLevel: "Tehlikeli", method: "5x5 Matris",
-  reportDate: today, validityDate: calculateValidityDate(today, "Tehlikeli"), logo: null,
-  employerRepresentativeName: "", occupationalSafetySpecialistName: "", workplaceDoctorName: "",
-  employerRepresentativeSignatureUrl: null, occupationalSafetySpecialistSignatureUrl: null, workplaceDoctorSignatureUrl: null,
-  employeeRepresentativeName: "", supportPersonnelName: "", employeeRepresentativeSignatureUrl: null, supportPersonnelSignatureUrl: null,
-  hazardSources: "", identifiedRisks: "", controlMeasures: "", responsiblePersons: "", legislationNotes: "", renewalTriggersNote: defaultRenewalNote("Tehlikeli"),
+const normalizeLegacyOsgb = (value: unknown): RiskTeamOsgb => {
+  if (value && typeof value === "object") {
+    const candidate = value as Partial<RiskTeamOsgb>;
+    return {
+      title: cleanText(candidate.title),
+      phone: cleanText(candidate.phone),
+      email: cleanText(candidate.email),
+      authorizedPerson: cleanText(candidate.authorizedPerson),
+    };
+  }
+  return {
+    ...emptyOsgbInfo(),
+    title: cleanText(typeof value === "string" ? value : ""),
+  };
+};
+
+const normalizeTeamInfo = (value?: Partial<RiskWizardTeamInfo> | null): RiskWizardTeamInfo => ({
+  employer: normalizeLegacyTeamPerson(value?.employer),
+  employeeRepresentative: normalizeLegacyTeamPerson(value?.employeeRepresentative),
+  safetyExpert: normalizeLegacyTeamPerson(value?.safetyExpert),
+  workplaceDoctor: normalizeLegacyTeamPerson(value?.workplaceDoctor),
+  osgb: normalizeLegacyOsgb(value?.osgb),
 });
 
-export default function RiskAssessmentWizard() {
-  const { user, profile } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const signatureInputRefs = useRef<Record<SignatureFieldKey, HTMLInputElement | null>>({
-    employerRepresentativeSignatureUrl: null,
-    occupationalSafetySpecialistSignatureUrl: null,
-    workplaceDoctorSignatureUrl: null,
-    employeeRepresentativeSignatureUrl: null,
-    supportPersonnelSignatureUrl: null,
-  });
+const getRiskLevelFromScore = (score: number) => {
+  if (score >= 16) return "Çok Yüksek";
+  if (score >= 10) return "Yüksek";
+  if (score >= 5) return "Orta";
+  if (score >= 1) return "Düşük";
+  return "";
+};
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState<FormData>(createInitialFormData);
-  const [signaturePreview, setSignaturePreview] = useState<{ title: string; imageUrl: string; field: SignatureFieldKey } | null>(null);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-  
-  const locationState = location.state as { companyId?: string | null } | null;
-  const draftContextKey = useMemo(
-    () => `${location.pathname}:${locationState?.companyId || "general"}`,
-    [location.pathname, locationState?.companyId],
+const createEmptyRiskItem = (no: number): RiskWizardTableItem => ({
+  id: createId("risk"),
+  no,
+  departmentActivity: "",
+  hazardSource: "",
+  riskConsequence: "",
+  affectedPeople: "",
+  currentMeasure: "",
+  probability: "",
+  severity: "",
+  riskScore: "",
+  riskLevel: "",
+  additionalMeasures: "",
+  responsible: "",
+  deadline: "",
+});
+
+const createEmptyAction = (no: number): CorrectivePreventiveAction => ({
+  id: createId("action"),
+  no,
+  finding: "",
+  action: "",
+  responsible: "",
+  deadline: "",
+  status: "",
+});
+
+const createEmptySignatureRow = (role = ""): SignatureRow => ({
+  id: createId("signature"),
+  fullName: "",
+  role,
+  documentOrContact: "",
+});
+
+const buildSignatureRowsFromTeam = (teamInfo: RiskWizardTeamInfo): SignatureRow[] => {
+  const rows: SignatureRow[] = [
+    {
+      id: createId("signature"),
+      fullName: cleanText(teamInfo.employer.fullName),
+      role: "İşveren",
+      documentOrContact: cleanText(teamInfo.employer.phone || teamInfo.employer.tcNo),
+    },
+    {
+      id: createId("signature"),
+      fullName: cleanText(teamInfo.employeeRepresentative.fullName),
+      role: "Çalışan Temsilcisi",
+      documentOrContact: cleanText(teamInfo.employeeRepresentative.phone),
+    },
+    {
+      id: createId("signature"),
+      fullName: cleanText(teamInfo.safetyExpert.fullName),
+      role: "İş Güvenliği Uzmanı",
+      documentOrContact: cleanText(
+        [
+          teamInfo.safetyExpert.certificateNo ? `Sertifika No: ${teamInfo.safetyExpert.certificateNo}` : "",
+          teamInfo.safetyExpert.phone ? `Tel: ${teamInfo.safetyExpert.phone}` : "",
+        ]
+          .filter(Boolean)
+          .join(" / "),
+      ),
+    },
+    {
+      id: createId("signature"),
+      fullName: cleanText(teamInfo.workplaceDoctor.fullName),
+      role: "İşyeri Hekimi",
+      documentOrContact: cleanText(
+        [
+          teamInfo.workplaceDoctor.certificateNo ? `Sertifika No: ${teamInfo.workplaceDoctor.certificateNo}` : "",
+          teamInfo.workplaceDoctor.phone ? `Tel: ${teamInfo.workplaceDoctor.phone}` : "",
+        ]
+          .filter(Boolean)
+          .join(" / "),
+      ),
+    },
+    {
+      id: createId("signature"),
+      fullName: cleanText(teamInfo.osgb.authorizedPerson || teamInfo.osgb.title),
+      role: "OSGB",
+      documentOrContact: cleanText([teamInfo.osgb.email, teamInfo.osgb.phone].filter(Boolean).join(" / ")),
+    },
+  ];
+  return rows.filter((row) => cleanText(row.fullName) || cleanText(row.role));
+};
+
+const mapEditorRiskItemToWizardRow = (item: RiskItem, index: number): RiskWizardTableItem => ({
+  id: item.id || createId("risk"),
+  no: index + 1,
+  departmentActivity: cleanText(item.department),
+  hazardSource: cleanText(item.hazard),
+  riskConsequence: cleanText(item.risk),
+  affectedPeople: cleanText(item.affected_people),
+  currentMeasure: cleanText(item.existing_controls),
+  probability: item.probability_1 ? String(item.probability_1) : "",
+  severity: item.severity_1 ? String(item.severity_1) : "",
+  riskScore: item.score_1 ? String(item.score_1) : "",
+  riskLevel: cleanText(item.risk_class_1),
+  additionalMeasures: cleanText(item.proposed_controls),
+  responsible: cleanText(item.responsible_person),
+  deadline: item.deadline || "",
+});
+
+const mapTemplateRiskItemToWizardRow = (item: Record<string, unknown>, index: number): RiskWizardTableItem => ({
+  id: createId("risk-template"),
+  no: index + 1,
+  departmentActivity: cleanText(String(item.department || item.activity || item.area || "")),
+  hazardSource: cleanText(String(item.hazardSource || item.hazard || "")),
+  riskConsequence: cleanText(String(item.risk || item.consequence || "")),
+  affectedPeople: cleanText(String(item.affectedPeople || item.affected_people || "")),
+  currentMeasure: cleanText(String(item.existingControl || item.currentMeasure || item.existing_controls || "")),
+  probability: item.probability ? String(item.probability) : item.probability_1 ? String(item.probability_1) : "",
+  severity: item.severity ? String(item.severity) : item.severity_1 ? String(item.severity_1) : "",
+  riskScore: item.riskScore ? String(item.riskScore) : item.score_1 ? String(item.score_1) : "",
+  riskLevel: cleanText(String(item.riskLevel || item.risk_class_1 || "")),
+  additionalMeasures: cleanText(String(item.additionalMeasures || item.actions || item.proposed_controls || "")),
+  responsible: cleanText(String(item.responsible || item.responsible_person || "")),
+  deadline: cleanText(String(item.deadline || "")),
+});
+
+const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
+  items.map((item, index) => ({
+    ...item,
+    no: index + 1,
+    riskScore: item.riskScore || String(asInt(item.probability) * asInt(item.severity) || ""),
+    riskLevel:
+      cleanText(item.riskLevel) ||
+      getRiskLevelFromScore(asInt(item.riskScore) || asInt(item.probability) * asInt(item.severity)),
+  }));
+
+const buildCorrectiveActionsSummary = (actions: CorrectivePreventiveAction[]) =>
+  actions.map((action, index) => ({ ...action, no: index + 1 }));
+
+const createInitialDraft = (): RiskAssessmentWizardDraft => ({
+  currentStep: 0,
+  companyInfo: emptyCompanyInfo(),
+  teamInfo: emptyTeamInfo(),
+  scopeInfo: emptyScopeInfo(),
+  riskItems: [],
+  correctiveActions: [],
+  conclusionInfo: emptyConclusionInfo(),
+  signatureRows: [],
+  logo: null,
+});
+
+const drawCenteredWrappedText = (
+  doc: jsPDF,
+  text: string,
+  centerX: number,
+  startY: number,
+  maxWidth: number,
+  options?: { startFontSize?: number; minFontSize?: number; maxLines?: number; lineHeight?: number; weight?: "normal" | "bold" }
+) => {
+  const startFontSize = options?.startFontSize ?? 24;
+  const minFontSize = options?.minFontSize ?? 12;
+  const maxLines = options?.maxLines ?? 3;
+  const lineHeight = options?.lineHeight ?? 6.2;
+  let fontSize = startFontSize;
+  let lines: string[] = [];
+
+  while (fontSize >= minFontSize) {
+    doc.setFontSize(fontSize);
+    lines = doc.splitTextToSize(text, maxWidth) as string[];
+    if (lines.length <= maxLines) break;
+    fontSize -= 1;
+  }
+
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    const lastLine = lines[maxLines - 1] || "";
+    lines[maxLines - 1] = `${lastLine.slice(0, Math.max(0, lastLine.length - 3)).trimEnd()}...`;
+  }
+
+  doc.setFontSize(fontSize);
+  doc.setFont("Inter", options?.weight ?? "normal");
+  doc.text(lines, centerX, startY, { align: "center", baseline: "top" });
+  return { lines, height: lines.length * lineHeight, fontSize };
+};
+
+const buildTeamExtraInfo = (person: RiskTeamPerson) => cleanText(person.certificateNo);
+
+const buildOsgbExtraInfo = (osgb: RiskTeamOsgb) =>
+  cleanText(
+    [
+      osgb.authorizedPerson ? `Yetkili: ${osgb.authorizedPerson}` : "",
+      osgb.email ? `E-posta: ${osgb.email}` : "",
+    ]
+      .filter(Boolean)
+      .join(" / "),
   );
 
-  const draftFormData = useMemo<FormData>(() => ({
-    ...formData,
-    logo: formData.logo?.startsWith("data:") ? null : formData.logo,
-    employerRepresentativeSignatureUrl: formData.employerRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employerRepresentativeSignatureUrl,
-    occupationalSafetySpecialistSignatureUrl: formData.occupationalSafetySpecialistSignatureUrl?.startsWith("data:") ? null : formData.occupationalSafetySpecialistSignatureUrl,
-    workplaceDoctorSignatureUrl: formData.workplaceDoctorSignatureUrl?.startsWith("data:") ? null : formData.workplaceDoctorSignatureUrl,
-    employeeRepresentativeSignatureUrl: formData.employeeRepresentativeSignatureUrl?.startsWith("data:") ? null : formData.employeeRepresentativeSignatureUrl,
-    supportPersonnelSignatureUrl: formData.supportPersonnelSignatureUrl?.startsWith("data:") ? null : formData.supportPersonnelSignatureUrl,
-  }), [formData]);
+const addWizardPdfSectionTitle = (doc: jsPDF, y: number, title: string) => {
+  doc.setFillColor(15, 23, 42);
+  doc.roundedRect(14, y, 182, 9, 2.5, 2.5, "F");
+  doc.setFont("Inter", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text(title, 18, y + 5.9);
+  doc.setTextColor(15, 23, 42);
+};
 
-  const { clearDraft } = usePersistentFormDraft<RiskAssessmentWizardDraft>({
-    formId: `risk-assessment-wizard:${draftContextKey}`,
-    enabled: Boolean(user?.id),
-    version: 1,
-    storage: "indexedDb",
-    ttlMs: 14 * 24 * 60 * 60 * 1000,
-    debounceMs: 500,
-    userId: user?.id,
-    organizationId: profile?.organization_id ?? null,
-    value: {
-      currentStep,
-      formData: draftFormData,
-    },
-    initialValue: {
-      currentStep: 0,
-      formData: createInitialFormData(),
-    },
-    isDirty:
-      draftFormData.firmName.trim().length > 0 ||
-      draftFormData.workplaceTitle.trim().length > 0 ||
-      draftFormData.employerName.trim().length > 0 ||
-      currentStep > 0,
-    onRestore: (draft) => {
-      setCurrentStep(
-        typeof draft.currentStep === "number"
-          ? Math.min(Math.max(draft.currentStep, 0), steps.length - 1)
-          : 0,
+const ensurePdfPage = (doc: jsPDF, cursorY: number, neededHeight: number) => {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  if (cursorY + neededHeight <= pageHeight - 18) return cursorY;
+  doc.addPage("a4", "portrait");
+  return 18;
+};
+
+const addPdfFooter = (doc: jsPDF, companyTitle: string, assessmentDate: string) => {
+  const pageCount = doc.getNumberOfPages();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const baseText = `${cleanText(companyTitle) || "Firma"} Risk Değerlendirmesi - ${formatDisplayDate(assessmentDate)}`;
+
+  for (let pageIndex = 1; pageIndex <= pageCount; pageIndex += 1) {
+    doc.setPage(pageIndex);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.15);
+    doc.line(14, pageHeight - 12, pageWidth - 14, pageHeight - 12);
+    doc.setFont("Inter", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    let footerText = `${baseText} | Sayfa ${pageIndex}`;
+    const maxWidth = pageWidth - 28;
+    while (doc.getTextWidth(footerText) > maxWidth && footerText.length > 18) {
+      footerText = `${footerText.slice(0, -4)}...`;
+    }
+    doc.text(footerText, pageWidth / 2, pageHeight - 7, { align: "center" });
+  }
+};
+
+const buildWizardPdf = async (draft: RiskAssessmentWizardDraft) => {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  addInterFontsToJsPDF(doc);
+  doc.setFont("Inter", "normal");
+
+  const companyInfo = draft.companyInfo;
+  const teamInfo = draft.teamInfo;
+  const scopeInfo = draft.scopeInfo;
+  const riskItems = buildRiskItemsSummary(draft.riskItems);
+  const correctiveActions = buildCorrectiveActionsSummary(draft.correctiveActions);
+  const signatureRows = draft.signatureRows.length > 0 ? draft.signatureRows : buildSignatureRowsFromTeam(teamInfo);
+  const scopeItems = (scopeInfo.assessmentScopeItems || []).map((item) => cleanText(item)).filter(Boolean);
+  const conclusionItems = (draft.conclusionInfo.conclusionItems || []).map((item) => cleanText(item)).filter(Boolean);
+  const hasNote = Boolean(cleanText(companyInfo.note));
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  doc.setFillColor(241, 245, 249);
+  doc.rect(0, 0, pageWidth, pageHeight, "F");
+  doc.setDrawColor(30, 64, 175);
+  doc.setLineWidth(1.2);
+  doc.roundedRect(10, 10, pageWidth - 20, pageHeight - 20, 5, 5);
+
+  if (draft.logo?.dataUrl) {
+    try {
+      doc.addImage(
+        draft.logo.dataUrl,
+        draft.logo.type.includes("png") ? "PNG" : "JPEG",
+        pageWidth - 48,
+        16,
+        30,
+        18,
+        undefined,
+        "FAST",
       );
-      setFormData({
-        ...createInitialFormData(),
-        ...(draft.formData || {}),
-      });
+    } catch {
+      // noop
+    }
+  }
+
+  doc.setTextColor(30, 41, 59);
+  doc.setFont("Inter", "bold");
+  doc.setFontSize(18);
+  doc.text("İŞ SAĞLIĞI VE GÜVENLİĞİ", pageWidth / 2, 24, { align: "center" });
+  doc.text("RİSK DEĞERLENDİRMESİ RAPORU", pageWidth / 2, 32, { align: "center" });
+
+  const companyTitleBlock = drawCenteredWrappedText(
+    doc,
+    cleanText(companyInfo.companyTitle) || "FİRMA ÜNVANI",
+    pageWidth / 2,
+    41,
+    draft.logo?.dataUrl ? 112 : 126,
+    {
+    startFontSize: 20,
+    minFontSize: 13,
+    maxLines: 3,
+    lineHeight: 5.8,
+    weight: "bold",
     },
-    debugLabel: "RiskAssessmentWizard",
+  );
+
+  let coverTableStartY = 41 + companyTitleBlock.height + 8;
+  doc.setFont("Inter", "normal");
+  doc.setFontSize(10);
+  const coverRows = [
+    ["Tehlike Sınıfı", cleanText(companyInfo.hazardClass) || ""],
+    ["Faaliyet Kapsamı", cleanText(companyInfo.activityScope) || ""],
+    ["Firma Ünvanı", cleanText(companyInfo.companyTitle) || ""],
+    ["Adres", cleanText(companyInfo.address) || ""],
+    ["E-posta", cleanText(companyInfo.email) || ""],
+    ["İşyeri Sicil No", cleanText(companyInfo.workplaceRegistryNo) || ""],
+    ["Çalışan Sayısı", cleanText(companyInfo.employeeCount) || ""],
+    ["Değerlendirme Tarihi", formatDisplayDate(companyInfo.assessmentDate)],
+    ["Risk Değerlendirme Yöntemi", cleanText(companyInfo.riskMethod) || ""],
+  ];
+
+  if (hasNote) {
+    coverRows.push(["Not", cleanText(companyInfo.note)]);
+  }
+
+  autoTable(doc, {
+    startY: coverTableStartY,
+    margin: { left: 18, right: 18 },
+    head: [["Alan", "Bilgi"]],
+    body: coverRows.map(([label, value]) => [label, value || ""]),
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 9,
+      cellPadding: 2.2,
+      textColor: [15, 23, 42],
+      lineColor: [203, 213, 225],
+      lineWidth: 0.15,
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      fontStyle: "bold",
+      font: "Inter",
+    },
+    columnStyles: {
+      0: { cellWidth: 42, fontStyle: "bold" },
+      1: { cellWidth: 130 },
+    },
   });
 
-  const resetWizardDraft = () => {
+  doc.addPage("a4", "portrait");
+  let cursorY = 18;
+
+  addWizardPdfSectionTitle(doc, cursorY, "1. İŞYERİNE AİT BİLGİLER VE RİSK DEĞERLENDİRME EKİBİ");
+  cursorY += 13;
+  autoTable(doc, {
+    startY: cursorY,
+    margin: { left: 14, right: 14 },
+    head: [["Görev / Rol", "Ad - Soyad / Ünvan", "T.C. Kimlik No", "Telefon", "Sertifika No / Ek Bilgi"]],
+    body: [
+      [
+        "İşveren",
+        cleanText(teamInfo.employer.fullName),
+        cleanText(teamInfo.employer.tcNo),
+        cleanText(teamInfo.employer.phone),
+        "",
+      ],
+      [
+        "Çalışan Temsilcisi",
+        cleanText(teamInfo.employeeRepresentative.fullName),
+        cleanText(teamInfo.employeeRepresentative.tcNo),
+        cleanText(teamInfo.employeeRepresentative.phone),
+        "",
+      ],
+      [
+        "İş Güvenliği Uzmanı",
+        cleanText(teamInfo.safetyExpert.fullName),
+        cleanText(teamInfo.safetyExpert.tcNo),
+        cleanText(teamInfo.safetyExpert.phone),
+        buildTeamExtraInfo(teamInfo.safetyExpert),
+      ],
+      [
+        "İşyeri Hekimi",
+        cleanText(teamInfo.workplaceDoctor.fullName),
+        cleanText(teamInfo.workplaceDoctor.tcNo),
+        cleanText(teamInfo.workplaceDoctor.phone),
+        buildTeamExtraInfo(teamInfo.workplaceDoctor),
+      ],
+      [
+        "OSGB",
+        cleanText(teamInfo.osgb.title),
+        "",
+        cleanText(teamInfo.osgb.phone),
+        buildOsgbExtraInfo(teamInfo.osgb),
+      ],
+    ],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 9,
+      cellPadding: 2.2,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.15,
+      textColor: [15, 23, 42],
+      minCellHeight: 10,
+    },
+    headStyles: {
+      fillColor: [226, 232, 240],
+      textColor: [15, 23, 42],
+      fontStyle: "bold",
+      font: "Inter",
+    },
+    columnStyles: {
+      0: { cellWidth: 32, fontStyle: "bold" },
+      1: { cellWidth: 50 },
+      2: { cellWidth: 30 },
+      3: { cellWidth: 26 },
+      4: { cellWidth: 42 },
+    },
+  });
+  cursorY = ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || cursorY) + 8;
+
+  cursorY = ensurePdfPage(doc, cursorY, 32);
+  addWizardPdfSectionTitle(doc, cursorY, "2. DEĞERLENDİRME KAPSAMI");
+  cursorY += 13;
+  doc.setFont("Inter", "normal");
+  doc.setFontSize(9.5);
+  if (scopeItems.length > 0) {
+    scopeItems.forEach((item) => {
+      const scopeLines = doc.splitTextToSize(`• ${item}`, 176) as string[];
+      doc.text(scopeLines, 14, cursorY);
+      cursorY += scopeLines.length * 5 + 2;
+    });
+    cursorY += 4;
+  } else {
+    const scopeLines = doc.splitTextToSize("Değerlendirme kapsamı belirtilmemiştir.", 178) as string[];
+    doc.text(scopeLines, 14, cursorY);
+    cursorY += scopeLines.length * 5 + 8;
+  }
+  if (cleanText(scopeInfo.evaluatedSections)) {
+    doc.setFont("Inter", "bold");
+    doc.text("Değerlendirilen Bölümler / Faaliyetler", 14, cursorY);
+    cursorY += 5.5;
+    doc.setFont("Inter", "normal");
+    const evaluatedLines = doc.splitTextToSize(cleanText(scopeInfo.evaluatedSections), 178) as string[];
+    doc.text(evaluatedLines, 14, cursorY);
+    cursorY += evaluatedLines.length * 5 + 8;
+  }
+
+  cursorY = ensurePdfPage(doc, cursorY, 36);
+  addWizardPdfSectionTitle(doc, cursorY, "3. RİSK PUANLAMA METODU");
+  cursorY += 13;
+  const methodLines = doc.splitTextToSize(FIXED_METHOD_DESCRIPTION, 178) as string[];
+  doc.text(methodLines, 14, cursorY);
+  cursorY += methodLines.length * 5 + 6;
+  autoTable(doc, {
+    startY: cursorY,
+    margin: { left: 14, right: 14 },
+    head: [["Puan", "Olasılık", "Açıklama", "Şiddet", "Açıklama"]],
+    body: [
+      ["1", "Çok düşük", "Beklenmez/çok seyrek", "Çok hafif", "İlk yardım gerektirmeyen küçük durum"],
+      ["2", "Düşük", "Seyrek", "Hafif", "İlk yardım, kısa süreli rahatsızlık"],
+      ["3", "Orta", "Ara sıra", "Orta", "Tıbbi müdahale, iş günü kaybı ihtimali"],
+      ["4", "Yüksek", "Sık", "Ciddi", "Ciddi yaralanma, kalıcı etki ihtimali"],
+      ["5", "Çok yüksek", "Çok sık/kaçınılmaz", "Çok ciddi", "Ölüm, ağır yaralanma veya büyük hasar"],
+    ],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 8.2,
+      cellPadding: 2,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.15,
+      textColor: [15, 23, 42],
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [219, 234, 254],
+      textColor: [15, 23, 42],
+      font: "Inter",
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 28 },
+      2: { cellWidth: 50 },
+      3: { cellWidth: 24 },
+      4: { cellWidth: 64 },
+    },
+  });
+
+  doc.addPage("a4", "landscape");
+  addWizardPdfSectionTitle(doc, 12, "4. RİSK DEĞERLENDİRME TABLOSU");
+  autoTable(doc, {
+    startY: 24,
+    margin: { left: 8, right: 8, bottom: 12 },
+    head: [[
+      "No",
+      "Bölüm / Faaliyet",
+      "Tehlike Kaynağı",
+      "Risk / Olası Sonuç",
+      "Etkilenenler",
+      "Mevcut Önlem",
+      "O",
+      "Ş",
+      "R",
+      "Düzey",
+      "Alınacak İlave Önlemler",
+      "Sorumlu",
+      "Termin",
+    ]],
+    body:
+      riskItems.length > 0
+        ? riskItems.map((item) => [
+            String(item.no),
+            item.departmentActivity,
+            item.hazardSource,
+            item.riskConsequence,
+            item.affectedPeople,
+            item.currentMeasure,
+            item.probability,
+            item.severity,
+            item.riskScore,
+            item.riskLevel,
+            item.additionalMeasures,
+            item.responsible,
+            item.deadline ? formatDisplayDate(item.deadline) : "",
+          ])
+        : [["", "Risk maddesi eklenmedi.", "", "", "", "", "", "", "", "", "", "", ""]],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 6.3,
+      cellPadding: 1.3,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.1,
+      textColor: [15, 23, 42],
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      font: "Inter",
+      fontStyle: "bold",
+      fontSize: 6.5,
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center" },
+      1: { cellWidth: 26 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 28 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 24 },
+      6: { cellWidth: 7, halign: "center" },
+      7: { cellWidth: 7, halign: "center" },
+      8: { cellWidth: 8, halign: "center" },
+      9: { cellWidth: 14, halign: "center" },
+      10: { cellWidth: 34 },
+      11: { cellWidth: 18 },
+      12: { cellWidth: 16, halign: "center" },
+    },
+  });
+
+  doc.addPage("a4", "landscape");
+  addWizardPdfSectionTitle(doc, 12, "5. ÖNCELİKLİ DÜZELTİCİ / ÖNLEYİCİ FAALİYET PLANI");
+  autoTable(doc, {
+    startY: 24,
+    margin: { left: 10, right: 10, bottom: 12 },
+    head: [["No", "Tespit / Risk", "Yapılacak Faaliyet", "Sorumlu", "Termin", "Durum"]],
+    body:
+      correctiveActions.length > 0
+        ? correctiveActions.map((item) => [
+            String(item.no),
+            item.finding,
+            item.action,
+            item.responsible,
+            item.deadline ? formatDisplayDate(item.deadline) : "",
+            item.status,
+          ])
+        : [["", "Öncelikli düzeltici/önleyici faaliyet eklenmedi.", "", "", "", ""]],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 7.4,
+      cellPadding: 1.8,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.1,
+      textColor: [15, 23, 42],
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      font: "Inter",
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: "center" },
+      1: { cellWidth: 55 },
+      2: { cellWidth: 90 },
+      3: { cellWidth: 40 },
+      4: { cellWidth: 24, halign: "center" },
+      5: { cellWidth: 36, halign: "center" },
+    },
+  });
+
+  doc.addPage("a4", "portrait");
+  cursorY = 18;
+  addWizardPdfSectionTitle(doc, cursorY, "6. GENEL SONUÇ VE ONAY");
+  cursorY += 13;
+  if (conclusionItems.length > 0) {
+    conclusionItems.forEach((item) => {
+      const conclusionLines = doc.splitTextToSize(`• ${item}`, 176) as string[];
+      doc.text(conclusionLines, 14, cursorY);
+      cursorY += conclusionLines.length * 5 + 2;
+    });
+    cursorY += 4;
+  } else {
+    const conclusionLines = doc.splitTextToSize(
+      cleanText(draft.conclusionInfo.generalConclusion) || "Genel sonuç girilmedi.",
+      178,
+    ) as string[];
+    doc.text(conclusionLines, 14, cursorY);
+    cursorY += conclusionLines.length * 5 + 6;
+  }
+  if (cleanText(draft.conclusionInfo.approvalNote)) {
+    doc.setFont("Inter", "bold");
+    doc.text("Onay Notu", 14, cursorY);
+    cursorY += 5;
+    doc.setFont("Inter", "normal");
+    const approvalLines = doc.splitTextToSize(cleanText(draft.conclusionInfo.approvalNote), 178) as string[];
+    doc.text(approvalLines, 14, cursorY);
+    cursorY += approvalLines.length * 5 + 6;
+  }
+  autoTable(doc, {
+    startY: cursorY,
+    margin: { left: 14, right: 14 },
+    head: [["Alan", "Bilgi"]],
+    body: [
+      ["Hazırlayan", cleanText(draft.conclusionInfo.preparedBy)],
+      ["Onaylayan", cleanText(draft.conclusionInfo.approvedBy)],
+      ["İmza Tarihi", formatDisplayDate(draft.conclusionInfo.signatureDate)],
+    ],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 9,
+      cellPadding: 2.2,
+      textColor: [15, 23, 42],
+      lineColor: [203, 213, 225],
+      lineWidth: 0.15,
+    },
+    headStyles: {
+      fillColor: [226, 232, 240],
+      textColor: [15, 23, 42],
+      fontStyle: "bold",
+      font: "Inter",
+    },
+    columnStyles: {
+      0: { cellWidth: 44, fontStyle: "bold" },
+      1: { cellWidth: 134 },
+    },
+  });
+  cursorY = ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || cursorY) + 8;
+
+  cursorY = ensurePdfPage(doc, cursorY, 40);
+  addWizardPdfSectionTitle(doc, cursorY, "7. İMZALAR");
+  autoTable(doc, {
+    startY: cursorY + 12,
+    margin: { left: 14, right: 14, bottom: 16 },
+    head: [["Adı Soyadı", "Görevi", "Belge / İletişim Bilgisi", "İmza"]],
+    body:
+      signatureRows.length > 0
+        ? signatureRows.map((row) => [cleanText(row.fullName), cleanText(row.role), cleanText(row.documentOrContact), ""])
+        : [["", "İmza satırı eklenmedi.", "", ""]],
+    theme: "grid",
+    styles: {
+      font: "Inter",
+      fontSize: 9,
+      cellPadding: 2.2,
+      textColor: [15, 23, 42],
+      lineColor: [203, 213, 225],
+      lineWidth: 0.15,
+      minCellHeight: 11,
+    },
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      font: "Inter",
+      fontStyle: "bold",
+    },
+    columnStyles: {
+      0: { cellWidth: 52 },
+      1: { cellWidth: 46 },
+      2: { cellWidth: 58 },
+      3: { cellWidth: 22 },
+    },
+  });
+
+  addPdfFooter(doc, companyInfo.companyTitle, companyInfo.assessmentDate);
+
+  return doc;
+};
+
+export default function RiskAssessmentWizard() {
+  const { profile } = useAuth();
+  const location = useLocation();
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const locationState = location.state as { assessmentId?: string | null; companyId?: string | null } | null;
+  const importAssessmentId = locationState?.assessmentId || null;
+
+  const [currentStep, setCurrentStep] = useState(0);
+  const [companyInfo, setCompanyInfo] = useState<RiskWizardCompanyInfo>(emptyCompanyInfo);
+  const [teamInfo, setTeamInfo] = useState<RiskWizardTeamInfo>(emptyTeamInfo);
+  const [scopeInfo, setScopeInfo] = useState<RiskWizardScopeInfo>(emptyScopeInfo);
+  const [riskItems, setRiskItems] = useState<RiskWizardTableItem[]>([]);
+  const [correctiveActions, setCorrectiveActions] = useState<CorrectivePreventiveAction[]>([]);
+  const [conclusionInfo, setConclusionInfo] = useState<RiskWizardConclusionInfo>(emptyConclusionInfo);
+  const [signatureRows, setSignatureRows] = useState<SignatureRow[]>([]);
+  const [logo, setLogo] = useState<RiskAssessmentLogo>(null);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [wordTemplateAvailable, setWordTemplateAvailable] = useState(false);
+  const [checkingTemplate, setCheckingTemplate] = useState(true);
+  const [importingRiskItems, setImportingRiskItems] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [riskTemplateDialogOpen, setRiskTemplateDialogOpen] = useState(false);
+  const [riskTemplates, setRiskTemplates] = useState<RiskAssessmentTemplateRecord[]>([]);
+  const [loadingRiskTemplates, setLoadingRiskTemplates] = useState(false);
+
+  const draftContextKey = useMemo(
+    () => `${location.pathname}:${locationState?.assessmentId || locationState?.companyId || "general"}`,
+    [location.pathname, locationState?.assessmentId, locationState?.companyId],
+  );
+
+  const { clearDraft } = usePersistentFormDraft<RiskAssessmentWizardDraft>({
+    formId: `risk-assessment-wizard-v2:${draftContextKey}`,
+    enabled: true,
+    version: 2,
+    storage: "indexedDb",
+    ttlMs: 14 * 24 * 60 * 60 * 1000,
+    debounceMs: 450,
+    value: {
+      currentStep,
+      companyInfo,
+      teamInfo,
+      scopeInfo,
+      riskItems,
+      correctiveActions,
+      conclusionInfo,
+      signatureRows,
+      logo,
+    },
+    initialValue: createInitialDraft(),
+    isDirty:
+      Boolean(cleanText(companyInfo.companyTitle)) ||
+      scopeInfo.assessmentScopeItems.some((item) => Boolean(cleanText(item))) ||
+      riskItems.length > 0 ||
+      correctiveActions.length > 0 ||
+      signatureRows.length > 0 ||
+      currentStep > 0,
+    onRestore: (draft) => {
+      setCurrentStep(Math.min(Math.max(draft.currentStep || 0, 0), WIZARD_STEPS.length - 1));
+      setCompanyInfo({ ...emptyCompanyInfo(), ...(draft.companyInfo || {}) });
+      setTeamInfo(normalizeTeamInfo(draft.teamInfo || {}));
+      const restoredScope = { ...emptyScopeInfo(), ...(draft.scopeInfo || {}) };
+      setScopeInfo({
+        evaluatedSections: cleanText(restoredScope.evaluatedSections),
+        assessmentScopeItems:
+          Array.isArray(restoredScope.assessmentScopeItems) && restoredScope.assessmentScopeItems.length > 0
+            ? restoredScope.assessmentScopeItems
+            : splitTextToItems((draft.scopeInfo as { scopeText?: string } | undefined)?.scopeText),
+      });
+      setRiskItems(Array.isArray(draft.riskItems) ? draft.riskItems : []);
+      setCorrectiveActions(Array.isArray(draft.correctiveActions) ? draft.correctiveActions : []);
+      const restoredConclusion = { ...emptyConclusionInfo(), ...(draft.conclusionInfo || {}) };
+      setConclusionInfo({
+        ...restoredConclusion,
+        conclusionItems:
+          Array.isArray(restoredConclusion.conclusionItems) && restoredConclusion.conclusionItems.length > 0
+            ? restoredConclusion.conclusionItems
+            : splitTextToItems(restoredConclusion.generalConclusion),
+      });
+      setSignatureRows(Array.isArray(draft.signatureRows) ? draft.signatureRows : []);
+      setLogo(draft.logo || null);
+    },
+    debugLabel: "RiskAssessmentWizardV2",
+  });
+
+  useEffect(() => {
+    let active = true;
+    const checkTemplate = async () => {
+      try {
+        const response = await fetch("/templates/Risk_Analizi.docx");
+        if (!active) return;
+        setWordTemplateAvailable(response.ok);
+      } catch {
+        if (!active) return;
+        setWordTemplateAvailable(false);
+      } finally {
+        if (active) setCheckingTemplate(false);
+      }
+    };
+    void checkTemplate();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const fetchRiskTemplates = async () => {
+    if (!profile?.organization_id) {
+      setRiskTemplates([]);
+      return;
+    }
+
+    setLoadingRiskTemplates(true);
+    try {
+      const { data, error } = await supabase
+        .from("risk_assessment_templates")
+        .select("id, name, sector, method, payload, created_at")
+        .eq("org_id", profile.organization_id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setRiskTemplates((data || []) as RiskAssessmentTemplateRecord[]);
+    } catch (error) {
+      console.error("Risk wizard template fetch error", error);
+      toast.error("Risk şablonları yüklenemedi.");
+    } finally {
+      setLoadingRiskTemplates(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!riskTemplateDialogOpen) return;
+    void fetchRiskTemplates();
+  }, [profile?.organization_id, riskTemplateDialogOpen]);
+
+  const previewRiskItems = useMemo(() => buildRiskItemsSummary(riskItems), [riskItems]);
+  const previewActions = useMemo(() => buildCorrectiveActionsSummary(correctiveActions), [correctiveActions]);
+  const previewSignatureRows = useMemo(
+    () => (signatureRows.length > 0 ? signatureRows : buildSignatureRowsFromTeam(teamInfo)),
+    [signatureRows, teamInfo],
+  );
+
+  const progressRatio = ((currentStep + 1) / WIZARD_STEPS.length) * 100;
+
+  const validationState = useMemo(() => {
+    const missingCompanyFields = REQUIRED_COMPANY_FIELDS.filter((field) => !cleanText(String(companyInfo[field] || "")));
+    return {
+      companyStepValid: missingCompanyFields.length === 0,
+      missingCompanyFields,
+    };
+  }, [companyInfo]);
+
+  const isStepValid = (stepIndex: number) => {
+    if (stepIndex === 0 && !validationState.companyStepValid) {
+      return {
+        valid: false,
+        message: "Lütfen zorunlu firma ve işyeri bilgilerini doldurun.",
+      };
+    }
+    return { valid: true };
+  };
+
+  const resetWizard = () => {
     clearDraft();
     setCurrentStep(0);
-    setFormData(createInitialFormData());
-    setSignaturePreview(null);
+    setCompanyInfo(emptyCompanyInfo());
+    setTeamInfo(emptyTeamInfo());
+    setScopeInfo(emptyScopeInfo());
+    setRiskItems([]);
+    setCorrectiveActions([]);
+    setConclusionInfo(emptyConclusionInfo());
+    setSignatureRows([]);
+    setLogo(null);
     setTouched({});
     toast.success("Risk değerlendirme taslağı temizlendi.");
   };
 
-  const hazardCfg = hazardConfig[formData.hazardLevel];
-  const currentStepConfig = steps[currentStep];
-  const completionRatio = ((currentStep + 1) / steps.length) * 100;
-  const brandedCompanyName = cleanText(formData.firmName) || "Kurumsal Risk Değerlendirme Raporu";
-  const createdAtLabel = useMemo(() => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date()), []);
-  
-  const checklist = useMemo(() => [
-    formData.workplaceTitle, formData.workplaceAddress, formData.employerName, formData.employerRepresentativeName, 
-    formData.occupationalSafetySpecialistName, formData.workplaceDoctorName, formData.employeeRepresentativeName, 
-    formData.supportPersonnelName, formData.reportDate, formData.validityDate, formData.method, formData.hazardSources, 
-    formData.identifiedRisks, formData.controlMeasures, formData.responsiblePersons
-  ].map(cleanText), [formData]);
-  
-  const completedFields = checklist.filter(Boolean).length;
-  const pdfReady = completedFields >= 13;
-  
-  const isStepValid = (stepIndex: number): { valid: boolean; message?: string } => {
-    switch (stepIndex) {
-      case 0:
-        if (!cleanText(formData.firmName)) return { valid: false, message: "Lütfen Rapor Başlığını doldurun." };
-        if (!cleanText(formData.workplaceTitle)) return { valid: false, message: "Lütfen İşyeri Unvanını doldurun." };
-        if (!cleanText(formData.employerName)) return { valid: false, message: "Lütfen İşveren Adını doldurun." };
-        if (!cleanText(formData.workplaceAddress)) return { valid: false, message: "Lütfen İşyeri Adresini doldurun." };
-        return { valid: true };
-      case 1:
-        if (!cleanText(formData.employerRepresentativeName)) return { valid: false, message: "Lütfen İşveren / Vekili adını girin." };
-        if (!cleanText(formData.occupationalSafetySpecialistName)) return { valid: false, message: "Lütfen İSG Uzmanı adını girin." };
-        if (!cleanText(formData.workplaceDoctorName)) return { valid: false, message: "Lütfen İşyeri Hekimi adını girin." };
-        if (!cleanText(formData.employeeRepresentativeName)) return { valid: false, message: "Lütfen Çalışan Temsilcisi adını girin." };
-        if (!cleanText(formData.supportPersonnelName)) return { valid: false, message: "Lütfen Destek Elemanı adını girin." };
-        return { valid: true };
-      case 2:
-        if (!formData.reportDate) return { valid: false, message: "Lütfen Analiz Tarihini seçin." };
-        return { valid: true };
-      case 3:
-        if (!cleanText(formData.hazardSources)) return { valid: false, message: "Lütfen Tehlike Kaynaklarını tanımlayın." };
-        if (!cleanText(formData.identifiedRisks)) return { valid: false, message: "Lütfen Doğabilecek Riskleri belirtin." };
-        return { valid: true };
-      case 4:
-        if (!cleanText(formData.controlMeasures)) return { valid: false, message: "Lütfen Kontrol Tedbirlerini girin." };
-        if (!cleanText(formData.responsiblePersons)) return { valid: false, message: "Lütfen Sorumlu Kişileri belirtin." };
-        return { valid: true };
-      default:
-        return { valid: true };
+  const touchField = (key: string) => setTouched((prev) => ({ ...prev, [key]: true }));
+
+  const handleNext = () => {
+    const validation = isStepValid(currentStep);
+    if (!validation.valid) {
+      REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
+      toast.error(validation.message);
+      return;
     }
+    setCurrentStep((prev) => Math.min(prev + 1, WIZARD_STEPS.length - 1));
   };
 
-  const stepCompletionCounts = useMemo(() => {
-    const counters = [
-      [formData.firmName, formData.workplaceTitle, formData.workplaceAddress, formData.employerName, formData.department, formData.logo ? "logo" : ""],
-      [formData.employerRepresentativeName, formData.occupationalSafetySpecialistName, formData.workplaceDoctorName, formData.employeeRepresentativeName, formData.supportPersonnelName, formData.employerRepresentativeSignatureUrl ? "asset" : "", formData.occupationalSafetySpecialistSignatureUrl ? "asset" : "", formData.workplaceDoctorSignatureUrl ? "asset" : "", formData.employeeRepresentativeSignatureUrl ? "asset" : "", formData.supportPersonnelSignatureUrl ? "asset" : ""],
-      [formData.method, formData.reportDate, formData.validityDate, formData.renewalTriggersNote],
-      [formData.hazardSources, formData.identifiedRisks],
-      [formData.controlMeasures, formData.responsiblePersons, formData.legislationNotes],
-      [pdfReady ? "ready" : "", formData.firmName, formData.method],
-    ];
-    return counters.map((items) => ({ completed: items.filter((item) => cleanText(item).length > 0).length, total: items.length }));
-  }, [formData, pdfReady]);
-
-  const updateForm = <K extends keyof FormData>(key: K, value: FormData[K]) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
-    setTouched((prev) => ({ ...prev, [key]: true }));
+  const handlePrev = () => {
+    setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
-  
-  const handleHazardLevelChange = (level: HazardLevel) => setFormData((prev) => ({ 
-    ...prev, 
-    hazardLevel: level, 
-    validityDate: calculateValidityDate(prev.reportDate, level), 
-    renewalTriggersNote: cleanText(prev.renewalTriggersNote) === cleanText(defaultRenewalNote(prev.hazardLevel)) || !cleanText(prev.renewalTriggersNote) ? defaultRenewalNote(level) : prev.renewalTriggersNote 
-  }));
-  
-  const handleReportDateChange = (date: string) => setFormData((prev) => ({ 
-    ...prev, 
-    reportDate: date, 
-    validityDate: date ? calculateValidityDate(date, prev.hazardLevel) : "" 
-  }));
+
+  const updateCompanyInfo = <K extends keyof RiskWizardCompanyInfo>(key: K, value: RiskWizardCompanyInfo[K]) => {
+    setCompanyInfo((prev) => ({ ...prev, [key]: value }));
+    touchField(String(key));
+  };
+
+  const updateTeamPerson = (
+    key: "employer" | "employeeRepresentative" | "safetyExpert" | "workplaceDoctor",
+    field: keyof RiskTeamPerson,
+    value: string,
+  ) => {
+    setTeamInfo((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateTeamOsgb = (field: keyof RiskTeamOsgb, value: string) => {
+    setTeamInfo((prev) => ({
+      ...prev,
+      osgb: {
+        ...prev.osgb,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateScopeInfo = <K extends keyof RiskWizardScopeInfo>(key: K, value: RiskWizardScopeInfo[K]) => {
+    setScopeInfo((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateConclusionInfo = <K extends keyof RiskWizardConclusionInfo>(
+    key: K,
+    value: RiskWizardConclusionInfo[K],
+  ) => {
+    setConclusionInfo((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addRiskItem = () => {
+    setRiskItems((prev) => [...prev, createEmptyRiskItem(prev.length + 1)]);
+  };
+
+  const updateRiskItem = <K extends keyof RiskWizardTableItem>(id: string, key: K, value: RiskWizardTableItem[K]) => {
+    setRiskItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const nextItem = { ...item, [key]: value };
+        if (key === "probability" || key === "severity") {
+          const score = asInt(String(nextItem.probability)) * asInt(String(nextItem.severity));
+          nextItem.riskScore = score ? String(score) : "";
+          nextItem.riskLevel = score ? getRiskLevelFromScore(score) : "";
+        }
+        if (key === "riskScore") {
+          nextItem.riskLevel = getRiskLevelFromScore(asInt(String(value)));
+        }
+        return nextItem;
+      }),
+    );
+  };
+
+  const removeRiskItem = (id: string) => {
+    setRiskItems((prev) => prev.filter((item) => item.id !== id).map((item, index) => ({ ...item, no: index + 1 })));
+  };
+
+  const addCorrectiveAction = () => {
+    setCorrectiveActions((prev) => [...prev, createEmptyAction(prev.length + 1)]);
+  };
+
+  const updateCorrectiveAction = <K extends keyof CorrectivePreventiveAction>(
+    id: string,
+    key: K,
+    value: CorrectivePreventiveAction[K],
+  ) => {
+    setCorrectiveActions((prev) => prev.map((item) => (item.id === id ? { ...item, [key]: value } : item)));
+  };
+
+  const removeCorrectiveAction = (id: string) => {
+    setCorrectiveActions((prev) => prev.filter((item) => item.id !== id).map((item, index) => ({ ...item, no: index + 1 })));
+  };
+
+  const regenerateSignaturesFromTeam = () => {
+    setSignatureRows(buildSignatureRowsFromTeam(teamInfo));
+    toast.success("İmza satırları ekip bilgilerinden yeniden oluşturuldu.");
+  };
+
+  const addSignatureRow = () => {
+    setSignatureRows((prev) => [...prev, createEmptySignatureRow()]);
+  };
+
+  const updateSignatureRow = <K extends keyof SignatureRow>(id: string, key: K, value: SignatureRow[K]) => {
+    setSignatureRows((prev) => prev.map((row) => (row.id === id ? { ...row, [key]: value } : row)));
+  };
+
+  const removeSignatureRow = (id: string) => {
+    setSignatureRows((prev) => prev.filter((row) => row.id !== id));
+  };
 
   const handleLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return toast.error("Logo boyutu 2 MB sınırını aşamaz.");
+    const validTypes = ["image/png", "image/jpeg", "image/jpg"];
+    if (!validTypes.includes(file.type)) {
+      toast.error("Sadece PNG veya JPG formatında logo yükleyebilirsiniz.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo dosyası en fazla 2 MB olabilir.");
+      event.target.value = "";
+      return;
+    }
     const reader = new FileReader();
-    reader.onload = (e) => { updateForm("logo", (e.target?.result as string) || null); toast.success("Firma logosu yüklendi."); };
+    reader.onload = (loadEvent) => {
+      setLogo({
+        name: file.name,
+        type: file.type,
+        dataUrl: String(loadEvent.target?.result || ""),
+      });
+      toast.success("Logo önizlemesi hazırlandı.");
+    };
     reader.readAsDataURL(file);
     event.target.value = "";
   };
 
-  const handleSignatureUpload = (field: SignatureFieldKey, event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return toast.error("İmza / kaşe görseli 2 MB sınırını aşamaz.");
-    const reader = new FileReader();
-    reader.onload = (e) => { updateForm(field, (e.target?.result as string) || null); toast.success("İmza görseli hazırlandı."); };
-    reader.readAsDataURL(file);
-    event.target.value = "";
-  };
-
-  const uploadDataUrlToStorage = async (dataUrl: string | null, assessmentId: string, slot: string) => {
-    if (!dataUrl || !user?.id) return null;
-    if (!dataUrl.startsWith("data:")) return dataUrl;
-    const response = await fetch(dataUrl);
-    const blob = await response.blob();
-    const extension = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
-    const path = `${user.id}/${assessmentId}/${slot}-${Date.now()}.${extension}`;
-    const file = new File([blob], `${slot}.${extension}`, { type: blob.type || "image/png" });
-    await uploadFileOptimized("risk-assessment-signatures", path, file);
-    return buildStorageObjectRef("risk-assessment-signatures", path);
-  };
-
-  const handleStepNavigation = (direction: "next" | "prev") => {
-    if (direction === "next") {
-      const check = isStepValid(currentStep);
-      if (!check.valid) {
-        const keysToTouch = steps[currentStep].id === "isyeri" 
-          ? ["firmName", "workplaceTitle", "employerName", "workplaceAddress"]
-          : steps[currentStep].id === "ekip"
-          ? ["employerRepresentativeName", "occupationalSafetySpecialistName", "workplaceDoctorName", "employeeRepresentativeName", "supportPersonnelName"]
-          : [];
-        
-        setTouched(prev => {
-          const newTouched = { ...prev };
-          keysToTouch.forEach(k => { newTouched[k] = true; });
-          return newTouched;
-        });
-
-        toast.error(check.message || "Lütfen zorunlu alanları doldurun.");
-        return;
-      }
-      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
-    } else {
-      setCurrentStep(prev => Math.max(prev - 1, 0));
+  const importRiskItemsFromAssessment = async () => {
+    if (!importAssessmentId) {
+      toast.error("RiskAssessmentEditor aktarımı için assessmentId bulunamadı.");
+      return;
+    }
+    setImportingRiskItems(true);
+    try {
+      const { data, error } = await supabase
+        .from("risk_items")
+        .select(
+          "id,item_number,department,hazard,risk,affected_people,existing_controls,proposed_controls,probability_1,severity_1,score_1,risk_class_1,responsible_person,deadline",
+        )
+        .eq("assessment_id", importAssessmentId)
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      const mappedItems = (data || []).map((item, index) =>
+        mapEditorRiskItemToWizardRow(item as unknown as RiskItem, index),
+      );
+      setRiskItems(mappedItems);
+      toast.success(`${mappedItems.length} risk maddesi editörden aktarıldı.`);
+    } catch (error) {
+      console.error("Risk wizard import error", error);
+      toast.error("Risk maddeleri aktarılamadı.");
+    } finally {
+      setImportingRiskItems(false);
     }
   };
 
-  const generatePDFPreview = () => {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-    const hasCustomFont = addInterFontsToJsPDF(doc);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const marginX = 14;
-    const contentWidth = pageWidth - marginX * 2;
-    const leftWidth = 52;
-    let cursorY = 16;
-    
-    const font = (style: "normal" | "bold" = "normal", size = 10) => { doc.setFont(hasCustomFont ? "Inter" : "helvetica", style); doc.setFontSize(size); };
-    
-    const footer = () => {
-      doc.setDrawColor(214, 223, 236); doc.line(marginX, pageHeight - 12, pageWidth - marginX, pageHeight - 12);
-      font("normal", 8.5); doc.setTextColor(100, 116, 139);
-      doc.text(brandedCompanyName, marginX, pageHeight - 6.5);
-      doc.text(`Oluşturulma: ${createdAtLabel}`, pageWidth / 2, pageHeight - 6.5, { align: "center" });
-      doc.text("İSG Risk Değerlendirme Raporu", pageWidth - marginX, pageHeight - 6.5, { align: "right" });
-    };
+  const applyRiskTemplateToWizard = (template: RiskAssessmentTemplateRecord) => {
+    const templateItems = Array.isArray(template.payload?.items) ? template.payload.items : [];
+    if (templateItems.length === 0) {
+      toast.error("Seçilen şablonda aktarılacak risk maddesi bulunamadı.");
+      return;
+    }
 
-    const sectionGap = 4;
-    const ensure = (needed: number) => { if (cursorY + needed <= pageHeight - 22) return; footer(); doc.addPage(); doc.setFillColor(245, 247, 251); doc.rect(0, 0, pageWidth, pageHeight, "F"); cursorY = 16; };
-    
-    const section = (title: string, content: string) => {
-      const lines = doc.splitTextToSize(cleanText(content) || "Belirtilmedi", contentWidth - leftWidth - 8);
-      const height = Math.max(22, lines.length * 5 + 12) + 10; ensure(height + sectionGap);
-      doc.setDrawColor(214, 226, 241); doc.setFillColor(255, 255, 255); doc.roundedRect(marginX, cursorY, contentWidth, height, 2, 2, "FD");
-      doc.setFillColor(15, 23, 42); doc.rect(marginX, cursorY, leftWidth, 10, "F"); doc.setFillColor(239, 246, 255); doc.rect(marginX + leftWidth, cursorY, contentWidth - leftWidth, 10, "F");
-      font("bold", 9); doc.setTextColor(255, 255, 255); doc.text("BÖLÜM", marginX + leftWidth / 2, cursorY + 6.5, { align: "center" });
-      doc.setTextColor(8, 47, 73); doc.text(title, marginX + leftWidth + 4, cursorY + 6.5);
-      doc.line(marginX + leftWidth, cursorY, marginX + leftWidth, cursorY + height); doc.line(marginX, cursorY + 10, marginX + contentWidth, cursorY + 10);
-      font("normal", 9.3); doc.setTextColor(31, 41, 55); doc.text(lines, marginX + leftWidth + 4, cursorY + 17); cursorY += height + sectionGap;
-    };
-
-    const table = (title: string, rows: Array<[string, string]>) => {
-      const rowHeight = 9; const height = 10 + rows.length * rowHeight; ensure(height + sectionGap);
-      doc.setDrawColor(214, 226, 241); doc.setFillColor(255, 255, 255); doc.roundedRect(marginX, cursorY, contentWidth, height, 2, 2, "FD");
-      doc.setFillColor(15, 23, 42); doc.rect(marginX, cursorY, leftWidth, 10, "F"); doc.setFillColor(239, 246, 255); doc.rect(marginX + leftWidth, cursorY, contentWidth - leftWidth, 10, "F");
-      font("bold", 9); doc.setTextColor(255, 255, 255); doc.text("BÖLÜM", marginX + leftWidth / 2, cursorY + 6.5, { align: "center" });
-      doc.setTextColor(8, 47, 73); doc.text(title, marginX + leftWidth + 4, cursorY + 6.5);
-      doc.line(marginX + leftWidth, cursorY, marginX + leftWidth, cursorY + height); doc.line(marginX, cursorY + 10, marginX + contentWidth, cursorY + 10);
-      rows.forEach(([label, value], i) => { const y = cursorY + 10 + i * rowHeight; if (i) doc.line(marginX, y, marginX + contentWidth, y); font("bold", 9); doc.setTextColor(51, 65, 85); doc.text(label, marginX + 4, y + 6); font("normal", 9.4); doc.setTextColor(15, 23, 42); doc.text(value || "-", marginX + leftWidth + 4, y + 6); });
-      cursorY += height + sectionGap;
-    };
-
-    const signatureTable = () => {
-      const previewTimestampIso = new Date().toISOString();
-      const rows = signatureDbConfigs.map((config) => {
-        const imageUrl = formData[config.key];
-        const meta = buildSignatureMeta(config.key, imageUrl, previewTimestampIso);
-        return {
-          role: config.title.replace(" İmza Alanı", "").replace(" İmza / Kaşe", ""),
-          subtitle: config.subtitle,
-          name: formData[config.nameKey],
-          imageUrl,
-          status: meta?.status || "Bekliyor",
-          signedAt: meta?.signedAt || null,
-        };
-      });
-      const rowHeight = 19; const height = 18 + rows.length * rowHeight; ensure(height + sectionGap);
-      const titleBlockWidth = 40;
-      const roleColWidth = 48;
-      const nameColWidth = 54;
-      const statusColWidth = 28;
-      doc.setDrawColor(214, 226, 241); doc.setFillColor(255, 255, 255); doc.roundedRect(marginX, cursorY, contentWidth, height, 2, 2, "FD");
-      doc.setFillColor(15, 23, 42); doc.rect(marginX, cursorY, titleBlockWidth, 18, "F"); doc.setFillColor(239, 246, 255); doc.rect(marginX + titleBlockWidth, cursorY, contentWidth - titleBlockWidth, 18, "F");
-      font("bold", 8.8); doc.setTextColor(255, 255, 255); doc.text("İMZA", marginX + titleBlockWidth / 2, cursorY + 7, { align: "center" });
-      font("normal", 7.4); doc.text("ONAY", marginX + titleBlockWidth / 2, cursorY + 13, { align: "center" });
-      doc.setTextColor(8, 47, 73); font("bold", 8.6); doc.text("Ekip Üyeleri ve Onay Görselleri", marginX + titleBlockWidth + 4, cursorY + 6.8);
-      font("normal", 7.2); doc.text("Rol bazlı imza / kaşe alanları", marginX + titleBlockWidth + 4, cursorY + 12.6);
-      doc.line(marginX + titleBlockWidth, cursorY, marginX + titleBlockWidth, cursorY + height); doc.line(marginX, cursorY + 18, marginX + contentWidth, cursorY + 18);
-      const roleDivider = marginX + roleColWidth;
-      const nameDivider = marginX + roleColWidth + nameColWidth;
-      const statusDivider = marginX + roleColWidth + nameColWidth + statusColWidth;
-      doc.line(roleDivider, cursorY + 18, roleDivider, cursorY + height);
-      doc.line(nameDivider, cursorY + 18, nameDivider, cursorY + height);
-      doc.line(statusDivider, cursorY + 18, statusDivider, cursorY + height);
-      font("bold", 7.5); doc.setTextColor(71, 85, 105);
-      doc.text("ROL", marginX + 4, cursorY + 15);
-      doc.text("AD SOYAD", roleDivider + 4, cursorY + 15);
-      doc.text("TARİH / DURUM", nameDivider + 4, cursorY + 15);
-      doc.text("İMZA / KAŞE", statusDivider + 4, cursorY + 15);
-      rows.forEach((row, i) => {
-        const y = cursorY + 18 + i * rowHeight;
-        if (i) doc.line(marginX, y, marginX + contentWidth, y);
-        font("bold", 8.3); doc.setTextColor(51, 65, 85); doc.text(row.role, marginX + 4, y + 8);
-        font("normal", 7.2); doc.setTextColor(100, 116, 139); doc.text(row.subtitle, marginX + 4, y + 13.2);
-        font("normal", 8.4); doc.setTextColor(15, 23, 42); doc.text(cleanText(row.name) || "-", roleDivider + 4, y + 8);
-        font("normal", 7); doc.setTextColor(100, 116, 139); doc.text(formatDisplayDate(row.signedAt || ""), nameDivider + 4, y + 6);
-        const badgeX = nameDivider + 4;
-        const badgeY = y + 8.5;
-        const badgeText = row.status.toUpperCase();
-        const badgeWidth = row.status === "Hazır" ? 16 : 19;
-        if (row.status === "Hazır") {
-          doc.setFillColor(236, 253, 245);
-          doc.setDrawColor(16, 185, 129);
-          doc.roundedRect(badgeX, badgeY, badgeWidth, 5.2, 1.2, 1.2, "FD");
-          font("bold", 6.8); doc.setTextColor(6, 95, 70); doc.text(badgeText, badgeX + badgeWidth / 2, badgeY + 3.5, { align: "center" });
-        } else {
-          doc.setFillColor(255, 251, 235);
-          doc.setDrawColor(245, 158, 11);
-          doc.roundedRect(badgeX, badgeY, badgeWidth, 5.2, 1.2, 1.2, "FD");
-          font("bold", 6.8); doc.setTextColor(146, 64, 14); doc.text(badgeText, badgeX + badgeWidth / 2, badgeY + 3.5, { align: "center" });
-        }
-        font("normal", 7.2); doc.setTextColor(100, 116, 139); doc.text("Yetkili imza alanı", statusDivider + 4, y + 6);
-        if (row.imageUrl) {
-          try {
-            doc.addImage(row.imageUrl, row.imageUrl.includes("image/png") ? "PNG" : "JPEG", statusDivider + 4, y + 7.5, 24, 9.5);
-          } catch {
-            doc.line(statusDivider + 4, y + 14.5, marginX + contentWidth - 6, y + 14.5);
-          }
-        } else {
-          doc.line(statusDivider + 4, y + 14.5, marginX + contentWidth - 6, y + 14.5);
-        }
-      });
-      cursorY += height + sectionGap;
-    };
-
-    font(); doc.setFillColor(247, 249, 252); doc.rect(0, 0, pageWidth, pageHeight, "F");
-    doc.setFillColor(15, 23, 42); doc.roundedRect(marginX, cursorY, contentWidth, 48, 5, 5, "F"); doc.setFillColor(255, 255, 255); doc.roundedRect(marginX + 4, cursorY + 5, 26, 26, 3, 3, "F");
-    if (formData.logo) { try { doc.addImage(formData.logo, formData.logo.includes("image/png") ? "PNG" : "JPEG", marginX + 5, cursorY + 6, 24, 24); } catch {} }
-    doc.setTextColor(255, 255, 255); font("bold", 15); doc.text("İSG Risk Değerlendirme Raporu", pageWidth / 2, cursorY + 13, { align: "center" }); font("normal", 10.2); doc.text(brandedCompanyName, pageWidth / 2, cursorY + 20, { align: "center" }); font("normal", 8.6); doc.setTextColor(186, 200, 220); doc.text("Oluşturulma", pageWidth - marginX - 6, cursorY + 10, { align: "right" }); doc.text(createdAtLabel, pageWidth - marginX - 6, cursorY + 15, { align: "right" }); doc.text("Rev. 1", pageWidth - marginX - 6, cursorY + 22, { align: "right" }); doc.text(`Geçerlilik: ${formatDisplayDate(formData.validityDate)}`, pageWidth - marginX - 6, cursorY + 27, { align: "right" }); doc.text(`Tehlike: ${formData.hazardLevel}`, pageWidth - marginX - 6, cursorY + 32, { align: "right" }); font("bold", 10); doc.setTextColor(255, 255, 255); doc.text(cleanText(formData.workplaceTitle) || cleanText(formData.firmName) || "İşyeri Unvanı", marginX + 34, cursorY + 31); font("normal", 8.7); doc.setTextColor(203, 213, 225); doc.text(cleanText(formData.workplaceAddress) || "İşyeri adresi bekleniyor", marginX + 34, cursorY + 36); doc.text(`İşveren Adı: ${cleanText(formData.employerName) || "-"}`, marginX + 34, cursorY + 41);
-    cursorY += 56;
-    table("İşyeri Bilgileri", [["İşyeri Unvanı", cleanText(formData.workplaceTitle) || cleanText(formData.firmName)], ["İşyeri Adresi", cleanText(formData.workplaceAddress)], ["İşveren Adı", cleanText(formData.employerName)], ["Bölüm / Alan", cleanText(formData.department)]]);
-    table("Analiz Takvimi", [["Analiz Tarihi", formatDisplayDate(formData.reportDate)], ["Geçerlilik Bitişi", formatDisplayDate(formData.validityDate)], ["Risk Analiz Yöntemi", formData.method], ["Yenileme Periyodu", hazardCfg.renewalLabel]]);
-    section("Tehlike Tanımları", formData.hazardSources); section("Doğabilecek Riskler", formData.identifiedRisks); section("Kontrol Tedbirleri", formData.controlMeasures); section("Uygulama Sorumluları", formData.responsiblePersons); section("Mevzuat ve Uygunluk Notları", formData.legislationNotes); section("Yenileme ve Güncelleme Notu", formData.renewalTriggersNote); signatureTable(); footer();
-    doc.save(`Isg-Risk-Degerlendirme-Raporu-${cleanText(formData.firmName || "taslak")}-${Date.now()}.pdf`); toast.success("PDF oluşturuldu ve indirildi.");
+    const mappedItems = templateItems.map((item, index) => mapTemplateRiskItemToWizardRow(item, index));
+    setRiskItems(mappedItems);
+    setRiskTemplateDialogOpen(false);
+    toast.success(`"${template.name}" şablonundan ${mappedItems.length} risk maddesi tabloya aktarıldı.`);
   };
 
-  const handleSubmit = async () => {
-    if (!user?.id) return toast.error("Kullanıcı oturumu bulunamadı.");
-    const check = isStepValid(currentStep);
-    if (!check.valid) return toast.error(check.message);
-    
-    setSubmitting(true);
+  const handleSaveDraft = () => {
+    toast.success("Taslak kaydedildi.", {
+      description: "Girilen bilgiler adımlar arasında ve tekrar girişte korunacaktır.",
+    });
+  };
+
+  const handleExportPdf = async () => {
+    if (!validationState.companyStepValid) {
+      REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
+      toast.error("PDF oluşturmadan önce zorunlu firma ve işyeri bilgilerini tamamlayın.");
+      setCurrentStep(0);
+      return;
+    }
+    setExportingPdf(true);
     try {
-      const { data: companyMatch } = await supabase.from("companies").select("id, name").eq("user_id", user.id).ilike("name", cleanText(formData.firmName)).maybeSingle();
-      const payload = {
-        user_id: user.id, company_id: companyMatch?.id ?? null, assessment_name: cleanText(formData.firmName), assessment_date: formData.reportDate || null, next_review_date: formData.validityDate || null,
-        department: cleanText(formData.department) || null, sector: formData.hazardLevel, method: formData.method,
-        assessor_name: cleanText(formData.occupationalSafetySpecialistName) || null, reviewer_name: cleanText(formData.employerRepresentativeName) || null,
-        status: "draft", version: 1, notes: cleanText(formData.legislationNotes) || null,
-        workplace_title: cleanText(formData.workplaceTitle) || null, workplace_address: cleanText(formData.workplaceAddress) || null, employer_name: cleanText(formData.employerName) || null,
-        employer_representative_name: cleanText(formData.employerRepresentativeName) || null, occupational_safety_specialist_name: cleanText(formData.occupationalSafetySpecialistName) || null,
-        workplace_doctor_name: cleanText(formData.workplaceDoctorName) || null, employee_representative_name: cleanText(formData.employeeRepresentativeName) || null, support_personnel_name: cleanText(formData.supportPersonnelName) || null,
-        hazard_sources: cleanText(formData.hazardSources) || null, identified_risks: cleanText(formData.identifiedRisks) || null, control_measures: cleanText(formData.controlMeasures) || null,
-        responsible_persons: cleanText(formData.responsiblePersons) || null, legislation_notes: cleanText(formData.legislationNotes) || null, renewal_triggers_note: cleanText(formData.renewalTriggersNote) || null,
-      };
-      const { data: insertedAssessment, error } = await supabase.from("risk_assessments").insert(payload as never).select("id, company_id").single();
-      if (error) throw error;
-      const signatureSavedAt = new Date().toISOString();
-      const uploadedSignatureUrls = {
-        employerRepresentativeSignatureUrl: await uploadDataUrlToStorage(formData.employerRepresentativeSignatureUrl, insertedAssessment.id, "employer-representative"),
-        occupationalSafetySpecialistSignatureUrl: await uploadDataUrlToStorage(formData.occupationalSafetySpecialistSignatureUrl, insertedAssessment.id, "occupational-safety-specialist"),
-        workplaceDoctorSignatureUrl: await uploadDataUrlToStorage(formData.workplaceDoctorSignatureUrl, insertedAssessment.id, "workplace-doctor"),
-        employeeRepresentativeSignatureUrl: await uploadDataUrlToStorage(formData.employeeRepresentativeSignatureUrl, insertedAssessment.id, "employee-representative"),
-        supportPersonnelSignatureUrl: await uploadDataUrlToStorage(formData.supportPersonnelSignatureUrl, insertedAssessment.id, "support-personnel"),
-      } satisfies Record<SignatureFieldKey, string | null>;
-      const signaturePayload: Record<string, string | null> = {};
-      signatureDbConfigs.forEach((config) => {
-        const uploadedUrl = uploadedSignatureUrls[config.key];
-        const meta = buildSignatureMeta(config.key, uploadedUrl, signatureSavedAt);
-        signaturePayload[config.dbUrlKey] = uploadedUrl;
-        signaturePayload[config.dbStatusKey] = meta?.status || "Bekliyor";
-        signaturePayload[config.dbSignedAtKey] = meta?.signedAt || null;
+      const doc = await buildWizardPdf({
+        currentStep,
+        companyInfo,
+        teamInfo,
+        scopeInfo,
+        riskItems,
+        correctiveActions,
+        conclusionInfo,
+        signatureRows,
+        logo,
       });
-      if (Object.values(signaturePayload).some((value) => value !== null)) {
-        const { error: updateError } = await supabase.from("risk_assessments").update(signaturePayload as never).eq("id", insertedAssessment.id);
-        if (updateError) throw updateError;
-      }
-      sessionStorage.setItem("risk-editor-bridge", JSON.stringify({ assessmentId: insertedAssessment.id, companyId: insertedAssessment.company_id, createdFromWizard: true, createdAt: Date.now() }));
-      toast.success("Risk değerlendirme taslağı oluşturuldu.", { description: "Detaylı yönetim için editör ekranına geçiliyor." });
-      clearDraft();
-      setFormData(createInitialFormData()); setCurrentStep(0);
-      navigate("/risk-editor", { state: { assessmentId: insertedAssessment.id, companyId: insertedAssessment.company_id, createdFromWizard: true } });
-    } catch (error: any) { toast.error(error.message || "Kayıt oluşturulamadı."); }
-    finally { setSubmitting(false); }
+      const fileName = `risk-analizi-${slugify(companyInfo.companyTitle || "firma")}-${today}.pdf`;
+      doc.save(fileName);
+      toast.success("Risk değerlendirme raporu PDF olarak hazırlandı.");
+    } catch (error) {
+      console.error("Risk wizard PDF error", error);
+      toast.error("PDF raporu oluşturulamadı.");
+    } finally {
+      setExportingPdf(false);
+    }
   };
 
-  const inputField = (label: string, fieldKey: keyof FormData, setter: (value: string) => void, placeholder: string, className?: string, type = "text") => {
-    const isError = touched[fieldKey] && !cleanText(formData[fieldKey] as string);
-    return (
-      <div className={cn("space-y-2", className)}>
-        <Label className={cn("text-xs font-semibold uppercase tracking-wider text-slate-400", isError && "text-red-400")}>
-          {label}
-        </Label>
-        <Input 
-          type={type}
-          value={formData[fieldKey] as string || ""} 
-          onChange={(e) => setter(e.target.value)} 
-          placeholder={placeholder} 
-          className={cn(
-            "h-12 bg-slate-900/50 border-slate-800 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100 placeholder:text-slate-600 rounded-xl transition-all",
-            isError && "border-red-500/50 focus:border-red-500 focus:ring-red-500/10 bg-red-950/10"
-          )} 
-        />
-        {isError && <p className="text-xs font-medium text-red-500/90">Bu alan resmî rapor için zorunludur.</p>}
-      </div>
-    );
+  const handleWordDownload = async () => {
+    if (!validationState.companyStepValid) {
+      REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
+      toast.error("Word çıktısı oluşturmadan önce zorunlu firma ve işyeri bilgilerini tamamlayın.");
+      setCurrentStep(0);
+      return;
+    }
+
+    setExportingWord(true);
+    try {
+      await generateRiskAssessmentOfficialDocx({
+        companyInfo,
+        teamInfo,
+        scopeInfo,
+        riskItems: buildRiskItemsSummary(riskItems),
+        correctiveActions: buildCorrectiveActionsSummary(correctiveActions),
+        conclusionInfo: {
+          conclusionItems: (conclusionInfo.conclusionItems || []).map((item) => cleanText(item)).filter(Boolean),
+          approvalNote: conclusionInfo.approvalNote,
+          preparedBy: conclusionInfo.preparedBy,
+          approvedBy: conclusionInfo.approvedBy,
+          signatureDate: conclusionInfo.signatureDate,
+        },
+        signatureRows: previewSignatureRows,
+      });
+      toast.success("Risk değerlendirme raporu Word şablonu ile hazırlandı.");
+    } catch (error) {
+      console.error("Risk wizard DOCX error", error);
+      toast.error("Word çıktısı oluşturulamadı.");
+    } finally {
+      setExportingWord(false);
+    }
+    return;
+
   };
 
-  const textField = (label: string, fieldKey: keyof FormData, setter: (value: string) => void, placeholder: string, helper?: string) => {
-    const isError = touched[fieldKey] && !cleanText(formData[fieldKey] as string);
+  const addScopeItem = () => {
+    setScopeInfo((prev) => ({ ...prev, assessmentScopeItems: [...prev.assessmentScopeItems, ""] }));
+  };
+
+  const updateScopeItem = (index: number, value: string) => {
+    setScopeInfo((prev) => ({
+      ...prev,
+      assessmentScopeItems: prev.assessmentScopeItems.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    }));
+  };
+
+  const removeScopeItem = (index: number) => {
+    setScopeInfo((prev) => ({
+      ...prev,
+      assessmentScopeItems: prev.assessmentScopeItems.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
+  const addConclusionItem = () => {
+    setConclusionInfo((prev) => ({ ...prev, conclusionItems: [...prev.conclusionItems, ""] }));
+  };
+
+  const updateConclusionItem = (index: number, value: string) => {
+    setConclusionInfo((prev) => ({
+      ...prev,
+      conclusionItems: prev.conclusionItems.map((item, itemIndex) => (itemIndex === index ? value : item)),
+    }));
+  };
+
+  const removeConclusionItem = (index: number) => {
+    setConclusionInfo((prev) => ({
+      ...prev,
+      conclusionItems: prev.conclusionItems.filter((_, itemIndex) => itemIndex !== index),
+    }));
+  };
+
+  const renderInput = (
+    label: string,
+    value: string,
+    onChange: (value: string) => void,
+    options?: { placeholder?: string; required?: boolean; type?: string; errorKey?: string },
+  ) => {
+    const isError = options?.required && touched[options?.errorKey || label] && !cleanText(value);
     return (
       <div className="space-y-2">
         <Label className={cn("text-xs font-semibold uppercase tracking-wider text-slate-400", isError && "text-red-400")}>
           {label}
         </Label>
-        <Textarea 
-          value={formData[fieldKey] as string || ""} 
-          onChange={(e) => setter(e.target.value)} 
-          placeholder={placeholder} 
+        <Input
+          type={options?.type || "text"}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={options?.placeholder}
           className={cn(
-            "min-h-[140px] bg-slate-900/50 border-slate-800 focus:border-cyan-500/50 focus:ring-cyan-500/20 text-slate-100 placeholder:text-slate-600 rounded-2xl transition-all",
-            isError && "border-red-500/50 focus:border-red-500 focus:ring-red-500/10 bg-red-950/10"
-          )} 
+            "h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600",
+            isError && "border-red-500/50 bg-red-950/10",
+          )}
         />
-        {isError ? (
-          <p className="text-xs font-medium text-red-500/90 font-semibold">Tehlike ve tedbir analizleri boş bırakılamaz.</p>
-        ) : helper ? (
-          <p className="text-xs text-slate-500 leading-normal">{helper}</p>
-        ) : null}
-      </div>
-    );
-  };
-
-  const renderSignatureCard = (role: SignatureRoleConfig) => {
-    const imageUrl = formData[role.key];
-    const signerName = cleanText(formData[role.nameKey]);
-    return (
-      <div key={role.key} className="rounded-[24px] border border-slate-800 bg-slate-900/40 p-5 shadow-[0_12px_28px_rgba(2,6,23,0.12)] transition hover:border-slate-800/80">
-        <div className="flex items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
-          <div className="space-y-1">
-            <p className="text-sm font-bold text-white">{role.subtitle}</p>
-            <p className="text-xs text-slate-400">{role.title}</p>
-          </div>
-          <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[10px] tracking-wider uppercase font-semibold", imageUrl ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-slate-800 bg-slate-950 text-slate-500")}>
-            {imageUrl ? "Hazır" : "Bekliyor"}
-          </Badge>
-        </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-[140px_1fr]">
-          <button 
-            type="button" 
-            onClick={() => imageUrl && setSignaturePreview({ title: role.title, imageUrl, field: role.key })} 
-            className="flex h-28 w-full items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-800 bg-slate-950/50 transition hover:border-slate-700/50 hover:bg-slate-950 disabled:cursor-default" 
-            disabled={!imageUrl}
-          >
-            {imageUrl ? (
-              <img src={imageUrl} alt={`${role.title} görseli`} className="h-full w-full object-contain p-2" />
-            ) : (
-              <div className="text-center space-y-2">
-                <FileSignature className="mx-auto h-5 w-5 text-slate-600" />
-                <span className="block text-[10px] text-slate-500">İmza Yok</span>
-              </div>
-            )}
-          </button>
-          <div className="flex flex-col justify-between space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs text-slate-500 leading-normal">{role.helper}</div>
-              {signerName ? (
-                <div className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-300">
-                  <Users className="h-3 w-3 text-cyan-400" />
-                  {signerName}
-                </div>
-              ) : (
-                <div className="text-xs font-semibold text-amber-500/90 inline-flex items-center gap-1">
-                  <Info className="h-3.5 w-3.5" /> Ad-soyad bilgisi girilmelidir.
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button type="button" size="sm" variant="outline" className="h-9 rounded-xl border-slate-800 bg-slate-900/50 text-slate-200 hover:bg-slate-900" onClick={() => signatureInputRefs.current[role.key]?.click()}>
-                <Upload className="mr-1.5 h-3.5 w-3.5" />Yükle
-              </Button>
-              {imageUrl && (
-                <>
-                  <Button type="button" size="sm" variant="outline" className="h-9 rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20" onClick={() => setSignaturePreview({ title: role.title, imageUrl, field: role.key })}>
-                    <FileSearch className="mr-1.5 h-3.5 w-3.5" />Büyüt
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-9 rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20" onClick={() => updateForm(role.key, null)}>
-                    <X className="mr-1.5 h-3.5 w-3.5" />Kaldır
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          <input ref={(node) => { signatureInputRefs.current[role.key] = node; }} type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => handleSignatureUpload(role.key, event)} />
-        </div>
+        {isError ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
       </div>
     );
   };
@@ -675,505 +1562,901 @@ export default function RiskAssessmentWizard() {
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-cyan-500/10 bg-cyan-500/5 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">1. Adım · İşyeri Temel Kaydı</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Yönetmeliğin 12. maddesi uyarınca raporda bulunması zorunlu olan unvan, adres ve işveren bilgilerini giriniz.</p>
-            </div>
-            
-            <div className="space-y-4">
-              {inputField("Rapor / Firma Başlığı *", "firmName", (v) => updateForm("firmName", v), "Örn: ABC Endüstri A.Ş. Risk Değerlendirme Raporu")}
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                {inputField("İşyeri Unvanı *", "workplaceTitle", (v) => updateForm("workplaceTitle", v), "Resmî işyeri unvanı")}
-                {inputField("İşveren Adı *", "employerName", (v) => updateForm("employerName", v), "İşveren veya yetkili vekil")}
-              </div>
-
-              {inputField("İşyeri Adresi *", "workplaceAddress", (v) => updateForm("workplaceAddress", v), "Sistemde kayıtlı açık adres")}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                {inputField("Bölüm / Departman", "department", (v) => updateForm("department", v), "Örn: Kaynakhane, Depolama Alanı")}
-                
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tehlike Sınıfı *</Label>
-                  <Select value={formData.hazardLevel} onValueChange={(value) => handleHazardLevelChange(value as HazardLevel)}>
-                    <SelectTrigger className="h-12 rounded-xl border-slate-800 bg-slate-900/50 text-white focus:ring-cyan-500/20 focus:border-cyan-500/50">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
-                      <SelectItem value="Az Tehlikeli">🟢 Az Tehlikeli</SelectItem>
-                      <SelectItem value="Tehlikeli">🟡 Tehlikeli</SelectItem>
-                      <SelectItem value="Çok Tehlikeli">🔴 Çok Tehlikeli</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">Adım 1</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Resmî kapak ve üst bilgi alanları için firma ve işyeri bilgilerini doldurun. Not alanı
+                opsiyoneldir; boş bırakılırsa çıktıda hiç görünmez.
+              </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 mt-2">
-              {(["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"] as HazardLevel[]).map((level) => {
-                const config = hazardConfig[level];
-                const isSelected = formData.hazardLevel === level;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => handleHazardLevelChange(level)}
-                    className={cn(
-                      "flex flex-col text-left p-4 rounded-2xl border transition-all",
-                      isSelected 
-                        ? cn("bg-slate-900 border-2", config.borderClass)
-                        : "border-slate-800 bg-slate-900/20 opacity-60 hover:opacity-100"
-                    )}
-                  >
-                    <span className="text-sm font-bold text-slate-100">{config.icon} {level}</span>
-                    <span className="mt-2 text-[11px] text-slate-400 leading-snug">{config.renewalLabel} yenileme</span>
-                  </button>
-                );
+            <div className="grid gap-4 md:grid-cols-2">
+              {renderInput("Firma Ünvanı *", companyInfo.companyTitle, (value) => updateCompanyInfo("companyTitle", value), {
+                placeholder: "Firma ünvanı",
+                required: true,
+                errorKey: "companyTitle",
               })}
+              {renderInput("İşyeri Sicil No", companyInfo.workplaceRegistryNo, (value) => updateCompanyInfo("workplaceRegistryNo", value), {
+                placeholder: "İşyeri sicil numarası",
+              })}
+              {renderInput("Adres", companyInfo.address, (value) => updateCompanyInfo("address", value), {
+                placeholder: "Açık adres",
+              })}
+              {renderInput("E-posta", companyInfo.email, (value) => updateCompanyInfo("email", value), {
+                placeholder: "E-posta adresi",
+                type: "email",
+              })}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tehlike Sınıfı *</Label>
+                <Select value={companyInfo.hazardClass} onValueChange={(value) => updateCompanyInfo("hazardClass", value as HazardClass)}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                    <SelectValue placeholder="Seçin" />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
+                    <SelectItem value="Az Tehlikeli">Az Tehlikeli</SelectItem>
+                    <SelectItem value="Tehlikeli">Tehlikeli</SelectItem>
+                    <SelectItem value="Çok Tehlikeli">Çok Tehlikeli</SelectItem>
+                  </SelectContent>
+                </Select>
+                {touched.companyTitle && !cleanText(companyInfo.hazardClass) ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
+              </div>
+              {renderInput("Çalışan Sayısı *", companyInfo.employeeCount, (value) => updateCompanyInfo("employeeCount", value), {
+                placeholder: "Çalışan sayısı",
+                required: true,
+                errorKey: "employeeCount",
+              })}
+              {renderInput("Değerlendirme Tarihi *", companyInfo.assessmentDate, (value) => updateCompanyInfo("assessmentDate", value), {
+                type: "date",
+                required: true,
+                errorKey: "assessmentDate",
+              })}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk Değerlendirme Yöntemi *</Label>
+                <Select value={companyInfo.riskMethod} onValueChange={(value) => updateCompanyInfo("riskMethod", value as RiskMethod)}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                    <SelectValue placeholder="Seçin" />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
+                    <SelectItem value="5x5 Matris">5x5 Matris</SelectItem>
+                    <SelectItem value="Fine-Kinney">Fine-Kinney</SelectItem>
+                    <SelectItem value="L Tipi Matris">L Tipi Matris</SelectItem>
+                    <SelectItem value="Diğer">Diğer</SelectItem>
+                  </SelectContent>
+                </Select>
+                {touched.riskMethod && !cleanText(companyInfo.riskMethod) ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
+              </div>
             </div>
 
-            <div className="space-y-3 pt-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Kurumsal Rapor Logosu</Label>
-              {formData.logo ? (
-                <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                  <img src={formData.logo} alt="Firma logosu" className="h-32 w-full rounded-xl object-contain bg-slate-900/30" />
-                  <Button type="button" size="icon" variant="outline" className="absolute right-6 top-6 rounded-lg border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20" onClick={() => updateForm("logo", null)}><X className="h-4 w-4" /></Button>
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Faaliyet Kapsamı *</Label>
+              <Textarea
+                value={companyInfo.activityScope}
+                onChange={(event) => updateCompanyInfo("activityScope", event.target.value)}
+                placeholder="Faaliyet kapsamını kısa ve net biçimde yazın"
+                className="min-h-[110px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Not</Label>
+              <Textarea
+                value={companyInfo.note}
+                onChange={(event) => updateCompanyInfo("note", event.target.value)}
+                placeholder="Opsiyonel not"
+                className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+              />
+              <p className="text-xs text-slate-500">Boş bırakılırsa çıktıda Not alanı hiç gösterilmez.</p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk Analizi Logosu</Label>
+                <p className="mt-1 text-xs text-slate-500">Logo eklerseniz PDF çıktısının üst bölümünde gösterilir.</p>
+              </div>
+              {logo ? (
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <img src={logo.dataUrl} alt={logo.name} className="h-20 w-40 rounded-xl bg-white object-contain p-3" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                      onClick={() => setLogo(null)}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Logoyu Kaldır
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-full rounded-2xl border border-dashed border-slate-800 bg-slate-900/10 p-8 text-center transition-colors hover:border-cyan-500/30 hover:bg-cyan-500/5">
-                  <Upload className="mx-auto h-7 w-7 text-cyan-400" />
-                  <p className="mt-3 text-sm font-semibold text-slate-200">Görsel Dosyası Seçin</p>
-                  <p className="mt-1 text-xs text-slate-500">PNG, JPG veya SVG · maks 2 MB</p>
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  className="w-full rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-8 text-center hover:border-cyan-500/30 hover:bg-cyan-500/5"
+                >
+                  <FileText className="mx-auto h-7 w-7 text-cyan-400" />
+                  <p className="mt-3 text-sm font-semibold text-slate-200">PNG veya JPG logo seçin</p>
+                  <p className="mt-1 text-xs text-slate-500">Maksimum 2 MB</p>
                 </button>
               )}
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg"
+                className="hidden"
+                onChange={handleLogoUpload}
+              />
             </div>
           </div>
         );
+
       case 1:
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">2. Adım · Atamalar ve İmzalar</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Ekip üyelerinin isimlerini ve resmî onay süreçleri için imza/kaşe görsellerini bu alandan yönetin.</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 2</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Bu bilgiler mevcut “İşyerine Ait Bilgiler ve Risk Değerlendirme Ekibi” bölümündeki ilgili
+                satırlara yazdırılır. Boş alanlar hücreyi boş bırakır.
+              </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-5 space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                {inputField("İşveren / İşveren Vekili Adı *", "employerRepresentativeName", (v) => updateForm("employerRepresentativeName", v), "Ad Soyad")}
-                {inputField("İş Güvenliği Uzmanı Adı *", "occupationalSafetySpecialistName", (v) => updateForm("occupationalSafetySpecialistName", v), "Ad Soyad")}
-                {inputField("İşyeri Hekimi Adı *", "workplaceDoctorName", (v) => updateForm("workplaceDoctorName", v), "Ad Soyad")}
-                {inputField("Çalışan Temsilcisi Adı *", "employeeRepresentativeName", (v) => updateForm("employeeRepresentativeName", v), "Ad Soyad")}
-                {inputField("Destek Elemanı Adı *", "supportPersonnelName", (v) => updateForm("supportPersonnelName", v), "Ad Soyad", "md:col-span-2")}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                <p className="text-sm font-bold text-white">İşveren</p>
+                {renderInput("Ad - Soyad", teamInfo.employer.fullName, (value) => updateTeamPerson("employer", "fullName", value), {
+                  placeholder: "İşveren ad soyad",
+                })}
+                {renderInput("T.C. Kimlik Numarası", teamInfo.employer.tcNo, (value) => updateTeamPerson("employer", "tcNo", value), {
+                  placeholder: "T.C. kimlik numarası",
+                })}
+                {renderInput("Telefon Numarası", teamInfo.employer.phone, (value) => updateTeamPerson("employer", "phone", value), {
+                  placeholder: "Telefon numarası",
+                })}
               </div>
-            </div>
 
-            <div className="space-y-3">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Rol Bazlı İmza & Onay Dosyaları</Label>
-              <div className="grid gap-4 md:grid-cols-2">
-                {signatureRoleConfigs.map(renderSignatureCard)}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                <p className="text-sm font-bold text-white">Çalışan Temsilcisi</p>
+                {renderInput("Ad - Soyad", teamInfo.employeeRepresentative.fullName, (value) => updateTeamPerson("employeeRepresentative", "fullName", value), {
+                  placeholder: "Çalışan temsilcisi ad soyad",
+                })}
+                {renderInput("T.C. Kimlik Numarası", teamInfo.employeeRepresentative.tcNo, (value) => updateTeamPerson("employeeRepresentative", "tcNo", value), {
+                  placeholder: "T.C. kimlik numarası",
+                })}
+                {renderInput("Telefon Numarası", teamInfo.employeeRepresentative.phone, (value) => updateTeamPerson("employeeRepresentative", "phone", value), {
+                  placeholder: "Telefon numarası",
+                })}
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                <p className="text-sm font-bold text-white">İş Güvenliği Uzmanı</p>
+                {renderInput("Ad - Soyad", teamInfo.safetyExpert.fullName, (value) => updateTeamPerson("safetyExpert", "fullName", value), {
+                  placeholder: "İş güvenliği uzmanı ad soyad",
+                })}
+                {renderInput("T.C. Kimlik Numarası", teamInfo.safetyExpert.tcNo, (value) => updateTeamPerson("safetyExpert", "tcNo", value), {
+                  placeholder: "T.C. kimlik numarası",
+                })}
+                {renderInput("Telefon Numarası", teamInfo.safetyExpert.phone, (value) => updateTeamPerson("safetyExpert", "phone", value), {
+                  placeholder: "Telefon numarası",
+                })}
+                {renderInput("Sertifika No", teamInfo.safetyExpert.certificateNo || "", (value) => updateTeamPerson("safetyExpert", "certificateNo", value), {
+                  placeholder: "Sertifika numarası",
+                })}
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                <p className="text-sm font-bold text-white">İşyeri Hekimi</p>
+                {renderInput("Ad - Soyad", teamInfo.workplaceDoctor.fullName, (value) => updateTeamPerson("workplaceDoctor", "fullName", value), {
+                  placeholder: "İşyeri hekimi ad soyad",
+                })}
+                {renderInput("T.C. Kimlik Numarası", teamInfo.workplaceDoctor.tcNo, (value) => updateTeamPerson("workplaceDoctor", "tcNo", value), {
+                  placeholder: "T.C. kimlik numarası",
+                })}
+                {renderInput("Telefon Numarası", teamInfo.workplaceDoctor.phone, (value) => updateTeamPerson("workplaceDoctor", "phone", value), {
+                  placeholder: "Telefon numarası",
+                })}
+                {renderInput("Sertifika No", teamInfo.workplaceDoctor.certificateNo || "", (value) => updateTeamPerson("workplaceDoctor", "certificateNo", value), {
+                  placeholder: "Sertifika numarası",
+                })}
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4 md:col-span-2">
+                <p className="text-sm font-bold text-white">OSGB</p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {renderInput("OSGB Unvanı", teamInfo.osgb.title, (value) => updateTeamOsgb("title", value), {
+                    placeholder: "OSGB unvanı",
+                  })}
+                  {renderInput("Telefon Numarası", teamInfo.osgb.phone, (value) => updateTeamOsgb("phone", value), {
+                    placeholder: "Telefon numarası",
+                  })}
+                  {renderInput("E-posta", teamInfo.osgb.email, (value) => updateTeamOsgb("email", value), {
+                    placeholder: "E-posta adresi",
+                    type: "email",
+                  })}
+                  {renderInput("Yetkili Kişi", teamInfo.osgb.authorizedPerson, (value) => updateTeamOsgb("authorizedPerson", value), {
+                    placeholder: "Yetkili kişi",
+                  })}
+                </div>
               </div>
             </div>
           </div>
         );
+
       case 2:
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">3. Adım · Metodoloji ve Takvim</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Raporun geçerlilik yapısını ve yasal yenileme periyotlarını tanımlayın.</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 3</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Değerlendirme kapsamını madde madde girin. Risk puanlama yöntemi bölümünde PDF’te her zaman sabit 5x5 tablo basılır.
+              </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk Değerlendirme Metodu *</Label>
-                <Select value={formData.method} onValueChange={(value) => updateForm("method", value as RiskMethod)}>
-                  <SelectTrigger className="h-12 rounded-xl border-slate-800 bg-slate-900/50 text-white focus:ring-cyan-500/20 focus:border-cyan-500/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
-                    {methodOptions.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Rapor Hazırlama Tarihi *</Label>
-                <Input type="date" value={formData.reportDate} onChange={(e) => handleReportDateChange(e.target.value)} className="h-12 rounded-xl border-slate-800 bg-slate-900/50 text-white focus:ring-cyan-500/20 focus:border-cyan-500/50 [color-scheme:dark]" />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Yasal Geçerlilik Bitiş Tarihi</Label>
-                <Input type="date" value={formData.validityDate} disabled className="h-12 cursor-not-allowed rounded-xl border-slate-850 bg-slate-950/80 text-slate-500 [color-scheme:dark]" />
-              </div>
-
-              <div className={cn("rounded-2xl border p-4 flex flex-col justify-center", hazardCfg.borderClass, hazardCfg.bgClass)}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Tehlike Sınıfı Yenileme Döngüsü</p>
-                <p className={cn("mt-1 text-sm font-bold", hazardCfg.textClass)}>{hazardCfg.renewalLabel} ({hazardCfg.years} Yıl)</p>
-                <p className="mt-1 text-xs text-slate-300 leading-snug">{hazardCfg.summary}</p>
-              </div>
+            <div className="flex items-center gap-3">
+              <Button type="button" onClick={addScopeItem} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Kapsam Maddesi Ekle
+              </Button>
             </div>
 
-            {textField("Yenileme ve Kapsam Notları", "renewalTriggersNote", (v) => updateForm("renewalTriggersNote", v), "Raporun olağan dışı hangi durumlarda kısmen veya tamamen revize edileceğini belirtiniz.")}
+            <div className="space-y-4">
+              {scopeInfo.assessmentScopeItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                  Henüz kapsam maddesi eklenmedi.
+                </div>
+              ) : (
+                scopeInfo.assessmentScopeItems.map((item, index) => (
+                  <div key={`scope-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge className="rounded-full border border-slate-800 bg-slate-950 text-slate-300">Kapsam Maddesi #{index + 1}</Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        onClick={() => removeScopeItem(index)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Sil
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={item}
+                      onChange={(event) => updateScopeItem(index, event.target.value)}
+                      placeholder="Değerlendirme kapsamı maddesi"
+                      className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Değerlendirilen Bölümler / Faaliyetler
+              </Label>
+              <Textarea
+                value={scopeInfo.evaluatedSections}
+                onChange={(event) => updateScopeInfo("evaluatedSections", event.target.value)}
+                placeholder="Örn: Üretim hattı, depo, sevkiyat alanı"
+                className="min-h-[100px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+              />
+            </div>
+            <Card className="border-slate-800 bg-slate-950/40">
+              <CardHeader>
+                <CardTitle className="text-sm text-white">PDF’te Sabit Görünecek Risk Puanlama Metodu</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Kapakta seçtiğiniz yöntem yazmaya devam eder; ancak resmi şablon gereği bu raporda sabit 5x5 puanlama açıklaması ve tablosu kullanılır.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-slate-300 leading-relaxed">
+                {FIXED_METHOD_DESCRIPTION}
+              </CardContent>
+            </Card>
           </div>
         );
+
       case 3:
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-rose-500/10 bg-rose-500/5 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-400">4. Adım · Risk ve Tehlike Matrisi</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300 font-medium">İşyerinde tespit edilen birincil tehlike kaynaklarını ve bu kaynakların yol açabileceği potansiyel tehlikeleri giriniz.</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-rose-400">Adım 4</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Risk tablosu yalnızca eklediğiniz veya aktardığınız satırlar kadar oluşturulur. Boş şablon satırı
+                basılmaz.
+              </p>
             </div>
 
-            {textField("Tehlike Kaynakları *", "hazardSources", (v) => updateForm("hazardSources", v), "Örn: Yüksekte çalışma, elektrik tesisatı, kimyasal depolama alanları, ergonomik risk etmenleri...")}
-            {textField("Doğabilecek Yasal Riskler *", "identifiedRisks", (v) => updateForm("identifiedRisks", v), "Örn: Düşme sonucu yaralanma, elektrik şoku, solvent maruziyeti bağlı meslek hastalıkları...")}
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" onClick={addRiskItem} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Manuel Risk Maddesi Ekle
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setRiskTemplateDialogOpen(true)}
+                className="rounded-xl border-amber-500/20 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+              >
+                {exportingWord ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                Risk Şablonundan Ekle
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!importAssessmentId || importingRiskItems}
+                onClick={importRiskItemsFromAssessment}
+                className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+              >
+                {importingRiskItems ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                RiskAssessmentEditor Maddelerini Aktar
+              </Button>
+            </div>
+            {!importAssessmentId ? (
+              <p className="text-xs text-slate-500">
+                Editörden aktarım için wizard bu sayfaya bir assessmentId ile açılmalıdır.
+              </p>
+            ) : null}
+
+            <div className="space-y-4">
+              {riskItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                  Henüz risk maddesi eklenmedi. İsterseniz manuel satır ekleyin veya mevcut editör risklerini aktarın.
+                </div>
+              ) : (
+                riskItems.map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge className="rounded-full border border-slate-800 bg-slate-950 text-slate-300">Risk Maddesi #{item.no}</Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        onClick={() => removeRiskItem(item.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Sil
+                      </Button>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {renderInput("Bölüm / Faaliyet", item.departmentActivity, (value) => updateRiskItem(item.id, "departmentActivity", value))}
+                      {renderInput("Tehlike Kaynağı", item.hazardSource, (value) => updateRiskItem(item.id, "hazardSource", value))}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk / Olası Sonuç</Label>
+                        <Textarea
+                          value={item.riskConsequence}
+                          onChange={(event) => updateRiskItem(item.id, "riskConsequence", event.target.value)}
+                          className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Etkilenenler</Label>
+                        <Textarea
+                          value={item.affectedPeople}
+                          onChange={(event) => updateRiskItem(item.id, "affectedPeople", event.target.value)}
+                          className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Mevcut Önlem</Label>
+                        <Textarea
+                          value={item.currentMeasure}
+                          onChange={(event) => updateRiskItem(item.id, "currentMeasure", event.target.value)}
+                          className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          Alınacak İlave Önlemler
+                        </Label>
+                        <Textarea
+                          value={item.additionalMeasures}
+                          onChange={(event) => updateRiskItem(item.id, "additionalMeasures", event.target.value)}
+                          className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-5">
+                      {renderInput("O", item.probability, (value) => updateRiskItem(item.id, "probability", value), { type: "number" })}
+                      {renderInput("Ş", item.severity, (value) => updateRiskItem(item.id, "severity", value), { type: "number" })}
+                      {renderInput("R", item.riskScore, (value) => updateRiskItem(item.id, "riskScore", value), { type: "number" })}
+                      {renderInput("Düzey", item.riskLevel, (value) => updateRiskItem(item.id, "riskLevel", value))}
+                      {renderInput("Termin", item.deadline, (value) => updateRiskItem(item.id, "deadline", value), { type: "date" })}
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {renderInput("Sorumlu", item.responsible, (value) => updateRiskItem(item.id, "responsible", value))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         );
+
       case 4:
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/5 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">5. Adım · Önleyici Eylem Planı</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Tehlikelerin bertaraf edilmesi için uygulanacak düzeltici-önleyici tedbirleri ve sorumluları bağlayın.</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">Adım 5</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Faaliyet planı tablosu yalnızca eklediğiniz satırlardan oluşur. Boş satırlar çıktıdan tamamen çıkarılır.
+              </p>
             </div>
 
-            {textField("Kararlaştırılan Tedbirler *", "controlMeasures", (v) => updateForm("controlMeasures", v), "Örn: Yaşam hatlarının çekilmesi, periyodik kontrol takipleri, kişisel koruyucu donanım (KKD) temini...")}
-            {textField("Sorumlu Kadro & Departmanlar *", "responsiblePersons", (v) => updateForm("responsiblePersons", v), "Örn: Bakım Onarım Müdürü, İSG Sorumlusu, İlgili Postabaşı...")}
-            {textField("Mevzuat Referansları ve Notlar", "legislationNotes", (v) => updateForm("legislationNotes", v), "6331 Sayılı Kanun, Yapı İşlerinde İSG Yönetmeliği vb. standart referansları ekleyebilirsiniz.")}
+            <div className="flex items-center gap-3">
+              <Button type="button" onClick={addCorrectiveAction} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Faaliyet Ekle
+              </Button>
+            </div>
+
+            {correctiveActions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                Henüz faaliyet eklenmedi. İsterseniz bu adımı boş bırakabilirsiniz.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {correctiveActions.map((item) => (
+                  <div key={item.id} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge className="rounded-full border border-slate-800 bg-slate-950 text-slate-300">Faaliyet #{item.no}</Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        onClick={() => removeCorrectiveAction(item.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Sil
+                      </Button>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {renderInput("Tespit / Risk", item.finding, (value) => updateCorrectiveAction(item.id, "finding", value))}
+                      {renderInput("Yapılacak Faaliyet", item.action, (value) => updateCorrectiveAction(item.id, "action", value))}
+                      {renderInput("Sorumlu", item.responsible, (value) => updateCorrectiveAction(item.id, "responsible", value))}
+                      {renderInput("Termin", item.deadline, (value) => updateCorrectiveAction(item.id, "deadline", value), { type: "date" })}
+                      {renderInput("Durum", item.status, (value) => updateCorrectiveAction(item.id, "status", value))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
+
+      case 5:
+        return (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 6</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Genel sonuç maddelerini ekleyin ve imza satırlarını ekip üyelerinden otomatik oluşturun veya elle yönetin.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button type="button" onClick={addConclusionItem} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <Plus className="mr-2 h-4 w-4" />
+                Sonuç Maddesi Ekle
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              {conclusionInfo.conclusionItems.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                  Henüz sonuç maddesi eklenmedi.
+                </div>
+              ) : (
+                conclusionInfo.conclusionItems.map((item, index) => (
+                  <div key={`conclusion-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Badge className="rounded-full border border-slate-800 bg-slate-950 text-slate-300">Sonuç Maddesi #{index + 1}</Badge>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        onClick={() => removeConclusionItem(index)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Sil
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={item}
+                      onChange={(event) => updateConclusionItem(index, event.target.value)}
+                      placeholder="Genel sonuç / onay maddesi"
+                      className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Onay Notu</Label>
+              <Textarea
+                value={conclusionInfo.approvalNote}
+                onChange={(event) => updateConclusionInfo("approvalNote", event.target.value)}
+                className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-3">
+              {renderInput("Hazırlayan", conclusionInfo.preparedBy, (value) => updateConclusionInfo("preparedBy", value))}
+              {renderInput("Onaylayan", conclusionInfo.approvedBy, (value) => updateConclusionInfo("approvedBy", value))}
+              {renderInput("İmza Tarihi", conclusionInfo.signatureDate, (value) => updateConclusionInfo("signatureDate", value), { type: "date" })}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20" onClick={regenerateSignaturesFromTeam}>
+                <Users className="mr-2 h-4 w-4" />
+                Ekipten Otomatik Doldur
+              </Button>
+              <Button type="button" onClick={addSignatureRow} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <Plus className="mr-2 h-4 w-4" />
+                İmza Satırı Ekle
+              </Button>
+            </div>
+
+            {previewSignatureRows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                Henüz imza satırı eklenmedi.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {previewSignatureRows.map((row) => (
+                  <div key={row.id} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto]">
+                    {renderInput("Adı Soyadı", row.fullName, (value) => updateSignatureRow(row.id, "fullName", value))}
+                    {renderInput("Görevi", row.role, (value) => updateSignatureRow(row.id, "role", value))}
+                    {renderInput("Belge / İletişim Bilgisi", row.documentOrContact, (value) => updateSignatureRow(row.id, "documentOrContact", value))}
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                        onClick={() => removeSignatureRow(row.id)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Sil
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+
       default:
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">6. Adım · Resmî Önizleme</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">Oluşturulacak yasal belgenin sayfa düzenini ve onay tablosunu kontrol edin. Her şey hazırsa kaydı tamamlayın.</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 7</p>
+              <p className="mt-2 text-sm leading-relaxed text-slate-300">
+                Resmî şablondaki bölüm sırasına göre oluşturulacak rapor özetini kontrol edin.
+              </p>
             </div>
-            
-            <div className="grid gap-5 lg:grid-cols-[1.25fr_0.75fr]">
-              <Card className="border-slate-800 bg-slate-950 shadow-inner overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="rounded-xl border border-slate-200 bg-white p-5 text-slate-900">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shrink-0">
-                          {formData.logo ? <img src={formData.logo} alt="Logo" className="h-full w-full object-contain" /> : <FileText className="h-5 w-5 text-slate-400" />}
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Yönetmelik Uyumlu Risk Değerlendirmesi</p>
-                          <p className="text-base font-black text-slate-900">{brandedCompanyName}</p>
-                          <p className="text-xs text-slate-500 font-semibold">{formData.workplaceTitle || "İşyeri Ünvanı Eksik"}</p>
-                        </div>
-                      </div>
-                      <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-2.5 text-left sm:text-right shrink-0">
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Geçerlilik</p>
-                        <p className="text-xs font-bold text-slate-800">{formatDisplayDate(formData.validityDate)}</p>
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-2">Döngü</p>
-                        <p className="text-xs font-bold text-slate-800">{formData.hazardLevel}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4 mt-4">
-                      <div className="border border-slate-200 rounded-lg overflow-hidden text-xs">
-                        <div className="grid grid-cols-[140px_1fr] border-b border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-700">
-                          <div>PARAMETRE</div>
-                          <div>İŞYERİ BİLGİSİ</div>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {[
-                            ["İşyeri Unvanı", formData.workplaceTitle],
-                            ["İşveren Yetkili", formData.employerName],
-                            ["Açık Adres", formData.workplaceAddress],
-                            ["Bölüm / Alan", formData.department]
-                          ].map(([label, val]) => (
-                            <div key={label} className="grid grid-cols-[140px_1fr] px-3 py-2">
-                              <span className="font-semibold text-slate-500">{label}</span>
-                              <span className="text-slate-800">{val || "-"}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
 
-                      <div className="border border-slate-200 rounded-lg overflow-hidden text-[11px]">
-                        <div className="grid grid-cols-[140px_1fr_100px] border-b border-slate-200 bg-slate-50 px-3 py-2 font-bold text-slate-700">
-                          <div>EKİP ROLÜ</div>
-                          <div>AD SOYAD</div>
-                          <div className="text-center">İRE / ONAY</div>
-                        </div>
-                        <div className="divide-y divide-slate-100">
-                          {signatureRoleConfigs.map((role) => (
-                            <div key={role.key} className="grid grid-cols-[140px_1fr_100px] px-3 py-2 items-center">
-                              <div className="font-semibold text-slate-700">{role.subtitle}</div>
-                              <div className="text-slate-600 truncate">{cleanText(formData[role.nameKey]) || "-"}</div>
-                              <div className="flex justify-center">
-                                {formData[role.key] ? (
-                                  <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 text-[9px] hover:bg-emerald-50 shrink-0">ONAYLI</Badge>
-                                ) : (
-                                  <Badge className="border-amber-200 bg-amber-50 text-amber-700 text-[9px] hover:bg-amber-50 shrink-0">BEKLİYOR</Badge>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <div className="space-y-4">
-                <Card className="border-slate-850 bg-slate-900/30">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-xs uppercase tracking-wider text-slate-400">Yasal Uyum Raporu</CardTitle>
-                    <CardDescription className="text-xs text-slate-500">Raporun yasal geçerlilik durumu:</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {[
-                      ["Üst Bilgi Blokları", cleanText(formData.firmName) && cleanText(formData.workplaceTitle) && cleanText(formData.employerName)],
-                      ["Ekip Kadrosu", cleanText(formData.employerRepresentativeName) && cleanText(formData.occupationalSafetySpecialistName) && cleanText(formData.workplaceDoctorName)],
-                      ["Matris ve Çözüm Notları", cleanText(formData.hazardSources) && cleanText(formData.controlMeasures)]
-                    ].map(([label, ok]) => (
-                      <div key={label as string} className="flex items-center justify-between rounded-xl bg-slate-950/50 border border-slate-850 px-3.5 py-2 text-xs text-slate-200">
-                        <span>{label}</span>
-                        <Badge className={cn("rounded-full border text-[10px] font-semibold tracking-wide", ok ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-400")}>
-                          {ok ? "TAMAM" : "EKSİK"}
-                        </Badge>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                <Button type="button" onClick={generatePDFPreview} className="w-full h-12 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-bold shadow-lg shadow-violet-600/10 transition-all border-none">
-                  <Download className="mr-2 h-4 w-4" /> PDF Olarak İndir
-                </Button>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {[
+                ["Firma Ünvanı", companyInfo.companyTitle || "Belirtilmedi"],
+                ["Tehlike Sınıfı", companyInfo.hazardClass || "Belirtilmedi"],
+                ["Çalışan Sayısı", companyInfo.employeeCount || "Belirtilmedi"],
+                ["Faaliyet Kapsamı", companyInfo.activityScope || "Belirtilmedi"],
+                ["Değerlendirme Tarihi", formatDisplayDate(companyInfo.assessmentDate)],
+                ["Risk Değerlendirme Yöntemi", companyInfo.riskMethod || "Belirtilmedi"],
+                ["Risk Madde Sayısı", String(previewRiskItems.length)],
+                ["DÖF / Faaliyet Planı Sayısı", String(previewActions.length)],
+                ["İmza Satırı Sayısı", String(previewSignatureRows.length)],
+                ["Not", cleanText(companyInfo.note) ? "Var" : "Yok"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+                  <p className="mt-2 text-sm font-bold text-slate-100 break-words">{value}</p>
+                </div>
+              ))}
             </div>
+
+            <Card className="border-slate-800 bg-slate-950/50">
+              <CardHeader>
+                <CardTitle className="text-base text-white">Word Şablonu Durumu</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Resmî şablon dosyası erişimi kontrol edildi. Şablon bulunduğunda resmi Word çıktısı aynı veri setiyle indirilebilir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-slate-300">
+                <div className="flex items-center gap-2">
+                  <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[10px] font-semibold", wordTemplateAvailable ? "border-amber-500/20 bg-amber-500/10 text-amber-400" : "border-red-500/20 bg-red-500/10 text-red-400")}>
+                    {checkingTemplate ? "Kontrol ediliyor" : wordTemplateAvailable ? "Şablon bulundu" : "Şablon erişilemedi"}
+                  </Badge>
+                  <span>{wordTemplateAvailable ? "Word şablonu indirilmeye hazır." : "Word şablon dosyasına erişilemiyor."}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
     }
   };
 
   return (
-    <>
-      <div className="theme-page-readable space-y-8">
-        <section className="overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950 p-6 md:p-8 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-          <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr] items-center">
-            <div className="space-y-4">
-              <Badge className="rounded-full border border-slate-800 bg-slate-900 text-slate-300 font-semibold px-3 py-1 text-xs">
-                Yönetmelik Uyum Sihirbazı
-              </Badge>
-              <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
-                Standartlara uygun risk değerlendirme raporu hazırlayın
-              </h1>
-              <p className="text-sm leading-relaxed text-slate-400 max-w-2xl">
-                Bu sihirbaz, yasal zorunluluklara uygun şekilde işyeri bilgilerini, ekip kadrolarını, analiz metotlarını, tehlike kaynaklarını ve imza matrisini adım adım bir araya getirir.
-              </p>
-            </div>
-            
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">Aktif Rapor Süreci</span>
-                <Badge className={cn("rounded-full border px-2.5 py-0.5 text-[10px] tracking-wide uppercase font-semibold", pdfReady ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-400")}>
-                  {pdfReady ? "Hazır" : "Taslak"}
-                </Badge>
-              </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-slate-900">
-                <div className="h-full rounded-full bg-cyan-500 transition-all duration-300" style={{ width: `${completionRatio}%` }} />
-              </div>
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>İlerleme Oranı</span>
-                <span className="font-bold text-white">%{Math.round(completionRatio)}</span>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-          <Card className="border-slate-850 bg-slate-950/80 shadow-2xl rounded-[28px] overflow-hidden">
-            <CardContent className="space-y-6 p-6">
-              <div className="grid gap-3 grid-cols-2 md:grid-cols-3">
-                {steps.map((step, index) => {
-                  const isActive = index === currentStep;
-                  const isCompleted = index < currentStep;
-                  const progressPercent = Math.round((stepCompletionCounts[index].completed / stepCompletionCounts[index].total) * 100);
-                  return (
-                    <button
-                      key={step.id}
-                      type="button"
-                      onClick={() => {
-                        if (index <= currentStep) {
-                          setCurrentStep(index);
-                        } else {
-                          const check = isStepValid(currentStep);
-                          if (!check.valid) {
-                            toast.error(check.message);
-                          } else {
-                            setCurrentStep(index);
-                          }
-                        }
-                      }}
-                      className={cn(
-                        "rounded-xl border p-3 text-left transition-all relative overflow-hidden",
-                        isActive && "border-cyan-500/30 bg-cyan-500/5",
-                        isCompleted && "border-slate-800 bg-slate-900/30",
-                        !isActive && !isCompleted && "border-slate-800 bg-slate-950 hover:bg-slate-900/40"
-                      )}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "flex h-7 w-7 items-center justify-center rounded-lg border text-xs", 
-                          isActive && "border-cyan-500/30 bg-cyan-500/10 text-cyan-400", 
-                          isCompleted && "border-emerald-500/20 bg-emerald-500/10 text-emerald-400", 
-                          !isActive && !isCompleted && "border-slate-800 bg-slate-900 text-slate-400"
-                        )}>
-                          {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.icon}
-                        </div>
-                        <span className="text-[11px] font-bold text-slate-100 truncate">{step.label}</span>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-[10px] text-slate-500">
-                        <span>Tamamlanan</span>
-                        <span className="font-bold text-slate-300">{stepCompletionCounts[index].completed}/{stepCompletionCounts[index].total}</span>
-                      </div>
-                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-slate-900">
-                        <div className={cn("h-full rounded-full transition-all", isCompleted && "bg-emerald-400", isActive && "bg-cyan-500", !isActive && !isCompleted && "bg-slate-800")} style={{ width: `${progressPercent}%` }} />
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="rounded-2xl border border-slate-850 bg-slate-900/20 p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-bold text-white">{currentStepConfig.title}</h3>
-                  <p className="text-xs text-slate-400 mt-1">{currentStepConfig.description}</p>
-                </div>
-                {renderStepContent()}
-              </div>
-
-              <div className="flex flex-col gap-3 border-t border-slate-850 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => handleStepNavigation("prev")} 
-                  disabled={currentStep === 0} 
-                  className="rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 hover:bg-slate-900"
-                >
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Geri
-                </Button>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={resetWizardDraft} 
-                    disabled={submitting} 
-                    className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  >
-                    <X className="mr-2 h-4 w-4" /> Taslağı Temizle
-                  </Button>
-                  <Button 
-                    type="button" 
-                    onClick={currentStep === steps.length - 1 ? handleSubmit : () => handleStepNavigation("next")} 
-                    disabled={submitting} 
-                    className="rounded-xl bg-violet-650 text-white hover:bg-violet-700 font-bold border-none transition-all shadow-md active:scale-95"
-                  >
-                    {submitting ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Editör Hazırlanıyor...</>
-                    ) : currentStep === steps.length - 1 ? (
-                      <><FilePenLine className="mr-2 h-4 w-4" /> Kaydet ve Editöre Geç</>
-                    ) : (
-                      <span className="flex items-center text-white">İleri <ChevronRight className="ml-2 h-4 w-4" /></span>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
+    <div className="theme-page-readable space-y-8">
+      <section className="overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950 p-6 md:p-8 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
+        <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr] items-center">
           <div className="space-y-4">
-            <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
-              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Rapor Kimliği</p>
-              <div className="mt-4 space-y-3">
-                {[
-                  ["Yasal Unvan", formData.workplaceTitle || "Henüz Belirtilmedi"],
-                  ["İSG Değerlendirme Yöntemi", formData.method],
-                  ["Yasal Süre Sonu", formData.validityDate ? formatDisplayDate(formData.validityDate) : "Otomatik Hesaplanacak"],
-                  ["Yenileme Tipi", formData.hazardLevel]
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl border border-slate-850/80 bg-slate-900/10 p-3.5">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
-                    <p className="mt-1 text-sm font-bold text-slate-100 truncate">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <Badge className="rounded-full border border-slate-800 bg-slate-900 text-slate-300 font-semibold px-3 py-1 text-xs">
+              Resmî Risk Analizi Sihirbazı
+            </Badge>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
+              Resmî şablona uygun risk değerlendirme raporu oluşturun
+            </h1>
+            <p className="text-sm leading-relaxed text-slate-400 max-w-2xl">
+              Bu sihirbaz, <code className="rounded bg-slate-900 px-1.5 py-0.5 text-slate-200">Risk_Analizi.docx</code>
+              şablonundaki bölüm sırasını baz alır. Risk ve faaliyet tabloları yalnızca eklediğiniz satırlar kadar üretilir.
+            </p>
+          </div>
 
-            <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
-              <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Resmî Kapsam Notu</p>
-              <div className="mt-4 space-y-3 text-xs leading-relaxed text-slate-400">
-                <div className="rounded-xl bg-slate-900/10 border border-slate-850 p-4 space-y-1">
-                  <p className="font-bold text-slate-200">İşyeri ve Kurul Kadrosu</p>
-                  <p>Mevzuat uyarınca işveren, İSG uzmanı, hekim, temsilci ve destek elemanı atama yazıları PDF tablosuna otomatik yansıtılır.</p>
-                </div>
-                <div className="rounded-xl bg-slate-900/10 border border-slate-850 p-4 space-y-1">
-                  <p className="font-bold text-slate-200">Kaza ve Revizyon Notu</p>
-                  <p>İş kazası, proses veya ekipman değişikliği gibi acil durumlarda raporun revize edilmesi gerektiği uyarısı otomatik basılır.</p>
-                </div>
-              </div>
-            </Card>
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">İlerleme</span>
+              <Badge className="rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 text-[10px] font-semibold">
+                %{Math.round(progressRatio)}
+              </Badge>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-slate-900">
+              <div className="h-full rounded-full bg-cyan-500 transition-all duration-300" style={{ width: `${progressRatio}%` }} />
+            </div>
+            <p className="text-xs text-slate-400">
+              Zorunlu alanlar tamamlandığında PDF veya Word çıktısı oluşturabilirsiniz.
+            </p>
           </div>
         </div>
-      </div>
-      
-      <Dialog open={Boolean(signaturePreview)} onOpenChange={(open) => !open && setSignaturePreview(null)}>
-        <DialogContent className="max-w-3xl border-slate-800 bg-slate-950 text-white rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-base font-black">{signaturePreview?.title || "İmza Görseli"}</DialogTitle>
-          </DialogHeader>
-          {signaturePreview && (
-            <div className="space-y-4">
-              <div className="flex h-80 items-center justify-center rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
-                <img src={signaturePreview.imageUrl} alt={signaturePreview.title} className="max-h-full max-w-full object-contain" />
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
+        <Card className="border-slate-850 bg-slate-950/80 shadow-2xl rounded-[28px] overflow-hidden">
+          <CardContent className="space-y-6 p-6">
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+              {WIZARD_STEPS.map((step, index) => {
+                const isActive = index === currentStep;
+                const isCompleted = index < currentStep;
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => {
+                      if (index <= currentStep) {
+                        setCurrentStep(index);
+                        return;
+                      }
+                      const validation = isStepValid(currentStep);
+                      if (!validation.valid) {
+                        REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
+                        toast.error(validation.message);
+                        return;
+                      }
+                      setCurrentStep(index);
+                    }}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-all",
+                      isActive && "border-cyan-500/30 bg-cyan-500/5",
+                      isCompleted && "border-slate-800 bg-slate-900/30",
+                      !isActive && !isCompleted && "border-slate-800 bg-slate-950 hover:bg-slate-900/40",
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "flex h-7 w-7 items-center justify-center rounded-lg border text-xs",
+                          isActive && "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
+                          isCompleted && "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+                          !isActive && !isCompleted && "border-slate-800 bg-slate-900 text-slate-400",
+                        )}
+                      >
+                        {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.icon}
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-100 truncate">{step.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="rounded-2xl border border-slate-850 bg-slate-900/20 p-6">
+              <div className="mb-4">
+                <h3 className="text-lg font-bold text-white">{WIZARD_STEPS[currentStep].title}</h3>
+                <p className="text-xs text-slate-400 mt-1">{WIZARD_STEPS[currentStep].description}</p>
               </div>
-              <div className="flex flex-wrap gap-2 justify-end">
+              {renderStepContent()}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-850 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrev}
+                disabled={currentStep === 0}
+                className="rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 hover:bg-slate-900"
+              >
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                Geri
+              </Button>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-xl border-slate-800 bg-slate-900 text-slate-200 hover:bg-slate-900"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = signaturePreview.imageUrl;
-                    link.download = `${asciiSlug(signaturePreview.title)}-signature.png`;
-                    link.click();
-                  }}
-                >
-                  <Download className="mr-2 h-4 w-4" /> İndir
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
-                  onClick={() => {
-                    signatureInputRefs.current[signaturePreview.field]?.click();
-                    setSignaturePreview(null);
-                  }}
-                >
-                  <Upload className="mr-2 h-4 w-4" /> Değiştir
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
+                  onClick={resetWizard}
                   className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  onClick={() => {
-                    updateForm(signaturePreview.field, null);
-                    setSignaturePreview(null);
-                  }}
                 >
-                  <X className="mr-2 h-4 w-4" /> Kaldır
+                  <X className="mr-2 h-4 w-4" />
+                  Taslağı Temizle
                 </Button>
+                {currentStep < WIZARD_STEPS.length - 1 ? (
+                  <Button type="button" onClick={handleNext} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                    İleri
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : null}
               </div>
             </div>
-          )}
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
+            <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Özet</p>
+            <div className="mt-4 space-y-3">
+              {[
+                ["Firma Ünvanı", companyInfo.companyTitle || "Belirtilmedi"],
+                ["Risk Yöntemi", companyInfo.riskMethod || "Belirtilmedi"],
+                ["Risk Madde Sayısı", String(previewRiskItems.length)],
+                ["Faaliyet Sayısı", String(previewActions.length)],
+                ["İmza Satırı", String(previewSignatureRows.length)],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-850/80 bg-slate-900/10 p-3.5">
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
+                  <p className="mt-1 text-sm font-bold text-slate-100">{value}</p>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
+            <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Rapor Çıktıları</p>
+            <div className="mt-4 space-y-3">
+              <Button
+                type="button"
+                onClick={handleSaveDraft}
+                variant="outline"
+                className="w-full rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 hover:bg-slate-900"
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Taslak Kaydet
+              </Button>
+              <Button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                className="w-full rounded-xl bg-violet-600 text-white hover:bg-violet-700"
+              >
+                {exportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                Risk Değerlendirme Raporu Oluştur
+              </Button>
+              <Button
+                type="button"
+                onClick={handleWordDownload}
+                disabled={!wordTemplateAvailable || checkingTemplate || exportingWord}
+                variant="outline"
+                className="w-full rounded-xl border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-60"
+              >
+                <FileDown className="mr-2 h-4 w-4" />
+                Word Olarak İndir
+              </Button>
+              <Button
+                type="button"
+                onClick={handleExportPdf}
+                disabled={exportingPdf}
+                variant="outline"
+                className="w-full rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                PDF İndir
+              </Button>
+            </div>
+          </Card>
+
+          <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
+            <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Bilgilendirme</p>
+            <div className="mt-4 space-y-3 text-xs leading-relaxed text-slate-400">
+              <div className="rounded-xl border border-slate-850 bg-slate-900/10 p-4">
+                <p className="font-bold text-slate-200">Boş Not Alanı Gizlenir</p>
+                <p className="mt-1">Not boş bırakılırsa kapakta “Not:” etiketi ve ilgili boşluk hiç oluşturulmaz.</p>
+              </div>
+              <div className="rounded-xl border border-slate-850 bg-slate-900/10 p-4">
+                <p className="font-bold text-slate-200">Dinamik Tablo Satırları</p>
+                <p className="mt-1">
+                  Risk tablosu ve faaliyet planı, yalnızca eklediğiniz satırlar kadar üretilir; boş satır basılmaz.
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-850 bg-slate-900/10 p-4">
+                <p className="font-bold text-slate-200">Word Şablonu</p>
+                <p className="mt-1">
+                  DOCX şablonu bulunduğunda resmi Word çıktısı aynı veri setiyle indirilebilir. PDF çıktısı resmi bölüm sırasına göre çalışmaya devam eder.
+
+                </p>
+              </div>
+              <div className="inline-flex items-start gap-2 rounded-xl border border-cyan-500/10 bg-cyan-500/5 p-3 text-cyan-200">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>RiskAssessmentEditor maddeleri yalnızca assessmentId sağlanmışsa bu wizard’a aktarılabilir.</span>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      <Dialog open={riskTemplateDialogOpen} onOpenChange={setRiskTemplateDialogOpen}>
+        <DialogContent className="max-w-3xl border-slate-800 bg-slate-950 text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Risk Şablonları</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Kayıtlı risk şablonlarından birini tek tıkla Risk Değerlendirme Tablosu’na aktarın.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
+            {!profile?.organization_id ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                Risk şablonlarını kullanmak için organizasyon bilgisi bulunmalıdır.
+              </div>
+            ) : loadingRiskTemplates ? (
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-300">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Şablonlar yükleniyor...
+                </div>
+              </div>
+            ) : riskTemplates.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-sm text-slate-400">
+                Kayıtlı risk şablonu bulunamadı.
+              </div>
+            ) : (
+              riskTemplates.map((template) => {
+                const itemCount = Array.isArray(template.payload?.items) ? template.payload.items.length : 0;
+                return (
+                  <div key={template.id} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div className="space-y-2">
+                        <p className="text-sm font-bold text-white">{template.name}</p>
+                        <div className="flex flex-wrap gap-2 text-xs text-slate-400">
+                          {template.sector ? (
+                            <Badge className="rounded-full border border-slate-700 bg-slate-900 text-slate-300">
+                              {template.sector}
+                            </Badge>
+                          ) : null}
+                          <Badge className="rounded-full border border-slate-700 bg-slate-900 text-slate-300">
+                            {template.method || "Yöntem belirtilmedi"}
+                          </Badge>
+                          <Badge className="rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
+                            {itemCount} risk maddesi
+                          </Badge>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => applyRiskTemplateToWizard(template)}
+                        className="rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400"
+                      >
+                        Tabloya Ekle
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

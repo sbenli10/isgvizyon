@@ -2680,6 +2680,7 @@ export type Database = {
           hazard_sources: string | null
           id: string
           identified_risks: string | null
+          informed_employee_name: string | null
           is_deleted: boolean | null
           legislation_notes: string | null
           method: string | null
@@ -2689,6 +2690,9 @@ export type Database = {
           occupational_safety_specialist_signed_at: string | null
           occupational_safety_specialist_approval_status: string | null
           occupational_safety_specialist_name: string | null
+          risk_assessment_logo_data_url: string | null
+          risk_assessment_logo_name: string | null
+          risk_assessment_logo_type: string | null
           reviewer_name: string | null
           renewal_triggers_note: string | null
           responsible_persons: string | null
@@ -2729,6 +2733,7 @@ export type Database = {
           hazard_sources?: string | null
           id?: string
           identified_risks?: string | null
+          informed_employee_name?: string | null
           is_deleted?: boolean | null
           legislation_notes?: string | null
           method?: string | null
@@ -2738,6 +2743,9 @@ export type Database = {
           occupational_safety_specialist_signed_at?: string | null
           occupational_safety_specialist_approval_status?: string | null
           occupational_safety_specialist_name?: string | null
+          risk_assessment_logo_data_url?: string | null
+          risk_assessment_logo_name?: string | null
+          risk_assessment_logo_type?: string | null
           reviewer_name?: string | null
           renewal_triggers_note?: string | null
           responsible_persons?: string | null
@@ -2778,6 +2786,7 @@ export type Database = {
           hazard_sources?: string | null
           id?: string
           identified_risks?: string | null
+          informed_employee_name?: string | null
           is_deleted?: boolean | null
           legislation_notes?: string | null
           method?: string | null
@@ -2787,6 +2796,9 @@ export type Database = {
           occupational_safety_specialist_signed_at?: string | null
           occupational_safety_specialist_approval_status?: string | null
           occupational_safety_specialist_name?: string | null
+          risk_assessment_logo_data_url?: string | null
+          risk_assessment_logo_name?: string | null
+          risk_assessment_logo_type?: string | null
           reviewer_name?: string | null
           renewal_triggers_note?: string | null
           responsible_persons?: string | null
