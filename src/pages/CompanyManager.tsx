@@ -685,6 +685,86 @@ export default function CompanyManager() {
     };
   };
 
+  const syncEmployeesForCompany = async (
+    companyId: string,
+    employeesJson: Array<{
+      full_name: string | null;
+      first_name: string;
+      last_name: string;
+      tc_number: string | null;
+      job_title: string;
+      department: string | null;
+      start_date: string;
+      end_date: string | null;
+      gender: string | null;
+      insured_job_code: string | null;
+      insured_job_name: string | null;
+      phone: string | null;
+      email: string | null;
+    }>,
+  ) => {
+    if (employeesJson.length === 0) {
+      return;
+    }
+
+    const tcNumbers = Array.from(
+      new Set(
+        employeesJson
+          .map((employee) => employee.tc_number?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    const existingByTc = new Map<string, { id: string }>();
+
+    if (tcNumbers.length > 0) {
+      const { data: existingEmployeesData, error: existingEmployeesError } = await supabase
+        .from("employees")
+        .select("id, tc_number")
+        .eq("company_id", companyId)
+        .in("tc_number", tcNumbers);
+
+      if (existingEmployeesError) throw existingEmployeesError;
+
+      (existingEmployeesData || []).forEach((employee) => {
+        const tcNumber = String(employee.tc_number || "").trim();
+        if (tcNumber) {
+          existingByTc.set(tcNumber, { id: String(employee.id) });
+        }
+      });
+    }
+
+    const employeesToInsert: Array<Record<string, unknown>> = [];
+
+    for (const employee of employeesJson) {
+      const tcNumber = employee.tc_number?.trim() || "";
+      const payload = {
+        ...employee,
+        company_id: companyId,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
+
+      const existingEmployee = tcNumber ? existingByTc.get(tcNumber) : null;
+
+      if (existingEmployee?.id) {
+        const { error: updateError } = await supabase
+          .from("employees")
+          .update(payload)
+          .eq("id", existingEmployee.id);
+
+        if (updateError) throw updateError;
+      } else {
+        employeesToInsert.push(payload);
+      }
+    }
+
+    if (employeesToInsert.length > 0) {
+      const { error: insertError } = await supabase.from("employees").insert(employeesToInsert);
+      if (insertError) throw insertError;
+    }
+  };
+
   const loadExistingEmployees = async (companyId: string) => {
     try {
       setLoadingExistingEmployees(true);
@@ -1415,18 +1495,7 @@ export default function CompanyManager() {
         }
 
         if (employeesJson.length > 0) {
-          const employeesToUpsert = employeesJson.map(emp => ({
-            ...emp,
-            company_id: editingCompanyId,
-            is_active: true,
-            updated_at: new Date().toISOString(),
-          }));
-
-          const { error: employeesError } = await supabase
-            .from("employees")
-            .upsert(employeesToUpsert, { onConflict: "company_id,tc_number" });
-
-          if (employeesError) throw employeesError;
+          await syncEmployeesForCompany(editingCompanyId, employeesJson);
         }
 
         toast.success("✅ Firma güncellendi!", {
