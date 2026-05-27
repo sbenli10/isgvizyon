@@ -42,6 +42,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -659,6 +660,31 @@ export default function CompanyManager() {
     }
   };
 
+  const normalizeEmployeeRecord = (employee: Employee): Employee => {
+    const safeFullName = (employee.full_name || "").trim();
+    const safeFirstName = (employee.first_name || "").trim();
+    const safeLastName = (employee.last_name || "").trim();
+
+    if (safeFirstName || safeLastName) {
+      return {
+        ...employee,
+        full_name: safeFullName || `${safeFirstName} ${safeLastName}`.trim(),
+      };
+    }
+
+    if (!safeFullName) {
+      return employee;
+    }
+
+    const [firstName, ...rest] = safeFullName.split(/\s+/).filter(Boolean);
+    return {
+      ...employee,
+      first_name: firstName || employee.first_name,
+      last_name: rest.join(" ") || employee.last_name,
+      full_name: safeFullName,
+    };
+  };
+
   const loadExistingEmployees = async (companyId: string) => {
     try {
       setLoadingExistingEmployees(true);
@@ -666,11 +692,11 @@ export default function CompanyManager() {
         .from("employees")
         .select("*")
         .eq("company_id", companyId)
-        .eq("is_active", true)
+        .or("is_active.eq.true,is_active.is.null")
         .order("first_name", { ascending: true });
 
       if (error) throw error;
-      setExistingEmployees((data || []) as Employee[]);
+      setExistingEmployees(((data || []) as Employee[]).map(normalizeEmployeeRecord));
     } catch (error: any) {
       console.error("Çalışanlar yüklenemedi:", error);
       toast.error(`Firma çalışanları yüklenemedi: ${error.message}`);
@@ -3093,64 +3119,285 @@ export default function CompanyManager() {
       </RouteErrorBoundary>
       )}
 
-     {viewingCompany && (
+{viewingCompany && (
   <RouteErrorBoundary routeKey="companies:view-modal" componentName="CompanyManagerViewModal">
     <Dialog open={!!viewingCompany} onOpenChange={() => setViewingCompany(null)}>
       <DialogContent
-        container={overlayContainerRef.current}
-        // Mobil-öncelikli genişlik ve yükseklik ayarları
-        className="flex max-h-[95dvh] w-[95vw] max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-0 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.55)] sm:max-h-[90dvh] sm:w-[90vw] sm:rounded-3xl"
+        className="flex w-[calc(100vw-20px)] max-w-4xl max-h-[calc(100dvh-24px)] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.97))] p-0 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.55)] sm:w-[min(92vw,960px)] sm:max-h-[88dvh]"
       >
-        {/* Header - Sabit kalmalı */}
-        <DialogHeader className="shrink-0 border-b border-white/10 bg-slate-950/95 p-4 sm:p-6">
-          <DialogTitle className="flex min-w-0 items-center gap-2 text-white">
-            <Building2 className="h-5 w-5 shrink-0 text-cyan-300" />
-            <span className="truncate">{viewingCompany.company_name}</span>
-          </DialogTitle>
-        </DialogHeader>
+        {(() => {
+          const companyRisk = getCompanyRiskSummary(viewingCompany);
+          const tabCounts = getCompanyTabCounts(viewingCompany);
+          const workflowBadges = getCompanyWorkflowBadges(viewingCompany);
+          const rawCompany = companies.find((company) => company.id === viewingCompany.id) || viewingCompany;
 
-        {/* İçerik Alanı - Scroll edilebilir */}
-        <div ref={detailDialogBodyRef} className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
-          {(() => {
-            const companyRisk = getCompanyRiskSummary(viewingCompany);
-            const tabCounts = getCompanyTabCounts(viewingCompany);
-            return (
-              <Tabs defaultValue="logo" className="space-y-4">
-                {/* Tabs Listesi - Mobil: dikey veya dar grid, Masaüstü: geniş grid */}
-                <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-xl bg-white/[0.04] p-1 sm:grid-cols-4">
-                  {['logo', 'iletisim', 'risk', 'calisan'].map((val) => (
-                    <TabsTrigger key={val} value={val} className="data-[state=active]:bg-cyan-500/12 text-xs sm:text-sm">
-                      {val.toUpperCase()}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
+          return (
+            <>
+              <DialogHeader className="shrink-0 border-b border-white/10 bg-slate-950/95 px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
+                <div className="flex items-start justify-between gap-3 pr-8">
+                  <div className="min-w-0">
+                    <DialogTitle className="flex items-center gap-2 text-white">
+                      <Building2 className="h-5 w-5 shrink-0 text-cyan-300" />
+                      <span className="truncate">{viewingCompany.company_name}</span>
+                    </DialogTitle>
+                    <DialogDescription className="mt-2 break-words text-slate-300">
+                      Firma bilgileri, iletişim detayları, risk görünümü ve çalışan akışı tek ekranda sunulur.
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
 
-                {/* İçerik kartları - Mobil cihazlarda paddig'i optimize edildi */}
-                <TabsContent value="logo" className="mt-0 space-y-4">
-                   {/* Grid yapısı: Mobil 1 kolon, Masaüstü 2 kolon */}
-                   <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[1fr_2fr]">
-                      <div className="flex items-center justify-center rounded-xl bg-slate-950/50 p-4">
-                         <img src={viewingCompany.logo_url} className="h-24 w-24 object-contain" alt="logo" />
+              <div ref={detailDialogBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-6">
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-cyan-200/80">Firma</p>
+                      <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.company_name}</p>
+                      <p className="mt-1 text-xs text-slate-300">Vergi / Sicil No: {viewingCompany.tax_number || "Belirtilmedi"}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                      <p className="text-[11px] uppercase tracking-[0.2em] text-slate-400">Tehlike Sınıfı</p>
+                      <p className="mt-2 text-sm font-semibold text-white">{viewingCompany.hazard_class || "Belirtilmedi"}</p>
+                      <p className="mt-1 text-xs text-slate-300">Çalışan sayısı: {existingEmployees.length || Number(viewingCompany.employee_count || 0)}</p>
+                    </div>
+                    <div className={cn("rounded-2xl border p-4", companyRisk.tone)}>
+                      <p className="text-[11px] uppercase tracking-[0.2em] opacity-80">Risk Özeti</p>
+                      <p className="mt-2 text-sm font-semibold">{companyRisk.summary}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-200/90">{companyRisk.action}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Badge className={cn("rounded-full border", workflowBadges.template.className)}>
+                      <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                      {workflowBadges.template.label}
+                    </Badge>
+                    <Badge className={cn("rounded-full border", workflowBadges.employee.className)}>
+                      <Users className="mr-1.5 h-3.5 w-3.5" />
+                      {workflowBadges.employee.label}
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-slate-200">
+                      {tabCounts.contact} iletişim alanı dolu
+                    </Badge>
+                    <Badge variant="outline" className="rounded-full border-white/10 bg-white/[0.04] text-slate-200">
+                      {tabCounts.risk} risk verisi hazır
+                    </Badge>
+                  </div>
+
+                  <Tabs defaultValue="genel" className="space-y-4">
+                    <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1 sm:grid-cols-4">
+                      <TabsTrigger value="genel" className="rounded-xl text-xs data-[state=active]:bg-cyan-500/12 data-[state=active]:text-cyan-50 sm:text-sm">
+                        Genel
+                      </TabsTrigger>
+                      <TabsTrigger value="iletisim" className="rounded-xl text-xs data-[state=active]:bg-cyan-500/12 data-[state=active]:text-cyan-50 sm:text-sm">
+                        İletişim
+                      </TabsTrigger>
+                      <TabsTrigger value="risk" className="rounded-xl text-xs data-[state=active]:bg-cyan-500/12 data-[state=active]:text-cyan-50 sm:text-sm">
+                        Risk
+                      </TabsTrigger>
+                      <TabsTrigger value="calisan" className="rounded-xl text-xs data-[state=active]:bg-cyan-500/12 data-[state=active]:text-cyan-50 sm:text-sm">
+                        Çalışan
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="genel" className="mt-0 space-y-4">
+                      <div className="grid gap-4 rounded-[26px] border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+                        <div className="flex items-center justify-center rounded-2xl border border-white/10 bg-slate-950/55 p-4">
+                          <div className="flex h-36 w-full items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04]">
+                            {viewingCompany.logo_url ? (
+                              <img src={viewingCompany.logo_url} alt="Firma logosu" className="max-h-full max-w-full object-contain" />
+                            ) : (
+                              <div className="flex flex-col items-center gap-2 text-slate-500">
+                                <Building2 className="h-10 w-10" />
+                                <span className="text-xs">Logo bulunmuyor</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">Vergi / Sicil No</Label>
+                            <p className="mt-1 break-words font-mono text-sm font-semibold text-white">{viewingCompany.tax_number || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">NACE Kodu</Label>
+                            <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.nace_code || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">Sektör</Label>
+                            <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.industry_sector || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">Ziyaret Sıklığı</Label>
+                            <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.visit_frequency || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">İşyeri Sicil No</Label>
+                            <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.workplace_registration_number || viewingCompany.sgk_workplace_number || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-xl border border-white/10 bg-slate-950/35 p-3">
+                            <Label className="text-slate-400">Toplam Çalışan</Label>
+                            <p className="mt-1 break-words text-sm font-semibold text-white">{existingEmployees.length || Number(viewingCompany.employee_count || 0)}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                         {/* Bilgi alanları */}
-                         <div><Label className="text-slate-400 text-[10px]">Vergi No</Label><p className="font-mono">{viewingCompany.tax_number}</p></div>
-                         {/* ... diğer alanlar */}
-                      </div>
-                   </div>
-                </TabsContent>
-                
-                {/* Diğer TabContent'ler için benzer yapı kullanıldı */}
-              </Tabs>
-            );
-          })()}
-        </div>
 
-        {/* Footer - Mobil: dikey, Masaüstü: yatay */}
-        <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-white/10 bg-slate-950/95 p-4 sm:flex-row sm:justify-end">
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setViewingCompany(null)}>Kapat</Button>
-          <Button className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700" onClick={() => handleEditCompany(viewingCompany)}>Düzenle</Button>
-        </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">İşveren Temsilcisi</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.employer_representative_name || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">İSG Uzmanı</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.occupational_safety_specialist_name || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">İşyeri Hekimi</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.workplace_doctor_name || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Çalışan Temsilcisi</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.employee_representative_name || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Bilgi Sahibi Çalışan</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.knowledgeable_employee_name || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Destek Personeli</p>
+                          <p className="mt-2 break-words text-sm font-semibold text-white">
+                            {[viewingCompany.fire_support_person_name, viewingCompany.first_aid_support_person_name, viewingCompany.evacuation_support_person_name]
+                              .filter(Boolean)
+                              .join(" · ") || "Belirtilmedi"}
+                          </p>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="iletisim" className="mt-0 space-y-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Adres</p>
+                          <div className="mt-3 flex items-start gap-3">
+                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+                            <span className="min-w-0 break-words text-sm text-slate-200">{viewingCompany.address || "Adres bilgisi bulunmuyor."}</span>
+                          </div>
+                        </div>
+                        <div className="grid gap-3">
+                          <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Şehir</p>
+                            <p className="mt-2 break-words text-sm font-semibold text-white">{viewingCompany.city || "Belirtilmedi"}</p>
+                          </div>
+                          <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Telefon</p>
+                            <div className="mt-3 flex items-center gap-3 text-sm text-slate-200">
+                              <Phone className="h-4 w-4 shrink-0 text-cyan-300" />
+                              <span className="min-w-0 break-words">{viewingCompany.phone || "Telefon bilgisi bulunmuyor."}</span>
+                            </div>
+                          </div>
+                          <div className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">E-posta</p>
+                            <div className="mt-3 flex items-center gap-3 text-sm text-slate-200">
+                              <Mail className="h-4 w-4 shrink-0 text-cyan-300" />
+                              <span className="min-w-0 break-words">{viewingCompany.email || "E-posta bilgisi bulunmuyor."}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="risk" className="mt-0 space-y-4">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Tehlike Sınıfı</p>
+                          <p className="mt-2 text-sm font-semibold text-white">{viewingCompany.hazard_class || "Belirtilmedi"}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Risk Şablonu</p>
+                          <p className="mt-2 text-sm font-semibold text-white">{resolveSectorTemplateValue(viewingCompany.industry_sector || "") || "Henüz eşleşmedi"}</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">NACE Eşleşmesi</p>
+                          <p className="mt-2 text-sm font-semibold text-white">{viewingCompany.nace_code || "Belirtilmedi"}</p>
+                        </div>
+                      </div>
+                      <div className={cn("rounded-2xl border p-4", companyRisk.tone)}>
+                        <p className="text-[11px] uppercase tracking-[0.22em] opacity-80">Operasyon Yorumu</p>
+                        <p className="mt-2 text-sm font-semibold">{companyRisk.summary}</p>
+                        <p className="mt-2 text-sm leading-6 text-slate-200/90">{companyRisk.action}</p>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="calisan" className="mt-0 space-y-4">
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Çalışan Akışı</p>
+                            <p className="mt-2 text-sm text-slate-300">Bu firmaya bağlı aktif çalışanlar aşağıda listelenir.</p>
+                          </div>
+                          <Badge variant="outline" className="w-fit rounded-full border-white/10 bg-white/[0.04] text-slate-100">
+                            {existingEmployees.length} aktif çalışan
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {existingEmployees.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-slate-400">
+                          Bu firmaya ait kayıtlı çalışan bulunamadı.
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {existingEmployees.map((employee) => (
+                            <div key={employee.id} className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:grid-cols-2 lg:grid-cols-4">
+                              <div className="min-w-0">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Ad Soyad</p>
+                                <p className="mt-2 break-words text-sm font-semibold text-white">{employee.full_name || `${employee.first_name || ""} ${employee.last_name || ""}`.trim() || "Belirtilmedi"}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Görev</p>
+                                <p className="mt-2 break-words text-sm font-semibold text-white">{employee.insured_job_name || employee.job_title || "Belirtilmedi"}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Bölüm</p>
+                                <p className="mt-2 break-words text-sm font-semibold text-white">{employee.department || "Belirtilmedi"}</p>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Başlangıç</p>
+                                <p className="mt-2 break-words text-sm font-semibold text-white">{employee.start_date || "Belirtilmedi"}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </div>
+
+              <DialogFooter className="shrink-0 border-t border-white/10 bg-slate-950/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-2xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08] sm:w-auto"
+                    onClick={() => setViewingCompany(null)}
+                  >
+                    Kapat
+                  </Button>
+                  <Button
+                    className="w-full rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 text-white hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400 sm:w-auto"
+                    onClick={() => {
+                      setViewingCompany(null);
+                      handleEditCompany(rawCompany);
+                    }}
+                  >
+                    Düzenle
+                  </Button>
+                </div>
+              </DialogFooter>
+            </>
+          );
+        })()}
       </DialogContent>
     </Dialog>
   </RouteErrorBoundary>
@@ -3158,4 +3405,3 @@ export default function CompanyManager() {
     </div>    
   );
 }
-
