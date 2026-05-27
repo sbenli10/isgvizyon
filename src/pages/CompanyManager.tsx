@@ -42,6 +42,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -349,6 +350,7 @@ export default function CompanyManager() {
   const [searchParams, setSearchParams] = useSearchParams();
   const runtimeMode = useSafeMode();
   const overlayContainerRef = useRef<HTMLDivElement | null>(null);
+  const companyDetailScrollRef = useRef<HTMLDivElement | null>(null);
   const lastSearchSyncRef = useRef<string | null>(null);
   const [viewingCompany, setViewingCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -571,6 +573,13 @@ export default function CompanyManager() {
     if (!naceOpen && !(workspaceMode === "wizard" && formData.nace_code)) return;
     void ensureNaceCatalogLoaded();
   }, [ensureNaceCatalogLoaded, formData.nace_code, naceOpen, workspaceMode]);
+
+  useEffect(() => {
+    if (!viewingCompany) return;
+    requestAnimationFrame(() => {
+      companyDetailScrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    });
+  }, [viewingCompany]);
 
   const loadCompanies = async () => {
     try {
@@ -3087,15 +3096,21 @@ export default function CompanyManager() {
       {viewingCompany && (
         <RouteErrorBoundary routeKey="companies:view-modal" componentName="CompanyManagerViewModal">
         <Dialog open={!!viewingCompany} onOpenChange={() => setViewingCompany(null)}>
-          <DialogContent container={overlayContainerRef.current} className="max-w-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_28px_90px_rgba(2,6,23,0.55)]">
-            <DialogHeader>
+          <DialogContent
+            container={overlayContainerRef.current}
+            className="flex h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-none flex-col overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-0 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.55)] sm:h-auto sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100vw-24px)] sm:max-w-3xl"
+          >
+            <DialogHeader className="sticky top-0 z-20 shrink-0 border-b border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.97))] px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
               <DialogTitle className="flex items-center gap-2 text-white">
                 <Building2 className="h-5 w-5 text-cyan-300" />
                 {viewingCompany.company_name}
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4">
+            <div
+              ref={companyDetailScrollRef}
+              className="flex-1 space-y-4 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6"
+            >
               {(() => {
                 const companyRisk = getCompanyRiskSummary(viewingCompany);
                 const tabCounts = getCompanyTabCounts(viewingCompany);
@@ -3153,25 +3168,25 @@ export default function CompanyManager() {
                         </div>
 
                         <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="min-w-0">
                               <Label className="text-slate-400">Vergi No</Label>
-                              <p className="mt-1 font-mono font-semibold text-white">{viewingCompany.tax_number}</p>
+                              <p className="mt-1 break-words font-mono font-semibold text-white">{viewingCompany.tax_number}</p>
                             </div>
 
-                            <div>
+                            <div className="min-w-0">
                               <Label className="text-slate-400">NACE</Label>
-                              <Badge variant="outline" className="mt-1 border-white/10 bg-white/[0.04] text-slate-200">{viewingCompany.nace_code}</Badge>
+                              <Badge variant="outline" className="mt-1 max-w-full border-white/10 bg-white/[0.04] text-slate-200">{viewingCompany.nace_code}</Badge>
                             </div>
 
-                            <div>
+                            <div className="min-w-0">
                               <Label className="text-slate-400">Sektör</Label>
-                              <p className="mt-1 text-sm font-semibold text-white">{viewingCompany.industry_sector || "Henüz eşleşmedi"}</p>
+                              <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.industry_sector || "Henüz eşleşmedi"}</p>
                             </div>
 
-                            <div>
+                            <div className="min-w-0">
                               <Label className="text-slate-400">Şehir</Label>
-                              <p className="mt-1 text-sm font-semibold text-white">{viewingCompany.city || "Belirtilmedi"}</p>
+                              <p className="mt-1 break-words text-sm font-semibold text-white">{viewingCompany.city || "Belirtilmedi"}</p>
                             </div>
                           </div>
 
@@ -3188,11 +3203,11 @@ export default function CompanyManager() {
                     <TabsContent value="iletisim" className="mt-0">
                       <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
                         <div className="grid gap-4 md:grid-cols-2">
-                          <div className="rounded-2xl border border-white/10 bg-slate-950/55 p-4">
+                          <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/55 p-4">
                             <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Adres</p>
                             <div className="mt-3 flex items-start gap-3 text-sm text-slate-200">
                               <MapPin className="mt-0.5 h-4 w-4 text-cyan-300" />
-                              <span>{viewingCompany.address || "Adres bilgisi bulunmuyor."}</span>
+                              <span className="min-w-0 break-words">{viewingCompany.address || "Adres bilgisi bulunmuyor."}</span>
                             </div>
                           </div>
                           <div className="space-y-4">
@@ -3351,8 +3366,10 @@ export default function CompanyManager() {
                   </Tabs>
                 );
               })()}
+            </div>
 
-              <div className="flex gap-2 border-t border-white/10 pt-4">
+            <DialogFooter className="sticky bottom-0 z-20 shrink-0 border-t border-white/10 bg-[linear-gradient(0deg,rgba(15,23,42,0.99),rgba(2,6,23,0.97))] px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-start">
                 <Button className="rounded-2xl bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 text-white hover:from-cyan-400 hover:via-sky-400 hover:to-indigo-400" onClick={() => {
                   const rawCompany = companies.find((company) => company.id === viewingCompany.id) || viewingCompany;
                   setViewingCompany(null);
@@ -3365,7 +3382,7 @@ export default function CompanyManager() {
                   Kapat
                 </Button>
               </div>
-            </div>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
         </RouteErrorBoundary>
