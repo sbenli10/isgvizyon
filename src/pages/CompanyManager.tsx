@@ -3098,7 +3098,7 @@ export default function CompanyManager() {
         <Dialog open={!!viewingCompany} onOpenChange={() => setViewingCompany(null)}>
           <DialogContent
             container={overlayContainerRef.current}
-            className="flex h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-none flex-col overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-0 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.55)] sm:h-auto sm:max-h-[calc(100dvh-32px)] sm:w-[calc(100vw-24px)] sm:max-w-3xl"
+            className="flex w-[calc(100vw-24px)] max-w-none max-h-[calc(100dvh-32px)] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] p-0 text-slate-100 shadow-[0_28px_90px_rgba(2,6,23,0.55)] sm:w-[calc(100vw-32px)] sm:max-h-[calc(100dvh-48px)] sm:max-w-3xl"
           >
             <DialogHeader className="sticky top-0 z-20 shrink-0 border-b border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.97))] px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-6">
               <DialogTitle className="flex items-center gap-2 text-white">
