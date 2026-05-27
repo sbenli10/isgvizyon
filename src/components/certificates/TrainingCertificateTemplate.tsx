@@ -118,16 +118,27 @@ function CertificateTopicsBlock({ topics }: { topics: string[] }) {
 
 function CertificateVerificationBlock({ code, date }: { code: string; date: string }) {
   return (
-    <div className="cert-text-body flex items-end gap-3">
-      <div className="flex h-16 w-16 items-center justify-center rounded-md border border-[#0b5f9e]/30 bg-white shadow-sm">
-        <QrCode className="h-11 w-11 text-[#0b5f9e]" />
-      </div>
-      <div className="space-y-1 text-[10px] font-bold">
+    <div className="space-y-1 text-[10px] font-bold">
+      <div className="space-y-1 rounded-xl border border-[#c7d7e7] bg-white p-3 shadow-sm">
         <p className="cert-text-muted text-[9px] italic">Dogrulama Kodu</p>
-        <p className="cert-text-dark max-w-[132px] truncate">{code}</p>
+        <p className="cert-text-dark break-all leading-4">{code}</p>
         <p className="cert-text-muted pt-1 text-[9px] italic">Duzenlenme Tarihi</p>
         <p className="cert-text-dark">{date}</p>
       </div>
+    </div>
+  );
+}
+
+function CertificateQrBlock() {
+  return (
+    <div className="rounded-xl border border-[#c7d7e7] bg-white p-3 text-center shadow-sm">
+      <div className="mx-auto flex h-[74px] w-[74px] items-center justify-center rounded-md border border-[#0b5f9e]/30 bg-white">
+        <QrCode className="h-12 w-12 text-[#0b5f9e]" />
+      </div>
+      <p className="cert-text-primary mt-2 text-[10px] font-extrabold">QR ile dogrula</p>
+      <p className="cert-text-muted mt-1 text-[8.5px] font-semibold leading-4">
+        Dogrulama icin QR kodunu okutun veya dogrulama sayfasini ziyaret edin.
+      </p>
     </div>
   );
 }
@@ -289,9 +300,10 @@ export function TrainingCertificateTemplate({ form, participant, className }: Tr
               </section>
             </main>
 
-            <footer className="relative z-10 mt-2 grid grid-cols-[42%_22%_1fr] items-end gap-4">
+            <footer className="relative z-10 mt-2 grid grid-cols-[40%_18%_14%_1fr] items-end gap-4">
               <CertificateTopicsBlock topics={topics} />
               <CertificateVerificationBlock code={verificationCode} date={new Date().toLocaleDateString("tr-TR")} />
+              <CertificateQrBlock />
               <div className="grid grid-cols-2 gap-4">
                 {signatures.map((signature, index) => (
                   <CertificateSignatureBlock

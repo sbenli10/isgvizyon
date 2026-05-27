@@ -1,4 +1,5 @@
-﻿import { corsHeaders, createServiceClient, jsonResponse, requireAuthUser, workerBaseUrl } from "../_shared/certificate-utils.ts";
+import { createServiceClient, getCorsHeaders, jsonResponse, requireAuthUser } from "../_shared/certificate-utils.ts";
+import { requeueStaleCertificateItems, runCertificateWorker } from "../_shared/certificate-worker-runner.ts";
 
 function normalizeText(value: unknown) {
   if (typeof value !== "string") return null;
@@ -8,7 +9,7 @@ function normalizeText(value: unknown) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req.headers.get("origin")) });
   }
 
   try {
@@ -16,7 +17,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const certificateId = normalizeText(url.searchParams.get("certificateId"));
     if (!certificateId) {
-      return jsonResponse({ error: "certificateId is required" }, 400);
+      return jsonResponse({ error: "certificateId is required" }, 400, req);
     }
 
     const supabase = createServiceClient();
@@ -27,10 +28,10 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (certificateError) throw certificateError;
     if (!certificate) {
-      return jsonResponse({ error: "Certificate not found" }, 404);
+      return jsonResponse({ error: "Certificate not found" }, 404, req);
     }
 
-    const { data: job, error: jobError } = await supabase
+    let { data: job, error: jobError } = await supabase
       .from("certificate_jobs")
       .select("*")
       .eq("certificate_id", certificateId)
@@ -53,55 +54,62 @@ Deno.serve(async (req) => {
           error_message: null,
         },
         items: [],
-      });
+      }, 200, req);
     }
 
-    const staleThresholdIso = new Date(Date.now() - 45_000).toISOString();
-    const { error: requeueError } = await supabase
-      .from("certificate_job_items")
-      .update({ status: "pending", worker_id: null })
-      .eq("job_id", job.id)
-      .eq("status", "processing")
-      .lt("started_at", staleThresholdIso);
-    if (requeueError) {
-      console.error("status stale processing requeue failed", { jobId: job.id, requeueError });
-    }
+    await requeueStaleCertificateItems(supabase, job.id);
 
-    const { data: items, error: itemError } = await supabase
+    let { data: items, error: itemError } = await supabase
       .from("certificate_job_items")
       .select("*, certificate_participants(name)")
       .eq("job_id", job.id)
       .order("created_at", { ascending: true });
     if (itemError) throw itemError;
 
-    const mappedItems = (items || []).map((item: any) => ({
-      ...item,
-      participant_name: item.certificate_participants?.name || null,
-    }));
-
-    const pendingCount = mappedItems.filter((item: any) => ["pending", "processing"].includes(item.status)).length;
+    const pendingCount = (items || []).filter((item: any) => ["pending", "processing"].includes(item.status)).length;
     const shouldTriggerWorker = pendingCount > 0 && ["queued", "processing", "processing_with_errors"].includes(job.status);
     const shouldFinalizeZip = pendingCount === 0 && !job.zip_path && ["completed", "completed_with_errors"].includes(job.status);
 
     if (shouldTriggerWorker || shouldFinalizeZip) {
       try {
-        const response = await fetch(`${workerBaseUrl()}/certificates-worker`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
-          },
-          body: JSON.stringify({ jobId: job.id, concurrency: 2 }),
-        });
-        console.log("status triggered worker", { jobId: job.id, pendingCount, shouldFinalizeZip, status: response.status });
+        await runCertificateWorker(job.id, 2, { maxBatches: 1 });
       } catch (workerTriggerError) {
         console.error("status worker trigger failed", { jobId: job.id, workerTriggerError });
       }
+
+      const latestJobResponse = await supabase
+        .from("certificate_jobs")
+        .select("*")
+        .eq("id", job.id)
+        .maybeSingle();
+      if (!latestJobResponse.error && latestJobResponse.data) {
+        job = latestJobResponse.data;
+      }
+
+      const latestItemsResponse = await supabase
+        .from("certificate_job_items")
+        .select("*, certificate_participants(name)")
+        .eq("job_id", job.id)
+        .order("created_at", { ascending: true });
+      if (!latestItemsResponse.error && latestItemsResponse.data) {
+        items = latestItemsResponse.data;
+      }
     }
 
-    return jsonResponse({ certificate, job, items: mappedItems });
+    const mappedItems = (items || []).map((item: any) => {
+      const participantRecord = Array.isArray(item.certificate_participants)
+        ? item.certificate_participants[0]
+        : item.certificate_participants;
+
+      return {
+        ...item,
+        participant_name: participantRecord?.name || null,
+      };
+    });
+
+    return jsonResponse({ certificate, job, items: mappedItems }, 200, req);
   } catch (error) {
     console.error("certificates-status failed", error);
-    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500, req);
   }
 });

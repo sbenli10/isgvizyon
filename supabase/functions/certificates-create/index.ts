@@ -1,4 +1,4 @@
-﻿import { corsHeaders, createServiceClient, jsonResponse, requireAuthUser } from "../_shared/certificate-utils.ts";
+import { createServiceClient, getCorsHeaders, jsonResponse, requireAuthUser } from "../_shared/certificate-utils.ts";
 
 function normalizeText(value: unknown) {
   if (typeof value !== "string") return null;
@@ -12,7 +12,7 @@ function normalizeRequiredText(value: unknown) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req.headers.get("origin")) });
   }
 
   try {
@@ -33,11 +33,11 @@ Deno.serve(async (req) => {
     const designConfig = payload.design_config && typeof payload.design_config === "object" ? payload.design_config : {};
 
     if (!companyName || !trainingName || !trainingDate || !trainingDuration) {
-      return jsonResponse({ error: "Firma adı, eğitim adı, eğitim tarihi ve eğitim süresi zorunludur." }, 400);
+      return jsonResponse({ error: "Firma adı, eğitim adı, eğitim tarihi ve eğitim süresi zorunludur." }, 400, req);
     }
 
     if (participants.length === 0) {
-      return jsonResponse({ error: "En az bir katılımcı eklenmelidir." }, 400);
+      return jsonResponse({ error: "En az bir katılımcı eklenmelidir." }, 400, req);
     }
 
     const certificateInsert = {
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       .filter((participant: { name: string }) => participant.name.length > 0);
 
     if (normalizedParticipants.length === 0) {
-      return jsonResponse({ error: "En az bir geçerli katılımcı adı girilmelidir." }, 400);
+      return jsonResponse({ error: "En az bir geçerli katılımcı adı girilmelidir." }, 400, req);
     }
 
     const { error: participantError } = await supabase.from("certificate_participants").insert(normalizedParticipants);
@@ -100,9 +100,9 @@ Deno.serve(async (req) => {
 
     if (jobError) throw jobError;
 
-    return jsonResponse({ certificate, job }, 201);
+    return jsonResponse({ certificate, job }, 201, req);
   } catch (error) {
     console.error("certificates-create failed", error);
-    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500, req);
   }
 });

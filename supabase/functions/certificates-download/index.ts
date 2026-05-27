@@ -1,4 +1,4 @@
-﻿import { corsHeaders, createServiceClient, jsonResponse, requireAuthUser } from "../_shared/certificate-utils.ts";
+import { createServiceClient, getCorsHeaders, jsonResponse, requireAuthUser } from "../_shared/certificate-utils.ts";
 
 function normalizeText(value: unknown) {
   if (typeof value !== "string") return null;
@@ -8,7 +8,7 @@ function normalizeText(value: unknown) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: getCorsHeaders(req.headers.get("origin")) });
   }
 
   try {
@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const certificateId = normalizeText(url.searchParams.get("certificateId"));
     if (!certificateId) {
-      return jsonResponse({ error: "certificateId is required" }, 400);
+      return jsonResponse({ error: "certificateId is required" }, 400, req);
     }
 
     const supabase = createServiceClient();
@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
         zip_path: null,
         error_message: null,
         downloadUrl: null,
-      });
+      }, 200, req);
     }
 
     let downloadUrl: string | null = null;
@@ -54,9 +54,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    return jsonResponse({ ...job, zip_path: zipPath, downloadUrl });
+    return jsonResponse({ ...job, zip_path: zipPath, downloadUrl }, 200, req);
   } catch (error) {
     console.error("certificates-download failed", error);
-    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : "Unknown error" }, 500, req);
   }
 });

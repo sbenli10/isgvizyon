@@ -49,8 +49,6 @@ import {
   getCertificateStatus,
 } from "@/lib/certificateApi";
 import { createCertificateExcelTemplate, parseCertificateParticipantsExcel } from "@/lib/certificateExcel";
-import { CertificatePreviewCard } from "@/components/certificates/CertificatePreviewCard";
-
 import type {
   CertificateDesignConfig,
   CertificateFormValues,
@@ -60,6 +58,7 @@ import type {
   CertificateRecord,
 } from "@/types/certificates";
 import type { Company } from "@/types/companies";
+import CertificatePreview from "@/components/certificates/CertificatePreview";
 
 // ====================================================
 // ✅ FIX: local type for signatures (prevents TS2552)
@@ -314,6 +313,24 @@ function toDisplayText(value: unknown) {
   return "";
 }
 
+function splitCertificateTopics(value?: string | null) {
+  const topics = (value || "")
+    .split(/[\n;,]+/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return topics.length > 0 ? topics : ["Konu bilgisi bulunmamaktadır."];
+}
+
+function formatPreviewDate(value?: string | null, fallback = "Belirtilmedi") {
+  if (!value) return fallback;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleDateString("tr-TR");
+}
+
 function buildDefaultDesignConfig(trainerNames: string[] = [], companyName = ""): CertificateDesignConfig {
   return {
     primaryColor: "#d4af37",
@@ -418,6 +435,11 @@ export default function CertificatesDashboard() {
     () => jobItems.filter((item) => item.status === "completed" && item.pdf_path),
     [jobItems],
   );
+  const failedItems = useMemo(() => jobItems.filter((item) => item.status === "failed"), [jobItems]);
+  const queuedItems = useMemo(() => jobItems.filter((item) => item.status === "pending"), [jobItems]);
+  const processingItems = useMemo(() => jobItems.filter((item) => item.status === "processing"), [jobItems]);
+  const activeProductionCount = queuedItems.length + processingItems.length;
+  const isJobRunning = Boolean(activeJob && ["queued", "processing", "processing_with_errors"].includes(activeJob.status));
 
   const previewParticipant = participants[0];
   const jobStatusMeta = useMemo(
@@ -433,6 +455,40 @@ export default function CertificatesDashboard() {
     }),
     [form, logoPreviewUrl],
   );
+
+
+  const previewData = useMemo(() => {
+    const designConfig = normalizeDesignConfig(
+      previewForm.design_config,
+      previewForm.trainer_names,
+      previewForm.company_name,
+    );
+
+    return {
+      participantName: previewParticipant?.name || "Örnek Katılımcı",
+      role: previewParticipant?.job_title || "Belirtilmedi",
+      trainingTitle: previewForm.training_name,
+      date: formatPreviewDate(previewForm.training_date),
+      duration: previewForm.training_duration,
+      validity: previewForm.validity_date ? formatPreviewDate(previewForm.validity_date) : "Süresiz",
+      certificateNo: activeCertificate?.id
+        ? `SERT-${activeCertificate.id.slice(0, 8).toUpperCase()}`
+        : "Önizleme",
+      companyName: previewForm.company_name,
+      address: previewForm.company_address,
+      trainers: previewForm.trainer_names,
+      trainingTopics: splitCertificateTopics(previewForm.notes),
+      verificationCode: activeCertificate?.id
+        ? activeCertificate.id.slice(0, 12).toUpperCase()
+        : "Önizleme",
+      issueDate: formatPreviewDate(new Date().toISOString()),
+      summaryText: designConfig.descriptionText || undefined,
+      logoUrl: previewForm.logo_url,
+      osgbLogoUrl: designConfig.osgb_logo_url,
+      primaryColor: designConfig.primaryColor,
+      secondaryColor: designConfig.secondaryColor,
+    };
+  }, [activeCertificate?.id, previewForm, previewParticipant]);
 
   const syncStoredPreview = useCallback(
     async (logoValue: string | undefined, setter: (value: string) => void) => {
@@ -565,6 +621,16 @@ export default function CertificatesDashboard() {
     } catch (error: any) {
       console.error("Sertifika durumu alınamadı:", error);
     }
+  }
+
+  async function handleRefreshStatus() {
+    if (!activeCertificate?.id) {
+      toast.error("Önce bir sertifika kaydı seçin.");
+      return;
+    }
+
+    await refreshJobStatus(activeCertificate.id);
+    toast.success("Üretim durumu güncellendi.");
   }
 
   async function applyCompany(companyId: string) {
@@ -714,9 +780,34 @@ export default function CertificatesDashboard() {
       setActiveCertificate(response.certificate);
       setActiveJob(response.job);
       await refreshJobStatus(certificate.id);
-      toast.success("Toplu üretim kuyruğa alındı");
+      toast.success("Sertifika üretimi başlatıldı");
     } catch (error: any) {
       toast.error(`Üretim başlatılamadı: ${error.message}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRetryFailed() {
+    if (!activeCertificate?.id) {
+      toast.error("Hatalıları tekrar denemek için bir sertifika kaydı seçin.");
+      return;
+    }
+
+    if (failedItems.length === 0) {
+      toast.error("Tekrar denenecek hatalı sertifika bulunamadı.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const response = await generateCertificateJob(activeCertificate.id, { retryFailedOnly: true });
+      setActiveCertificate(response.certificate);
+      setActiveJob(response.job);
+      await refreshJobStatus(activeCertificate.id);
+      toast.success("Hatalı sertifikalar yeniden kuyruğa alındı.");
+    } catch (error: any) {
+      toast.error(`Hatalılar tekrar denenemedi: ${error.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1146,59 +1237,7 @@ export default function CertificatesDashboard() {
             </CardContent>
           </Card>
 
-          {/* Templates */}
-          <Card
-            ref={studioSectionRef}
-            className={cn(currentTab === "templates" ? "border-primary/30 shadow-lg shadow-primary/10" : "border-border")}
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Palette className="h-5 w-5 text-primary" /> Tasarım Şablonları
-              </CardTitle>
-              <CardDescription>
-                Tema seçimi ve gelişmiş tasarım ayarları sertifika üretim akışının içinden yönetilir.
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
-                {templateCards.map((template) => (
-                  <button
-                    key={template.value}
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, template_type: template.value }))}
-                    className={cn(
-                      "rounded-2xl border p-4 text-left transition-all",
-                      form.template_type === template.value
-                        ? "border-primary bg-primary/5 shadow-lg shadow-primary/10"
-                        : "border-border hover:border-primary/40 hover:bg-muted/30",
-                    )}
-                  >
-                    <p className="text-sm font-semibold text-foreground">{template.title}</p>
-                    <p className="mt-2 text-xs leading-5 text-muted-foreground">{template.text}</p>
-                  </button>
-                ))}
-              </div>
-
-              <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                <p className="text-sm font-semibold text-foreground">Gelişmiş tasarım görünümü</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Renk paleti, ikinci logo, mühür, özel başlık, açıklama, imza görselleri ve canlı stüdyo önizlemesi için bu alanı kullanın.
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Badge variant="secondary">Canlı önizleme</Badge>
-                  <Badge variant="secondary">Tema stüdyosu</Badge>
-                  <Badge variant="secondary">İmza görseli</Badge>
-                  <Badge variant="secondary">Premium hazırlık</Badge>
-                </div>
-
-                <Button type="button" className="mt-4 gap-2" onClick={() => setSearchParams({ tab: "templates" })}>
-                  <Palette className="h-4 w-4" /> Şablon alanına odaklan
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          
 
           {/* Production Status */}
           <Card className="border-border">
@@ -1222,24 +1261,40 @@ export default function CertificatesDashboard() {
                 <p className="mt-3 text-xs text-foreground/75">{jobStatusMeta.detail}</p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs text-muted-foreground">Durum</p>
-                  <p className="mt-1 text-lg font-semibold text-foreground">{jobStatusMeta.label}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs text-muted-foreground">Tamamlanan</p>
+                <div className="grid gap-4 md:grid-cols-5">
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs text-muted-foreground">Durum</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{jobStatusMeta.label}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs text-muted-foreground">Tamamlanan</p>
                   <p className="mt-1 text-lg font-semibold text-foreground">
                     {activeJob?.completed_files || 0} / {activeJob?.total_files || participants.length}
                   </p>
                 </div>
-                <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs text-muted-foreground">İlerleme</p>
-                  <p className="mt-1 text-lg font-semibold text-foreground">%{Math.round(activeJob?.progress || 0)}</p>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs text-muted-foreground">İlerleme</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">%{Math.round(activeJob?.progress || 0)}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs text-muted-foreground">Kuyruk / Üretim</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">
+                      {queuedItems.length} / {processingItems.length}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-card p-4">
+                    <p className="text-xs text-muted-foreground">Hatalı</p>
+                    <p className="mt-1 text-lg font-semibold text-foreground">{failedItems.length}</p>
+                  </div>
                 </div>
-              </div>
 
               <Progress value={activeJob?.progress || 0} className="h-3" />
+
+              <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
+                {activeJob?.total_files
+                  ? `${activeJob.total_files} sertifikadan ${activeJob.completed_files || 0} tanesi üretildi, ${failedItems.length} hata var, ${activeProductionCount} kayıt sırada veya işleniyor.`
+                  : "Henüz üretim başlatılmadı."}
+              </div>
 
               {activeJob?.error_message && (
                 <div className="rounded-xl border border-orange-500/25 bg-orange-500/10 px-4 py-3 text-sm text-foreground">
@@ -1249,12 +1304,25 @@ export default function CertificatesDashboard() {
               )}
 
               <div className="flex flex-wrap gap-3">
-                <Button onClick={() => void handleCreate()} disabled={submitting} variant="outline" className="gap-2">
+                <Button onClick={() => void handleCreate()} disabled={submitting || isJobRunning} variant="outline" className="gap-2">
                   <Plus className="h-4 w-4" /> İşi Kaydet
                 </Button>
 
-                <Button onClick={() => void handleGenerate()} disabled={submitting} className="gap-2">
-                  <RefreshCw className="h-4 w-4" /> Sertifikaları Üret
+                <Button onClick={() => void handleGenerate()} disabled={submitting || isJobRunning} className="gap-2">
+                  <RefreshCw className="h-4 w-4" /> Sertifikaları Oluştur
+                </Button>
+
+                <Button onClick={() => void handleRefreshStatus()} disabled={submitting || !activeCertificate} variant="outline" className="gap-2">
+                  <RefreshCw className="h-4 w-4" /> Durumu Yenile
+                </Button>
+
+                <Button
+                  onClick={() => void handleRetryFailed()}
+                  disabled={submitting || isJobRunning || failedItems.length === 0}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" /> Hatalıları Tekrar Dene
                 </Button>
 
                 <Dialog>
@@ -1273,7 +1341,7 @@ export default function CertificatesDashboard() {
                     </DialogHeader>
 
                     <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
-                      <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+                      <CertificatePreview data={previewData} scale={0.55} />
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -1339,7 +1407,7 @@ export default function CertificatesDashboard() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
-                <CertificatePreviewCard form={previewForm} participant={previewParticipant} className="min-h-[540px]" />
+                <CertificatePreview data={previewData} scale={0.55} />
               </div>
             </CardContent>
           </Card>

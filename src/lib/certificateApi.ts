@@ -118,10 +118,10 @@ export async function createCertificate(input: CertificateFormValues, participan
   });
 }
 
-export async function generateCertificateJob(certificateId: string) {
+export async function generateCertificateJob(certificateId: string, options?: { retryFailedOnly?: boolean }) {
   return await callFunction<{ certificate: CertificateRecord; job: CertificateJobRecord }>("certificates-generate", {
     method: "POST",
-    body: JSON.stringify({ certificateId }),
+    body: JSON.stringify({ certificateId, retryFailedOnly: Boolean(options?.retryFailedOnly) }),
   });
 }
 
