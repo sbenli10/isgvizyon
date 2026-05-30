@@ -1402,100 +1402,107 @@ export default function AssignmentLetters() {
   }
 
   return (
-    <div className="theme-page-readable mx-auto max-w-[1600px] space-y-8 px-1 pb-6 sm:px-2">
-      <section className="relative overflow-hidden rounded-[32px] border border-border/70 bg-gradient-to-br from-slate-50 via-white to-slate-100 px-5 py-6 text-slate-950 shadow-[0_24px_70px_rgba(2,6,23,0.10)] dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 dark:text-slate-50 dark:shadow-[0_30px_90px_rgba(2,6,23,0.32)] sm:px-7 sm:py-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.10),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.14),transparent_34%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(37,99,235,0.22),transparent_34%)]" />
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
-              <ShieldCheck className="h-4 w-4" />
-              Resmi Belge Modülü
-            </div>
-            <h1 className="mt-4 flex items-center gap-3 text-3xl font-black tracking-tight text-slate-950 dark:text-white lg:text-4xl">
-              <FileText className="h-8 w-8 text-cyan-600 dark:text-cyan-300" />
+    <div className="theme-page-readable mx-auto max-w-[1500px] space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
+      <section className="overflow-hidden rounded-[24px] border border-border/60 bg-gradient-to-br from-cyan-50 via-background to-emerald-50/70 p-4 shadow-sm dark:from-cyan-950/20 dark:via-background dark:to-emerald-950/20 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <Badge className="border-cyan-500/20 bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-200">
+              <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+              İSG Belge Merkezi
+            </Badge>
+            <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              <FileText className="h-6 w-6 shrink-0 text-cyan-600 dark:text-cyan-300" />
               İSG Formları ve Atama Yazıları
             </h1>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 dark:text-slate-300 lg:text-base">
-              İSG profesyonelleri için resmi atama, eğitim, olay bildirimi ve tatbikat belgelerini tek ekrandan daha hızlı üretin.
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Atama, eğitim, olay bildirimi ve tatbikat belgelerini düzenli Word çıktılarıyla oluşturun.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Badge className="border-cyan-500/15 bg-cyan-500/10 px-3 py-1 text-cyan-800 hover:bg-cyan-500/10 dark:border-cyan-400/15 dark:bg-white/10 dark:text-cyan-100 dark:hover:bg-white/10">Word üretimi</Badge>
-            <Badge className="border-slate-300 bg-white/80 px-3 py-1 text-slate-800 hover:bg-white/80 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/10">Kurumsal belge akışı</Badge>
-            <Badge className="border-slate-300 bg-white/80 px-3 py-1 text-slate-800 hover:bg-white/80 dark:border-white/10 dark:bg-white/10 dark:text-slate-100 dark:hover:bg-white/10">Mobil uyumlu dialoglar</Badge>
+            <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-background/70 px-3 py-1 text-cyan-700 dark:text-cyan-200">10+ Belge</Badge>
+            <Badge variant="outline" className="rounded-full border-emerald-500/20 bg-background/70 px-3 py-1 text-emerald-700 dark:text-emerald-200">DOCX Çıktı</Badge>
+            <Badge variant="outline" className="rounded-full border-amber-500/20 bg-background/70 px-3 py-1 text-amber-700 dark:text-amber-200">Arşiv Uyumlu</Badge>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="cardBase overflow-hidden rounded-[28px] border border-border/70 bg-gradient-to-br from-background via-background to-muted/20 shadow-[0_20px_55px_rgba(2,6,23,0.08)]">
-          <CardHeader className="space-y-3">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/15 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-primary">
-              Belge Standardı
-            </div>
-            <CardTitle className="cardTitle text-xl tracking-tight">Daha düzenli, daha hızlı belge üretimi</CardTitle>
-            <CardDescription className="cardDescription max-w-3xl text-sm leading-6">
-              Kartlar belge türüne göre gruplanır, her form mobil uyumlu dialog ile açılır ve tüm Word çıktıları aynı profesyonel belge akışında oluşturulur.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Belge Sayısı</div>
-              <div className="mt-2 text-2xl font-black tracking-tight text-foreground">10+</div>
-              <p className="mt-2 text-sm text-muted-foreground">Atama, olay, eğitim ve tatbikat formu tek modülde.</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Çıktı Tipi</div>
-              <div className="mt-2 text-2xl font-black tracking-tight text-foreground">DOCX</div>
-              <p className="mt-2 text-sm text-muted-foreground">Kurumsal Word belgeleriyle düzenli arşiv akışı.</p>
-            </div>
-            <div className="rounded-2xl border border-border/70 bg-muted/30 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Kullanım Deneyimi</div>
-              <div className="mt-2 text-2xl font-black tracking-tight text-foreground">Mobil</div>
-              <p className="mt-2 text-sm text-muted-foreground">Dar ekranda taşmayan, rahat doldurulan form dialogları.</p>
+      <section className="grid gap-4 md:grid-cols-3">
+        <Card className="rounded-2xl border border-cyan-500/15 bg-cyan-50/70 shadow-sm dark:bg-cyan-950/15">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700 dark:text-cyan-200">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Atama Yazıları</h2>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">İSG uzmanı, hekim ve destek görevlisi belgeleri.</p>
+              </div>
             </div>
           </CardContent>
         </Card>
-
-        <Card className="cardBase rounded-[28px] border border-border/70 bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-950 shadow-[0_20px_60px_rgba(2,6,23,0.08)] dark:from-slate-900 dark:via-slate-950 dark:to-slate-900 dark:text-slate-50 dark:shadow-[0_20px_60px_rgba(2,6,23,0.28)]">
-          <CardHeader className="space-y-3">
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-300 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-700 dark:border-white/10 dark:bg-white/10 dark:text-slate-200">
-              Hızlı Bilgi
+        <Card className="rounded-2xl border border-emerald-500/15 bg-emerald-50/70 shadow-sm dark:bg-emerald-950/15">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-200">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Eğitim Formları</h2>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">Oryantasyon, işbaşı ve işe dönüş eğitim kayıtları.</p>
+              </div>
             </div>
-            <CardTitle className="text-xl font-semibold tracking-tight text-slate-950 dark:text-white">Minimum Süre Kuralı</CardTitle>
-            <CardDescription className="text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Tehlike sınıfına göre sistem bilgi amaçlı minimum süre uyarısı gösterir.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm md:grid-cols-3 xl:grid-cols-1">
-            <div className="rounded-2xl border border-slate-300 bg-white/75 p-4 text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-100">Az Tehlikeli: çalışan başına 10 dakika</div>
-            <div className="rounded-2xl border border-slate-300 bg-white/75 p-4 text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-100">Tehlikeli: çalışan başına 20 dakika</div>
-            <div className="rounded-2xl border border-slate-300 bg-white/75 p-4 text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-slate-100">Çok Tehlikeli: çalışan başına 40 dakika</div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border border-amber-500/15 bg-amber-50/70 shadow-sm dark:bg-amber-950/15">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="rounded-xl bg-amber-500/10 p-2 text-amber-700 dark:text-amber-200">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">Olay / Tatbikat Kayıtları</h2>
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">Kaza, ramak kala, kök neden ve tatbikat formları.</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </section>
-      <AssignmentTypeCards
-        onCreate={openCreateModal}
-        onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
-        onOpenWorkAccidentReport={openWorkAccidentModal}
-        onOpenReturnToWorkTraining={openReturnTrainingModal}
-        onOpenRootCauseInvestigation={openRootCauseModal}
-        onOpenNearMissReport={openNearMissModal}
-        onOpenEmergencyDrillAttendance={openEmergencyDrillModal}
-        onOpenDrillForm={openDrillFormModal}
-        onOpenIncidentInvestigationReport={openIncidentInvestigationModal}
-        onOpenOrientationOnboardingTraining={openOrientationOnboardingTrainingModal}
-      />
 
-      <Card className="cardBase rounded-[28px] border border-border/70 bg-gradient-to-br from-background via-background to-muted/20 shadow-[0_18px_50px_rgba(2,6,23,0.06)]">
-        <CardHeader>
-          <CardTitle className="cardTitle">Belge Ayarları</CardTitle>
-          <CardDescription className="cardDescription">
-            Tüm atama yazılarında ortak kullanılacak kurum başlığı, belge kodu, yayın no ve imza alanlarını buradan yönetin.
-          </CardDescription>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">Belge Türleri</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Oluşturmak istediğiniz belgeyi seçin.</p>
+        </div>
+        <AssignmentTypeCards
+          onCreate={openCreateModal}
+          onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
+          onOpenWorkAccidentReport={openWorkAccidentModal}
+          onOpenReturnToWorkTraining={openReturnTrainingModal}
+          onOpenRootCauseInvestigation={openRootCauseModal}
+          onOpenNearMissReport={openNearMissModal}
+          onOpenEmergencyDrillAttendance={openEmergencyDrillModal}
+          onOpenDrillForm={openDrillFormModal}
+          onOpenIncidentInvestigationReport={openIncidentInvestigationModal}
+          onOpenOrientationOnboardingTraining={openOrientationOnboardingTrainingModal}
+        />
+      </section>
+
+      <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700 dark:text-cyan-200">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold tracking-tight">Belge Ayarları</CardTitle>
+              <CardDescription className="mt-1 text-sm">
+                Ortak kurum başlığı, belge kodu, yayın no ve imza alanlarını yönetin.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
+        <CardContent className="space-y-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="institution_title">Sabit kurum başlığı</Label>
               <Input
@@ -1544,7 +1551,7 @@ export default function AssignmentLetters() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4 rounded-2xl border border-border bg-muted/20 p-4">
+            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
               <div className="space-y-2">
                 <Label htmlFor="left_signature_name">Sol imza alanı adı</Label>
                 <Input
@@ -1565,7 +1572,7 @@ export default function AssignmentLetters() {
               </div>
             </div>
 
-            <div className="space-y-4 rounded-2xl border border-border bg-muted/20 p-4">
+            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
               <div className="space-y-2">
                 <Label htmlFor="right_signature_name">Sağ imza alanı adı</Label>
                 <Input
@@ -1588,21 +1595,28 @@ export default function AssignmentLetters() {
           </div>
 
           <div className="flex justify-end">
-            <Button className="rounded-xl px-5" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
+            <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
               {settingsSaving ? "Kaydediliyor..." : "Belge Ayarlarını Kaydet"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="cardBase rounded-[28px] border border-border/70 bg-gradient-to-br from-background via-background to-muted/20 shadow-[0_18px_50px_rgba(2,6,23,0.06)]">
-        <CardHeader>
-          <CardTitle className="cardTitle">Çalışan Temsilcisi Dosya Ayarları</CardTitle>
-          <CardDescription className="cardDescription">
-            Çalışan temsilcisi dosyasında kullanılacak revizyon no, hazırlayan, onaylayan ve eğitici bilgilerini ayrı olarak yönetin.
-          </CardDescription>
+      <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+        <CardHeader className="pb-4">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-200">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-semibold tracking-tight">Çalışan Temsilcisi Dosya Ayarları</CardTitle>
+              <CardDescription className="mt-1 text-sm">
+                Revizyon, hazırlayan, onaylayan ve eğitici bilgilerini düzenleyin.
+              </CardDescription>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="employee_rep_revision_no">Revizyon no</Label>
@@ -1677,19 +1691,27 @@ export default function AssignmentLetters() {
           </div>
 
           <div className="flex justify-end">
-            <Button className="rounded-xl px-5" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
+            <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
               {settingsSaving ? "Kaydediliyor..." : "Temsilci Dosya Ayarlarını Kaydet"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      <AssignmentHistoryTable
-        items={historyItems}
-        onDownload={handleDownloadHistoryItem}
-        onEdit={handleEditHistoryItem}
-        onDelete={handleDeleteHistoryItem}
-      />
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">Son Oluşturulan Belgeler</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Daha önce oluşturulan belgeleri indirin, düzenleyin veya silin.
+          </p>
+        </div>
+        <AssignmentHistoryTable
+          items={historyItems}
+          onDownload={handleDownloadHistoryItem}
+          onEdit={handleEditHistoryItem}
+          onDelete={handleDeleteHistoryItem}
+        />
+      </section>
 
       <AssignmentFormModal
         open={modalOpen}
@@ -2092,7 +2114,11 @@ export default function AssignmentLetters() {
         onSubmit={handleGenerateIncidentInvestigationReport}
       />
 
-      {loading ? <div className="text-sm text-muted-foreground">Atama yazıları yükleniyor...</div> : null}
+      {loading ? (
+        <div className="rounded-2xl border border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground shadow-sm">
+          Belgeler yükleniyor...
+        </div>
+      ) : null}
     </div>
   );
 }
