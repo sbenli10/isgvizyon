@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { FileText, ShieldCheck } from "lucide-react";
+import { FileText, Settings, ShieldCheck, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -516,6 +516,7 @@ export default function AssignmentLetters() {
       right_signature_name: data.right_signature_name || "",
       right_signature_title: data.right_signature_title || "",
     });
+
     setEmployeeRepresentativeBundleSettings({
       revision_no: data.employee_rep_revision_no || defaultEmployeeRepresentativeBundleSettings.revision_no,
       prepared_by_name: data.employee_rep_prepared_by_name || defaultEmployeeRepresentativeBundleSettings.prepared_by_name,
@@ -645,6 +646,7 @@ export default function AssignmentLetters() {
     return historyRows.map((row) => {
       const company = companies.find((item) => item.id === row.company_id);
       const employee = employees.find((item) => item.id === row.employee_id);
+
       return {
         id: row.id,
         companyName: company?.company_name || "Firma bulunamadı",
@@ -657,6 +659,7 @@ export default function AssignmentLetters() {
 
   async function resolveCompanyLogoUrl(company?: CompanyRecord) {
     if (!company?.logo_url) return undefined;
+
     if (company.logo_url.startsWith("http") || company.logo_url.startsWith("data:")) {
       return company.logo_url;
     }
@@ -681,6 +684,7 @@ export default function AssignmentLetters() {
   ): Promise<AssignmentLetterDocumentData | null> {
     const company = companies.find((item) => item.id === row.company_id);
     const employee = employees.find((item) => item.id === row.employee_id);
+
     if (!company || !employee) return null;
 
     const companyLogoUrl = await resolveCompanyLogoUrl(company);
@@ -719,9 +723,7 @@ export default function AssignmentLetters() {
     const normalizedName = normalizeCompanyNameLookup(companyName);
     if (!normalizedName) return null;
 
-    return (
-      companies.find((item) => normalizeCompanyNameLookup(item.company_name) === normalizedName) || null
-    );
+    return companies.find((item) => normalizeCompanyNameLookup(item.company_name) === normalizedName) || null;
   }
 
   async function archiveGeneratedDocument(input: {
@@ -741,10 +743,9 @@ export default function AssignmentLetters() {
     const safeFileName = input.fileName.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_");
     const storagePath = `firma-arsivi/${company.id}/belgeler/${Date.now()}__${safeFileName}`;
     const file = new File([input.blob], safeFileName, {
-      type:
-        input.fileName.toLowerCase().endsWith(".docx")
-          ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          : "application/octet-stream",
+      type: input.fileName.toLowerCase().endsWith(".docx")
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/octet-stream",
     });
 
     await uploadFileOptimized("safety_documents", storagePath, file);
@@ -790,6 +791,7 @@ export default function AssignmentLetters() {
     }
 
     setSettingsSaving(true);
+
     try {
       const payload = {
         user_id: user.id,
@@ -803,19 +805,27 @@ export default function AssignmentLetters() {
         left_signature_title: letterSettings.left_signature_title.trim() || null,
         right_signature_name: letterSettings.right_signature_name.trim() || null,
         right_signature_title: letterSettings.right_signature_title.trim() || null,
-        employee_rep_revision_no: employeeRepresentativeBundleSettings.revision_no.trim() || defaultEmployeeRepresentativeBundleSettings.revision_no,
+        employee_rep_revision_no:
+          employeeRepresentativeBundleSettings.revision_no.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.revision_no,
         employee_rep_prepared_by_name:
-          employeeRepresentativeBundleSettings.prepared_by_name.trim() || defaultEmployeeRepresentativeBundleSettings.prepared_by_name,
+          employeeRepresentativeBundleSettings.prepared_by_name.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.prepared_by_name,
         employee_rep_prepared_by_title:
-          employeeRepresentativeBundleSettings.prepared_by_title.trim() || defaultEmployeeRepresentativeBundleSettings.prepared_by_title,
+          employeeRepresentativeBundleSettings.prepared_by_title.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.prepared_by_title,
         employee_rep_approved_by_name:
-          employeeRepresentativeBundleSettings.approved_by_name.trim() || defaultEmployeeRepresentativeBundleSettings.approved_by_name,
+          employeeRepresentativeBundleSettings.approved_by_name.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.approved_by_name,
         employee_rep_approved_by_title:
-          employeeRepresentativeBundleSettings.approved_by_title.trim() || defaultEmployeeRepresentativeBundleSettings.approved_by_title,
+          employeeRepresentativeBundleSettings.approved_by_title.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.approved_by_title,
         employee_rep_trainer_name:
-          employeeRepresentativeBundleSettings.trainer_name.trim() || defaultEmployeeRepresentativeBundleSettings.trainer_name,
+          employeeRepresentativeBundleSettings.trainer_name.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.trainer_name,
         employee_rep_trainer_title:
-          employeeRepresentativeBundleSettings.trainer_title.trim() || defaultEmployeeRepresentativeBundleSettings.trainer_title,
+          employeeRepresentativeBundleSettings.trainer_title.trim() ||
+          defaultEmployeeRepresentativeBundleSettings.trainer_title,
       };
 
       const { error } = await (supabase as any)
@@ -835,12 +845,14 @@ export default function AssignmentLetters() {
 
   async function handleCreateAssignment() {
     if (!activeType) return;
+
     if (!form.company_id || !form.employee_id || !form.start_date || !form.duration || !form.weekly_hours) {
       toast.error("Lütfen tüm zorunlu alanları doldurun.");
       return;
     }
 
     setSaving(true);
+
     try {
       const payload = {
         company_id: form.company_id,
@@ -875,10 +887,12 @@ export default function AssignmentLetters() {
       }
 
       const documentData = await buildDocumentData(activeType, savedRow, form.hazard_class);
+
       if (!documentData) {
         toast.error("Belge kaydedildi ancak Word çıktısı için firma veya personel bilgisi bulunamadı.");
       } else {
         const generated = await generateAssignmentWord(documentData);
+
         await archiveGeneratedDocument({
           companyId: savedRow.company_id,
           companyName: documentData.companyName,
@@ -902,6 +916,7 @@ export default function AssignmentLetters() {
 
   async function handleDownloadHistoryItem(id: string) {
     const row = historyRows.find((item) => item.id === id);
+
     if (!row) {
       toast.error("Belge kaydı bulunamadı.");
       return;
@@ -910,6 +925,7 @@ export default function AssignmentLetters() {
     const company = companies.find((item) => item.id === row.company_id);
     const hazardClass = normalizeHazardClass(company?.hazard_class);
     const documentData = await buildDocumentData(row.assignment_type, row, hazardClass);
+
     if (!documentData) {
       toast.error("İlgili firma veya personel kaydı bulunamadı.");
       return;
@@ -920,12 +936,14 @@ export default function AssignmentLetters() {
 
   function handleEditHistoryItem(id: string) {
     const row = historyRows.find((item) => item.id === id);
+
     if (!row) {
       toast.error("Düzenlenecek belge bulunamadı.");
       return;
     }
 
     const company = companies.find((item) => item.id === row.company_id);
+
     setEditingId(row.id);
     setActiveType(row.assignment_type);
     setForm({
@@ -945,7 +963,9 @@ export default function AssignmentLetters() {
 
     try {
       const { error } = await (supabase as any).from("assignment_letters").delete().eq("id", id);
+
       if (error) throw error;
+
       setHistoryRows((prev) => prev.filter((item) => item.id !== id));
       toast.success("Atama yazısı silindi.");
     } catch (error: any) {
@@ -969,6 +989,7 @@ export default function AssignmentLetters() {
     }
 
     setWorkAccidentSaving(true);
+
     try {
       const generated = await generateWorkAccidentWord({
         accidentDate: workAccidentForm.accident_date,
@@ -985,6 +1006,7 @@ export default function AssignmentLetters() {
         reportDate: workAccidentForm.report_date,
         photos: workAccidentForm.photos,
       });
+
       await archiveGeneratedDocument({
         companyId: workAccidentForm.company_id,
         title: "İş Kazası Tutanağı",
@@ -1020,6 +1042,7 @@ export default function AssignmentLetters() {
     }
 
     setReturnTrainingSaving(true);
+
     try {
       const generated = await generateReturnToWorkTrainingWord({
         organizationName: returnTrainingForm.organization_name,
@@ -1037,6 +1060,7 @@ export default function AssignmentLetters() {
           title: item.title,
         })),
       });
+
       await archiveGeneratedDocument({
         companyId: returnTrainingForm.company_id,
         companyName: returnTrainingForm.organization_name,
@@ -1072,6 +1096,7 @@ export default function AssignmentLetters() {
     }
 
     setRootCauseSaving(true);
+
     try {
       const generated = await generateRootCauseInvestigationWord({
         unitName: rootCauseForm.unit_name,
@@ -1097,6 +1122,7 @@ export default function AssignmentLetters() {
         otherEvaluatorName: rootCauseForm.other_evaluator_name,
         recommendedMeasures: rootCauseForm.recommended_measures,
       });
+
       await archiveGeneratedDocument({
         companyId: rootCauseForm.company_id,
         companyName: rootCauseForm.manual_company_name || rootCauseForm.unit_name,
@@ -1130,6 +1156,7 @@ export default function AssignmentLetters() {
     }
 
     setNearMissSaving(true);
+
     try {
       const generated = await generateNearMissReportWord({
         reportDate: nearMissForm.report_date,
@@ -1145,6 +1172,7 @@ export default function AssignmentLetters() {
         plannedActions: nearMissForm.planned_actions,
         signerName: nearMissForm.signer_name,
       });
+
       await archiveGeneratedDocument({
         companyId: nearMissForm.company_id,
         companyName: nearMissForm.manual_company_name,
@@ -1165,12 +1193,17 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateEmergencyDrillAttendance() {
-    if (!emergencyDrillForm.drill_topic.trim() || !emergencyDrillForm.drill_date || !emergencyDrillForm.drill_duration.trim()) {
+    if (
+      !emergencyDrillForm.drill_topic.trim() ||
+      !emergencyDrillForm.drill_date ||
+      !emergencyDrillForm.drill_duration.trim()
+    ) {
       toast.error("Lütfen tatbikat konusu, tarihi ve süresini doldurun.");
       return;
     }
 
     setEmergencyDrillSaving(true);
+
     try {
       const generated = await generateEmergencyDrillAttendanceWord({
         drillTopic: emergencyDrillForm.drill_topic,
@@ -1194,12 +1227,18 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateDrillForm() {
-    if (!drillForm.workplace_name.trim() || !drillForm.drill_name.trim() || !drillForm.drill_date || drillForm.drill_types.length === 0) {
+    if (
+      !drillForm.workplace_name.trim() ||
+      !drillForm.drill_name.trim() ||
+      !drillForm.drill_date ||
+      drillForm.drill_types.length === 0
+    ) {
       toast.error("Lütfen işyeri, tatbikat adı, tarihi ve en az bir tatbikat türü girin.");
       return;
     }
 
     setDrillFormSaving(true);
+
     try {
       const generated = await generateDrillFormWord({
         workplaceName: drillForm.workplace_name,
@@ -1221,6 +1260,7 @@ export default function AssignmentLetters() {
         conductorTitle: drillForm.conductor_title,
         approverName: drillForm.approver_name,
       });
+
       await archiveGeneratedDocument({
         companyName: drillForm.workplace_name,
         title: "Tatbikat Formu",
@@ -1252,6 +1292,7 @@ export default function AssignmentLetters() {
     }
 
     setIncidentInvestigationSaving(true);
+
     try {
       const generated = await generateIncidentInvestigationReportWord({
         causeActivity: incidentInvestigationForm.cause_activity,
@@ -1283,6 +1324,7 @@ export default function AssignmentLetters() {
         preparedBy: incidentInvestigationForm.prepared_by,
         approvedBy: incidentInvestigationForm.approved_by,
       });
+
       if (incidentInvestigationForm.injured_department.trim()) {
         await archiveGeneratedDocument({
           companyName: incidentInvestigationForm.injured_department,
@@ -1315,6 +1357,7 @@ export default function AssignmentLetters() {
     }
 
     setEmployeeRepresentativeAppointmentSaving(true);
+
     try {
       const generated = await generateEmployeeRepresentativeAppointmentWord({
         workplaceTitle: employeeRepresentativeAppointmentForm.workplace_title,
@@ -1344,6 +1387,7 @@ export default function AssignmentLetters() {
         trainerTitle: employeeRepresentativeBundleSettings.trainer_title,
         additionalNotes: employeeRepresentativeAppointmentForm.additional_notes,
       });
+
       await archiveGeneratedDocument({
         companyId: employeeRepresentativeAppointmentForm.company_id,
         companyName:
@@ -1372,6 +1416,7 @@ export default function AssignmentLetters() {
     }
 
     setOrientationOnboardingTrainingSaving(true);
+
     try {
       const generated = await generateOrientationOnboardingTrainingWord({
         fullName: orientationOnboardingTrainingForm.full_name,
@@ -1402,7 +1447,7 @@ export default function AssignmentLetters() {
   }
 
   return (
-    <div className="theme-page-readable mx-auto max-w-[1500px] space-y-6 px-4 pb-6 sm:px-6 lg:px-8">
+    <div className="theme-page-readable mx-auto max-w-[1500px] space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
       <section className="overflow-hidden rounded-[24px] border border-border/60 bg-gradient-to-br from-cyan-50 via-background to-emerald-50/70 p-4 shadow-sm dark:from-cyan-950/20 dark:via-background dark:to-emerald-950/20 sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
@@ -1410,293 +1455,297 @@ export default function AssignmentLetters() {
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
               İSG Belge Merkezi
             </Badge>
+
             <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
               <FileText className="h-6 w-6 shrink-0 text-cyan-600 dark:text-cyan-300" />
               İSG Formları ve Atama Yazıları
             </h1>
+
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Atama, eğitim, olay bildirimi ve tatbikat belgelerini düzenli Word çıktılarıyla oluşturun.
+              Atama, eğitim, olay bildirimi ve tatbikat belgelerini sade bir akışla oluşturun ve Word çıktısı alın.
             </p>
           </div>
+
           <div className="flex flex-wrap gap-2">
-            <Badge variant="outline" className="rounded-full border-cyan-500/20 bg-background/70 px-3 py-1 text-cyan-700 dark:text-cyan-200">10+ Belge</Badge>
-            <Badge variant="outline" className="rounded-full border-emerald-500/20 bg-background/70 px-3 py-1 text-emerald-700 dark:text-emerald-200">DOCX Çıktı</Badge>
-            <Badge variant="outline" className="rounded-full border-amber-500/20 bg-background/70 px-3 py-1 text-amber-700 dark:text-amber-200">Arşiv Uyumlu</Badge>
+            <Badge
+              variant="outline"
+              className="rounded-full border-cyan-500/20 bg-background/70 px-3 py-1 text-cyan-700 dark:text-cyan-200"
+            >
+              10+ Belge
+            </Badge>
+            <Badge
+              variant="outline"
+              className="rounded-full border-emerald-500/20 bg-background/70 px-3 py-1 text-emerald-700 dark:text-emerald-200"
+            >
+              DOCX Çıktı
+            </Badge>
+            <Badge
+              variant="outline"
+              className="rounded-full border-amber-500/20 bg-background/70 px-3 py-1 text-amber-700 dark:text-amber-200"
+            >
+              Arşiv Uyumlu
+            </Badge>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <Card className="rounded-2xl border border-cyan-500/15 bg-cyan-50/70 shadow-sm dark:bg-cyan-950/15">
-          <CardContent className="p-4">
+      <AssignmentTypeCards
+        onCreate={openCreateModal}
+        onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
+        onOpenWorkAccidentReport={openWorkAccidentModal}
+        onOpenReturnToWorkTraining={openReturnTrainingModal}
+        onOpenRootCauseInvestigation={openRootCauseModal}
+        onOpenNearMissReport={openNearMissModal}
+        onOpenEmergencyDrillAttendance={openEmergencyDrillModal}
+        onOpenDrillForm={openDrillFormModal}
+        onOpenIncidentInvestigationReport={openIncidentInvestigationModal}
+        onOpenOrientationOnboardingTraining={openOrientationOnboardingTrainingModal}
+      />
+
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700 dark:text-cyan-200">
-                <FileText className="h-5 w-5" />
+                <Settings className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Atama Yazıları</h2>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">İSG uzmanı, hekim ve destek görevlisi belgeleri.</p>
+                <CardTitle className="text-lg font-semibold tracking-tight">Belge Ayarları</CardTitle>
+                <CardDescription className="mt-1 text-sm">
+                  Ortak kurum başlığı, belge kodu, yayın no ve imza alanlarını yönetin.
+                </CardDescription>
               </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="institution_title">Sabit kurum başlığı</Label>
+                <Input
+                  id="institution_title"
+                  value={letterSettings.institution_title}
+                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, institution_title: event.target.value }))}
+                  placeholder="Örn: T.C."
+                />
+              </div>
+
+              <div className="space-y-2 xl:col-span-2">
+                <Label htmlFor="institution_subtitle">Alt kurum / birim satırı</Label>
+                <Input
+                  id="institution_subtitle"
+                  value={letterSettings.institution_subtitle}
+                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, institution_subtitle: event.target.value }))}
+                  placeholder="Örn: Giresun Üniversitesi İş Sağlığı ve Güvenliği Koordinatörlüğü"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="document_code">Belge kodu</Label>
+                <Input
+                  id="document_code"
+                  value={letterSettings.document_code}
+                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, document_code: event.target.value }))}
+                  placeholder="Örn: ISG-BLG-ATM"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="publish_number">Yayın no</Label>
+                <Input
+                  id="publish_number"
+                  value={letterSettings.publish_number}
+                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, publish_number: event.target.value }))}
+                  placeholder="Örn: Yayın 02"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="revision_date">Revizyon tarihi</Label>
+                <Input
+                  id="revision_date"
+                  type="date"
+                  value={letterSettings.revision_date}
+                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, revision_date: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/25 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Sol imza alanı</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">İşveren veya yetkili kişi bilgisi.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="left_signature_name">Ad / kurum</Label>
+                  <Input
+                    id="left_signature_name"
+                    value={letterSettings.left_signature_name}
+                    onChange={(event) =>
+                      setLetterSettings((prev) => ({ ...prev, left_signature_name: event.target.value }))
+                    }
+                    placeholder="Örn: İşveren / İşveren Vekili"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="left_signature_title">Unvan</Label>
+                  <Input
+                    id="left_signature_title"
+                    value={letterSettings.left_signature_title}
+                    onChange={(event) =>
+                      setLetterSettings((prev) => ({ ...prev, left_signature_title: event.target.value }))
+                    }
+                    placeholder="Örn: Genel Müdür"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/25 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Sağ imza alanı</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Boş bırakılırsa personel bilgisi kullanılır.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="right_signature_name">Ad / kurum</Label>
+                  <Input
+                    id="right_signature_name"
+                    value={letterSettings.right_signature_name}
+                    onChange={(event) =>
+                      setLetterSettings((prev) => ({ ...prev, right_signature_name: event.target.value }))
+                    }
+                    placeholder="Boş bırakılırsa atanan personel adı kullanılır"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="right_signature_title">Unvan</Label>
+                  <Input
+                    id="right_signature_title"
+                    value={letterSettings.right_signature_title}
+                    onChange={(event) =>
+                      setLetterSettings((prev) => ({ ...prev, right_signature_title: event.target.value }))
+                    }
+                    placeholder="Boş bırakılırsa personel unvanı kullanılır"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-border/60 pt-4">
+              <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
+                {settingsSaving ? "Kaydediliyor..." : "Belge Ayarlarını Kaydet"}
+              </Button>
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-2xl border border-emerald-500/15 bg-emerald-50/70 shadow-sm dark:bg-emerald-950/15">
-          <CardContent className="p-4">
+
+        <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+          <CardHeader className="pb-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-200">
-                <ShieldCheck className="h-5 w-5" />
+                <UserCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-foreground">Eğitim Formları</h2>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">Oryantasyon, işbaşı ve işe dönüş eğitim kayıtları.</p>
+                <CardTitle className="text-lg font-semibold tracking-tight">Temsilci Dosya Ayarları</CardTitle>
+                <CardDescription className="mt-1 text-sm">
+                  Çalışan temsilcisi dosyası için sabit bilgileri düzenleyin.
+                </CardDescription>
               </div>
             </div>
-          </CardContent>
-        </Card>
-        <Card className="rounded-2xl border border-amber-500/15 bg-amber-50/70 shadow-sm dark:bg-amber-950/15">
-          <CardContent className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-xl bg-amber-500/10 p-2 text-amber-700 dark:text-amber-200">
-                <FileText className="h-5 w-5" />
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_revision_no">Revizyon no</Label>
+                <Input
+                  id="employee_rep_revision_no"
+                  value={employeeRepresentativeBundleSettings.revision_no}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, revision_no: event.target.value }))
+                  }
+                />
               </div>
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">Olay / Tatbikat Kayıtları</h2>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">Kaza, ramak kala, kök neden ve tatbikat formları.</p>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_prepared_by_name">Hazırlayan</Label>
+                <Input
+                  id="employee_rep_prepared_by_name"
+                  value={employeeRepresentativeBundleSettings.prepared_by_name}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, prepared_by_name: event.target.value }))
+                  }
+                />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_prepared_by_title">Hazırlayan unvanı</Label>
+                <Input
+                  id="employee_rep_prepared_by_title"
+                  value={employeeRepresentativeBundleSettings.prepared_by_title}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, prepared_by_title: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_approved_by_name">Onaylayan</Label>
+                <Input
+                  id="employee_rep_approved_by_name"
+                  value={employeeRepresentativeBundleSettings.approved_by_name}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, approved_by_name: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_approved_by_title">Onaylayan unvanı</Label>
+                <Input
+                  id="employee_rep_approved_by_title"
+                  value={employeeRepresentativeBundleSettings.approved_by_title}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, approved_by_title: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_trainer_name">Eğitici</Label>
+                <Input
+                  id="employee_rep_trainer_name"
+                  value={employeeRepresentativeBundleSettings.trainer_name}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, trainer_name: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="employee_rep_trainer_title">Eğitici unvanı</Label>
+                <Input
+                  id="employee_rep_trainer_title"
+                  value={employeeRepresentativeBundleSettings.trainer_title}
+                  onChange={(event) =>
+                    setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, trainer_title: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-border/60 pt-4">
+              <Button className="w-full rounded-xl shadow-sm sm:w-auto" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
+                {settingsSaving ? "Kaydediliyor..." : "Kaydet"}
+              </Button>
             </div>
           </CardContent>
         </Card>
       </section>
-
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">Belge Türleri</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Oluşturmak istediğiniz belgeyi seçin.</p>
-        </div>
-        <AssignmentTypeCards
-          onCreate={openCreateModal}
-          onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
-          onOpenWorkAccidentReport={openWorkAccidentModal}
-          onOpenReturnToWorkTraining={openReturnTrainingModal}
-          onOpenRootCauseInvestigation={openRootCauseModal}
-          onOpenNearMissReport={openNearMissModal}
-          onOpenEmergencyDrillAttendance={openEmergencyDrillModal}
-          onOpenDrillForm={openDrillFormModal}
-          onOpenIncidentInvestigationReport={openIncidentInvestigationModal}
-          onOpenOrientationOnboardingTraining={openOrientationOnboardingTrainingModal}
-        />
-      </section>
-
-      <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700 dark:text-cyan-200">
-              <FileText className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-semibold tracking-tight">Belge Ayarları</CardTitle>
-              <CardDescription className="mt-1 text-sm">
-                Ortak kurum başlığı, belge kodu, yayın no ve imza alanlarını yönetin.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="institution_title">Sabit kurum başlığı</Label>
-              <Input
-                id="institution_title"
-                value={letterSettings.institution_title}
-                onChange={(event) => setLetterSettings((prev) => ({ ...prev, institution_title: event.target.value }))}
-                placeholder="Örn: T.C."
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="institution_subtitle">Alt kurum / birim satırı</Label>
-              <Input
-                id="institution_subtitle"
-                value={letterSettings.institution_subtitle}
-                onChange={(event) => setLetterSettings((prev) => ({ ...prev, institution_subtitle: event.target.value }))}
-                placeholder="Örn: Giresun Üniversitesi İş Sağlığı ve Güvenliği Koordinatörlüğü"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="document_code">Belge kodu</Label>
-              <Input
-                id="document_code"
-                value={letterSettings.document_code}
-                onChange={(event) => setLetterSettings((prev) => ({ ...prev, document_code: event.target.value }))}
-                placeholder="Örn: ISG-BLG-ATM"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="publish_number">Yayın no</Label>
-              <Input
-                id="publish_number"
-                value={letterSettings.publish_number}
-                onChange={(event) => setLetterSettings((prev) => ({ ...prev, publish_number: event.target.value }))}
-                placeholder="Örn: Yayın 02"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="revision_date">Revizyon tarihi</Label>
-              <Input
-                id="revision_date"
-                type="date"
-                value={letterSettings.revision_date}
-                onChange={(event) => setLetterSettings((prev) => ({ ...prev, revision_date: event.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
-              <div className="space-y-2">
-                <Label htmlFor="left_signature_name">Sol imza alanı adı</Label>
-                <Input
-                  id="left_signature_name"
-                  value={letterSettings.left_signature_name}
-                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, left_signature_name: event.target.value }))}
-                  placeholder="Örn: İşveren / İşveren Vekili"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="left_signature_title">Sol imza alanı unvanı</Label>
-                <Input
-                  id="left_signature_title"
-                  value={letterSettings.left_signature_title}
-                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, left_signature_title: event.target.value }))}
-                  placeholder="Örn: Genel Müdür"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/30 p-4">
-              <div className="space-y-2">
-                <Label htmlFor="right_signature_name">Sağ imza alanı adı</Label>
-                <Input
-                  id="right_signature_name"
-                  value={letterSettings.right_signature_name}
-                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, right_signature_name: event.target.value }))}
-                  placeholder="Boş bırakılırsa atanan personel adı kullanılır"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="right_signature_title">Sağ imza alanı unvanı</Label>
-                <Input
-                  id="right_signature_title"
-                  value={letterSettings.right_signature_title}
-                  onChange={(event) => setLetterSettings((prev) => ({ ...prev, right_signature_title: event.target.value }))}
-                  placeholder="Boş bırakılırsa personel unvanı kullanılır"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
-              {settingsSaving ? "Kaydediliyor..." : "Belge Ayarlarını Kaydet"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
-        <CardHeader className="pb-4">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-200">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg font-semibold tracking-tight">Çalışan Temsilcisi Dosya Ayarları</CardTitle>
-              <CardDescription className="mt-1 text-sm">
-                Revizyon, hazırlayan, onaylayan ve eğitici bilgilerini düzenleyin.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_revision_no">Revizyon no</Label>
-              <Input
-                id="employee_rep_revision_no"
-                value={employeeRepresentativeBundleSettings.revision_no}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, revision_no: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_prepared_by_name">Hazırlayan</Label>
-              <Input
-                id="employee_rep_prepared_by_name"
-                value={employeeRepresentativeBundleSettings.prepared_by_name}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, prepared_by_name: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_prepared_by_title">Hazırlayan Unvanı</Label>
-              <Input
-                id="employee_rep_prepared_by_title"
-                value={employeeRepresentativeBundleSettings.prepared_by_title}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, prepared_by_title: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_approved_by_name">Onaylayan</Label>
-              <Input
-                id="employee_rep_approved_by_name"
-                value={employeeRepresentativeBundleSettings.approved_by_name}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, approved_by_name: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_approved_by_title">Onaylayan Unvanı</Label>
-              <Input
-                id="employee_rep_approved_by_title"
-                value={employeeRepresentativeBundleSettings.approved_by_title}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, approved_by_title: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_trainer_name">Eğitici</Label>
-              <Input
-                id="employee_rep_trainer_name"
-                value={employeeRepresentativeBundleSettings.trainer_name}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, trainer_name: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee_rep_trainer_title">Eğitici Unvanı</Label>
-              <Input
-                id="employee_rep_trainer_title"
-                value={employeeRepresentativeBundleSettings.trainer_title}
-                onChange={(event) =>
-                  setEmployeeRepresentativeBundleSettings((prev) => ({ ...prev, trainer_title: event.target.value }))
-                }
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
-              {settingsSaving ? "Kaydediliyor..." : "Temsilci Dosya Ayarlarını Kaydet"}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <section className="space-y-3">
         <div>
@@ -1705,6 +1754,7 @@ export default function AssignmentLetters() {
             Daha önce oluşturulan belgeleri indirin, düzenleyin veya silin.
           </p>
         </div>
+
         <AssignmentHistoryTable
           items={historyItems}
           onDownload={handleDownloadHistoryItem}
@@ -1731,10 +1781,12 @@ export default function AssignmentLetters() {
         onValueChange={(patch) => {
           setForm((prev) => {
             const next = { ...prev, ...patch };
+
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
               next.hazard_class = normalizeHazardClass(company?.hazard_class);
             }
+
             return next;
           });
         }}
@@ -1757,16 +1809,20 @@ export default function AssignmentLetters() {
         onValueChange={(patch) => {
           setWorkAccidentForm((prev) => {
             const next = { ...prev, ...patch };
+
             if (patch.company_id) {
               next.employee_id = "";
             }
+
             if (patch.employee_id) {
               const employee = employees.find((item) => item.id === patch.employee_id);
+
               if (employee) {
                 next.injured_full_name = `${employee.first_name} ${employee.last_name}`.trim();
                 next.injured_tc = employee.tc_number || next.injured_tc;
               }
             }
+
             return next;
           });
         }}
@@ -1792,11 +1848,13 @@ export default function AssignmentLetters() {
 
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
+
               if (company) {
                 next.organization_name = company.company_name || next.organization_name;
                 next.address = [company.address, company.district, company.city].filter(Boolean).join(", ") || next.address;
                 next.sgk_registration_no = company.sgk_workplace_number || next.sgk_registration_no;
               }
+
               next.employee_id = "";
               next.participant_name = "";
               next.participant_title = "";
@@ -1819,6 +1877,7 @@ export default function AssignmentLetters() {
 
             if (patch.employee_id) {
               const employee = employees.find((item) => item.id === patch.employee_id);
+
               if (employee) {
                 next.participant_name = `${employee.first_name} ${employee.last_name}`.trim();
                 next.participant_title = employee.job_title || next.participant_title;
@@ -1867,6 +1926,7 @@ export default function AssignmentLetters() {
 
             if (patch.employee_id) {
               const employee = employees.find((item) => item.id === patch.employee_id);
+
               if (employee) {
                 next.injured_name = `${employee.first_name} ${employee.last_name}`.trim();
                 next.task_title = employee.job_title || next.task_title;
@@ -1948,9 +2008,13 @@ export default function AssignmentLetters() {
 
             if (patch.employee_id) {
               const employee = employees.find((item) => item.id === patch.employee_id);
+
               if (employee) {
                 next.reporter_name = `${employee.first_name} ${employee.last_name}`.trim();
-                next.reporter_unit_role = [employee.department, employee.job_title].filter(Boolean).join(" - ") || employee.job_title || next.reporter_unit_role;
+                next.reporter_unit_role =
+                  [employee.department, employee.job_title].filter(Boolean).join(" - ") ||
+                  employee.job_title ||
+                  next.reporter_unit_role;
                 next.signer_name = `${employee.first_name} ${employee.last_name}`.trim();
               }
             }
@@ -2027,11 +2091,14 @@ export default function AssignmentLetters() {
 
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
+
               if (company) {
                 next.workplace_title = company.company_name || next.workplace_title;
-                next.workplace_address = [company.address, company.district, company.city].filter(Boolean).join(", ") || next.workplace_address;
+                next.workplace_address =
+                  [company.address, company.district, company.city].filter(Boolean).join(", ") || next.workplace_address;
                 next.sgk_registration_no = company.sgk_workplace_number || next.sgk_registration_no;
               }
+
               next.employee_id = "";
             }
 
@@ -2051,8 +2118,10 @@ export default function AssignmentLetters() {
 
             if (patch.employee_id) {
               const employee = employees.find((item) => item.id === patch.employee_id);
+
               if (employee) {
                 const fullName = `${employee.first_name} ${employee.last_name}`.trim();
+
                 next.representative_name = fullName;
                 next.representative_tc = employee.tc_number || next.representative_tc;
                 next.representative_title = employee.job_title || next.representative_title;
