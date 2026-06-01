@@ -117,6 +117,107 @@ const createEmptyAnnualEvaluationWork = (): AnnualEvaluationWorkItem => ({
   sonucYorum: "",
 });
 
+const createAnnualEvaluationOfficialTemplateRows = (year: number): AnnualEvaluationWorkItem[] => [
+  {
+    yapilanCalismalar: "Risk değerlendirmesi",
+    tarih: "",
+    yapanKisiUnvani: "İş Güvenliği Uzmanı\n\nİşyeri Hekimi",
+    tekrarSayisi: "4 yılda 1",
+    kullanilanYontem: "FINE KINNEY",
+    sonucYorum:
+      "Yapılan risk analizinde belirtilen hususlar ve düzeltici önleyici tedbirlerin alınmasına devam edilmektedir. Sahada belirli periyotlarda kontrol yapılarak tespit öneri defterine önerilerde bulunulmuştur.",
+  },
+  {
+    yapilanCalismalar: "Ortam ölçümleri",
+    tarih: "-",
+    yapanKisiUnvani: "Onaylanmış kuruluş",
+    tekrarSayisi: "Gerekli görülen durumlarda",
+    kullanilanYontem: "İş hijyeni ölçüm, test ve analiz laboratuvarları hakkındaki yönetmeliğe göre yapılan ölçümler",
+    sonucYorum:
+      "Firmada yapılan iş ve işlemler göz önünde bulundurulduğunda, risk değerlendirme ekibinin de tavsiyesiyle ortam ölçümlerine gerek görülmemiştir.",
+  },
+  {
+    yapilanCalismalar: "İşe giriş muayeneleri",
+    tarih: "Her işe girişte ve tüm personele",
+    yapanKisiUnvani: "İşyeri Hekimi",
+    tekrarSayisi: "İşe yeni girişlerde ve 3 yılda 1",
+    kullanilanYontem: "Fiziki muayene",
+    sonucYorum:
+      "Firmada işe başlayacak personelin görevlendirileceği bölüm ve yapacağı iş ve işlemlerde mevcut sağlık durumunu etkileyebilecek faktörlere istinaden işyeri hekimince belirlenen tetkikler yaptırılmaktadır.",
+  },
+  {
+    yapilanCalismalar: "Periyodik muayeneler",
+    tarih: "-",
+    yapanKisiUnvani: "-\nElektrik Mühendisi\n\n-\nMakine Mühendisi",
+    tekrarSayisi: "Yılda 1\n\nYılda 1",
+    kullanilanYontem:
+      "Volt amper metrik yöntem\n\nHidrostatik deney, emniyet ventili deneyi, kaldırma testi, mekanik dayanıklılık testi",
+    sonucYorum:
+      "Yapılan testler sonucunda topraklama ölçümleri sınır değerlerin altında bulunmaktadır.\n\nKaldırma araçları ve basınçlı kapların yapılan testlerinde makine ve aletlerin çalışmasında sakınca bulunmamıştır.",
+  },
+  {
+    yapilanCalismalar: "Radyolojik analizler",
+    tarih: String(year),
+    yapanKisiUnvani: "İşyeri Hekimi",
+    tekrarSayisi: "İşe yeni girişlerde ve yılda 1",
+    kullanilanYontem: "PA AC grafisi",
+    sonucYorum:
+      `${year} yılında, işe girişlerde ve periyodik muayenelerde personelin PA AC grafisi çekilerek akciğerde aktif lezyon olup olmadığı değerlendirildi. Herhangi bir olumsuz sonuca rastlanmamıştır.`,
+  },
+  {
+    yapilanCalismalar: "Biyolojik analizler",
+    tarih: "-",
+    yapanKisiUnvani: "Onaylanmış kuruluş",
+    tekrarSayisi: "Gerekli görülen durumlarda",
+    kullanilanYontem: "-",
+    sonucYorum:
+      "Kuyu suyuna ait bakteriyolojik testler halk sağlığı laboratuvarına belirli periyotlarda yaptırılmaktadır. Değerlendirme sonuçlarında uygunsuz bir sonuç bulunmamıştır.",
+  },
+  {
+    yapilanCalismalar: "Toksikolojik analizler",
+    tarih: "-",
+    yapanKisiUnvani: "Onaylanmış kuruluş",
+    tekrarSayisi: "Gerekli görülen durumlarda",
+    kullanilanYontem: "İş hijyeni ölçüm, test ve analiz laboratuvarları hakkındaki yönetmeliğe göre yapılan ölçümler",
+    sonucYorum:
+      "Kuyu suyuna ait kimyasal testler halk sağlığı laboratuvarına belirli periyotlarda yaptırılmaktadır. Değerlendirme sonuçlarında uygunsuz bir sonuç bulunmamıştır.",
+  },
+  {
+    yapilanCalismalar: "Fizyolojik testler",
+    tarih: "-",
+    yapanKisiUnvani: "-",
+    tekrarSayisi: "-",
+    kullanilanYontem: "-",
+    sonucYorum: "-",
+  },
+  {
+    yapilanCalismalar: "Psikolojik testler",
+    tarih: "-",
+    yapanKisiUnvani: "-",
+    tekrarSayisi: "-",
+    kullanilanYontem: "-",
+    sonucYorum: "-",
+  },
+  {
+    yapilanCalismalar: "Eğitim çalışmaları",
+    tarih: `${year} yılı içerisinde`,
+    yapanKisiUnvani: "İş Güvenliği Uzmanı\n\nİşyeri Hekimi",
+    tekrarSayisi: "Tüm personele toplam 12 saat / yıllık",
+    kullanilanYontem: "Slayt",
+    sonucYorum:
+      `${year} yılında tüm personel iş güvenliği uzmanı ve işyeri hekimi tarafından mevzuatta belirtilen süreler kadar İSG eğitimi verilmiştir.`,
+  },
+  {
+    yapilanCalismalar: "Diğer çalışmalar",
+    tarih: "-",
+    yapanKisiUnvani: "Yangın tatbikatı\nYangın firması",
+    tekrarSayisi: "Yıllık",
+    kullanilanYontem: "-",
+    sonucYorum:
+      "Firmanın faaliyet alanında olası acil durumlarda yapılacaklar bir eylem planı çerçevesinde hazırlanmış ve bilgilendirmesi çalışanlara aktarılmıştır.",
+  },
+];
+
 const createEmptyAnnualTrainingPlanItem = (): AnnualTrainingPlanItem => ({
   egitimKonusu: "",
   egitimiVerecekKisiKurulus: "",
@@ -124,6 +225,115 @@ const createEmptyAnnualTrainingPlanItem = (): AnnualTrainingPlanItem => ({
   gerceklesenTarih: "",
   aciklamalar: "",
 });
+
+const createAnnualTrainingOfficialTemplateRows = (): AnnualTrainingPlanItem[] => [
+  {
+    egitimKonusu:
+      "Genel Konular\n" +
+      "a) Çalışma mevzuatı ile ilgili bilgiler\n" +
+      "b) Çalışanların yasal hak ve sorumlulukları\n" +
+      "c) İşyeri temizliği ve düzeni\n" +
+      "d) İş kazası ve meslek hastalığından doğan hukuki sonuçlar",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "SÜREKLİ",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu:
+      "Sağlık Konuları\n" +
+      "a) Meslek hastalıklarının sebepleri\n" +
+      "b) Hastalıktan korunma prensipleri ve korunma tekniklerinin uygulanması\n" +
+      "c) Biyolojik ve psikososyal risk etmenleri\n" +
+      "d) İlkyardım",
+    egitimiVerecekKisiKurulus: "İşyeri Hekimi",
+    planlananTarih: "SÜREKLİ",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu:
+      "Teknik Konular\n" +
+      "a) Kimyasal, fiziksel ve ergonomik risk etmenleri\n" +
+      "b) Elle kaldırma ve taşıma\n" +
+      "c) Parlama, patlama, yangın ve yangından korunma\n" +
+      "d) İş ekipmanlarının güvenli kullanımı\n" +
+      "e) Ekranlı araçlarla çalışma\n" +
+      "f) Elektrik tehlikeleri, riskleri ve önlemleri\n" +
+      "g) İş kazalarının sebepleri ve korunma prensipleri ile tekniklerin uygulanması\n" +
+      "h) Güvenlik ve sağlık işaretleri\n" +
+      "i) Kişisel koruyucu donanım kullanımı\n" +
+      "j) İş sağlığı ve güvenliği genel kuralları ve güvenlik kültürü\n" +
+      "k) Tahliye ve kurtarma",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "SÜREKLİ",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Risk Değerlendirme Ekibi Eğitimi",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "OCAK",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "İş Sağlığı ve Güvenliği Kurulu Eğitimi",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "MUAF",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Çalışan Temsilcisi Eğitimi",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "OCAK",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Acil Durum Planı Personel Bilgilendirme Eğitimi",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı / İşyeri Hekimi",
+    planlananTarih: "OCAK",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "İlk Yardımcı Eğitimi",
+    egitimiVerecekKisiKurulus: "Yetkili Eğitim Kuruluşu",
+    planlananTarih: "3 YIL",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Hijyen Eğitimi",
+    egitimiVerecekKisiKurulus: "Yetkili Kuruluş",
+    planlananTarih: "ŞUBAT",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Destek Elemanı ve Ekipler Eğitimi",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "OCAK",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "Mesleki Eğitimler / Mesleki Yeterlilik",
+    egitimiVerecekKisiKurulus: "Yetkili Eğitim Kuruluşu",
+    planlananTarih: "SÜREKLİ",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+  {
+    egitimKonusu: "İşbaşı İş Eğitimleri",
+    egitimiVerecekKisiKurulus: "İş Güvenliği Uzmanı",
+    planlananTarih: "SÜREKLİ",
+    gerceklesenTarih: "",
+    aciklamalar: "",
+  },
+];
 
 const baseRows = [
   {
@@ -605,6 +815,13 @@ export default function AnnualPlans() {
     setAnnualEvaluationWorks((previous) => [...previous, createEmptyAnnualEvaluationWork()]);
   };
 
+  const loadAnnualEvaluationOfficialTemplate = () => {
+    setAnnualEvaluationWorks(createAnnualEvaluationOfficialTemplateRows(selectedYear));
+    toast.success("Yıllık değerlendirme raporu hazır şablonu yüklendi", {
+      description: "Görseldeki resmi değerlendirme matrisi yapılan çalışmalar tablosuna aktarıldı.",
+    });
+  };
+
   const handleRemoveAnnualEvaluationWork = (index: number) => {
     setAnnualEvaluationWorks((previous) => {
       if (previous.length <= 1) {
@@ -638,6 +855,13 @@ export default function AnnualPlans() {
 
   const handleAddAnnualTrainingPlanItem = () => {
     setAnnualTrainingPlanItems((previous) => [...previous, createEmptyAnnualTrainingPlanItem()]);
+  };
+
+  const loadAnnualTrainingOfficialTemplate = () => {
+    setAnnualTrainingPlanItems(createAnnualTrainingOfficialTemplateRows());
+    toast.success("İSG yıllık eğitim planı hazır şablonu yüklendi", {
+      description: "Görseldeki resmi eğitim matrisi eğitim planı satırlarına aktarıldı.",
+    });
   };
 
   const handleRemoveAnnualTrainingPlanItem = (index: number) => {
@@ -1450,6 +1674,45 @@ export default function AnnualPlans() {
               </div>
             </div>
 
+            <div className="overflow-hidden rounded-2xl border border-blue-200/70 bg-gradient-to-br from-blue-50 via-background to-card p-4 dark:border-blue-500/20 dark:from-blue-500/15 dark:via-card dark:to-card">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm">
+                    <FileSpreadsheet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold uppercase tracking-[0.16em] text-blue-700 dark:text-blue-200">
+                      Resmi yıllık plan matrisi hazır şablonu
+                    </div>
+                    <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                      Görseldeki “Risk değerlendirmesi, ortam ölçümleri, işe giriş muayeneleri,
+                      periyodik muayeneler, analizler, eğitim çalışmaları ve diğer çalışmalar”
+                      satırlarını tek tıkla YILLIK DEĞERLENDİRME RAPORU tablosuna yükleyin.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={loadAnnualEvaluationOfficialTemplate}
+                  className="shrink-0 gap-2 rounded-xl bg-blue-600 text-white hover:bg-blue-500"
+                >
+                  <FileText className="h-4 w-4" />
+                  Hazır Şablonu Yükle
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  11 resmi çalışma satırı
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  Sonuç ve yorum alanları dolu gelir
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  Yüklendikten sonra tüm hücreler düzenlenebilir
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-2xl border border-border bg-muted/30 p-4">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -1647,6 +1910,45 @@ export default function AnnualPlans() {
                     className="min-h-[110px] bg-background"
                   />
                 </Field>
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-background to-card p-4 dark:border-emerald-500/20 dark:from-emerald-500/15 dark:via-card dark:to-card">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
+                    <FileSpreadsheet className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-200">
+                      Resmi yıllık eğitim planı hazır şablonu
+                    </div>
+                    <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                      Görseldeki “Genel Konular, Sağlık Konuları, Teknik Konular, risk değerlendirme
+                      ekibi eğitimi, kurul eğitimi, acil durum, ilkyardım, hijyen ve mesleki eğitim”
+                      satırlarını tek tıkla İSG Yıllık Eğitim Planı tablosuna yükleyin.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  onClick={loadAnnualTrainingOfficialTemplate}
+                  className="shrink-0 gap-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500"
+                >
+                  <FileText className="h-4 w-4" />
+                  Hazır Şablonu Yükle
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  12 resmi eğitim satırı
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  Sürekli, Ocak, Şubat ve muaf periyotları hazır gelir
+                </div>
+                <div className="rounded-xl border border-border/70 bg-background/70 px-3 py-2">
+                  Yüklendikten sonra tüm hücreler düzenlenebilir
+                </div>
               </div>
             </div>
 

@@ -231,6 +231,7 @@ const ProtectedShell = () => {
             {/* DASHBOARD */}
             {/* ============================================ */}
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
 
             {/* ============================================ */}
             {/* PROFILE & SETTINGS */}

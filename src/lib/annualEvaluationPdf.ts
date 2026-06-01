@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import autoTable, { type CellHookData } from "jspdf-autotable";
 
 import type {
   AnnualEvaluationCompanyFormState,
@@ -12,198 +13,186 @@ export interface AnnualEvaluationPdfPayload {
   year?: number;
 }
 
-const PAGE_WIDTH = 297;
-const TABLE_START_X = 15;
-const TABLE_START_Y = 74;
-const HEADER_HEIGHT = 10;
-const ROWS_PER_PAGE = 6;
-const MIN_ROW_HEIGHT = 18;
-const CELL_PADDING_X = 1.5;
-const CELL_PADDING_Y = 3.8;
+const COLORS = {
+  title: [15, 23, 42] as const,
+  text: [51, 65, 85] as const,
+  muted: [100, 116, 139] as const,
+  border: [203, 213, 225] as const,
+  soft: [248, 250, 252] as const,
+  blue: [0, 102, 204] as const,
+  white: [255, 255, 255] as const,
+};
 
 const sanitizeFileName = (value: string) =>
   value
     .replace(/[<>:"/\\|?*]+/g, "-")
-    .replace(/\s+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "");
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-const text = (
+const safeText = (value?: string | null) => {
+  const text = String(value || "").trim();
+  return text || "-";
+};
+
+const buildBody = (works: AnnualEvaluationWorkItem[]) =>
+  works.map((item, index) => [
+    String(index + 1),
+    safeText(item.yapilanCalismalar),
+    safeText(item.tarih),
+    safeText(item.yapanKisiUnvani),
+    safeText(item.tekrarSayisi),
+    safeText(item.kullanilanYontem),
+    safeText(item.sonucYorum),
+  ]);
+
+const drawHeader = (
   doc: jsPDF,
-  value: string | string[],
-  x: number,
-  y: number,
-  options?: Parameters<jsPDF["text"]>[3],
+  payload: AnnualEvaluationPdfPayload,
+  fontName: string,
 ) => {
-  doc.text(value as string, x, y, options);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const year = payload.year || new Date().getFullYear();
+
+  doc.setFont(fontName, "bold");
+  doc.setTextColor(...COLORS.title);
+  doc.setFontSize(18);
+  doc.text(`YILLIK DEĞERLENDİRME RAPORU (${year})`, 15, 18);
+
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.text);
+
+  doc.text(`İş Yerinin Unvanı: ${payload.company.isyeriUnvani || "-"}`, 15, 28);
+  doc.text(`SGK / Bölge Müdürlüğü Sicil No: ${payload.company.sgkSicilNo || "-"}`, 15, 35);
+  doc.text(`Tel ve Fax: ${payload.company.telFax || "-"}`, 15, 42);
+  doc.text(`E-posta: ${payload.company.eposta || "-"}`, 15, 49);
+  doc.text(`İşkolu: ${payload.company.iskolu || "-"}`, 15, 56);
+
+  const addressLines = doc.splitTextToSize(`Adres: ${payload.company.adres || "-"}`, 150);
+  doc.text(addressLines, pageWidth - 165, 28);
+
+  doc.setFont(fontName, "bold");
+  doc.text("Çalışan Sayısı", pageWidth - 165, 49);
+  doc.setFont(fontName, "normal");
+  doc.text(
+    `Erkek: ${payload.company.calisanErkek || "-"}   Kadın: ${payload.company.calisanKadin || "-"}   Genç: ${payload.company.calisanGenc || "-"}   Çocuk: ${payload.company.calisanCocuk || "-"}   Toplam: ${payload.company.calisanToplam || "-"}`,
+    pageWidth - 165,
+    56,
+  );
 };
 
-const drawLabelValue = (
-  doc: jsPDF,
-  label: string,
-  value: string,
-  x: number,
-  y: number,
-  valueX: number,
-  width: number,
-) => {
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(8);
-  text(doc, label, x, y);
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(8);
-  const lines = doc.splitTextToSize(value || "", width);
-  text(doc, lines.length > 0 ? lines : [""], valueX, y);
-};
+const drawSignatureBlock = (doc: jsPDF, fontName: string, startY: number) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const blockY = startY + 12 > pageHeight - 45 ? pageHeight - 42 : startY + 12;
 
-const drawHeader = (doc: jsPDF, payload: AnnualEvaluationPdfPayload) => {
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  text(doc, `YILLIK DEGERLENDIRME RAPORU (${payload.year || new Date().getFullYear()})`, PAGE_WIDTH / 2, 22, {
-    align: "center",
-  });
-
-  drawLabelValue(doc, "İş Yerinin:", "", 15, 30, 0, 0);
-  drawLabelValue(doc, "Ünvanı :", payload.company.isyeriUnvani, 15, 36, 30, 100);
-  drawLabelValue(doc, "SGK/Bolge Müdürlüğü Sicil No:", payload.company.sgkSicilNo, 15, 42, 58, 58);
-  drawLabelValue(doc, "Adres :", payload.company.adres, 15, 48, 30, 110);
-  drawLabelValue(doc, "Tel ve Fax :", payload.company.telFax, 15, 54, 35, 40);
-  drawLabelValue(doc, "E-posta:", payload.company.eposta, 83, 54, 99, 58);
-  drawLabelValue(doc, "İşkolu :", payload.company.iskolu, 15, 60, 30, 58);
-  drawLabelValue(doc, "Çalışan Sayısı:", "", 15, 66, 0, 0);
-  drawLabelValue(doc, "Erkek:", payload.company.calisanErkek, 55, 66, 68, 12);
-  drawLabelValue(doc, "Kadın:", payload.company.calisanKadin, 88, 66, 101, 12);
-  drawLabelValue(doc, "Genç:", payload.company.calisanGenc, 126, 66, 138, 12);
-  drawLabelValue(doc, "Çocuk:", payload.company.calisanCocuk, 162, 66, 177, 12);
-  drawLabelValue(doc, "Toplam:", payload.company.calisanToplam, 202, 66, 218, 12);
-};
-
-const TABLE_COLUMNS = [
-  { key: "siraNo", title: "Sira\nNo.", width: 9 },
-  { key: "yapilanCalismalar", title: "Yapilan calismalar", width: 34 },
-  { key: "tarih", title: "Tarih", width: 22 },
-  { key: "yapanKisiUnvani", title: "Yapan Kisi ve Unvani", width: 35 },
-  { key: "tekrarSayisi", title: "Tekrar Sayisi", width: 24 },
-  { key: "kullanilanYontem", title: "Kullanilan Yontem", width: 28 },
-  { key: "sonucYorum", title: "Sonuc ve Yorum", width: 46 },
-] as const;
-
-const getCellLines = (
-  doc: jsPDF,
-  value: string,
-  width: number,
-  fallbackBlank = false,
-) => {
-  const safeValue = value?.trim() || "";
-  if (!safeValue) {
-    return [fallbackBlank ? "" : "-"];
-  }
-
-  return doc.splitTextToSize(safeValue, Math.max(width - CELL_PADDING_X * 2, 4));
-};
-
-const getRowHeight = (doc: jsPDF, item: AnnualEvaluationWorkItem | undefined, start: number, rowIndex: number) => {
-  const lineCounts = TABLE_COLUMNS.map((column) => {
-    const rawValue =
-      column.key === "siraNo"
-        ? item
-          ? String(start + rowIndex + 1)
-          : ""
-        : item
-          ? item[column.key]
-          : "";
-
-    return getCellLines(doc, rawValue, column.width, column.key === "siraNo").length;
-  });
-
-  const maxLines = Math.max(...lineCounts, 1);
-  return Math.max(MIN_ROW_HEIGHT, maxLines * 3.6 + CELL_PADDING_Y * 2);
-};
-
-const drawTable = (doc: jsPDF, works: AnnualEvaluationWorkItem[], pageIndex: number) => {
-  const start = pageIndex * ROWS_PER_PAGE;
-  const visibleRows = works.slice(start, start + ROWS_PER_PAGE);
-
-  let cursorX = TABLE_START_X;
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(...COLORS.border);
   doc.setLineWidth(0.2);
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(7);
+  doc.roundedRect(15, blockY, pageWidth - 30, 28, 2, 2);
 
-  TABLE_COLUMNS.forEach((column) => {
-    doc.rect(cursorX, TABLE_START_Y, column.width, HEADER_HEIGHT);
-    const lines = column.title.split("\n");
-    text(doc, lines, cursorX + column.width / 2, TABLE_START_Y + 4, { align: "center" });
-    cursorX += column.width;
-  });
-
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(7);
-  let cursorY = TABLE_START_Y + HEADER_HEIGHT;
-
-  for (let rowIndex = 0; rowIndex < ROWS_PER_PAGE; rowIndex += 1) {
-    const item = visibleRows[rowIndex];
-    const rowHeight = getRowHeight(doc, item, start, rowIndex);
-    cursorX = TABLE_START_X;
-
-    TABLE_COLUMNS.forEach((column) => {
-      doc.rect(cursorX, cursorY, column.width, rowHeight);
-
-      const rawValue =
-        column.key === "siraNo"
-          ? item
-            ? String(start + rowIndex + 1)
-            : ""
-          : item
-            ? item[column.key]
-            : "";
-
-      const lines = getCellLines(doc, rawValue, column.width, column.key === "siraNo");
-      if (column.key === "siraNo") {
-        text(doc, lines, cursorX + column.width / 2, cursorY + CELL_PADDING_Y + 1, { align: "center" });
-      } else {
-        text(doc, lines, cursorX + CELL_PADDING_X, cursorY + CELL_PADDING_Y + 1);
-      }
-      cursorX += column.width;
-    });
-
-    cursorY += rowHeight;
-  }
-};
-
-const drawSignaturePage = (doc: jsPDF) => {
-  doc.addPage("a4", "landscape");
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(8);
-  text(doc, "Tarih:", 145, 30, { align: "center" });
-  text(doc, "Is Guvenligi Uzmani", 75, 40, { align: "center" });
-  text(doc, "Isveren / Vekili", 148, 40, { align: "center" });
-  text(doc, "Isyeri Hekimi", 260, 40, { align: "right" });
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.title);
+  doc.text("Tarih:", pageWidth / 2, blockY + 7, { align: "center" });
+  doc.text("İş Güvenliği Uzmanı", 70, blockY + 18, { align: "center" });
+  doc.text("İşveren / Vekili", pageWidth / 2, blockY + 18, { align: "center" });
+  doc.text("İşyeri Hekimi", pageWidth - 70, blockY + 18, { align: "center" });
 };
 
 export const downloadAnnualEvaluationPdf = async (payload: AnnualEvaluationPdfPayload) => {
   const doc = new jsPDF({
     orientation: "landscape",
     unit: "mm",
-    format: "a4",
+    format: "a3",
     compress: true,
   });
 
   const interLoaded = addInterFontsToJsPDF(doc);
-  doc.setFont(interLoaded ? "Inter" : "helvetica", "normal");
-  doc.setTextColor(0, 0, 0);
+  const fontName = interLoaded ? "Inter" : "helvetica";
+  doc.setFont(fontName, "normal");
+  doc.setTextColor(...COLORS.text);
 
-  drawHeader(doc, payload);
-  const totalPages = Math.max(1, Math.ceil(payload.works.length / ROWS_PER_PAGE));
-  for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    if (pageIndex > 0) {
-      doc.addPage("a4", "landscape");
-      drawHeader(doc, payload);
-    }
-    drawTable(doc, payload.works, pageIndex);
-  }
-  drawSignaturePage(doc);
+  drawHeader(doc, payload, fontName);
 
-  const fileName = sanitizeFileName("YILLIK_DEGERLENDIRME_RAPORU");
+  autoTable(doc, {
+    startY: 68,
+    theme: "grid",
+    head: [[
+      "Sıra No.",
+      "Yapılan Çalışmalar",
+      "Tarih",
+      "Yapan Kişi ve Unvanı",
+      "Tekrar Sayısı",
+      "Kullanılan Yöntem",
+      "Sonuç ve Yorum",
+    ]],
+    body: buildBody(payload.works),
+    styles: {
+      font: fontName,
+      fontSize: 7.2,
+      cellPadding: 1.8,
+      textColor: COLORS.text,
+      lineColor: COLORS.border,
+      lineWidth: 0.2,
+      valign: "middle",
+      overflow: "linebreak",
+      minCellHeight: 10,
+    },
+    headStyles: {
+      fillColor: COLORS.soft,
+      textColor: COLORS.title,
+      fontStyle: "bold",
+      fontSize: 8,
+      halign: "center",
+      valign: "middle",
+      lineColor: COLORS.border,
+    },
+    bodyStyles: {
+      fillColor: COLORS.white,
+    },
+    columnStyles: {
+      0: { cellWidth: 14, halign: "center" },
+      1: { cellWidth: 58 },
+      2: { cellWidth: 42, halign: "center" },
+      3: { cellWidth: 62, halign: "center" },
+      4: { cellWidth: 42, halign: "center" },
+      5: { cellWidth: 58, halign: "center" },
+      6: { cellWidth: 114 },
+    },
+    margin: { left: 15, right: 15, bottom: 18 },
+    didParseCell: (hookData: CellHookData) => {
+      if (hookData.section !== "body") return;
+
+      const raw = String(hookData.cell.raw || "");
+      if (["4 yılda 1", "3 yılda 1", "Yılda 1", "yılda 1"].some((value) => raw.includes(value))) {
+        hookData.cell.styles.textColor = [...COLORS.blue];
+      }
+      if (hookData.column.index === 0) {
+        hookData.cell.styles.fontStyle = "bold";
+      }
+    },
+    didDrawPage: () => {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const page = doc.getCurrentPageInfo().pageNumber;
+      const total = doc.getNumberOfPages();
+
+      doc.setDrawColor(...COLORS.border);
+      doc.line(15, pageHeight - 10, pageWidth - 15, pageHeight - 10);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...COLORS.muted);
+      doc.text(`Firma: ${payload.company.isyeriUnvani || "-"}`, 15, pageHeight - 5);
+      doc.text(`Sayfa ${page} / ${total}`, pageWidth - 15, pageHeight - 5, { align: "right" });
+    },
+  });
+
+  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 68;
+  drawSignatureBlock(doc, fontName, finalY);
+
+  const fileName = sanitizeFileName(
+    `Yillik-Degerlendirme-Raporu-${payload.company.isyeriUnvani || "Firma"}-${payload.year || new Date().getFullYear()}`,
+  );
   doc.save(`${fileName}.pdf`);
 };

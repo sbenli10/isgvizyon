@@ -16,11 +16,12 @@ import { SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sid
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
-import { ChevronRight, LogOut, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
+import { ChevronRight, LayoutDashboard, LogOut, Settings, ShieldCheck, Sparkles, User } from "lucide-react";
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const routeMeta = [
+  { match: "/dashboard", label: "Ana Panel", section: "İSGVİZYON" },
   { match: "/companies", label: "Firma Yönetimi", section: "Operasyon" },
   { match: "/employees", label: "Çalışan Yönetimi", section: "Operasyon" },
   { match: "/capa", label: "DÖF Yönetimi", section: "Risk ve Güvenlik" },
@@ -139,6 +140,14 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => navigate("/dashboard")}
+                  className="hidden h-10 rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 px-4 text-sm font-bold text-white shadow-[0_14px_34px_-18px_rgba(124,58,237,0.9)] transition hover:from-violet-500 hover:via-fuchsia-500 hover:to-indigo-500 xl:inline-flex"
+                >
+                  <LayoutDashboard className="mr-2 h-4 w-4" />
+                  Panel
+                </Button>
                 <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 py-2 shadow-sm md:flex">
                   <NotificationBell />
                   <ThemeToggle />
@@ -246,6 +255,14 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => navigate("/dashboard")}
+                  aria-label="Panele git"
+                  className="h-10 w-10 rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-600 to-indigo-600 p-0 text-white shadow-sm hover:from-violet-500 hover:via-fuchsia-500 hover:to-indigo-500"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                </Button>
                 <NotificationBell />
                 <ThemeToggle />
               </div>

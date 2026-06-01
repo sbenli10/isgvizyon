@@ -75,5 +75,10 @@ export const saveLastSafeRoute = (path: string) => {
 
 export const readLastSafeRoute = () => readRoute(LAST_SAFE_ROUTE_KEY);
 
-export const resolvePostAuthRoute = (fallback = "/") =>
-  consumeIntendedRoute() || readLastSafeRoute() || fallback;
+const normalizeProfileHomeRoute = (path: string | null) => {
+  if (!path || path === "/") return "/profile";
+  return path;
+};
+
+export const resolvePostAuthRoute = (fallback = "/profile") =>
+  normalizeProfileHomeRoute(consumeIntendedRoute()) || normalizeProfileHomeRoute(readLastSafeRoute()) || normalizeProfileHomeRoute(fallback);

@@ -408,7 +408,6 @@ export function AppSidebar() {
               icon: Award,
               badge: "NEW",
             },
-            { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
             canAccessOsgbModule
               ? {
                   title: "OSGB Modülü",
@@ -434,12 +433,6 @@ export function AppSidebar() {
           icon: ShieldAlert,
           items: [
             { title: "Risk Sihirbazı", url: "/risk-wizard", icon: TrendingUp, badge: "AI" },
-            {
-              title: "Klasik Risk Editörü",
-              url: "/risk-editor",
-              icon: FileSearch,
-              badge: "NEW",
-            },
             { title: "Acil Durum Planı", url: "/adep-wizard", icon: Flame, badge: null },
             { title: "ADEP Planlarım", url: "/adep-plans", icon: FileText, badge: null },
             {
@@ -478,11 +471,9 @@ export function AppSidebar() {
           ],
         },
         {
-          label: "Firma & Çalışan Yönetimi",
+          label: "Firma & Çalışan Operasyonları",
           icon: Building2,
           items: [
-            { title: "Firmalar", url: "/companies", icon: Building2, badge: null },
-            { title: "Çalışanlar", url: "/employees", icon: Users, badge: null },
             { title: "KKD Zimmet", url: "/ppe-management", icon: Shield, badge: "NEW" },
             {
               title: "Sağlık Gözetimi",
@@ -565,7 +556,6 @@ export function AppSidebar() {
           label: "Genel",
           icon: LayoutDashboard,
           items: [
-            { title: "Ana Panel", url: "/", icon: LayoutDashboard, badge: null },
             { title: "Profilim", url: "/profile", icon: User, badge: null },
             { title: "E-posta Arşivi", url: "/email-history", icon: Mail, badge: null },
           ],

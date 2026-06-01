@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import autoTable, { type CellHookData } from "jspdf-autotable";
 
 import type {
   AnnualTrainingPlanDocumentData,
@@ -6,21 +7,14 @@ import type {
 } from "@/lib/annualTrainingPlanOfficialDocx";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
 
-const PAGE_WIDTH = 210;
-const PAGE_HEIGHT = 297;
-const LEFT = 10;
-const TABLE_TOP = 48;
-const TABLE_WIDTH = 190;
-const DATA_ROWS_PER_PAGE = 12;
-const HEADER_HEIGHT = 13;
-const ROW_HEIGHT = 11;
-const SIGNATURE_HEIGHT = 24;
-const NOTE_TOP = 194;
-
-const COL_WIDTHS = [8, 50, 20, 20, 20, 72];
 const COLORS = {
-  text: [0, 0, 0] as const,
+  title: [15, 23, 42] as const,
+  text: [20, 25, 35] as const,
+  muted: [100, 116, 139] as const,
+  border: [20, 25, 35] as const,
+  soft: [248, 250, 252] as const,
   blue: [0, 0, 128] as const,
+  white: [255, 255, 255] as const,
 };
 
 const sanitizeFileName = (value: string) =>
@@ -30,129 +24,99 @@ const sanitizeFileName = (value: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 
-const wrap = (doc: jsPDF, value: string, width: number) =>
-  doc.splitTextToSize(value || "", Math.max(width - 2, 6));
-
-const drawCenteredCellText = (
-  doc: jsPDF,
-  lines: string[],
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) => {
-  const lineHeight = 3.7;
-  const totalHeight = lines.length * lineHeight;
-  const startY = y + (height - totalHeight) / 2 + 3;
-  doc.text(lines, x + width / 2, startY, { align: "center" });
+const safeText = (value?: string | null) => {
+  const text = String(value || "").trim();
+  return text || "";
 };
 
-const drawTrainingHeader = (doc: jsPDF, payload: AnnualTrainingPlanDocumentData) => {
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(11);
-  doc.text("İŞ SAĞLIĞI ve GÜVENLİĞİ YILLIK EĞİTİM PLANI", PAGE_WIDTH / 2, 20, { align: "center" });
+const buildBody = (items: AnnualTrainingPlanItem[]) =>
+  items.map((item, index) => [
+    String(index + 1),
+    safeText(item.egitimKonusu),
+    safeText(item.egitimiVerecekKisiKurulus),
+    safeText(item.planlananTarih),
+    safeText(item.gerceklesenTarih),
+    safeText(item.aciklamalar),
+  ]);
 
-  doc.rect(LEFT, 12, TABLE_WIDTH, 12);
-  doc.rect(LEFT, 24, TABLE_WIDTH, 8);
+const drawHeader = (doc: jsPDF, payload: AnnualTrainingPlanDocumentData, fontName: string) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  doc.setDrawColor(...COLORS.border);
+  doc.setLineWidth(0.25);
+  doc.rect(10, 10, pageWidth - 20, 12);
+  doc.rect(10, 22, pageWidth - 20, 9);
+
+  doc.setFont(fontName, "bold");
   doc.setFontSize(10);
-  doc.text(`${payload.year} YILI EĞİTİM PLANI`, PAGE_WIDTH / 2, 29, { align: "center" });
+  doc.setTextColor(...COLORS.title);
+  doc.text("İŞ SAĞLIĞI ve GÜVENLİĞİ YILLIK EĞİTİM PLANI", pageWidth / 2, 18, { align: "center" });
+  doc.setFontSize(9);
+  doc.text(`${payload.year} YILI EĞİTİM PLANI`, pageWidth / 2, 28, { align: "center" });
 
-  doc.rect(LEFT, 32, 58, 24);
-  doc.rect(68, 32, 38, 24);
-  doc.rect(106, 32, 15, 24);
-  doc.rect(121, 32, 79, 24);
+  doc.rect(10, 31, 58, 28);
+  doc.rect(68, 31, 38, 28);
+  doc.rect(106, 31, 15, 28);
+  doc.rect(121, 31, pageWidth - 131, 28);
 
-  doc.setFontSize(7);
-  doc.setFont("Inter", "bold");
-  doc.text("İş Yeri Unvanı:", 39, 40, { align: "center" });
-  doc.text("İş Yeri Adresi:", 160.5, 40, { align: "center" });
-  doc.text("İş Yeri Sicil No:", 39, 52, { align: "center" });
+  doc.setFontSize(6.8);
+  doc.setFont(fontName, "bold");
+  doc.text("İş Yeri Unvanı:", 39, 39, { align: "center" });
+  doc.text("İş Yeri Sicil No:", 39, 53, { align: "center" });
+  doc.text("İş Yeri Adresi:", 165, 39, { align: "center" });
 
-  doc.setFont("Inter", "normal");
-  doc.text(wrap(doc, payload.form.isYeriUnvani, 34), 87, 40, { align: "center" });
-  doc.text(wrap(doc, payload.form.isYeriAdresi, 75), 160.5, 46, { align: "center" });
-  doc.text(wrap(doc, payload.form.isYeriSicilNo, 34), 87, 52, { align: "center" });
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(6.6);
+  doc.text(doc.splitTextToSize(payload.form.isYeriUnvani || "-", 33), 87, 39, { align: "center" });
+  doc.text(doc.splitTextToSize(payload.form.isYeriSicilNo || "-", 33), 87, 53, { align: "center" });
+  doc.text(doc.splitTextToSize(payload.form.isYeriAdresi || "-", 76), 165, 45, { align: "center" });
 };
 
-const drawTrainingTable = (doc: jsPDF, items: AnnualTrainingPlanItem[], pageIndex: number) => {
-  const start = pageIndex * DATA_ROWS_PER_PAGE;
-  const visible = items.slice(start, start + DATA_ROWS_PER_PAGE);
+const addNotesAndSignatures = (
+  doc: jsPDF,
+  payload: AnnualTrainingPlanDocumentData,
+  fontName: string,
+  startY: number,
+) => {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = Math.min(startY + 5, pageHeight - 58);
 
-  let x = LEFT;
-  const headers = [
-    "Sıra\nNo",
-    "EĞİTİM KONUSU",
-    "Eğitimi Verecek\nKişi/Kuruluş",
-    "Planlanan Tarih",
-    "Gerçekleşen Tarih",
-    "AÇIKLAMALAR",
+  const notes = [
+    "*EĞİTİMLERİN SÜRESİ: Az tehlikeli işyerleri için en az 8 saat, tehlikeli işyerleri için en az 12 saat, çok tehlikeli işyerleri için en az 16 saat olarak her çalışan için düzenlenecektir.",
+    "*EĞİTİMLERİN TEKRARI: Çok tehlikeli sınıfta yer alan işyerlerinde yılda en az 1 defa, tehlikeli sınıfta yer alan işyerlerinde 2 yılda en az 1 defa, az tehlikeli sınıfta yer alan işyerlerinde 3 yılda en az 1 defa yapılır.",
+    "*HİJYEN EĞİTİMİ ALINACAK İŞYERLERİ: Gıda üretim ve perakende iş yerleri, insani tüketim amaçlı sular ile doğal mineralli suların üretimini yapan iş yerleri, kaplıca, hamam, sauna, berber, kuaför ve güzellik salonları gibi iş kolları.",
+    "*EĞİTİMLERİN AMACI: Çalışanlarda iş sağlığı ve güvenliğine yönelik davranış değişikliği sağlamayı ve eğitimlerde aktarılan bilgilerin öneminin çalışanlarca kavranmasını sağlamaktır.",
+    "*İLK YARDIM EĞİTİMİ ALINACAK İŞYERLERİ: İlkyardım Yönetmeliği'ne göre çok tehlikeli sınıfta her 10 kişiden, tehlikeli sınıfta her 15 kişiden, az tehlikeli sınıfta her 20 kişiden bir kişi ilkyardım eğitimi almış olmalıdır.",
   ];
 
-  doc.setFont("Inter", "bold");
-  doc.setTextColor(...COLORS.blue);
-  headers.forEach((header, index) => {
-    doc.rect(x, TABLE_TOP, COL_WIDTHS[index], HEADER_HEIGHT);
-    drawCenteredCellText(doc, header.split("\n"), x, TABLE_TOP, COL_WIDTHS[index], HEADER_HEIGHT);
-    x += COL_WIDTHS[index];
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(5);
+  doc.setTextColor(...COLORS.text);
+  notes.forEach((note) => {
+    const lines = doc.splitTextToSize(note, pageWidth - 20);
+    doc.text(lines, 10, y);
+    y += lines.length * 2.45 + 0.4;
   });
 
-  doc.setFont("Inter", "normal");
-  doc.setTextColor(...COLORS.text);
+  const signatureY = pageHeight - 34;
+  doc.setDrawColor(...COLORS.border);
+  doc.setLineWidth(0.25);
+  doc.rect(10, signatureY, 55, 22);
+  doc.rect(65, signatureY, 70, 22);
+  doc.rect(135, signatureY, pageWidth - 145, 22);
 
-  for (let rowIndex = 0; rowIndex < DATA_ROWS_PER_PAGE; rowIndex += 1) {
-    const item = visible[rowIndex];
-    const y = TABLE_TOP + HEADER_HEIGHT + rowIndex * ROW_HEIGHT;
-    x = LEFT;
-    const values = [
-      String(start + rowIndex + 1),
-      item?.egitimKonusu || "",
-      item?.egitimiVerecekKisiKurulus || "",
-      item?.planlananTarih || "",
-      item?.gerceklesenTarih || "",
-      item?.aciklamalar || "",
-    ];
+  doc.setFont(fontName, "bold");
+  doc.setFontSize(5.8);
+  doc.text("İş Güvenliği Uzmanı", 37.5, signatureY + 6, { align: "center" });
+  doc.text("İşyeri Hekimi", 100, signatureY + 6, { align: "center" });
+  doc.text("İşveren / İ.Vekili", 172.5, signatureY + 6, { align: "center" });
 
-    values.forEach((value, index) => {
-      doc.rect(x, y, COL_WIDTHS[index], ROW_HEIGHT);
-      const lines = wrap(doc, value, COL_WIDTHS[index]);
-      if (index === 0) {
-        drawCenteredCellText(doc, lines, x, y, COL_WIDTHS[index], ROW_HEIGHT);
-      } else {
-        doc.text(lines, x + 1, y + 4);
-      }
-      x += COL_WIDTHS[index];
-    });
-  }
-};
-
-const drawFooter = (doc: jsPDF, payload: AnnualTrainingPlanDocumentData) => {
-  doc.setFont("Inter", "normal");
-  doc.setFontSize(6);
-  doc.text(
-    wrap(
-      doc,
-      "*EĞİTİMLERİN SÜRESİ : Az tehlikeli işyerleri için en az 8 saat, Tehlikeli işyerleri için en az 12 saat, Çok tehlikeli işyerleri için en az 16 saat olarak her çalışan için düzenlenecektir.",
-      TABLE_WIDTH,
-    ),
-    LEFT,
-    NOTE_TOP,
-  );
-
-  const signatureTop = 262;
-  doc.rect(LEFT, signatureTop, 50, SIGNATURE_HEIGHT);
-  doc.rect(60, signatureTop, 70, SIGNATURE_HEIGHT);
-  doc.rect(130, signatureTop, 70, SIGNATURE_HEIGHT);
-
-  doc.setFont("Inter", "bold");
-  doc.setFontSize(7);
-  doc.text("İş Güvenliği Uzmanı", 35, signatureTop + 6, { align: "center" });
-  doc.text("İşyeri Hekimi", 95, signatureTop + 6, { align: "center" });
-  doc.text("İşveren / İ.Vekili", 165, signatureTop + 6, { align: "center" });
-
-  doc.setFont("Inter", "normal");
-  doc.text(wrap(doc, payload.form.isGuvenligiUzmani, 44), 35, signatureTop + 14, { align: "center" });
-  doc.text(wrap(doc, payload.form.isyeriHekimi, 64), 95, signatureTop + 14, { align: "center" });
-  doc.text(wrap(doc, payload.form.isverenVekili, 64), 165, signatureTop + 14, { align: "center" });
+  doc.setFont(fontName, "normal");
+  doc.setFontSize(5.6);
+  doc.text(doc.splitTextToSize(payload.form.isGuvenligiUzmani || "", 48), 37.5, signatureY + 14, { align: "center" });
+  doc.text(doc.splitTextToSize(payload.form.isyeriHekimi || "", 63), 100, signatureY + 14, { align: "center" });
+  doc.text(doc.splitTextToSize(payload.form.isverenVekili || "", 63), 172.5, signatureY + 14, { align: "center" });
 };
 
 export const downloadAnnualTrainingPlanPdf = async (payload: AnnualTrainingPlanDocumentData) => {
@@ -164,20 +128,84 @@ export const downloadAnnualTrainingPlanPdf = async (payload: AnnualTrainingPlanD
   });
 
   const interLoaded = addInterFontsToJsPDF(doc);
-  doc.setFont(interLoaded ? "Inter" : "helvetica", "normal");
+  const fontName = interLoaded ? "Inter" : "helvetica";
+  doc.setFont(fontName, "normal");
   doc.setTextColor(...COLORS.text);
 
-  const totalPages = Math.max(1, Math.ceil(payload.items.length / DATA_ROWS_PER_PAGE));
-  for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
-    if (pageIndex > 0) {
-      doc.addPage("a4", "portrait");
-    }
-    drawTrainingHeader(doc, payload);
-    drawTrainingTable(doc, payload.items, pageIndex);
-    if (pageIndex === totalPages - 1) {
-      drawFooter(doc, payload);
-    }
-  }
+  drawHeader(doc, payload, fontName);
+
+  autoTable(doc, {
+    startY: 61,
+    theme: "grid",
+    head: [[
+      "Sıra\nNo",
+      "EĞİTİM KONUSU",
+      "Eğitimi Verecek\nKişi/Kuruluş",
+      "Planlanan\nTarih",
+      "Gerçekleşen\nTarih",
+      "AÇIKLAMALAR",
+    ]],
+    body: buildBody(payload.items),
+    styles: {
+      font: fontName,
+      fontSize: 5.25,
+      cellPadding: 0.65,
+      textColor: COLORS.text,
+      lineColor: COLORS.border,
+      lineWidth: 0.2,
+      valign: "middle",
+      overflow: "linebreak",
+      minCellHeight: 6,
+    },
+    headStyles: {
+      fillColor: COLORS.white,
+      textColor: COLORS.blue,
+      fontStyle: "bold",
+      fontSize: 5.6,
+      halign: "center",
+      valign: "middle",
+      lineColor: COLORS.border,
+    },
+    bodyStyles: {
+      fillColor: COLORS.white,
+    },
+    columnStyles: {
+      0: { cellWidth: 8, halign: "center", fontStyle: "bold" },
+      1: { cellWidth: 58 },
+      2: { cellWidth: 26, halign: "center" },
+      3: { cellWidth: 22, halign: "center" },
+      4: { cellWidth: 22, halign: "center" },
+      5: { cellWidth: 54 },
+    },
+    margin: { left: 10, right: 10, bottom: 46 },
+    rowPageBreak: "avoid",
+    didParseCell: (hookData: CellHookData) => {
+      if (hookData.section !== "body") return;
+      if (hookData.column.index === 1) {
+        hookData.cell.styles.fontStyle = "bold";
+      }
+      if ([2, 3].includes(hookData.column.index)) {
+        hookData.cell.styles.halign = "center";
+      }
+    },
+    didDrawPage: () => {
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const page = doc.getCurrentPageInfo().pageNumber;
+      const total = doc.getNumberOfPages();
+
+      doc.setDrawColor(203, 213, 225);
+      doc.line(10, pageHeight - 10, pageWidth - 10, pageHeight - 10);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(...COLORS.muted);
+      doc.text(`Firma: ${payload.form.isYeriUnvani || "-"}`, 10, pageHeight - 5);
+      doc.text(`Sayfa ${page} / ${total}`, pageWidth - 10, pageHeight - 5, { align: "right" });
+    },
+  });
+
+  const finalY = (doc as jsPDF & { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 61;
+  addNotesAndSignatures(doc, payload, fontName, finalY);
 
   const fileName = sanitizeFileName(`ISG-Yillik-Egitim-Plani-${payload.form.isYeriUnvani || "Firma"}-${payload.year}`);
   doc.save(`${fileName}.pdf`);
