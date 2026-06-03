@@ -24,7 +24,6 @@ import {
   History,
   Award,
   Briefcase,
-  FileSearch,
   CalendarClock,
   MapPinned,
   HeartPulse,
@@ -32,8 +31,6 @@ import {
   CircleHelp,
   PanelLeftClose,
   PanelLeftOpen,
-  Link2,
-  Globe2,
   Star,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -45,7 +42,6 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/WorkspaceSwitcher";
-import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import {
   Sidebar,
@@ -229,17 +225,6 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const { signOut, user } = useAuth();
-  const {
-    canViewAnalytics,
-    canViewAutomation,
-    canViewCompanyHub,
-    canViewDocuments,
-    canViewFinance,
-    canViewKatip,
-    canViewPeople,
-    canViewPortal,
-  } = useOsgbAccess();
-
   const { hasAccess } = usePlanLimits();
   const canAccessOsgbModule = hasAccess("osgb_module").allowed;
   const canAccessIsgBot = hasAccess("isg_bot").allowed;
@@ -295,101 +280,6 @@ export function AppSidebar() {
 
   const menuGroups: MenuGroup[] = useMemo(
     () => {
-      const osgbChildren: MenuItem[] = [
-        {
-          title: "OSGB Başlangıç",
-          url: "/osgb/dashboard",
-          icon: LayoutDashboard,
-          badge: null,
-        },
-        {
-          title: "Nasıl Kullanılır",
-          url: "/osgb/how-to",
-          icon: CircleHelp,
-          badge: null,
-        },
-        canViewCompanyHub
-          ? {
-              title: "Firma Havuzu",
-              url: "/osgb/company-tracking",
-              icon: Building2,
-              badge: null,
-            }
-          : null,
-        canViewPeople
-          ? {
-              title: "Personel ve Atamalar",
-              url: "/osgb/assignments",
-              icon: Briefcase,
-              badge: null,
-            }
-          : null,
-        canViewPeople
-          ? {
-              title: "Dakika ve Kapasite",
-              url: "/osgb/capacity",
-              icon: TrendingUp,
-              badge: null,
-            }
-          : null,
-        canViewPeople
-          ? {
-              title: "Saha Operasyonu",
-              url: "/osgb/field-visits",
-              icon: MapPinned,
-              badge: "NEW",
-            }
-          : null,
-        canViewDocuments
-          ? {
-              title: "Yasal Evraklar",
-              url: "/osgb/documents",
-              icon: FileSearch,
-              badge: null,
-            }
-          : null,
-        canViewKatip
-          ? {
-              title: "ISG-KATIP Merkezi",
-              url: "/osgb/isgkatip",
-              icon: Link2,
-              badge: "NEW",
-            }
-          : null,
-        canViewAutomation
-          ? {
-              title: "Otomasyon Merkezi",
-              url: "/osgb/automation",
-              icon: Bot,
-              badge: "NEW",
-            }
-          : null,
-        canViewPortal
-          ? {
-              title: "Müşteri Portalı",
-              url: "/osgb/client-portal",
-              icon: Globe2,
-              badge: "NEW",
-            }
-          : null,
-        canViewFinance
-          ? {
-              title: "Finans ve Karlılık",
-              url: "/osgb/finance",
-              icon: FileText,
-              badge: null,
-            }
-          : null,
-        canViewAnalytics
-          ? {
-              title: "Trend Analizi",
-              url: "/osgb/analytics",
-              icon: TrendingUp,
-              badge: null,
-            }
-          : null,
-      ].filter((item): item is NonNullable<typeof item> => item !== null);
-
       return [
         {
           label: "Öne Çıkanlar",
@@ -414,7 +304,6 @@ export function AppSidebar() {
                   url: "/osgb",
                   icon: Briefcase,
                   badge: "NEW",
-                  children: osgbChildren,
                 }
               : null,
           ].filter((item): item is NonNullable<typeof item> => item !== null),
@@ -483,15 +372,6 @@ export function AppSidebar() {
             },
           ],
         },
-        ...(canAccessOsgbModule
-          ? [
-              {
-                label: "OSGB Yönetimi",
-                icon: Briefcase,
-                items: osgbChildren,
-              } satisfies MenuGroup,
-            ]
-          : []),
         {
           label: "Eğitim & Belge Yönetimi",
           icon: Award,
@@ -563,14 +443,6 @@ export function AppSidebar() {
       ];
     },
     [
-      canViewAnalytics,
-      canViewAutomation,
-      canViewCompanyHub,
-      canViewDocuments,
-      canViewFinance,
-      canViewKatip,
-      canViewPeople,
-      canViewPortal,
       canAccessIsgBot,
       canAccessOsgbModule,
       draftMeetingsCount,
