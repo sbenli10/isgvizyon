@@ -5031,6 +5031,17 @@ export default function ISGBot() {
     }
   }, [profile?.organization_id, user?.id]);
 
+  const importRuntime = runtimeByFeature["company-import"] ?? {};
+  const alreadyImportedCompanyIds = useMemo(
+    () =>
+      importTarget === "personal"
+        ? snapshot.companies
+            .filter((company) => isKatipCompanyAlreadyImported(company, existingPersonalCompanyIdentities))
+            .map((company) => company.id)
+        : [],
+    [existingPersonalCompanyIdentities, importTarget, snapshot.companies],
+  );
+
   useEffect(() => {
     if (!user?.id) {
       void loadSnapshot({ silent: true });
@@ -5114,16 +5125,6 @@ export default function ISGBot() {
   }, [extensionStatus.state]);
 
   const selectedRuntime = selectedFeature ? runtimeByFeature[selectedFeature.id] ?? {} : {};
-  const importRuntime = runtimeByFeature["company-import"] ?? {};
-  const alreadyImportedCompanyIds = useMemo(
-    () =>
-      importTarget === "personal"
-        ? snapshot.companies
-            .filter((company) => isKatipCompanyAlreadyImported(company, existingPersonalCompanyIdentities))
-            .map((company) => company.id)
-        : [],
-    [existingPersonalCompanyIdentities, importTarget, snapshot.companies],
-  );
   const extensionSyncIsNewer =
     Boolean(extensionStatus.extensionLastSyncedAt && snapshot.lastSyncedAt) &&
     new Date(extensionStatus.extensionLastSyncedAt!).getTime() > new Date(snapshot.lastSyncedAt!).getTime() + 60_000;
