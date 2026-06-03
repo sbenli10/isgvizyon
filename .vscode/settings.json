@@ -2,5 +2,33 @@
   "deno.enable": true,
   "deno.lint": true,
   "deno.unstable": true,
-  "deno.enablePaths": ["supabase/functions"]
+  "deno.enablePaths": ["supabase/functions"],
+
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.git/**": true,
+    "**/.vercel/**": true,
+    "**/coverage/**": true,
+    "**/tmp/**": true,
+    "**/.tmp_*/**": true,
+    "**/docs/**": true,
+    "**/tests/**": true,
+    "**/load-tests/**": true,
+    "**/chrome-extension/**": true
+  },
+
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.git": true,
+    "**/tmp": true,
+    "**/.tmp_*": true,
+    "**/docs": true,
+    "**/tests": true,
+    "**/load-tests": true,
+    "**/chrome-extension": true
+  },
+
+  "typescript.disableAutomaticTypeAcquisition": true
 }
