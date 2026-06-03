@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
@@ -6,6 +6,7 @@ import { History, FileImage, FileDown, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { withTemporaryBodyChild } from "@/lib/safeDom";
+import { useFormDraft } from "@/hooks/useFormDraft";
 
 interface SavedProject {
   id: string;
@@ -29,7 +30,7 @@ function downloadDataUrl(dataUrl: string, fileName: string) {
 
 export default function EvacuationHistory() {
   const navigate = useNavigate();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useFormDraft("evacuationHistory:query", "");
   const [projects, setProjects] = useState<SavedProject[]>(() => JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
 
   const filtered = useMemo(() => {
