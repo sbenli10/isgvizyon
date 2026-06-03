@@ -17,6 +17,7 @@ import {
   Trash2,
   Upload,
   Users,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -212,6 +213,28 @@ const templateCards = [
   { value: "minimal", title: "Minimal Baskı", text: "Temiz çizgiler, sade tipografi ve hızlı baskı için dengeli görünüm" },
 ] as const;
 
+const DEFAULT_CERTIFICATE_TOPICS_TEXT = `1. GENEL KONULAR
+- Çalışma mevzuatı ile ilgili bilgiler
+- Çalışanların yasal hak ve sorumlulukları
+- İşyeri temizliği ve düzeni
+- İş kazaları ve meslek hastalıklarının hukuki sonuçları
+
+2. SAĞLIK KONULARI
+- Meslek hastalıklarının sebepleri
+- Meslek hastalıklarından korunma prensipleri
+- Biyolojik ve psikososyal risk etmenleri
+- İlk yardım
+
+3. TEKNİK KONULAR
+- Kimyasal, fiziksel ve ergonomik risk etmenleri
+- İş ekipmanlarının güvenli kullanımı
+- Ekranlı araçlarla çalışma
+- Elektrik, yangın ve yangından korunma
+- İş kazalarının sebepleri ve korunma prensipleri
+- Güvenlik ve sağlık işaretleri
+- Kişisel koruyucu donanım kullanımı
+- Tahliye ve kurtarma`;
+
 // ====================================================
 // STATUS META (theme-safe tones)
 // ====================================================
@@ -314,10 +337,29 @@ function toDisplayText(value: unknown) {
 }
 
 function splitCertificateTopics(value?: string | null) {
+  let activeSection = "";
   const topics = (value || "")
-    .split(/[\n;,]+/g)
+    .split(/\r?\n|;/g)
     .map((item) => item.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((item) => {
+      const normalized = item.toLocaleLowerCase("tr-TR");
+      if (normalized.includes("genel konular")) {
+        activeSection = "general";
+        return [];
+      }
+      if (normalized.includes("sağlık konuları") || normalized.includes("saglik konulari")) {
+        activeSection = "health";
+        return [];
+      }
+      if (normalized.includes("teknik konular")) {
+        activeSection = "technical";
+        return [];
+      }
+
+      const cleanItem = item.replace(/^[-•]\s*/, "").trim();
+      return cleanItem ? [`${activeSection || "manual"}::${cleanItem}`] : [];
+    });
 
   return topics.length > 0 ? topics : ["Konu bilgisi bulunmamaktadır."];
 }
@@ -329,6 +371,116 @@ function formatPreviewDate(value?: string | null, fallback = "Belirtilmedi") {
   if (Number.isNaN(date.getTime())) return value;
 
   return date.toLocaleDateString("tr-TR");
+}
+
+function normalizeFileNameForStorage(fileName: string) {
+  const extension = (fileName.split(".").pop() || "bin")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 12) || "bin";
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+  const safeBase = baseName
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "I")
+    .replace(/ğ/g, "g")
+    .replace(/Ğ/g, "G")
+    .replace(/ü/g, "u")
+    .replace(/Ü/g, "U")
+    .replace(/ş/g, "s")
+    .replace(/Ş/g, "S")
+    .replace(/ö/g, "o")
+    .replace(/Ö/g, "O")
+    .replace(/ç/g, "c")
+    .replace(/Ç/g, "C")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return `${safeBase || "logo"}.${extension}`;
+}
+
+function normalizeRoleText(value: unknown) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "i")
+    .replace(/ğ/g, "g")
+    .replace(/ü/g, "u")
+    .replace(/ş/g, "s")
+    .replace(/ö/g, "o")
+    .replace(/ç/g, "c");
+}
+
+function findAssignmentPerson(assignments: any[], roleKeywords: string[]) {
+  const normalizedKeywords = roleKeywords.map(normalizeRoleText);
+  return assignments.find((assignment) => {
+    const haystack = [
+      assignment.role_type,
+      assignment.assignment_group,
+      assignment.notes,
+    ].map(normalizeRoleText).join(" ");
+
+    return normalizedKeywords.some((keyword) => haystack.includes(keyword));
+  });
+}
+
+async function loadCompanyCertificatePeople(company: Company) {
+  try {
+    const { data, error } = await (supabase as any)
+      .from("company_assignments")
+      .select("role_type, assignment_group, person_name, certificate_no, phone, email, notes")
+      .eq("company_id", company.id)
+      .eq("is_active", true);
+
+    if (error) throw error;
+
+    const assignments = Array.isArray(data) ? data : [];
+    const safetyExpert = findAssignmentPerson(assignments, [
+      "is guvenligi uzmani",
+      "isg uzmani",
+      "igu",
+      "safety expert",
+      "occupational safety",
+      "uzman",
+    ]);
+    const workplaceDoctor = findAssignmentPerson(assignments, [
+      "isyeri hekimi",
+      "hekim",
+      "doctor",
+      "workplace doctor",
+    ]);
+    const employer = findAssignmentPerson(assignments, [
+      "isveren",
+      "isveren vekili",
+      "yetkili",
+      "employer",
+    ]);
+
+    return {
+      safetyExpertName: safetyExpert?.person_name || company.occupational_safety_specialist_name || "",
+      safetyExpertCertificateNo: safetyExpert?.certificate_no || "",
+      workplaceDoctorName: workplaceDoctor?.person_name || company.workplace_doctor_name || "",
+      workplaceDoctorCertificateNo: workplaceDoctor?.certificate_no || "",
+      employerName: employer?.person_name || company.employer_representative_name || company.company_name || "",
+    };
+  } catch (error) {
+    console.warn("[CertificatesDashboard] Firma atama bilgileri alınamadı", {
+      companyId: company.id,
+      message: error instanceof Error ? error.message : error,
+    });
+
+    return {
+      safetyExpertName: company.occupational_safety_specialist_name || "",
+      safetyExpertCertificateNo: "",
+      workplaceDoctorName: company.workplace_doctor_name || "",
+      workplaceDoctorCertificateNo: "",
+      employerName: company.employer_representative_name || company.company_name || "",
+    };
+  }
 }
 
 function buildDefaultDesignConfig(trainerNames: string[] = [], companyName = ""): CertificateDesignConfig {
@@ -483,12 +635,18 @@ export default function CertificatesDashboard() {
         : "Önizleme",
       issueDate: formatPreviewDate(new Date().toISOString()),
       summaryText: designConfig.descriptionText || undefined,
+      signatures: designConfig.signatures,
       logoUrl: previewForm.logo_url,
       osgbLogoUrl: designConfig.osgb_logo_url,
       primaryColor: designConfig.primaryColor,
       secondaryColor: designConfig.secondaryColor,
     };
   }, [activeCertificate?.id, previewForm, previewParticipant]);
+
+  const editableSignatures = useMemo(
+    () => normalizeDesignConfig(form.design_config, form.trainer_names, form.company_name).signatures.slice(0, 3),
+    [form.design_config, form.trainer_names, form.company_name],
+  );
 
   const syncStoredPreview = useCallback(
     async (logoValue: string | undefined, setter: (value: string) => void) => {
@@ -636,6 +794,33 @@ export default function CertificatesDashboard() {
   async function applyCompany(companyId: string) {
     const company = companies.find((item) => item.id === companyId);
     if (!company) return;
+    const companyPeople = await loadCompanyCertificatePeople(company);
+    const trainerNames = [
+      companyPeople.safetyExpertName,
+      companyPeople.workplaceDoctorName,
+    ].map((item) => item.trim()).filter(Boolean);
+    const signaturePeople = [
+      {
+        name: companyPeople.safetyExpertName,
+        title: companyPeople.safetyExpertCertificateNo
+          ? `İş Güvenliği Uzmanı\nBelge No: ${companyPeople.safetyExpertCertificateNo}`
+          : "İş Güvenliği Uzmanı",
+      },
+      {
+        name: companyPeople.workplaceDoctorName,
+        title: companyPeople.workplaceDoctorCertificateNo
+          ? `İşyeri Hekimi\nBelge No: ${companyPeople.workplaceDoctorCertificateNo}`
+          : "İşyeri Hekimi",
+      },
+      {
+        name: companyPeople.employerName,
+        title: "İşveren / Yetkili\nKaşe - İmza",
+      },
+      {
+        name: "OSGB Yetkilisi",
+        title: "Düzenleyen Birim",
+      },
+    ];
 
     setForm((prev) => ({
       ...prev,
@@ -644,8 +829,20 @@ export default function CertificatesDashboard() {
       company_address: [company.address, company.city].filter(Boolean).join(", "),
       company_phone: company.phone || "",
       logo_url: company.logo_url || "",
-      design_config: normalizeDesignConfig(prev.design_config, prev.trainer_names, company.company_name),
+      trainer_names: trainerNames,
+      design_config: {
+        ...normalizeDesignConfig(prev.design_config, trainerNames, company.company_name),
+        signatures: signaturePeople.map((signature, index) => ({
+          ...signature,
+          image_url: normalizeDesignConfig(prev.design_config, trainerNames, company.company_name).signatures[index]?.image_url || "",
+        })),
+      } as any,
     }));
+    setTrainerNamesInput(trainerNames.join(", "));
+
+    if (trainerNames.length === 0) {
+      toast.info("Seçilen firmada İSG uzmanı/işyeri hekimi bilgisi yok. Eğitmenleri manuel girebilirsiniz.");
+    }
 
     try {
       const { data: employees, error } = await (supabase as any)
@@ -703,7 +900,7 @@ export default function CertificatesDashboard() {
   }
 
   async function uploadCertificateAsset(file: File) {
-    const fileName = `logos/${crypto.randomUUID()}-${file.name}`;
+    const fileName = `logos/${crypto.randomUUID()}-${normalizeFileNameForStorage(file.name)}`;
     await uploadFileOptimized("certificate-files", fileName, file);
     return fileName;
   }
@@ -734,6 +931,23 @@ export default function CertificatesDashboard() {
       URL.revokeObjectURL(localPreviewUrl);
       setUploadingLogo(false);
     }
+  }
+
+  function updateCertificateSignature(index: number, patch: Partial<CertificateSignatureConfig>) {
+    setForm((prev) => {
+      const normalized = normalizeDesignConfig(prev.design_config, prev.trainer_names, prev.company_name);
+      const signatures = normalized.signatures.map((signature: any, signatureIndex: number) =>
+        signatureIndex === index ? { ...signature, ...patch } : signature,
+      );
+
+      return {
+        ...prev,
+        design_config: {
+          ...normalized,
+          signatures,
+        } as any,
+      };
+    });
   }
 
   async function handleCreate() {
@@ -1182,16 +1396,64 @@ export default function CertificatesDashboard() {
                   />
                 </div>
 
+                <div className="space-y-3 md:col-span-2">
+                  <div>
+                    <Label>Sertifika İmza Alanları</Label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Firma seçtiğinizde kayıtlı İSG uzmanı, işyeri hekimi ve işveren/yetkili bilgileri otomatik dolar. Eksikse buradan manuel girebilirsiniz.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    {[
+                      { label: "İş Güvenliği Uzmanı", namePlaceholder: "Uzman ad soyad", titlePlaceholder: "İş Güvenliği Uzmanı\nBelge No: ..." },
+                      { label: "İşyeri Hekimi", namePlaceholder: "Hekim ad soyad", titlePlaceholder: "İşyeri Hekimi\nBelge No: ..." },
+                      { label: "İşveren / Yetkili", namePlaceholder: "İşveren veya yetkili", titlePlaceholder: "İşveren / Yetkili\nKaşe - İmza" },
+                    ].map((item, index) => (
+                      <div key={item.label} className="rounded-2xl border border-border bg-muted/20 p-3">
+                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                        <div className="mt-3 space-y-2">
+                          <Input
+                            value={editableSignatures[index]?.name || ""}
+                            onChange={(e) => updateCertificateSignature(index, { name: e.target.value })}
+                            placeholder={item.namePlaceholder}
+                          />
+                          <Textarea
+                            value={editableSignatures[index]?.title || ""}
+                            onChange={(e) => updateCertificateSignature(index, { title: e.target.value })}
+                            placeholder={item.titlePlaceholder}
+                            className="min-h-16 resize-none text-xs"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-2 md:col-span-2">
-                  <Label>Eğitim Konuları</Label>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <Label>Eğitim Konuları</Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 sm:w-auto"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, notes: DEFAULT_CERTIFICATE_TOPICS_TEXT }));
+                        toast.success("Hazır eğitim konuları yüklendi.");
+                      }}
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      Hazır Konuları Yükle
+                    </Button>
+                  </div>
                   <Textarea
                     value={form.notes}
                     onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
                     className="min-h-24"
-                    placeholder="İstersen eğitim konu başlıklarını satır satır, virgülle veya noktalı virgülle yazabilirsin."
+                    placeholder="İstersen hazır konuları yükleyebilir veya eğitim konu başlıklarını manuel yazabilirsin."
                   />
                   <p className="text-xs text-muted-foreground">
-                    Bu alan isteğe bağlıdır. Doldurursan tüm sertifika tasarımlarında gösterilir, boş bırakırsan gizlenir.
+                    Hazır konular Genel, Sağlık ve Teknik başlıklarıyla sertifikadaki üç kolona yerleşir. Dilersen metni manuel düzenleyebilirsin.
                   </p>
                 </div>
 

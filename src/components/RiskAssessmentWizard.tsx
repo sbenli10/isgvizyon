@@ -1,5 +1,5 @@
 ﻿import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Archive,
@@ -18,6 +18,7 @@ import {
   Loader2,
   PenSquare,
   Plus,
+  Search,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePersistentFormDraft } from "@/hooks/usePersistentFormDraft";
 import { supabase } from "@/integrations/supabase/client";
+import { MANUAL_RISK_LIBRARY, type ManualRiskLibraryItem } from "@/lib/risk/manualRiskLibrary";
 import { generateSectorRiskTemplates } from "@/lib/risk/sectorRiskTemplates";
 import { getSectorMinimumRiskItemCount, RISK_TEMPLATE_CONFIGS } from "@/lib/risk/riskTemplateConfig";
 import { generateRiskAssessmentOfficialDocx } from "@/lib/riskAssessmentOfficialDocx";
@@ -147,6 +149,22 @@ type RiskAssessmentLogo = {
 
 type RiskAdditionMethod = "ai" | "manual" | "templates" | "saved";
 
+type WizardCompanyOption = {
+  id: string;
+  name: string;
+  email?: string | null;
+  address?: string | null;
+  sgkNumber?: string | null;
+  employeeCount?: number | null;
+  hazardClass?: string | null;
+  activityScope?: string | null;
+  employerRepresentativeName?: string | null;
+  occupationalSafetySpecialistName?: string | null;
+  workplaceDoctorName?: string | null;
+  employeeRepresentativeName?: string | null;
+  osgbTitle?: string | null;
+};
+
 type WizardStep = {
   id: string;
   label: string;
@@ -157,6 +175,7 @@ type WizardStep = {
 
 type RiskAssessmentWizardDraft = {
   currentStep: number;
+  selectedCompanyId?: string;
   companyInfo: RiskWizardCompanyInfo;
   teamInfo: RiskWizardTeamInfo;
   scopeInfo: RiskWizardScopeInfo;
@@ -542,6 +561,23 @@ const mapTemplateRiskItemToWizardRow = (item: Record<string, unknown>, index: nu
   deadline: cleanText(String(item.deadline || "")),
 });
 
+const mapManualLibraryItemToWizardRow = (item: ManualRiskLibraryItem, index: number): RiskWizardTableItem => ({
+  id: createId("risk-library"),
+  no: index + 1,
+  departmentActivity: cleanText(item.departmentActivity || item.category),
+  hazardSource: cleanText(item.hazardSource),
+  riskConsequence: cleanText(item.riskConsequence),
+  affectedPeople: cleanText(item.affectedPeople || "Çalışanlar"),
+  currentMeasure: cleanText(item.currentMeasure),
+  probability: cleanText(item.probability),
+  severity: cleanText(item.severity),
+  riskScore: cleanText(item.riskScore),
+  riskLevel: cleanText(item.riskLevel),
+  additionalMeasures: cleanText(item.additionalMeasures),
+  responsible: cleanText(item.responsible),
+  deadline: cleanText(item.deadline),
+});
+
 const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
   items.map((item, index) => ({
     ...item,
@@ -557,6 +593,7 @@ const buildCorrectiveActionsSummary = (actions: CorrectivePreventiveAction[]) =>
 
 const createInitialDraft = (): RiskAssessmentWizardDraft => ({
   currentStep: 0,
+  selectedCompanyId: "",
   companyInfo: emptyCompanyInfo(),
   teamInfo: emptyTeamInfo(),
   scopeInfo: emptyScopeInfo(),
@@ -1117,13 +1154,17 @@ const buildWizardPdf = async (draft: RiskAssessmentWizardDraft) => {
 };
 
 export default function RiskAssessmentWizard() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const locationState = location.state as { assessmentId?: string | null; companyId?: string | null } | null;
   const importAssessmentId = locationState?.assessmentId || null;
 
   const [currentStep, setCurrentStep] = useState(0);
+  const [companies, setCompanies] = useState<WizardCompanyOption[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState(locationState?.companyId || "");
   const [companyInfo, setCompanyInfo] = useState<RiskWizardCompanyInfo>(emptyCompanyInfo);
   const [teamInfo, setTeamInfo] = useState<RiskWizardTeamInfo>(emptyTeamInfo);
   const [scopeInfo, setScopeInfo] = useState<RiskWizardScopeInfo>(emptyScopeInfo);
@@ -1146,6 +1187,8 @@ export default function RiskAssessmentWizard() {
   const [aiContext, setAiContext] = useState("");
   const [aiRiskCount, setAiRiskCount] = useState("40");
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [manualRiskSearch, setManualRiskSearch] = useState("");
+  const [expandedManualCategories, setExpandedManualCategories] = useState<Record<string, boolean>>({});
 
   const draftContextKey = useMemo(
     () => `${location.pathname}:${locationState?.assessmentId || locationState?.companyId || "general"}`,
@@ -1161,6 +1204,7 @@ export default function RiskAssessmentWizard() {
     debounceMs: 450,
     value: {
       currentStep,
+      selectedCompanyId,
       companyInfo,
       teamInfo,
       scopeInfo,
@@ -1174,6 +1218,7 @@ export default function RiskAssessmentWizard() {
     initialValue: createInitialDraft(),
     isDirty:
       Boolean(cleanText(companyInfo.companyTitle)) ||
+      Boolean(selectedCompanyId) ||
       scopeInfo.assessmentScopeItems.some((item) => Boolean(cleanText(item))) ||
       riskItems.length > 0 ||
       correctiveActions.length > 0 ||
@@ -1182,6 +1227,7 @@ export default function RiskAssessmentWizard() {
       currentStep > 0,
     onRestore: (draft) => {
       setCurrentStep(Math.min(Math.max(draft.currentStep || 0, 0), WIZARD_STEPS.length - 1));
+      setSelectedCompanyId(draft.selectedCompanyId || locationState?.companyId || "");
       setCompanyInfo({ ...emptyCompanyInfo(), ...(draft.companyInfo || {}) });
       setTeamInfo(normalizeTeamInfo(draft.teamInfo || {}));
       const restoredScope = { ...emptyScopeInfo(), ...(draft.scopeInfo || {}) };
@@ -1258,12 +1304,109 @@ export default function RiskAssessmentWizard() {
     void fetchRiskTemplates();
   }, [profile?.organization_id, riskTemplateDialogOpen]);
 
+  useEffect(() => {
+    let active = true;
+    const loadCompanies = async () => {
+      setCompaniesLoading(true);
+      try {
+        let query = supabase
+          .from("companies")
+          .select("*")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        if (profile?.organization_id) {
+          query = query.eq("organization_id", profile.organization_id);
+        } else if (user?.id) {
+          query = query.eq("user_id", user.id);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        if (!active) return;
+
+        setCompanies(
+          ((data || []) as Array<Record<string, unknown>>).map((row) => ({
+            id: String(row.id),
+            name: cleanText(String(row.name || row.company_name || "İsimsiz firma")),
+            email: row.email ? String(row.email) : null,
+            address: row.address ? String(row.address) : null,
+            sgkNumber: row.sgk_number || row.sgk_workplace_number || row.workplace_registration_number
+              ? String(row.sgk_number || row.sgk_workplace_number || row.workplace_registration_number)
+              : null,
+            employeeCount: typeof row.employee_count === "number" ? row.employee_count : null,
+            hazardClass: row.hazard_class ? String(row.hazard_class) : null,
+            activityScope: row.activity_scope || row.sector ? String(row.activity_scope || row.sector) : null,
+            employerRepresentativeName: row.employer_representative_name ? String(row.employer_representative_name) : null,
+            occupationalSafetySpecialistName: row.occupational_safety_specialist_name
+              ? String(row.occupational_safety_specialist_name)
+              : null,
+            workplaceDoctorName: row.workplace_doctor_name ? String(row.workplace_doctor_name) : null,
+            employeeRepresentativeName: row.employee_representative_name ? String(row.employee_representative_name) : null,
+            osgbTitle: row.osgb_title ? String(row.osgb_title) : null,
+          })),
+        );
+      } catch (error) {
+        console.error("Risk wizard company fetch error", error);
+        if (active) toast.error("Profildeki firmalar yüklenemedi.");
+      } finally {
+        if (active) setCompaniesLoading(false);
+      }
+    };
+
+    void loadCompanies();
+    return () => {
+      active = false;
+    };
+  }, [profile?.organization_id, user?.id]);
+
   const previewRiskItems = useMemo(() => buildRiskItemsSummary(riskItems), [riskItems]);
   const previewActions = useMemo(() => buildCorrectiveActionsSummary(correctiveActions), [correctiveActions]);
   const previewSignatureRows = useMemo(
     () => (signatureRows.length > 0 ? signatureRows : buildSignatureRowsFromTeam(teamInfo)),
     [signatureRows, teamInfo],
   );
+  const selectedCompany = useMemo(
+    () => companies.find((company) => company.id === selectedCompanyId) || null,
+    [companies, selectedCompanyId],
+  );
+  const selectedCompanyMissingTeamFields = useMemo(() => {
+    if (!selectedCompany) return [];
+    return [
+      ["İşveren / İşveren Vekili", selectedCompany.employerRepresentativeName],
+      ["İş Güvenliği Uzmanı", selectedCompany.occupationalSafetySpecialistName],
+      ["İşyeri Hekimi", selectedCompany.workplaceDoctorName],
+      ["Çalışan Temsilcisi", selectedCompany.employeeRepresentativeName],
+    ]
+      .filter(([, value]) => !cleanText(String(value || "")))
+      .map(([label]) => label);
+  }, [selectedCompany]);
+  const manualRiskCategories = useMemo(() => {
+    const search = manualRiskSearch.toLocaleLowerCase("tr-TR").trim();
+    const grouped = new Map<string, ManualRiskLibraryItem[]>();
+
+    MANUAL_RISK_LIBRARY.forEach((item) => {
+      const category = cleanText(item.category || "Genel");
+      const searchableText = [
+        item.category,
+        item.hazardSource,
+        item.riskConsequence,
+        item.currentMeasure,
+        item.additionalMeasures,
+        item.responsible,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+
+      if (search && !searchableText.includes(search)) return;
+      grouped.set(category, [...(grouped.get(category) || []), item]);
+    });
+
+    return Array.from(grouped.entries())
+      .map(([category, items]) => ({ category, items }))
+      .sort((first, second) => first.category.localeCompare(second.category, "tr-TR"));
+  }, [manualRiskSearch]);
 
   const progressRatio = ((currentStep + 1) / WIZARD_STEPS.length) * 100;
 
@@ -1288,6 +1431,7 @@ export default function RiskAssessmentWizard() {
   const resetWizard = () => {
     clearDraft();
     setCurrentStep(0);
+    setSelectedCompanyId("");
     setCompanyInfo(emptyCompanyInfo());
     setTeamInfo(emptyTeamInfo());
     setScopeInfo(emptyScopeInfo());
@@ -1300,11 +1444,73 @@ export default function RiskAssessmentWizard() {
     setAiSector("");
     setAiContext("");
     setAiRiskCount("40");
+    setManualRiskSearch("");
+    setExpandedManualCategories({});
     setTouched({});
     toast.success("Risk değerlendirme taslağı temizlendi.");
   };
 
   const touchField = (key: string) => setTouched((prev) => ({ ...prev, [key]: true }));
+
+  const applyCompanyToWizard = (companyId: string) => {
+    setSelectedCompanyId(companyId);
+    const company = companies.find((item) => item.id === companyId);
+    if (!company) return;
+
+    const hazardClass = ["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].includes(cleanText(company.hazardClass))
+      ? (cleanText(company.hazardClass) as HazardClass)
+      : "";
+
+    setCompanyInfo((prev) => ({
+      ...prev,
+      companyTitle: company.name || prev.companyTitle,
+      address: company.address || prev.address,
+      email: company.email || prev.email,
+      workplaceRegistryNo: company.sgkNumber || prev.workplaceRegistryNo,
+      hazardClass: hazardClass || prev.hazardClass,
+      employeeCount: company.employeeCount != null ? String(company.employeeCount) : prev.employeeCount,
+      activityScope: company.activityScope || prev.activityScope,
+    }));
+
+    setTeamInfo((prev) => ({
+      ...prev,
+      employer: {
+        ...prev.employer,
+        fullName: company.employerRepresentativeName || prev.employer.fullName,
+      },
+      employeeRepresentative: {
+        ...prev.employeeRepresentative,
+        fullName: company.employeeRepresentativeName || prev.employeeRepresentative.fullName,
+      },
+      safetyExpert: {
+        ...prev.safetyExpert,
+        fullName: company.occupationalSafetySpecialistName || prev.safetyExpert.fullName,
+      },
+      workplaceDoctor: {
+        ...prev.workplaceDoctor,
+        fullName: company.workplaceDoctorName || prev.workplaceDoctor.fullName,
+      },
+      osgb: {
+        ...prev.osgb,
+        title: company.osgbTitle || prev.osgb.title,
+      },
+    }));
+
+    const missingFields = [
+      ["İşveren / İşveren Vekili", company.employerRepresentativeName],
+      ["İş Güvenliği Uzmanı", company.occupationalSafetySpecialistName],
+      ["İşyeri Hekimi", company.workplaceDoctorName],
+      ["Çalışan Temsilcisi", company.employeeRepresentativeName],
+    ].filter(([, value]) => !cleanText(String(value || "")));
+
+    if (missingFields.length > 0) {
+      toast.warning("Firma bilgileri aktarıldı; risk değerlendirme ekibinde eksik alanlar var.", {
+        description: missingFields.map(([label]) => label).join(", "),
+      });
+    } else {
+      toast.success("Firma ve risk değerlendirme ekibi bilgileri otomatik dolduruldu.");
+    }
+  };
 
   const handleNext = () => {
     const validation = isStepValid(currentStep);
@@ -1422,12 +1628,28 @@ export default function RiskAssessmentWizard() {
     }
   };
 
+  const addManualLibraryItems = (items: ManualRiskLibraryItem[]) => {
+    if (items.length === 0) return;
+
+    const mappedItems = items.map((item, index) => mapManualLibraryItemToWizardRow(item, index));
+    appendRiskItems(mappedItems);
+    setRiskAdditionMethod("manual");
+    toast.success(`${mappedItems.length} risk maddesi Risk Değerlendirme Tablosu’na eklendi.`);
+  };
+
+  const addManualLibraryCategory = (items: ManualRiskLibraryItem[]) => {
+    addManualLibraryItems(items);
+    setCurrentStep(RISK_TABLE_STEP_INDEX);
+  };
+
+  const toggleManualCategory = (category: string) => {
+    setExpandedManualCategories((prev) => ({ ...prev, [category]: !prev[category] }));
+  };
+
   const handleRiskAdditionMethodSelect = (method: RiskAdditionMethod) => {
     setRiskAdditionMethod(method);
 
     if (method === "manual") {
-      if (riskItems.length === 0) addRiskItem();
-      setCurrentStep(RISK_TABLE_STEP_INDEX);
       return;
     }
 
@@ -1720,6 +1942,53 @@ export default function RiskAssessmentWizard() {
                 opsiyoneldir; boş bırakılırsa çıktıda hiç görünmez.
               </p>
             </div>
+
+            <Card className="border-cyan-500/10 bg-slate-950/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-white">
+                  <Building2 className="h-4 w-4 text-cyan-300" />
+                  Profilimdeki Firmadan Doldur
+                </CardTitle>
+                <CardDescription className="text-slate-400">
+                  Firma seçildiğinde kapak bilgileri ve Risk Değerlendirme Ekibi alanları Profilim &gt; Firmalar
+                  kaydından otomatik aktarılır.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <Select value={selectedCompanyId} onValueChange={applyCompanyToWizard} disabled={companiesLoading}>
+                    <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                      <SelectValue placeholder={companiesLoading ? "Firmalar yükleniyor..." : "Firma seçin"} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-80 border-slate-800 bg-slate-950 text-slate-100">
+                      {companies.map((company) => (
+                        <SelectItem key={company.id} value={company.id}>
+                          {company.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate("/profile?tab=companies")}
+                    className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                  >
+                    Profilim / Firmalar
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+                {selectedCompany && selectedCompanyMissingTeamFields.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                    <p className="font-bold">Risk Değerlendirme Ekibi bilgileri eksik.</p>
+                    <p className="mt-1 text-amber-200/90">
+                      Eksik alanlar: {selectedCompanyMissingTeamFields.join(", ")}. Bu alanları Profilim &gt; Firmalar
+                      sekmesindeki Atamalar bölümünden doldurabilirsiniz.
+                    </p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               {renderInput("Firma Ünvanı *", companyInfo.companyTitle, (value) => updateCompanyInfo("companyTitle", value), {
@@ -2086,6 +2355,138 @@ export default function RiskAssessmentWizard() {
               ))}
             </div>
 
+            {riskAdditionMethod === "manual" ? (
+              <Card className="overflow-hidden border-slate-800 bg-slate-950/50">
+                <CardHeader className="border-b border-slate-800/80">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/90 text-white">
+                        <BookOpen className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-white">Manuel Risk Seçimi</CardTitle>
+                        <CardDescription className="mt-1 text-slate-400">
+                          Şablondaki {MANUAL_RISK_LIBRARY.length} risk maddesini kategorilere göre seçip tabloya ekleyin.
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Badge className="w-fit rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-emerald-300">
+                      {manualRiskCategories.length} kategori
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 p-5">
+                  <div className="grid gap-3 lg:grid-cols-[170px_1fr] lg:items-center">
+                    <div className="flex items-center gap-2 text-sm font-black text-white">
+                      <BookOpen className="h-4 w-4 text-emerald-400" />
+                      Risk Kütüphanesi
+                    </div>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      <Input
+                        value={manualRiskSearch}
+                        onChange={(event) => setManualRiskSearch(event.target.value)}
+                        placeholder="Kategori, tehlike, risk veya önlem ara..."
+                        className="h-11 rounded-xl border-slate-700 bg-slate-900/70 pl-10 text-slate-100 placeholder:text-slate-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+                    {manualRiskCategories.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 p-6 text-center text-sm text-slate-400">
+                        Aramanıza uygun risk maddesi bulunamadı.
+                      </div>
+                    ) : (
+                      manualRiskCategories.map(({ category, items }) => {
+                        const isExpanded = Boolean(expandedManualCategories[category]);
+                        return (
+                          <div key={category} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/30">
+                            <div className="flex items-center gap-3 p-3">
+                              <button
+                                type="button"
+                                onClick={() => toggleManualCategory(category)}
+                                className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-1 py-2 text-left transition hover:bg-slate-800/50"
+                              >
+                                <span className="truncate text-sm font-black uppercase tracking-wide text-white">{category}</span>
+                                <Badge className="rounded-full bg-slate-700 px-2 py-0.5 text-[11px] font-bold text-slate-100">
+                                  {items.length}
+                                </Badge>
+                                <ChevronRight
+                                  className={cn(
+                                    "ml-auto h-4 w-4 shrink-0 text-slate-400 transition-transform",
+                                    isExpanded ? "rotate-90" : "",
+                                  )}
+                                />
+                              </button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => addManualLibraryCategory(items)}
+                                className="h-9 w-9 shrink-0 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                                title="Bu kategorideki tüm riskleri ekle"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {isExpanded ? (
+                              <div className="space-y-2 border-t border-slate-800/80 p-3">
+                                {items.map((item) => (
+                                  <div key={item.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                      <div className="min-w-0 space-y-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          <Badge className="rounded-full border border-slate-700 bg-slate-900 text-slate-300">
+                                            #{item.sourceSequenceNo}
+                                          </Badge>
+                                          {item.riskLevel ? (
+                                            <Badge className="rounded-full border border-amber-500/20 bg-amber-500/10 text-amber-300">
+                                              {item.riskLevel}
+                                            </Badge>
+                                          ) : null}
+                                        </div>
+                                        <p className="text-sm font-bold text-white">{item.hazardSource || "Tehlike kaynağı belirtilmedi"}</p>
+                                        <p className="text-sm leading-relaxed text-slate-300">{item.riskConsequence || "Risk açıklaması yok"}</p>
+                                        {item.additionalMeasures ? (
+                                          <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{item.additionalMeasures}</p>
+                                        ) : null}
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        onClick={() => addManualLibraryItems([item])}
+                                        className="shrink-0 rounded-xl bg-emerald-600 text-white hover:bg-emerald-500"
+                                      >
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Ekle
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t border-slate-800/80 pt-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                    <span>Eklenen maddeler bir sonraki adımda düzenlenebilir veya silinebilir.</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setCurrentStep(RISK_TABLE_STEP_INDEX)}
+                      className="rounded-xl border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+                    >
+                      Risk Tablosuna Geç
+                      <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             <Card className="border-slate-800 bg-slate-950/50">
               <CardHeader>
                 <CardTitle className="text-base text-white">AI ile Risk Üretim Alanı</CardTitle>
@@ -2259,7 +2660,9 @@ export default function RiskAssessmentWizard() {
                       {renderInput("Ş", item.severity, (value) => updateRiskItem(item.id, "severity", value), { type: "number" })}
                       {renderInput("R", item.riskScore, (value) => updateRiskItem(item.id, "riskScore", value), { type: "number" })}
                       {renderInput("Düzey", item.riskLevel, (value) => updateRiskItem(item.id, "riskLevel", value))}
-                      {renderInput("Termin", item.deadline, (value) => updateRiskItem(item.id, "deadline", value), { type: "date" })}
+                      {renderInput("Termin", item.deadline, (value) => updateRiskItem(item.id, "deadline", value), {
+                        placeholder: "Süreklilik esastır / gg.aa.yyyy",
+                      })}
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       {renderInput("Sorumlu", item.responsible, (value) => updateRiskItem(item.id, "responsible", value))}

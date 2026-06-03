@@ -145,6 +145,14 @@ type ImportResult = {
   updated: number;
 };
 
+type ExistingCompanyIdentity = {
+  id: string;
+  name: string | null;
+  tax_number: string | null;
+  sgk_workplace_number: string | null;
+  workplace_registration_number: string | null;
+};
+
 type KatipChangeType = "added" | "removed" | "updated";
 
 type KatipChangeItem = {
@@ -414,12 +422,111 @@ const normalizeHazardClass = (value: string | null) => {
   return "Az Tehlikeli";
 };
 
+const normalizeImportText = (value: unknown) => String(value ?? "").trim();
+
+const getRawErrorMessage = (error: unknown) => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const maybeError = error as Record<string, unknown>;
+    return String(maybeError.message || maybeError.error || maybeError.details || "");
+  }
+  return "";
+};
+
+const getIsgbotFriendlyErrorMessage = (
+  error: unknown,
+  fallback = "İşlem tamamlanamadı. Lütfen bağlantınızı, oturumunuzu ve seçili verileri kontrol edip tekrar deneyin.",
+) => {
+  const rawMessage = getRawErrorMessage(error);
+  const normalized = rawMessage.toLocaleLowerCase("tr-TR");
+
+  if (!rawMessage.trim()) return fallback;
+
+  if (normalized.includes("cannot read properties") || normalized.includes("undefined") || normalized.includes("null")) {
+    return "İşlem için gerekli verilerden biri eksik görünüyor. Lütfen listeyi yenileyip kayıt seçimini tekrar yapın.";
+  }
+
+  if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("err_failed")) {
+    return "Sunucuya ulaşılamadı. İnternet bağlantınızı ve Supabase/eklenti erişimini kontrol edip tekrar deneyin.";
+  }
+
+  if (normalized.includes("jwt") || normalized.includes("unauthorized") || normalized.includes("auth") || normalized.includes("oturumu")) {
+    return "Oturum doğrulanamadı. Lütfen çıkış yapıp tekrar giriş yapın, ardından işlemi yeniden deneyin.";
+  }
+
+  if (normalized.includes("row-level security") || normalized.includes("rls") || normalized.includes("permission denied")) {
+    return "Bu işlem için yetkiniz doğrulanamadı. Kurum/organizasyon erişiminizi kontrol edip tekrar deneyin.";
+  }
+
+  if (normalized.includes("relation") || normalized.includes("does not exist") || normalized.includes("schema cache") || normalized.includes("42p01")) {
+    return "Gerekli veritabanı tablosu veya migration eksik görünüyor. Lütfen sistem kurulumunu/migration durumunu kontrol edin.";
+  }
+
+  if (normalized.includes("duplicate") || normalized.includes("23505") || normalized.includes("unique")) {
+    return "Bu kayıt sistemde zaten bulunuyor. Mevcut kaydı güncelleyebilir veya farklı bir kayıt seçebilirsiniz.";
+  }
+
+  if (normalized.includes("on conflict")) {
+    return "Kayıt eşleştirme kuralı veritabanında eksik görünüyor. İlgili unique index migration’ı uygulanmalıdır.";
+  }
+
+  if (normalized.includes("not-null") || normalized.includes("null value") || normalized.includes("23502")) {
+    return "Zorunlu alanlardan biri boş. Lütfen seçili kayıttaki firma adı, SGK no ve gerekli süre bilgilerini kontrol edin.";
+  }
+
+  if (normalized.includes("receiving end does not exist") || normalized.includes("message port") || normalized.includes("extension")) {
+    return "Tarayıcı eklentisiyle bağlantı kurulamadı. Eklentinin açık, güncel ve İSG-KATİP oturumunun aktif olduğundan emin olun.";
+  }
+
+  if (normalized.includes("form") || normalized.includes("selector") || normalized.includes("alanları doğrulanamadı")) {
+    return "İSG-KATİP form alanları doğrulanamadı. Sayfa yapısı değişmiş olabilir veya yanlış ekranda olabilirsiniz.";
+  }
+
+  if (normalized.includes("timeout") || normalized.includes("time out") || normalized.includes("zaman aşımı")) {
+    return "İşlem zaman aşımına uğradı. İSG-KATİP sayfasının açık olduğundan emin olup tekrar deneyin.";
+  }
+
+  if (normalized.includes("organization")) {
+    return "Organizasyon bilgisi bulunamadı. Lütfen hesap/kurum bağlantınızı kontrol edin.";
+  }
+
+  return fallback;
+};
+
+const normalizeCompanyMatchText = (value: unknown) => String(value ?? "").trim().toLocaleLowerCase("tr-TR");
+
+const normalizeCompanyIdentifier = (value: unknown) => String(value ?? "").replace(/\D/g, "");
+
+const isKatipCompanyAlreadyImported = (company: IsgkatipCompanyRow, identities: ExistingCompanyIdentity[]) => {
+  const sgkNo = normalizeCompanyIdentifier(company.sgk_no);
+  const companyName = normalizeCompanyMatchText(company.company_name);
+
+  return identities.some((identity) => {
+    const identityNumbers = [
+      identity.tax_number,
+      identity.sgk_workplace_number,
+      identity.workplace_registration_number,
+    ]
+      .map(normalizeCompanyIdentifier)
+      .filter(Boolean);
+
+    if (sgkNo && identityNumbers.includes(sgkNo)) return true;
+    return Boolean(companyName && normalizeCompanyMatchText(identity.name) === companyName);
+  });
+};
+
 const buildCompanyImportPayload = (row: IsgkatipCompanyRow, userId: string) => {
-  const sgkNo = row.sgk_no.trim() || null;
+  const companyName = normalizeImportText(row.company_name);
+  const sgkNo = normalizeImportText(row.sgk_no) || null;
+
+  if (!companyName) {
+    throw new Error("Aktarılacak firmalardan birinde firma adı eksik. Lütfen İSG-KATİP senkronunu yenileyip tekrar deneyin.");
+  }
 
   return {
     user_id: userId,
-    name: row.company_name,
+    name: companyName,
     tax_number: sgkNo,
     industry: row.nace_code || null,
     employee_count: Number(row.employee_count || 0),
@@ -432,34 +539,31 @@ const buildCompanyImportPayload = (row: IsgkatipCompanyRow, userId: string) => {
   };
 };
 
+const loadExistingPersonalCompanyIdentities = async (userId: string): Promise<ExistingCompanyIdentity[]> => {
+  const { data, error } = await (supabase as any)
+    .from("companies")
+    .select("id,name,tax_number,sgk_workplace_number,workplace_registration_number")
+    .eq("user_id", userId)
+    .eq("is_active", true);
+
+  if (error) throw error;
+  return (data ?? []) as ExistingCompanyIdentity[];
+};
+
 const importRowsToPersonalCompanies = async (
   userId: string,
   rows: IsgkatipCompanyRow[],
 ): Promise<ImportResult> => {
   if (rows.length === 0) return { created: 0, updated: 0 };
 
-  const { data: existingRows, error: readError } = await (supabase as any)
-    .from("companies")
-    .select("id,name,tax_number,sgk_workplace_number,workplace_registration_number")
-    .eq("user_id", userId)
-    .eq("is_active", true);
-
-  if (readError) throw readError;
-
-  const existing = (existingRows ?? []) as Array<{
-    id: string;
-    name: string | null;
-    tax_number: string | null;
-    sgk_workplace_number: string | null;
-    workplace_registration_number: string | null;
-  }>;
+  const existing = await loadExistingPersonalCompanyIdentities(userId);
 
   let created = 0;
   let updated = 0;
 
   for (const row of rows) {
-    const sgkNo = row.sgk_no.trim() || "";
-    const companyName = row.company_name.trim().toLocaleLowerCase("tr-TR");
+    const sgkNo = normalizeImportText(row.sgk_no);
+    const companyName = normalizeImportText(row.company_name).toLocaleLowerCase("tr-TR");
     const match = existing.find((item) => {
       const identifiers = [
         item.tax_number,
@@ -472,7 +576,7 @@ const importRowsToPersonalCompanies = async (
 
     const payload = buildCompanyImportPayload(row, userId);
 
-    if (match.id) {
+    if (match?.id) {
       const { error } = await (supabase as any)
         .from("companies")
         .update(payload)
@@ -1435,13 +1539,14 @@ function StatusAlert({
   }
 
   if (error) {
+    const friendlyError = getIsgbotFriendlyErrorMessage(error, error);
     return (
       <div className="rounded-2xl border border-rose-400/35 bg-rose-500/10 p-4 text-rose-50">
         <div className="flex items-start gap-3">
           <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-300" />
           <div className="min-w-0 flex-1">
             <p className="font-black">Hata Oluştu</p>
-            <p className="mt-1 text-sm leading-6 text-rose-100/80">{error}</p>
+            <p className="mt-1 text-sm leading-6 text-rose-100/80">{friendlyError}</p>
             {onRetry && (
               <Button
                 type="button"
@@ -2802,6 +2907,7 @@ function CompanyImportPanel({
   extensionStatus,
   companies,
   selectedIds,
+  disabledIds,
   target,
   isOsgbPlan,
   hasOrganization,
@@ -2817,6 +2923,7 @@ function CompanyImportPanel({
   extensionStatus: ExtensionStatus;
   companies: IsgkatipCompanyRow[];
   selectedIds: string[];
+  disabledIds: string[];
   target: ImportTarget;
   isOsgbPlan: boolean;
   hasOrganization: boolean;
@@ -2841,8 +2948,14 @@ function CompanyImportPanel({
   }, [companies, query]);
 
   const selectedCount = selectedIds.length;
+  const disabledIdSet = useMemo(() => new Set(disabledIds), [disabledIds]);
+  const selectableFilteredCompanies = useMemo(
+    () => filteredCompanies.filter((company) => !disabledIdSet.has(company.id)),
+    [disabledIdSet, filteredCompanies],
+  );
+  const disabledCount = companies.filter((company) => disabledIdSet.has(company.id)).length;
   const allFilteredSelected =
-    filteredCompanies.length > 0 && filteredCompanies.every((company) => selectedIds.includes(company.id));
+    selectableFilteredCompanies.length > 0 && selectableFilteredCompanies.every((company) => selectedIds.includes(company.id));
   const osgbTargetDisabled = !isOsgbPlan || !hasOrganization;
   const syncReady = extensionStatus.state === "sync_ready";
 
@@ -2949,13 +3062,16 @@ function CompanyImportPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="font-black text-white">Aktarılacak firmaları seçin</h3>
-              <p className="text-xs text-slate-400">{selectedCount} firma seçildi · Toplam {companies.length} kayıt</p>
+              <p className="text-xs text-slate-400">
+                {selectedCount} firma seçildi · {selectableFilteredCompanies.length} aktarılabilir · {disabledCount} zaten ekli
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
                 className="rounded-xl bg-blue-500 text-white hover:bg-blue-400"
                 onClick={allFilteredSelected ? onClearSelection : onSelectAll}
+                disabled={selectableFilteredCompanies.length === 0}
               >
                 <CheckSquare className="mr-2 h-4 w-4" />
                 {allFilteredSelected ? "Seçimi Temizle" : "Tümünü Seç"}
@@ -2985,24 +3101,39 @@ function CompanyImportPanel({
             ) : (
               filteredCompanies.map((company) => {
                 const checked = selectedIds.includes(company.id);
+                const disabled = disabledIdSet.has(company.id);
 
                 return (
                   <button
                     key={company.id}
                     type="button"
-                    onClick={() => onToggleCompany(company.id)}
+                    onClick={() => !disabled && onToggleCompany(company.id)}
+                    disabled={disabled}
                     className={cn(
                       "flex w-full items-start gap-3 rounded-2xl border p-3 text-left transition",
-                      checked
+                      disabled
+                        ? "cursor-not-allowed border-slate-700/60 bg-slate-950/45 opacity-60"
+                        : checked
                         ? "border-emerald-400/40 bg-emerald-500/10"
                         : "border-slate-700/70 bg-slate-950/70 hover:border-slate-500",
                     )}
                   >
-                    <span className={cn("mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-md border", checked ? "border-emerald-400 bg-emerald-500 text-white" : "border-slate-600 bg-slate-900")}>
-                      {checked ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
+                    <span className={cn("mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-md border", disabled ? "border-slate-600 bg-slate-800 text-slate-400" : checked ? "border-emerald-400 bg-emerald-500 text-white" : "border-slate-600 bg-slate-900")}>
+                      {disabled || checked ? <CheckCircle2 className="h-3.5 w-3.5" /> : null}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate font-bold text-slate-100">{company.company_name}</span>
+                      <span className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="block truncate font-bold text-slate-100">{company.company_name}</span>
+                        {disabled ? (
+                          <Badge className="rounded-full border border-slate-500/30 bg-slate-700/60 text-[10px] text-slate-200 hover:bg-slate-700/60">
+                            Zaten ekli
+                          </Badge>
+                        ) : (
+                          <Badge className="rounded-full border border-emerald-400/25 bg-emerald-500/12 text-[10px] text-emerald-200 hover:bg-emerald-500/12">
+                            Aktarılabilir
+                          </Badge>
+                        )}
+                      </span>
                       <span className="mt-1 flex flex-wrap gap-2 text-[11px] text-slate-400">
                         <span>SGK: {company.sgk_no || "-"}</span>
                         <span>Çalışan: {company.employee_count || 0}</span>
@@ -3018,7 +3149,7 @@ function CompanyImportPanel({
           <Button
             className="h-11 w-full rounded-2xl bg-gradient-to-r from-violet-500 to-blue-500 font-black text-white shadow-lg shadow-violet-950/35 hover:from-violet-400 hover:to-blue-400"
             onClick={onImportSelected}
-            disabled={runtime.loading || selectedCount === 0 || (target === "osgb" && osgbTargetDisabled)}
+            disabled={runtime.loading || selectedCount === 0 || selectableFilteredCompanies.length === 0 || (target === "osgb" && osgbTargetDisabled)}
           >
             {runtime.loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Upload className="mr-2 h-5 w-5" />}
             Seçili {selectedCount} Firmayı Aktar
@@ -3278,7 +3409,8 @@ function MultiAssignmentPanelV2({
       setSurfaceValidation(nextValidation);
       return Boolean(response?.success && nextValidation?.canApply);
     } catch (error) {
-      const message = error instanceof Error ? error.message : ISGBOT_FORM_SURFACE_ERROR_MESSAGE;
+      console.error("ISGBot assignment surface validation failed:", error);
+      const message = getIsgbotFriendlyErrorMessage(error, ISGBOT_FORM_SURFACE_ERROR_MESSAGE);
       setSurfaceValidation({
         canApply: false,
         blockingReasons: [message],
@@ -3586,7 +3718,7 @@ function MultiAssignmentPanelV2({
       });
     } catch (error) {
       console.error("ISGBot multi assignment apply failed:", error);
-      const message = error instanceof Error ? error.message : "Pilot işlem sırasında beklenmeyen bir hata oluştu.";
+      const message = getIsgbotFriendlyErrorMessage(error, "Pilot işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
       await finishClientOperation(operation, "failed", {
         selected_count: selectedPlanRows.length,
         plan_hash: planHash,
@@ -4077,7 +4209,8 @@ function ExcessDurationUpdatePanelV2({
       setSurfaceValidation(nextValidation);
       return Boolean(response?.success && nextValidation?.canApply);
     } catch (error) {
-      const message = error instanceof Error ? error.message : ISGBOT_FORM_SURFACE_ERROR_MESSAGE;
+      console.error("ISGBot duration surface validation failed:", error);
+      const message = getIsgbotFriendlyErrorMessage(error, ISGBOT_FORM_SURFACE_ERROR_MESSAGE);
       setSurfaceValidation({
         canApply: false,
         blockingReasons: [message],
@@ -4269,7 +4402,7 @@ function ExcessDurationUpdatePanelV2({
       );
     } catch (error) {
       console.error("ISGBot excess duration apply failed:", error);
-      const message = error instanceof Error ? error.message : "Pilot işlem sırasında beklenmeyen bir hata oluştu.";
+      const message = getIsgbotFriendlyErrorMessage(error, "Pilot işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
       await finishClientOperation(operation, "failed", {
         selected_count: selectedRows.length,
         plan_hash: planHash,
@@ -4289,6 +4422,7 @@ function ExcessDurationUpdatePanelV2({
             : row,
         ),
       );
+      toast.error("Pilot işlem başlatılamadı", { description: message });
     } finally {
       setIsApplying(false);
     }
@@ -4670,6 +4804,7 @@ export default function ISGBot() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importTarget, setImportTarget] = useState<ImportTarget>("personal");
   const [selectedImportIds, setSelectedImportIds] = useState<string[]>([]);
+  const [existingPersonalCompanyIdentities, setExistingPersonalCompanyIdentities] = useState<ExistingCompanyIdentity[]>([]);
   const [changeResult, setChangeResult] = useState<KatipChangeResult | null>(null);
   const [complianceFlags, setComplianceFlags] = useState<IsgkatipFlagRow[]>([]);
   const [operationHistory, setOperationHistory] = useState<IsgbotOperationRow[]>([]);
@@ -4804,7 +4939,12 @@ export default function ISGBot() {
       } as BotSnapshot;
       setSnapshot(nextSnapshot);
       return nextSnapshot;
-    } catch {
+    } catch (error) {
+      console.error("ISGBot snapshot load failed:", error);
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "İSG-KATİP firma verileri yüklenemedi. Lütfen oturumunuzu, eklenti senkronunu ve internet bağlantınızı kontrol edin.",
+      );
       const nextSnapshot = {
         companies: [],
         companyCount: 0,
@@ -4812,6 +4952,10 @@ export default function ISGBot() {
         connectionStatus: "waiting",
       } as BotSnapshot;
       setSnapshot(nextSnapshot);
+      if (!options.silent) {
+        setRuntime("company-import", { loading: false, error: message });
+        toast.error("Firma verileri yüklenemedi", { description: message });
+      }
       return nextSnapshot;
     } finally {
       if (!options.silent) setLoadingSnapshot(false);
@@ -4831,10 +4975,10 @@ export default function ISGBot() {
       setOperationsNotice(null);
     } catch (error) {
       console.error("ISGBot operation history load failed:", error);
-      const message =
-        error instanceof Error
-          ? error.message
-          : "İSGBot işlem kayıtları şu anda okunamadı. Lütfen daha sonra tekrar deneyin.";
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "İSGBot işlem kayıtları şu anda okunamadı. Lütfen daha sonra tekrar deneyin.",
+      );
       setOperationsNotice(message);
       toast.error("İşlem geçmişi yüklenemedi", {
         description: message,
@@ -4843,6 +4987,29 @@ export default function ISGBot() {
       setLoadingOperations(false);
     }
   }, [profile?.organization_id]);
+
+  const loadExistingPersonalCompanies = useCallback(async () => {
+    if (!user?.id) {
+      setExistingPersonalCompanyIdentities([]);
+      return [];
+    }
+
+    try {
+      const rows = await loadExistingPersonalCompanyIdentities(user.id);
+      setExistingPersonalCompanyIdentities(rows);
+      return rows;
+    } catch (error) {
+      console.error("ISGBot existing personal companies load failed:", error);
+      setExistingPersonalCompanyIdentities([]);
+      toast.warning("Mevcut firmalar kontrol edilemedi.", {
+        description: getIsgbotFriendlyErrorMessage(
+          error,
+          "Daha önce eklediğiniz firmalar doğrulanamadı. Aktarım öncesi listeyi dikkatli kontrol edin.",
+        ),
+      });
+      return [];
+    }
+  }, [user?.id]);
 
   const loadComplianceFlags = useCallback(async () => {
     if (!user?.id || !profile?.organization_id) {
@@ -4888,6 +5055,15 @@ export default function ISGBot() {
   useEffect(() => {
     void loadOperations();
   }, [loadOperations]);
+
+  useEffect(() => {
+    void loadExistingPersonalCompanies();
+  }, [loadExistingPersonalCompanies]);
+
+  useEffect(() => {
+    if (alreadyImportedCompanyIds.length === 0) return;
+    setSelectedImportIds((current) => current.filter((id) => !alreadyImportedCompanyIds.includes(id)));
+  }, [alreadyImportedCompanyIds]);
 
   useEffect(() => {
     void loadComplianceFlags();
@@ -4939,6 +5115,15 @@ export default function ISGBot() {
 
   const selectedRuntime = selectedFeature ? runtimeByFeature[selectedFeature.id] ?? {} : {};
   const importRuntime = runtimeByFeature["company-import"] ?? {};
+  const alreadyImportedCompanyIds = useMemo(
+    () =>
+      importTarget === "personal"
+        ? snapshot.companies
+            .filter((company) => isKatipCompanyAlreadyImported(company, existingPersonalCompanyIdentities))
+            .map((company) => company.id)
+        : [],
+    [existingPersonalCompanyIdentities, importTarget, snapshot.companies],
+  );
   const extensionSyncIsNewer =
     Boolean(extensionStatus.extensionLastSyncedAt && snapshot.lastSyncedAt) &&
     new Date(extensionStatus.extensionLastSyncedAt!).getTime() > new Date(snapshot.lastSyncedAt!).getTime() + 60_000;
@@ -5019,6 +5204,7 @@ export default function ISGBot() {
 
     try {
       const nextSnapshot = await loadSnapshot({ silent: true });
+      await loadExistingPersonalCompanies();
       if (nextSnapshot.companyCount === 0) {
         setRuntime("company-import", {
           loading: false,
@@ -5041,7 +5227,10 @@ export default function ISGBot() {
       await loadOperations();
     } catch (error) {
       console.error("ISGBot company import load failed:", error);
-      const message = "Firma listesi yüklenemedi. Lütfen eklenti bağlantınızı ve İSG-KATİP senkron durumunu kontrol edin.";
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "Firma listesi yüklenemedi. Lütfen eklenti bağlantınızı ve İSG-KATİP senkron durumunu kontrol edin.",
+      );
       setRuntime("company-import", { loading: false, error: message });
       await finishClientOperation(operation, "failed", null, message);
       await loadOperations();
@@ -5049,6 +5238,13 @@ export default function ISGBot() {
   };
 
   const handleToggleImportCompany = (companyId: string) => {
+    if (importTarget === "personal" && alreadyImportedCompanyIds.includes(companyId)) {
+      toast.info("Bu firma zaten ekli", {
+        description: "Daha önce Firmalarım alanına aktarılmış firmalar tekrar seçilemez.",
+      });
+      return;
+    }
+
     setSelectedImportIds((current) =>
       current.includes(companyId)
         ? current.filter((id) => id !== companyId)
@@ -5057,10 +5253,19 @@ export default function ISGBot() {
   };
 
   const handleSelectAllImportCompanies = () => {
-    setSelectedImportIds(snapshot.companies.map((company) => company.id));
+    setSelectedImportIds(
+      snapshot.companies
+        .filter((company) => importTarget !== "personal" || !alreadyImportedCompanyIds.includes(company.id))
+        .map((company) => company.id),
+    );
   };
 
   const handleClearImportSelection = () => {
+    setSelectedImportIds([]);
+  };
+
+  const handleImportTargetChange = (target: ImportTarget) => {
+    setImportTarget(target);
     setSelectedImportIds([]);
   };
 
@@ -5070,7 +5275,11 @@ export default function ISGBot() {
       return;
     }
 
-    const selectedRows = snapshot.companies.filter((company) => selectedImportIds.includes(company.id));
+    const selectedRows = snapshot.companies.filter(
+      (company) =>
+        selectedImportIds.includes(company.id) &&
+        (importTarget !== "personal" || !alreadyImportedCompanyIds.includes(company.id)),
+    );
     if (selectedRows.length === 0) {
       setRuntime("company-import", { loading: false, error: "Lütfen aktarılacak en az bir firma seçin." });
       return;
@@ -5132,10 +5341,15 @@ export default function ISGBot() {
 
       setSelectedImportIds([]);
       await loadSnapshot({ silent: true });
+      await loadExistingPersonalCompanies();
       await loadComplianceFlags();
       await loadOperations();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Firma aktarımı sırasında bir hata oluştu.";
+      console.error("ISGBot company import failed:", error);
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "Firma aktarımı sırasında bir hata oluştu. Lütfen seçili firmaları, oturumunuzu ve firma verilerini kontrol edip tekrar deneyin.",
+      );
       setRuntime("company-import", { loading: false, error: message });
       toast.error("Aktarım tamamlanamadı", { description: message });
       await finishClientOperation(operation, "failed", null, message);
@@ -5208,12 +5422,10 @@ export default function ISGBot() {
       await loadOperations();
     } catch (error) {
       console.error("ISGBot change tracking failed:", error);
-      const rawMessage = error instanceof Error ? error.message : "";
-      const message = rawMessage.includes("oturumu")
-        ? "ISGVizyon oturumu doğrulanamadı. Lütfen çıkış yapıp tekrar giriş yapın."
-        : rawMessage.includes("organization")
-          ? "Organizasyon bilgisi bulunamadı. Lütfen hesap/kurum bağlantınızı kontrol edin."
-          : "Değişiklik takibi çalıştırılamadı. Lütfen eklenti bağlantınızı ve senkron verilerinizi kontrol edin.";
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "Değişiklik takibi çalıştırılamadı. Lütfen eklenti bağlantınızı ve senkron verilerinizi kontrol edin.",
+      );
       setRuntime("change-tracking", { loading: false, error: message });
       toast.error("Değişiklik takibi tamamlanamadı", { description: message });
       await loadOperations();
@@ -5228,14 +5440,24 @@ export default function ISGBot() {
   ) => {
     if (!user?.id || !profile?.organization_id) return;
 
-    const operation = await startClientOperation(user.id, profile.organization_id, {
-      operationType,
-      operationTitle,
-      source: "web_app",
-      inputSummary: { feature_id: featureId },
-    });
-    await finishClientOperation(operation, "success", resultSummary);
-    await loadOperations();
+    try {
+      const operation = await startClientOperation(user.id, profile.organization_id, {
+        operationType,
+        operationTitle,
+        source: "web_app",
+        inputSummary: { feature_id: featureId },
+      });
+      await finishClientOperation(operation, "success", resultSummary);
+      await loadOperations();
+    } catch (error) {
+      console.error("ISGBot preview operation log failed:", error);
+      toast.warning("Önizleme hazırlandı ancak işlem geçmişi yazılamadı.", {
+        description: getIsgbotFriendlyErrorMessage(
+          error,
+          "İşlem geçmişi kaydı şu anda oluşturulamadı. Önizleme sonucunu kullanabilirsiniz.",
+        ),
+      });
+    }
   };
 
   const handleMultiAssignmentDryRun = (result: MultiAssignmentDryRunResult) => {
@@ -5255,89 +5477,99 @@ export default function ISGBot() {
   };
 
   const runFeatureAction = async (featureId: FeatureId) => {
-    if (featureId === "change-tracking") {
-      void handleAnalyzeKatipChanges();
-      return;
-    }
+    try {
+      if (featureId === "change-tracking") {
+        void handleAnalyzeKatipChanges();
+        return;
+      }
 
-    if (featureId === "duration-analysis") {
-      const rows = analyzeDurationRows(snapshot.companies);
-      const issueCount = rows.filter((row) => row.status === "critical" || row.status === "deficit" || row.status === "excess").length;
-      const missingCount = rows.filter((row) => row.status === "missing").length;
-      await recordPreviewOperation(featureId, "duration_analysis_preview", "Süre Analizi Önizlemesi", {
-        total: rows.length,
-        issues: issueCount,
-        missing: missingCount,
-      });
+      if (featureId === "duration-analysis") {
+        const rows = analyzeDurationRows(snapshot.companies);
+        const issueCount = rows.filter((row) => row.status === "critical" || row.status === "deficit" || row.status === "excess").length;
+        const missingCount = rows.filter((row) => row.status === "missing").length;
+        await recordPreviewOperation(featureId, "duration_analysis_preview", "Süre Analizi Önizlemesi", {
+          total: rows.length,
+          issues: issueCount,
+          missing: missingCount,
+        });
+        setRuntime(featureId, {
+          loading: false,
+          success: rows.length > 0 ? `${rows.length} firma analiz edildi; ${issueCount} sorun, ${missingCount} hesaplanamayan kayıt bulundu.` : null,
+          info: rows.length === 0 ? "Firma verisi bulunamadı. Önce İSG-KATİP senkronizasyonu yapın." : null,
+          error: null,
+        });
+        return;
+      }
+
+      if (featureId === "contracts-need-update") {
+        const candidates = buildContractUpdateCandidates(snapshot.companies, complianceFlags);
+        await recordPreviewOperation(featureId, "contracts_need_update_preview", "Güncellenmesi Gereken Sözleşmeler Önizlemesi", {
+          total: snapshot.companies.length,
+          issues: candidates.length,
+          missing: 0,
+        });
+        setRuntime(featureId, {
+          loading: false,
+          success: candidates.length > 0 ? `${candidates.length} sözleşme/süre kontrol adayı bulundu.` : "Açık güncelleme adayı bulunmadı.",
+          error: null,
+          info: null,
+        });
+        return;
+      }
+
+      if (featureId === "contract-status-report") {
+        const rows = buildContractStatusRows(snapshot.companies);
+        const issueCount = rows.filter((row) => row.color !== "green").length;
+        const missingCount = rows.filter((row) => row.color === "purple").length;
+        await recordPreviewOperation(featureId, "contract_status_report_preview", "Sözleşme Durumu Rapor Önizlemesi", {
+          total: rows.length,
+          issues: issueCount,
+          missing: missingCount,
+        });
+        setRuntime(featureId, {
+          loading: false,
+          success: `${rows.length} firma rapora alındı; ${issueCount} eksik/uyumsuz durum görünüyor.`,
+          error: null,
+          info: null,
+        });
+        return;
+      }
+
+      if (featureId === "excess-duration-update") {
+        const preview = buildExcessDurationPreview(snapshot.companies);
+        await recordPreviewOperation(featureId, "excess_duration_update_dry_run", "Fazla Süre Önizlemesi", {
+          ...preview.summary,
+          export_generated: false,
+        });
+        setRuntime(featureId, {
+          loading: false,
+          success: preview.rows.length > 0
+            ? `${preview.rows.length} fazla atama önerisi oluşturuldu; toplam ${preview.summary.total_excess_minutes} dk fazla süre görünüyor.`
+            : "Fazla atanmış firma bulunmadı.",
+          error: null,
+          info: "Bu işlem yalnızca önizleme üretir; İSG-KATİP üzerinde otomatik güncelleme yapılmaz.",
+        });
+        return;
+      }
+
       setRuntime(featureId, {
         loading: false,
-        success: rows.length > 0 ? `${rows.length} firma analiz edildi; ${issueCount} sorun, ${missingCount} hesaplanamayan kayıt bulundu.` : null,
-        info: rows.length === 0 ? "Firma verisi bulunamadı. Önce İSG-KATİP senkronizasyonu yapın." : null,
+        success: null,
         error: null,
+        info: "Bu işlem şu anda yalnızca önizleme modundadır. İSG-KATİP üzerinde otomatik değişiklik yapılmaz.",
       });
-      return;
+      toast.info("Önizleme modu", {
+        description: "Bu özellik Sprint 1 kapsamında güvenli moda alındı; gerçek İSG-KATİP güncellemesi yapmaz.",
+      });
+    } catch (error) {
+      console.error("ISGBot feature action failed:", error);
+      const message = getIsgbotFriendlyErrorMessage(
+        error,
+        "İşlem çalıştırılamadı. Lütfen gerekli verilerin yüklü olduğundan emin olup tekrar deneyin.",
+      );
+      setRuntime(featureId, { loading: false, error: message, success: null, info: null });
+      toast.error("İşlem tamamlanamadı", { description: message });
     }
-
-    if (featureId === "contracts-need-update") {
-      const candidates = buildContractUpdateCandidates(snapshot.companies, complianceFlags);
-      await recordPreviewOperation(featureId, "contracts_need_update_preview", "Güncellenmesi Gereken Sözleşmeler Önizlemesi", {
-        total: snapshot.companies.length,
-        issues: candidates.length,
-        missing: 0,
-      });
-      setRuntime(featureId, {
-        loading: false,
-        success: candidates.length > 0 ? `${candidates.length} sözleşme/süre kontrol adayı bulundu.` : "Açık güncelleme adayı bulunmadı.",
-        error: null,
-        info: null,
-      });
-      return;
-    }
-
-    if (featureId === "contract-status-report") {
-      const rows = buildContractStatusRows(snapshot.companies);
-      const issueCount = rows.filter((row) => row.color !== "green").length;
-      const missingCount = rows.filter((row) => row.color === "purple").length;
-      await recordPreviewOperation(featureId, "contract_status_report_preview", "Sözleşme Durumu Rapor Önizlemesi", {
-        total: rows.length,
-        issues: issueCount,
-        missing: missingCount,
-      });
-      setRuntime(featureId, {
-        loading: false,
-        success: `${rows.length} firma rapora alındı; ${issueCount} eksik/uyumsuz durum görünüyor.`,
-        error: null,
-        info: null,
-      });
-      return;
-    }
-
-    if (featureId === "excess-duration-update") {
-      const preview = buildExcessDurationPreview(snapshot.companies);
-      await recordPreviewOperation(featureId, "excess_duration_update_dry_run", "Fazla Süre Önizlemesi", {
-        ...preview.summary,
-        export_generated: false,
-      });
-      setRuntime(featureId, {
-        loading: false,
-        success: preview.rows.length > 0
-          ? `${preview.rows.length} fazla atama önerisi oluşturuldu; toplam ${preview.summary.total_excess_minutes} dk fazla süre görünüyor.`
-          : "Fazla atanmış firma bulunmadı.",
-        error: null,
-        info: "Bu işlem yalnızca önizleme üretir; İSG-KATİP üzerinde otomatik güncelleme yapılmaz.",
-      });
-      return;
-    }
-
-    setRuntime(featureId, {
-      loading: false,
-      success: null,
-      error: null,
-      info: "Bu işlem şu anda yalnızca önizleme modundadır. İSG-KATİP üzerinde otomatik değişiklik yapılmaz.",
-    });
-    toast.info("Önizleme modu", {
-      description: "Bu özellik Sprint 1 kapsamında güvenli moda alındı; gerçek İSG-KATİP güncellemesi yapmaz.",
-    });
   };
 
   const openFeature = (feature: BotFeature) => {
@@ -5555,6 +5787,7 @@ export default function ISGBot() {
               extensionStatus={extensionStatus}
               companies={snapshot.companies}
               selectedIds={selectedImportIds}
+              disabledIds={alreadyImportedCompanyIds}
               target={importTarget}
               isOsgbPlan={isOsgbPlan}
               hasOrganization={Boolean(profile?.organization_id)}
@@ -5563,7 +5796,7 @@ export default function ISGBot() {
               onToggleCompany={handleToggleImportCompany}
               onSelectAll={handleSelectAllImportCompanies}
               onClearSelection={handleClearImportSelection}
-              onTargetChange={setImportTarget}
+              onTargetChange={handleImportTargetChange}
               onImportSelected={handleImportSelectedCompanies}
             />
           </div>

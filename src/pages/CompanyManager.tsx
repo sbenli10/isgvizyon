@@ -110,6 +110,41 @@ const searchNaceCodes = (items: NACECode[], query: string) => {
   );
 };
 
+function getFriendlyEmployeeSaveError(error: unknown) {
+  const source = error && typeof error === "object" ? error as { code?: string; message?: string; details?: string } : {};
+  const message = String(source.message || source.details || error || "").toLocaleLowerCase("tr-TR");
+
+  if (source.code === "23502" || message.includes("not-null constraint") || message.includes("null value in column")) {
+    if (message.includes("company_id")) return "Çalışanların bağlanacağı firma bulunamadı. Lütfen firmayı kaydedip tekrar deneyin.";
+    if (message.includes("first_name") || message.includes("last_name") || message.includes("full_name")) return "Bazı çalışanlarda ad soyad bilgisi eksik. Lütfen çalışan listesini kontrol edin.";
+    if (message.includes("job_title")) return "Bazı çalışanlarda görev/pozisyon bilgisi eksik. Lütfen görev alanını doldurun.";
+    if (message.includes("start_date")) return "İşe giriş tarihi artık zorunlu değil; veritabanı migration'ının uygulandığından emin olun.";
+    return "Bazı zorunlu çalışan bilgileri eksik. Lütfen çalışan listesindeki boş alanları kontrol edin.";
+  }
+
+  if (source.code === "23505" || message.includes("duplicate key") || message.includes("unique constraint")) {
+    return "Aynı T.C. kimlik numarasına sahip çalışan bu firmada zaten kayıtlı. Lütfen mükerrer çalışanları kontrol edin.";
+  }
+
+  if (message.includes("on conflict")) {
+    return "Çalışan eşleştirme kuralı veritabanında hazır değil. Lütfen çalışan T.C. unique index migration'ının uygulandığından emin olun.";
+  }
+
+  if (source.code === "23503" || message.includes("foreign key")) {
+    return "Seçilen firma veya bağlantılı kayıt bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.";
+  }
+
+  if (source.code === "42501" || message.includes("row-level security") || message.includes("permission")) {
+    return "Bu çalışanları kaydetmek için yetkiniz doğrulanamadı. Lütfen oturumunuzu ve firma erişiminizi kontrol edin.";
+  }
+
+  if (message.includes("invalid input syntax") || message.includes("invalid date")) {
+    return "Çalışan listesinde geçersiz tarih veya veri formatı var. Lütfen tarihleri gg.aa.yyyy ya da yyyy-aa-gg formatında kontrol edin.";
+  }
+
+  return "Çalışan kayıtları kaydedilemedi. Lütfen bilgileri kontrol edip tekrar deneyin.";
+}
+
 const NACEVirtualList: React.FC<NACEVirtualListProps> = ({ 
   items, 
   selectedCode, 
@@ -779,7 +814,9 @@ export default function CompanyManager() {
       setExistingEmployees(((data || []) as Employee[]).map(normalizeEmployeeRecord));
     } catch (error: any) {
       console.error("Çalışanlar yüklenemedi:", error);
-      toast.error(`Firma çalışanları yüklenemedi: ${error.message}`);
+      toast.error("Firma çalışanları yüklenemedi.", {
+        description: "Çalışan listesine erişilemedi. Lütfen oturumunuzu, firma yetkinizi ve internet bağlantınızı kontrol edip tekrar deneyin.",
+      });
       setExistingEmployees([]);
     } finally {
       setLoadingExistingEmployees(false);
@@ -934,7 +971,10 @@ export default function CompanyManager() {
       toast.success("Çalışan bilgileri güncellendi.");
       cancelEmployeeEdit();
     } catch (error: any) {
-      toast.error(`Çalışan güncellenemedi: ${error.message}`);
+      console.error("Çalışan güncelleme başarısız:", error);
+      toast.error("Çalışan güncellenemedi.", {
+        description: getFriendlyEmployeeSaveError(error),
+      });
     } finally {
       setSavingEmployeeId(null);
     }
@@ -1352,7 +1392,7 @@ export default function CompanyManager() {
         tc_number: emp.tc_number ? emp.tc_number.replace(/\D/g, "") : null,
         job_title: emp.job_title || emp.insured_job_name || "Belirtilmemiş",
         department: emp.department || null,
-        start_date: emp.start_date || new Date().toISOString().split("T")[0],
+        start_date: emp.start_date || null,
         end_date: emp.end_date || null,
         employment_type: emp.employment_type || "Süresiz",
         birth_date: emp.birth_date || null,
@@ -1641,7 +1681,9 @@ export default function CompanyManager() {
         return;
       }
 
-      toast.error(`❌ Kaydetme hatası: ${error.message || "Beklenmeyen bir hata oluştu"}`);
+      toast.error("Kaydetme işlemi tamamlanamadı.", {
+        description: getFriendlyEmployeeSaveError(error),
+      });
     } finally {
       setSaving(false);
     }

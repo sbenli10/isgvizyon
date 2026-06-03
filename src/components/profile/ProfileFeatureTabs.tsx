@@ -52,6 +52,11 @@ type CompanyRow = {
   city?: string | null;
   visit_frequency?: string | null;
   used_minutes?: number | null;
+  employer_representative_name?: string | null;
+  occupational_safety_specialist_name?: string | null;
+  workplace_doctor_name?: string | null;
+  employee_representative_name?: string | null;
+  knowledgeable_employee_name?: string | null;
 };
 
 type EmployeeRow = {
@@ -75,6 +80,41 @@ type GenericRecord = Record<string, any>;
 const db = supabase as any;
 
 const emptyText = "Henüz kayıt yok";
+
+function getFriendlyEmployeeError(error: unknown) {
+  const source = error && typeof error === "object" ? error as { code?: string; message?: string; details?: string } : {};
+  const message = String(source.message || source.details || error || "").toLocaleLowerCase("tr-TR");
+
+  if (source.code === "23502" || message.includes("not-null constraint") || message.includes("null value in column")) {
+    if (message.includes("company_id")) return "Çalışanların ekleneceği firma bulunamadı. Lütfen firma seçimini kontrol edin.";
+    if (message.includes("first_name") || message.includes("last_name") || message.includes("full_name")) return "Bazı çalışanlarda ad soyad bilgisi eksik. Lütfen Excel dosyasını kontrol edin.";
+    if (message.includes("job_title")) return "Bazı çalışanlarda görev/pozisyon bilgisi eksik. Lütfen görev alanını doldurun.";
+    if (message.includes("start_date")) return "İşe giriş tarihi artık zorunlu değil; veritabanı migration'ının uygulandığından emin olun.";
+    return "Bazı zorunlu çalışan bilgileri eksik. Lütfen dosyadaki satırları kontrol edin.";
+  }
+
+  if (source.code === "23505" || message.includes("duplicate key") || message.includes("unique constraint")) {
+    return "Aynı T.C. kimlik numarasına sahip çalışan bu firmada zaten kayıtlı. Lütfen mükerrer satırları kontrol edin.";
+  }
+
+  if (message.includes("on conflict")) {
+    return "Çalışan eşleştirme kuralı veritabanında hazır değil. Lütfen ilgili unique index migration'ının uygulandığından emin olun.";
+  }
+
+  if (source.code === "23503" || message.includes("foreign key")) {
+    return "Seçilen firma veya bağlantılı kayıt bulunamadı. Lütfen firmayı yeniden seçip tekrar deneyin.";
+  }
+
+  if (source.code === "42501" || message.includes("row-level security") || message.includes("permission")) {
+    return "Bu çalışanları kaydetmek için yetkiniz doğrulanamadı. Lütfen oturumunuzu ve firma erişiminizi kontrol edin.";
+  }
+
+  if (message.includes("invalid input syntax") || message.includes("invalid date")) {
+    return "Dosyada geçersiz tarih veya veri formatı var. Lütfen tarihleri gg.aa.yyyy ya da yyyy-aa-gg formatında kontrol edin.";
+  }
+
+  return "Çalışan kayıtları kaydedilemedi. Lütfen dosyadaki bilgileri kontrol edip tekrar deneyin.";
+}
 
 type SavedRiskItem = {
   id: string;
@@ -241,6 +281,11 @@ async function loadCompanyById(companyId: string): Promise<CompanyRow | null> {
       city: data.city || null,
       visit_frequency: data.visit_frequency || null,
       used_minutes: typeof data.used_minutes === "number" ? data.used_minutes : null,
+      employer_representative_name: data.employer_representative_name || null,
+      occupational_safety_specialist_name: data.occupational_safety_specialist_name || null,
+      workplace_doctor_name: data.workplace_doctor_name || null,
+      employee_representative_name: data.employee_representative_name || null,
+      knowledgeable_employee_name: data.knowledgeable_employee_name || null,
     };
   } catch (error) {
     console.warn("[Profile] çalışan firması alınamadı", error);
@@ -267,6 +312,11 @@ async function loadProfileCompanies(orgId?: string | null, userId?: string | nul
         city: row.city || null,
         visit_frequency: row.visit_frequency || null,
         used_minutes: typeof row.used_minutes === "number" ? row.used_minutes : null,
+        employer_representative_name: row.employer_representative_name || null,
+        occupational_safety_specialist_name: row.occupational_safety_specialist_name || null,
+        workplace_doctor_name: row.workplace_doctor_name || null,
+        employee_representative_name: row.employee_representative_name || null,
+        knowledgeable_employee_name: row.knowledgeable_employee_name || null,
       }));
     } catch (error) {
       console.warn("[Profile] firma listesi alınamadı", error);
@@ -514,11 +564,11 @@ export function ProfileCompaniesTab() {
       employee_count: String(company?.employee_count ?? 0),
       hazard_class: company?.hazard_class || "Az Tehlikeli",
       visit_frequency: company?.visit_frequency || "Ayda 1 Defa",
-      employer_representative_name: "",
-      occupational_safety_specialist_name: "",
-      workplace_doctor_name: "",
-      employee_representative_name: "",
-      knowledgeable_employee_name: "",
+      employer_representative_name: company?.employer_representative_name || "",
+      occupational_safety_specialist_name: company?.occupational_safety_specialist_name || "",
+      workplace_doctor_name: company?.workplace_doctor_name || "",
+      employee_representative_name: company?.employee_representative_name || "",
+      knowledgeable_employee_name: company?.knowledgeable_employee_name || "",
     });
     setDialogOpen(true);
     if (company?.id) {
@@ -1039,7 +1089,8 @@ export function ProfileEmployeesTab() {
       setBulkUploadOpen(false);
       loadEmployees();
     } catch (error: any) {
-      toast.error("Toplu çalışan yükleme başarısız.", { description: error.message });
+      console.error("[Profile] toplu çalışan yükleme başarısız", error);
+      toast.error("Toplu çalışan yükleme başarısız.", { description: getFriendlyEmployeeError(error) });
     } finally {
       setBulkUploading(false);
     }
@@ -1117,7 +1168,8 @@ export function ProfileEmployeesTab() {
       setDialogOpen(false);
       loadEmployees();
     } catch (error: any) {
-      toast.error("Çalışan kaydedilemedi.", { description: error.message });
+      console.error("[Profile] çalışan kaydı başarısız", error);
+      toast.error("Çalışan kaydedilemedi.", { description: getFriendlyEmployeeError(error) });
     } finally {
       setSavingEmployee(false);
     }
