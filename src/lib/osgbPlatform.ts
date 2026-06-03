@@ -6,6 +6,7 @@ export type OsgbComplianceStatus = "compliant" | "warning" | "overdue" | "missin
 export interface OsgbWorkspaceCompanyOption {
   id: string;
   companyName: string;
+  sgkNo: string | null;
   hazardClass: string;
   employeeCount: number;
   complianceStatus: OsgbComplianceStatus;
@@ -44,6 +45,37 @@ export interface OsgbWorkspacePersonnelRecord {
   monthly_capacity_minutes: number;
   is_active: boolean;
   certificate_expiry_date: string | null;
+}
+
+export interface OsgbCompanyEmployeeRecord {
+  id: string;
+  organizationId: string;
+  userId: string;
+  companyId: string;
+  companyName: string;
+  fullName: string;
+  tcNumber: string | null;
+  jobTitle: string | null;
+  department: string | null;
+  phone: string | null;
+  email: string | null;
+  startDate: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbCompanyEmployeeInput {
+  organizationId: string;
+  userId: string;
+  companyId: string;
+  fullName: string;
+  tcNumber?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  startDate?: string | null;
 }
 
 export interface OsgbComplianceCompanyRecord {
@@ -466,7 +498,7 @@ export const listOsgbWorkspaceCompanies = async (
   const [companiesResponse, complianceResponse, contractsResponse] = await Promise.all([
     (supabase as any)
       .from("isgkatip_companies")
-      .select("id, company_name, hazard_class, employee_count")
+      .select("id, company_name, sgk_no, hazard_class, employee_count")
       .eq("org_id", organizationId)
       .eq("is_deleted", false)
       .eq("is_osgb_managed", true)
@@ -523,6 +555,7 @@ export const listOsgbWorkspaceCompanies = async (
     return {
       id: company.id,
       companyName: company.company_name || "Firma",
+      sgkNo: company.sgk_no || null,
       hazardClass: compliance?.hazard_class || company.hazard_class || "Bilinmiyor",
       employeeCount: compliance?.employee_count || company.employee_count || 0,
       complianceStatus: normalizeComplianceStatus(compliance?.compliance_status),
@@ -568,6 +601,112 @@ export const listOsgbWorkspacePersonnel = async (
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as OsgbWorkspacePersonnelRecord[];
+};
+
+export const listOsgbCompanyEmployees = async (
+  organizationId: string,
+): Promise<OsgbCompanyEmployeeRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .select(`
+      id,
+      organization_id,
+      user_id,
+      company_id,
+      full_name,
+      tc_number,
+      job_title,
+      department,
+      phone,
+      email,
+      start_date,
+      is_active,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .order("full_name", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    userId: row.user_id,
+    companyId: row.company_id,
+    companyName: row.company?.company_name || "Firma",
+    fullName: row.full_name,
+    tcNumber: row.tc_number || null,
+    jobTitle: row.job_title || null,
+    department: row.department || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    startDate: row.start_date || null,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const createOsgbCompanyEmployee = async (
+  input: OsgbCompanyEmployeeInput,
+): Promise<OsgbCompanyEmployeeRecord> => {
+  const payload = {
+    organization_id: input.organizationId,
+    user_id: input.userId,
+    company_id: input.companyId,
+    full_name: input.fullName.trim(),
+    tc_number: input.tcNumber?.trim() || null,
+    job_title: input.jobTitle?.trim() || null,
+    department: input.department?.trim() || null,
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null,
+    start_date: input.startDate || null,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .insert(payload)
+    .select(`
+      id,
+      organization_id,
+      user_id,
+      company_id,
+      full_name,
+      tc_number,
+      job_title,
+      department,
+      phone,
+      email,
+      start_date,
+      is_active,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    organizationId: data.organization_id,
+    userId: data.user_id,
+    companyId: data.company_id,
+    companyName: data.company?.company_name || "Firma",
+    fullName: data.full_name,
+    tcNumber: data.tc_number || null,
+    jobTitle: data.job_title || null,
+    department: data.department || null,
+    phone: data.phone || null,
+    email: data.email || null,
+    startDate: data.start_date || null,
+    isActive: Boolean(data.is_active),
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
 };
 
 export const listOsgbWorkspaceAssignmentsPage = async (

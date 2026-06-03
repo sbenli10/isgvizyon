@@ -26,10 +26,11 @@ import {
   listOsgbFinanceWorkspace,
   listOsgbRequiredDocumentsWorkspace,
 } from "@/lib/osgbPlatform";
+import { OSGBCompaniesPanel } from "@/components/osgb/OSGBCompaniesPanel";
+import { OSGBCompanyEmployeesPanel } from "@/components/osgb/OSGBCompanyEmployeesPanel";
 
 const OSGBPersonnel = lazy(() => import("@/pages/OSGBPersonnel"));
 const OSGBCompanyTracking = lazy(() => import("@/pages/OSGBCompanyTracking"));
-const CompanyManager = lazy(() => import("@/pages/CompanyManager"));
 const OSGBFinance = lazy(() => import("@/pages/Finance"));
 const OSGBAssignments = lazy(() => import("@/pages/OSGBAssignments"));
 const OsgbClientPortal = lazy(() => import("@/pages/OsgbClientPortal"));
@@ -289,9 +290,9 @@ function renderTab(tab: OsgbManagementTab, refreshKey: number) {
     case "personnel":
       return <OSGBPersonnel />;
     case "companies":
-      return <OSGBCompanyTracking />;
+      return <OSGBCompaniesPanel refreshKey={refreshKey} />;
     case "employees":
-      return <CompanyManager />;
+      return <OSGBCompanyEmployeesPanel refreshKey={refreshKey} />;
     case "tracking":
       return <OSGBCompanyTracking />;
     case "finance":
