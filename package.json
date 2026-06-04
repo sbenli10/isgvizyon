@@ -13,8 +13,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "generate:symbols": "node scripts/generate-public-symbols.mjs"
-    
+    "generate:symbols": "node scripts/generate-public-symbols.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

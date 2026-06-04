@@ -1611,10 +1611,11 @@ function MetricTile({
 }: {
   label: string;
   value: number | string;
-  tone: "blue" | "emerald" | "amber" | "rose" | "slate";
+  tone: "blue" | "emerald" | "amber" | "rose" | "slate" | "violet";
 }) {
   const toneClass = {
     blue: "border-blue-400/25 bg-blue-500/10 text-blue-100",
+    violet: "border-violet-400/25 bg-violet-500/10 text-violet-100",
     emerald: "border-emerald-400/25 bg-emerald-500/10 text-emerald-100",
     amber: "border-amber-400/25 bg-amber-500/10 text-amber-100",
     rose: "border-rose-400/25 bg-rose-500/10 text-rose-100",
