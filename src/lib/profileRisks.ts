@@ -107,8 +107,8 @@ const emptyToNull = (value?: string | null) => {
 };
 
 const toIntegerOrNull = (value: unknown) => {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(String(value).replace(",", "."));
+  if (value === null || value === undefined || clean(value) === "") return null;
+  const parsed = Number(clean(value).replace(",", "."));
   return Number.isFinite(parsed) ? Math.round(parsed) : null;
 };
 
@@ -125,7 +125,7 @@ const excelSerialToDate = (serial: number) => {
 };
 
 export const parseSavedRiskDate = (value: unknown): string | null => {
-  if (value === null || value === undefined || value === "") return null;
+  if (value === null || value === undefined || clean(value) === "") return null;
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
   if (typeof value === "number" && Number.isFinite(value)) return excelSerialToDate(value);
 
@@ -140,191 +140,184 @@ export const parseSavedRiskDate = (value: unknown): string | null => {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
 };
 
+type SavedRiskColumnKey =
+  | "activity"
+  | "hazard"
+  | "risk"
+  | "currentStatus"
+  | "detectionDate"
+  | "probabilityBefore"
+  | "frequencyBefore"
+  | "severityBefore"
+  | "riskScoreBefore"
+  | "riskDefinitionBefore"
+  | "possibleConsequence"
+  | "correctivePreventiveAction"
+  | "probabilityAfter"
+  | "frequencyAfter"
+  | "severityAfter"
+  | "riskScoreAfter"
+  | "riskDefinitionAfter"
+  | "deadline"
+  | "responsible";
+
+type SavedRiskColumnMap = Partial<Record<SavedRiskColumnKey, number>>;
 
 const normalizeHeader = (value: unknown) =>
   clean(value)
     .toLocaleUpperCase("tr-TR")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
     .replace(/İ/g, "I")
-    .replace(/İ/g, "I")
     .replace(/ı/g, "I")
     .replace(/Ğ/g, "G")
     .replace(/Ü/g, "U")
     .replace(/Ş/g, "S")
     .replace(/Ö/g, "O")
     .replace(/Ç/g, "C")
-    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/[.:;,_()\[\]{}]+/g, " ")
+    .replace(/[\\/]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-const HEADER_ALIASES: Record<keyof RiskColumnMap, string[]> = {
-  activity: ["FAALIYET", "IS FAALIYET", "ISLEM", "SUREC", "CALISMA ALANI"],
-  hazard: ["TEHLIKE", "TEHLIKE KAYNAGI", "TEHLIKE TANIMI"],
-  risk: ["RISK", "RISK TANIMI", "RISK ACIKLAMASI"],
-  currentStatus: ["MEVCUT DURUM", "MEVCUT ONLEM", "MEVCUT KONTROL", "MEVCUT TEDBIR", "MEVCUT ONLEMLER"],
-  detectionDate: ["TESPIT TARIHI", "TARIH", "SAPTAMA TARIHI"],
-  riskDefinitionBefore: ["RISKIN TANIMI", "RISK TANIMI"],
-  possibleConsequence: ["OLASI SONUC", "SONUC", "ETKI", "OLASI ETKI", "ZARAR"],
-  correctivePreventiveAction: [
-    "DUZELTICI ONLEYICI FAALIYET",
-    "DUZELTICI VE ONLEYICI FAALIYET",
-    "DOF",
-    "DUZELTICI FAALIYET",
-    "ONLEYICI FAALIYET",
-    "ALINACAK ONLEM",
-    "ALINACAK ONLEMLER",
-    "YAPILACAK FAALIYET",
-  ],
-  riskDefinitionAfter: ["RISKIN TANIMI DOF SONRASI", "DOF SONRASI RISK", "KALAN RISK", "ARTIK RISK", "RISK TANIMI DOF SONRASI"],
-  deadline: ["TERMIN", "TERMIN TARIHI", "BITIS TARIHI", "SON TARIH"],
-  responsible: ["SORUMLU", "SORUMLU KISI", "SORUMLU BIRIM", "SORUMLULAR"],
-  probabilityBefore: ["O", "OLASILIK"],
-  frequencyBefore: ["F", "FREKANS", "SIKLIK"],
-  severityBefore: ["S", "SIDDET", "Ş", "SİDDET"],
-  riskScoreBefore: ["R", "RISK SKORU", "SKOR", "RISK PUANI"],
-  probabilityAfter: ["O", "OLASILIK"],
-  frequencyAfter: ["F", "FREKANS", "SIKLIK"],
-  severityAfter: ["S", "SIDDET", "Ş", "SİDDET"],
-  riskScoreAfter: ["R", "RISK SKORU", "SKOR", "RISK PUANI"],
+const includesAny = (header: string, aliases: string[]) => aliases.some((alias) => header === alias || header.includes(alias));
+
+const isProbabilityHeader = (header: string) => ["O", "OLASILIK", "OLASILIK O"].includes(header);
+const isFrequencyHeader = (header: string) => ["F", "FREKANS", "FREKANS F"].includes(header);
+const isSeverityHeader = (header: string) => ["S", "SIDDET", "SIDDET S"].includes(header);
+const isScoreHeader = (header: string) => ["R", "RISK SKORU", "RISK PUANI", "RISK DERECESI", "SKOR"].includes(header);
+
+const firstScoreIndex = (headers: string[]) => {
+  const indexes = headers
+    .map((header, index) => (isProbabilityHeader(header) || isFrequencyHeader(header) || isSeverityHeader(header) || isScoreHeader(header) ? index : -1))
+    .filter((index) => index >= 0);
+  return indexes.length ? Math.min(...indexes) : Number.POSITIVE_INFINITY;
 };
 
-type RiskColumnMap = {
-  activity?: number;
-  hazard?: number;
-  risk?: number;
-  currentStatus?: number;
-  detectionDate?: number;
-  probabilityBefore?: number;
-  frequencyBefore?: number;
-  severityBefore?: number;
-  riskScoreBefore?: number;
-  riskDefinitionBefore?: number;
-  possibleConsequence?: number;
-  correctivePreventiveAction?: number;
-  probabilityAfter?: number;
-  frequencyAfter?: number;
-  severityAfter?: number;
-  riskScoreAfter?: number;
-  riskDefinitionAfter?: number;
-  deadline?: number;
-  responsible?: number;
+const assignScoreColumns = (headers: string[], columnMap: SavedRiskColumnMap) => {
+  const occurrences: Record<"probability" | "frequency" | "severity" | "score", number> = {
+    probability: 0,
+    frequency: 0,
+    severity: 0,
+    score: 0,
+  };
+
+  headers.forEach((header, index) => {
+    const assign = (kind: keyof typeof occurrences, beforeKey: SavedRiskColumnKey, afterKey: SavedRiskColumnKey) => {
+      occurrences[kind] += 1;
+      const targetKey = occurrences[kind] === 1 ? beforeKey : afterKey;
+      if (columnMap[targetKey] === undefined) columnMap[targetKey] = index;
+    };
+
+    if (isProbabilityHeader(header)) assign("probability", "probabilityBefore", "probabilityAfter");
+    else if (isFrequencyHeader(header)) assign("frequency", "frequencyBefore", "frequencyAfter");
+    else if (isSeverityHeader(header)) assign("severity", "severityBefore", "severityAfter");
+    else if (isScoreHeader(header)) assign("score", "riskScoreBefore", "riskScoreAfter");
+  });
 };
 
-const matchesAlias = (header: string, aliases: string[]) => aliases.some((alias) => header === normalizeHeader(alias));
+const buildColumnMap = (headerRow: unknown[]): SavedRiskColumnMap => {
+  const headers = headerRow.map(normalizeHeader);
+  const scoreStart = firstScoreIndex(headers);
+  const columnMap: SavedRiskColumnMap = {};
+  assignScoreColumns(headers, columnMap);
 
-const isProbabilityHeader = (header: string) => matchesAlias(header, HEADER_ALIASES.probabilityBefore);
-const isFrequencyHeader = (header: string) => matchesAlias(header, HEADER_ALIASES.frequencyBefore);
-const isSeverityHeader = (header: string) => matchesAlias(header, HEADER_ALIASES.severityBefore);
-const isScoreHeader = (header: string) => matchesAlias(header, HEADER_ALIASES.riskScoreBefore);
+  headers.forEach((header, index) => {
+    if (!header) return;
+    const assignIfEmpty = (key: SavedRiskColumnKey) => {
+      if (columnMap[key] === undefined) columnMap[key] = index;
+    };
+
+    if (includesAny(header, ["FAALIYET", "IS FAALIYET", "ISLEM", "SUREC"])) assignIfEmpty("activity");
+    else if (includesAny(header, ["TEHLIKE", "TEHLIKE KAYNAGI"])) assignIfEmpty("hazard");
+    else if (includesAny(header, ["MEVCUT DURUM", "MEVCUT ONLEM", "MEVCUT KONTROL", "MEVCUT TEDBIR"])) assignIfEmpty("currentStatus");
+    else if (includesAny(header, ["TESPIT TARIHI", "TARIH"])) assignIfEmpty("detectionDate");
+    else if (includesAny(header, ["OLASI SONUC", "SONUC", "ETKI"])) assignIfEmpty("possibleConsequence");
+    else if (includesAny(header, ["DUZELTICI ONLEYICI FAALIYET", "DOF", "DUZELTICI FAALIYET", "ONLEYICI FAALIYET", "ALINACAK ONLEM"])) assignIfEmpty("correctivePreventiveAction");
+    else if (includesAny(header, ["DOF SONRASI RISK", "KALAN RISK", "ARTIK RISK", "RISKIN TANIMI DOF SONRASI"])) assignIfEmpty("riskDefinitionAfter");
+    else if (includesAny(header, ["TERMIN", "TERMIN TARIHI", "BITIS TARIHI"])) assignIfEmpty("deadline");
+    else if (includesAny(header, ["SORUMLU", "SORUMLU KISI", "SORUMLU BIRIM"])) assignIfEmpty("responsible");
+    else if (includesAny(header, ["RISKIN TANIMI", "RISK TANIMI", "RISK ACIKLAMASI"])) {
+      if (index < scoreStart && columnMap.risk === undefined) assignIfEmpty("risk");
+      else assignIfEmpty("riskDefinitionBefore");
+    } else if (header === "RISK") assignIfEmpty("risk");
+  });
+
+  return columnMap;
+};
+
+const requiredMissing = (columnMap: SavedRiskColumnMap) =>
+  ([
+    ["FAALİYET", columnMap.activity],
+    ["TEHLİKE", columnMap.hazard],
+    ["RİSK", columnMap.risk],
+  ] as const)
+    .filter(([, index]) => index === undefined)
+    .map(([label]) => label);
+
+const headerScore = (row: unknown[]) => {
+  const columnMap = buildColumnMap(row);
+  const requiredFound = 3 - requiredMissing(columnMap).length;
+  const optionalFound = Object.keys(columnMap).length - requiredFound;
+  return requiredFound * 4 + optionalFound;
+};
 
 const findHeaderRowIndex = (rows: unknown[][]) => {
-  const scanLimit = Math.min(rows.length, 30);
-
-  for (let index = 0; index < scanLimit; index += 1) {
-    const normalized = (rows[index] ?? []).map(normalizeHeader);
-    const hasActivity = normalized.some((header) => matchesAlias(header, HEADER_ALIASES.activity));
-    const hasHazard = normalized.some((header) => matchesAlias(header, HEADER_ALIASES.hazard));
-    const hasRisk = normalized.some((header) => matchesAlias(header, HEADER_ALIASES.risk));
-    const scoreHeaderCount = normalized.filter((header) => isProbabilityHeader(header) || isFrequencyHeader(header) || isSeverityHeader(header) || isScoreHeader(header)).length;
-
-    if ((hasActivity && hasHazard && hasRisk) || (hasActivity && hasRisk && scoreHeaderCount >= 3)) {
-      return index;
+  let bestIndex = -1;
+  let bestScore = 0;
+  rows.slice(0, 30).forEach((row, index) => {
+    const score = headerScore(row);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
     }
-  }
-
-  return -1;
+  });
+  return bestScore >= 8 ? bestIndex : -1;
 };
 
-const buildColumnMap = (headerRow: unknown[]): RiskColumnMap => {
-  const normalized = headerRow.map(normalizeHeader);
-  const map: RiskColumnMap = {};
-
-  const findFirst = (aliases: string[], used = new Set<number>()) => {
-    const index = normalized.findIndex((header, headerIndex) => !used.has(headerIndex) && matchesAlias(header, aliases));
-    return index >= 0 ? index : undefined;
-  };
-
-  map.activity = findFirst(HEADER_ALIASES.activity);
-  map.hazard = findFirst(HEADER_ALIASES.hazard);
-
-  const riskDefinitionIndex = findFirst(HEADER_ALIASES.riskDefinitionBefore);
-  map.risk = normalized.findIndex((header, index) => index !== riskDefinitionIndex && matchesAlias(header, HEADER_ALIASES.risk));
-  if (map.risk < 0) map.risk = undefined;
-
-  map.currentStatus = findFirst(HEADER_ALIASES.currentStatus);
-  map.detectionDate = findFirst(HEADER_ALIASES.detectionDate);
-  map.riskDefinitionBefore = riskDefinitionIndex;
-  map.possibleConsequence = findFirst(HEADER_ALIASES.possibleConsequence);
-  map.correctivePreventiveAction = findFirst(HEADER_ALIASES.correctivePreventiveAction);
-  map.riskDefinitionAfter = findFirst(HEADER_ALIASES.riskDefinitionAfter);
-  map.deadline = findFirst(HEADER_ALIASES.deadline);
-  map.responsible = findFirst(HEADER_ALIASES.responsible);
-
-  const scoreColumns = normalized
-    .map((header, index) => ({ header, index }))
-    .filter(({ header }) => isProbabilityHeader(header) || isFrequencyHeader(header) || isSeverityHeader(header) || isScoreHeader(header));
-
-  const firstSet = scoreColumns.slice(0, 4);
-  const secondSet = scoreColumns.slice(4, 8);
-
-  const assignScoreSet = (set: Array<{ header: string; index: number }>, suffix: "Before" | "After") => {
-    for (const item of set) {
-      if (isProbabilityHeader(item.header)) map[`probability${suffix}` as keyof RiskColumnMap] = item.index;
-      else if (isFrequencyHeader(item.header)) map[`frequency${suffix}` as keyof RiskColumnMap] = item.index;
-      else if (isSeverityHeader(item.header)) map[`severity${suffix}` as keyof RiskColumnMap] = item.index;
-      else if (isScoreHeader(item.header)) map[`riskScore${suffix}` as keyof RiskColumnMap] = item.index;
-    }
-  };
-
-  assignScoreSet(firstSet, "Before");
-  assignScoreSet(secondSet, "After");
-
-  // Official template fallback: use index positions when duplicate O/F/Ş/R headers are present.
-  if (map.probabilityBefore === undefined && headerRow.length >= 9) map.probabilityBefore = 5;
-  if (map.frequencyBefore === undefined && headerRow.length >= 9) map.frequencyBefore = 6;
-  if (map.severityBefore === undefined && headerRow.length >= 9) map.severityBefore = 7;
-  if (map.riskScoreBefore === undefined && headerRow.length >= 9) map.riskScoreBefore = 8;
-  if (map.probabilityAfter === undefined && headerRow.length >= 16) map.probabilityAfter = 12;
-  if (map.frequencyAfter === undefined && headerRow.length >= 16) map.frequencyAfter = 13;
-  if (map.severityAfter === undefined && headerRow.length >= 16) map.severityAfter = 14;
-  if (map.riskScoreAfter === undefined && headerRow.length >= 16) map.riskScoreAfter = 15;
-
-  return map;
+const valueAt = (row: unknown[], columnMap: SavedRiskColumnMap, key: SavedRiskColumnKey) => {
+  const index = columnMap[key];
+  return index === undefined ? "" : row[index];
 };
 
-const getCell = (row: unknown[], index?: number) => (index === undefined || index < 0 ? "" : row[index]);
+const validateNumber = (errors: string[], label: string, original: unknown, parsed: number | null) => {
+  if (clean(original) && parsed === null) errors.push(`${label} sayısal olmalı.`);
+};
 
-const mapRowToInput = (row: unknown[], rowNumber: number, userId: string, organizationId: string | null | undefined, columns: RiskColumnMap): SavedRiskExcelRow => {
-  const probabilityBefore = toIntegerOrNull(getCell(row, columns.probabilityBefore));
-  const frequencyBefore = toIntegerOrNull(getCell(row, columns.frequencyBefore));
-  const severityBefore = toIntegerOrNull(getCell(row, columns.severityBefore));
-  const probabilityAfter = toIntegerOrNull(getCell(row, columns.probabilityAfter));
-  const frequencyAfter = toIntegerOrNull(getCell(row, columns.frequencyAfter));
-  const severityAfter = toIntegerOrNull(getCell(row, columns.severityAfter));
+const validateDate = (errors: string[], label: string, original: unknown, parsed: string | null) => {
+  if (clean(original) && parsed === null) errors.push(`${label} geçerli tarih olmalı.`);
+};
 
+const mapRowToInput = (row: unknown[], rowNumber: number, columnMap: SavedRiskColumnMap, userId: string, organizationId?: string | null): SavedRiskExcelRow => {
+  const probabilityBefore = toIntegerOrNull(valueAt(row, columnMap, "probabilityBefore"));
+  const frequencyBefore = toIntegerOrNull(valueAt(row, columnMap, "frequencyBefore"));
+  const severityBefore = toIntegerOrNull(valueAt(row, columnMap, "severityBefore"));
+  const probabilityAfter = toIntegerOrNull(valueAt(row, columnMap, "probabilityAfter"));
+  const frequencyAfter = toIntegerOrNull(valueAt(row, columnMap, "frequencyAfter"));
+  const severityAfter = toIntegerOrNull(valueAt(row, columnMap, "severityAfter"));
+  const detectionDate = parseSavedRiskDate(valueAt(row, columnMap, "detectionDate"));
+  const deadline = parseSavedRiskDate(valueAt(row, columnMap, "deadline"));
   const input: SavedRiskInput = {
     userId,
     organizationId: organizationId || null,
-    activity: clean(getCell(row, columns.activity)),
-    hazard: clean(getCell(row, columns.hazard)),
-    risk: clean(getCell(row, columns.risk)),
-    currentStatus: emptyToNull(clean(getCell(row, columns.currentStatus))),
-    detectionDate: parseSavedRiskDate(getCell(row, columns.detectionDate)),
+    activity: clean(valueAt(row, columnMap, "activity")),
+    hazard: clean(valueAt(row, columnMap, "hazard")),
+    risk: clean(valueAt(row, columnMap, "risk")),
+    currentStatus: emptyToNull(clean(valueAt(row, columnMap, "currentStatus"))),
+    detectionDate,
     probabilityBefore,
     frequencyBefore,
     severityBefore,
-    riskScoreBefore: calculateScore(probabilityBefore, frequencyBefore, severityBefore, toIntegerOrNull(getCell(row, columns.riskScoreBefore))),
-    riskDefinitionBefore: emptyToNull(clean(getCell(row, columns.riskDefinitionBefore))),
-    possibleConsequence: emptyToNull(clean(getCell(row, columns.possibleConsequence))),
-    correctivePreventiveAction: emptyToNull(clean(getCell(row, columns.correctivePreventiveAction))),
+    riskScoreBefore: calculateScore(probabilityBefore, frequencyBefore, severityBefore, toIntegerOrNull(valueAt(row, columnMap, "riskScoreBefore"))),
+    riskDefinitionBefore: emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionBefore"))),
+    possibleConsequence: emptyToNull(clean(valueAt(row, columnMap, "possibleConsequence"))),
+    correctivePreventiveAction: emptyToNull(clean(valueAt(row, columnMap, "correctivePreventiveAction"))),
     probabilityAfter,
     frequencyAfter,
     severityAfter,
-    riskScoreAfter: calculateScore(probabilityAfter, frequencyAfter, severityAfter, toIntegerOrNull(getCell(row, columns.riskScoreAfter))),
-    riskDefinitionAfter: emptyToNull(clean(getCell(row, columns.riskDefinitionAfter))),
-    deadline: parseSavedRiskDate(getCell(row, columns.deadline)),
-    responsible: emptyToNull(clean(getCell(row, columns.responsible))),
+    riskScoreAfter: calculateScore(probabilityAfter, frequencyAfter, severityAfter, toIntegerOrNull(valueAt(row, columnMap, "riskScoreAfter"))),
+    riskDefinitionAfter: emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionAfter"))),
+    deadline,
+    responsible: emptyToNull(clean(valueAt(row, columnMap, "responsible"))),
     source: "excel",
   };
 
@@ -333,18 +326,16 @@ const mapRowToInput = (row: unknown[], rowNumber: number, userId: string, organi
   if (!input.hazard) errors.push("TEHLİKE zorunlu.");
   if (!input.risk) errors.push("RİSK zorunlu.");
 
-  [
-    ["O", getCell(row, columns.probabilityBefore), probabilityBefore],
-    ["F", getCell(row, columns.frequencyBefore), frequencyBefore],
-    ["Ş", getCell(row, columns.severityBefore), severityBefore],
-    ["R", getCell(row, columns.riskScoreBefore), input.riskScoreBefore],
-    ["DÖF sonrası O", getCell(row, columns.probabilityAfter), probabilityAfter],
-    ["DÖF sonrası F", getCell(row, columns.frequencyAfter), frequencyAfter],
-    ["DÖF sonrası Ş", getCell(row, columns.severityAfter), severityAfter],
-    ["DÖF sonrası R", getCell(row, columns.riskScoreAfter), input.riskScoreAfter],
-  ].forEach(([label, original, parsed]) => {
-    if (original !== null && original !== undefined && original !== "" && parsed === null) errors.push(`${label} sayısal olmalı.`);
-  });
+  validateNumber(errors, "O", valueAt(row, columnMap, "probabilityBefore"), probabilityBefore);
+  validateNumber(errors, "F", valueAt(row, columnMap, "frequencyBefore"), frequencyBefore);
+  validateNumber(errors, "Ş", valueAt(row, columnMap, "severityBefore"), severityBefore);
+  validateNumber(errors, "R", valueAt(row, columnMap, "riskScoreBefore"), input.riskScoreBefore ?? null);
+  validateNumber(errors, "DÖF sonrası O", valueAt(row, columnMap, "probabilityAfter"), probabilityAfter);
+  validateNumber(errors, "DÖF sonrası F", valueAt(row, columnMap, "frequencyAfter"), frequencyAfter);
+  validateNumber(errors, "DÖF sonrası Ş", valueAt(row, columnMap, "severityAfter"), severityAfter);
+  validateNumber(errors, "DÖF sonrası R", valueAt(row, columnMap, "riskScoreAfter"), input.riskScoreAfter ?? null);
+  validateDate(errors, "TESPİT TARİHİ", valueAt(row, columnMap, "detectionDate"), detectionDate);
+  validateDate(errors, "TERMİN", valueAt(row, columnMap, "deadline"), deadline);
 
   return { rowNumber, input, errors };
 };
@@ -353,48 +344,30 @@ export const parseSavedRiskExcel = async (file: File, userId: string, organizati
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = sheetName ? workbook.Sheets[sheetName] : null;
-  const rows = sheet ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true }) : [];
-
+  const rows = sheet ? XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true, blankrows: false }) : [];
   const headerRowIndex = findHeaderRowIndex(rows);
+
   if (headerRowIndex < 0) {
     return {
       totalRows: 0,
       validRows: [],
       invalidRows: [],
-      missingHeaders: ["Başlık satırı bulunamadı. FAALİYET, TEHLİKE ve RİSK başlıklarını içeren satır bulunmalı."],
+      missingHeaders: ["Başlık satırı bulunamadı. İlk 30 satırda FAALİYET, TEHLİKE ve RİSK başlıklarını içeren satır bulunamadı."],
     };
   }
 
-  const columns = buildColumnMap(rows[headerRowIndex] ?? []);
-  const missingHeaders = [
-    columns.activity === undefined ? "FAALİYET" : null,
-    columns.hazard === undefined ? "TEHLİKE" : null,
-    columns.risk === undefined ? "RİSK" : null,
-  ].filter(Boolean) as string[];
-
-  const dataRows = rows
-    .slice(headerRowIndex + 1)
-    .map((row, index) => ({ row, rowNumber: headerRowIndex + index + 2 }))
-    .filter(({ row }) => row.some((cell) => clean(cell)));
-
-  if (missingHeaders.length > 0) {
-    return {
-      totalRows: dataRows.length,
-      validRows: [],
-      invalidRows: dataRows.map(({ rowNumber }) => ({
-        rowNumber,
-        errors: [`Zorunlu kolonlar eksik: ${missingHeaders.join(", ")}`],
-      })),
-      missingHeaders,
-    };
-  }
-
-  const parsedRows = dataRows.map(({ row, rowNumber }) => mapRowToInput(row, rowNumber, userId, organizationId, columns));
+  const columnMap = buildColumnMap(rows[headerRowIndex] ?? []);
+  const missingRequiredHeaders = requiredMissing(columnMap);
+  const missingHeaders = missingRequiredHeaders.length ? [`Şu zorunlu kolonlar eksik: ${missingRequiredHeaders.join(", ")}`] : [];
+  const dataRows = rows.slice(headerRowIndex + 1).filter((row) => row.some((cell) => clean(cell)));
+  const parsedRows = dataRows.map((row, index) => mapRowToInput(row, headerRowIndex + index + 2, columnMap, userId, organizationId));
 
   return {
     totalRows: dataRows.length,
-    validRows: parsedRows.filter((row) => row.errors.length === 0),
-    invalidRows: parsedRows.filter((row) => row.errors.length > 0),
+    validRows: missingRequiredHeaders.length ? [] : parsedRows.filter((row) => row.errors.length === 0),
+    invalidRows: missingRequiredHeaders.length
+      ? parsedRows.map((row) => ({ ...row, errors: [...row.errors, `Zorunlu kolon eksik: ${missingRequiredHeaders.join(", ")}`] }))
+      : parsedRows.filter((row) => row.errors.length > 0),
     missingHeaders,
   };
 };
@@ -544,10 +517,7 @@ export const downloadSavedRiskTemplate = () => {
     "2026-06-30",
     "Şantiye Şefi",
   ];
-  const worksheet = XLSX.utils.aoa_to_sheet([
-    [...SAVED_RISK_EXCEL_HEADERS],
-    example,
-  ]);
+  const worksheet = XLSX.utils.aoa_to_sheet([SAVED_RISK_EXCEL_HEADERS, example]);
   worksheet["!cols"] = SAVED_RISK_EXCEL_HEADERS.map(() => ({ wch: 24 }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Risklerim Şablonu");
