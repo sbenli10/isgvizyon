@@ -517,8 +517,10 @@ export const downloadSavedRiskTemplate = () => {
     "2026-06-30",
     "Şantiye Şefi",
   ];
-  const worksheet = XLSX.utils.aoa_to_sheet([SAVED_RISK_EXCEL_HEADERS, example]);
-  worksheet["!cols"] = SAVED_RISK_EXCEL_HEADERS.map(() => ({ wch: 24 }));
+  const worksheet = XLSX.utils.aoa_to_sheet([
+    [...SAVED_RISK_EXCEL_HEADERS],
+    example,
+  ]);  worksheet["!cols"] = SAVED_RISK_EXCEL_HEADERS.map(() => ({ wch: 24 }));
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Risklerim Şablonu");
   XLSX.writeFile(workbook, "risklerim-resmi-sablon.xlsx");
