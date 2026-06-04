@@ -865,11 +865,11 @@ export const createOsgbCompanyEmployee = async (
   };
 };
 
+
 const OSGB_ARCHIVE_BUCKET = "safety_documents";
 
 const sanitizeArchivePathPart = (value: string) =>
   value
-<<<<<<< HEAD
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/ı/g, "i")
@@ -896,16 +896,6 @@ const sanitizeArchiveFileName = (value: string) => {
 
   return extension ? `${safeBase}.${extension}` : safeBase;
 };
-=======
-    .trim()
-    .replace(/[\\:*?"<>|]+/g, "-")
-    .replace(/\s+/g, " ")
-    .replace(/^\/+|\/+$/g, "")
-    .replace(/\.+$/g, "")
-    .trim();
-
-const sanitizeArchiveFileName = (value: string) => sanitizeArchivePathPart(value) || "dosya";
->>>>>>> origin/codex/fix-type-assignment-error-in-isgbot.tsx-ax1nn2
 
 const mapOsgbArchiveFile = (row: any): OsgbArchiveFileRecord => ({
   id: row.id,
