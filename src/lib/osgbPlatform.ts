@@ -739,14 +739,32 @@ const OSGB_ARCHIVE_BUCKET = "safety_documents";
 
 const sanitizeArchivePathPart = (value: string) =>
   value
-    .trim()
-    .replace(/[\\:*?"<>|]+/g, "-")
-    .replace(/\s+/g, " ")
-    .replace(/^\/+|\/+$/g, "")
-    .replace(/\.+$/g, "")
-    .trim();
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "I")
+    .replace(/ğ/g, "g")
+    .replace(/Ğ/g, "G")
+    .replace(/ü/g, "u")
+    .replace(/Ü/g, "U")
+    .replace(/ş/g, "s")
+    .replace(/Ş/g, "S")
+    .replace(/ö/g, "o")
+    .replace(/Ö/g, "O")
+    .replace(/ç/g, "c")
+    .replace(/Ç/g, "C")
+    .replace(/[^a-zA-Z0-9-_]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase();
 
-const sanitizeArchiveFileName = (value: string) => sanitizeArchivePathPart(value) || "dosya";
+const sanitizeArchiveFileName = (value: string) => {
+  const extension = value.includes(".") ? value.split(".").pop()?.toLowerCase() : "";
+  const baseName = value.replace(/\.[^/.]+$/, "");
+  const safeBase = sanitizeArchivePathPart(baseName) || "dosya";
+
+  return extension ? `${safeBase}.${extension}` : safeBase;
+};
 
 const mapOsgbArchiveFile = (row: any): OsgbArchiveFileRecord => ({
   id: row.id,
