@@ -28,6 +28,7 @@ import {
 } from "@/lib/osgbPlatform";
 import { OSGBCompaniesPanel } from "@/components/osgb/OSGBCompaniesPanel";
 import { OSGBCompanyEmployeesPanel } from "@/components/osgb/OSGBCompanyEmployeesPanel";
+import { OSGBArchivePanel } from "@/components/osgb/OSGBArchivePanel";
 
 const OSGBPersonnel = lazy(() => import("@/pages/OSGBPersonnel"));
 const OSGBCompanyTracking = lazy(() => import("@/pages/OSGBCompanyTracking"));
@@ -35,7 +36,6 @@ const OSGBFinance = lazy(() => import("@/pages/Finance"));
 const OSGBAssignments = lazy(() => import("@/pages/OSGBAssignments"));
 const OsgbClientPortal = lazy(() => import("@/pages/OsgbClientPortal"));
 const OSGBFieldVisits = lazy(() => import("@/pages/FieldVisits"));
-const SafetyLibrary = lazy(() => import("@/pages/SafetyLibrary"));
 const OsgbKatipSyncCenter = lazy(() => import("@/pages/OsgbKatipSyncCenter"));
 
 interface OSGBManagementDialogProps {
@@ -304,7 +304,7 @@ function renderTab(tab: OsgbManagementTab, refreshKey: number) {
     case "visits":
       return <OSGBFieldVisits />;
     case "archive":
-      return <SafetyLibrary />;
+      return <OSGBArchivePanel refreshKey={refreshKey} />;
     case "katip":
       return <OsgbKatipSyncCenter />;
     default:
