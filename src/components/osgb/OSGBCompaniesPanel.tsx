@@ -38,6 +38,7 @@ const inputClass = "h-9 border-slate-700/70 bg-slate-900/70 text-slate-100 place
 const selectTriggerClass = "h-9 min-w-[128px] border-slate-700/70 bg-slate-900/70 text-xs font-bold text-slate-100 focus:ring-blue-500/40";
 const selectContentClass = "z-[130] border-slate-700 bg-slate-900 text-slate-100";
 
+<<<<<<< HEAD
 const formatNumber = (value: number | string | null | undefined) => {
   const numericValue =
     typeof value === "number"
@@ -48,6 +49,8 @@ const formatNumber = (value: number | string | null | undefined) => {
 
   return new Intl.NumberFormat("tr-TR").format(numericValue);
 };
+=======
+>>>>>>> origin/codex/fix-type-assignment-error-in-isgbot.tsx-ax1nn2
 const normalizeHazard = (value: string) => value.toLocaleLowerCase("tr-TR");
 
 const isLowHazard = (value: string) => normalizeHazard(value).includes("az");

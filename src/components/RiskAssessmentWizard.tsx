@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { MANUAL_RISK_LIBRARY, type ManualRiskLibraryItem } from "@/lib/risk/manualRiskLibrary";
 import { generateSectorRiskTemplates } from "@/lib/risk/sectorRiskTemplates";
 import { getSectorMinimumRiskItemCount, RISK_TEMPLATE_CONFIGS } from "@/lib/risk/riskTemplateConfig";
+import { listSavedRiskItems, type SavedRiskItem } from "@/lib/profileRisks";
 import { generateRiskAssessmentOfficialDocx } from "@/lib/riskAssessmentOfficialDocx";
 import { generateRisksWithGemini, type GeminiRiskResult } from "@/services/geminiService";
 import type { RiskItem } from "@/types/risk-assessment";
@@ -541,6 +542,24 @@ const mapEditorRiskItemToWizardRow = (item: RiskItem, index: number): RiskWizard
   riskLevel: cleanText(item.risk_class_1),
   additionalMeasures: cleanText(item.proposed_controls),
   responsible: cleanText(item.responsible_person),
+  deadline: item.deadline || "",
+});
+
+
+const mapSavedRiskItemToWizardRow = (item: SavedRiskItem, index: number): RiskWizardTableItem => ({
+  id: createId("saved-risk"),
+  no: index + 1,
+  departmentActivity: cleanText(item.activity),
+  hazardSource: cleanText(item.hazard),
+  riskConsequence: cleanText(item.risk),
+  affectedPeople: "Çalışanlar",
+  currentMeasure: cleanText(item.currentStatus || item.riskDefinitionBefore),
+  probability: item.probabilityBefore ? String(item.probabilityBefore) : "",
+  severity: item.severityBefore ? String(item.severityBefore) : "",
+  riskScore: item.riskScoreBefore ? String(item.riskScoreBefore) : "",
+  riskLevel: getRiskLevelFromScore(Number(item.riskScoreBefore || 0)),
+  additionalMeasures: cleanText(item.correctivePreventiveAction),
+  responsible: cleanText(item.responsible),
   deadline: item.deadline || "",
 });
 
@@ -1750,27 +1769,34 @@ export default function RiskAssessmentWizard() {
   };
 
   const importRiskItemsFromAssessment = async () => {
-    if (!importAssessmentId) {
-      toast.error("RiskAssessmentEditor aktarımı için assessmentId bulunamadı.");
+    if (!user?.id) {
+      toast.error("Kayıtlı riskleri aktarmak için oturum bulunamadı.");
       return;
     }
     setImportingRiskItems(true);
     try {
-      const { data, error } = await supabase
-        .from("risk_items")
-        .select(
-          "id,item_number,department,hazard,risk,affected_people,existing_controls,proposed_controls,probability_1,severity_1,score_1,risk_class_1,responsible_person,deadline",
-        )
-        .eq("assessment_id", importAssessmentId)
-        .order("sort_order", { ascending: true });
-      if (error) throw error;
-      const mappedItems = (data || []).map((item, index) =>
-        mapEditorRiskItemToWizardRow(item as unknown as RiskItem, index),
-      );
-      setRiskItems(mappedItems);
+      if (importAssessmentId) {
+        const { data, error } = await supabase
+          .from("risk_items")
+          .select(
+            "id,item_number,department,hazard,risk,affected_people,existing_controls,proposed_controls,probability_1,severity_1,score_1,risk_class_1,responsible_person,deadline",
+          )
+          .eq("assessment_id", importAssessmentId)
+          .order("sort_order", { ascending: true });
+        if (error) throw error;
+        const mappedItems = (data || []).map((item, index) =>
+          mapEditorRiskItemToWizardRow(item as unknown as RiskItem, index),
+        );
+        setRiskItems(mappedItems);
+        toast.success(`${mappedItems.length} risk maddesi editörden aktarıldı.`);
+      } else {
+        const savedRisks = await listSavedRiskItems(user.id);
+        const mappedItems = savedRisks.map(mapSavedRiskItemToWizardRow);
+        setRiskItems(mappedItems);
+        toast.success(`${mappedItems.length} kayıtlı risk maddesi aktarıldı.`);
+      }
       setRiskAdditionMethod("saved");
       setCurrentStep(RISK_TABLE_STEP_INDEX);
-      toast.success(`${mappedItems.length} risk maddesi editörden aktarıldı.`);
     } catch (error) {
       console.error("Risk wizard import error", error);
       toast.error("Risk maddeleri aktarılamadı.");
@@ -2579,7 +2605,7 @@ export default function RiskAssessmentWizard() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={!importAssessmentId || importingRiskItems}
+                disabled={importingRiskItems}
                 onClick={importRiskItemsFromAssessment}
                 className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20"
               >
@@ -2589,7 +2615,7 @@ export default function RiskAssessmentWizard() {
             </div>
             {!importAssessmentId ? (
               <p className="text-xs text-slate-500">
-                Kayıtlı risk aktarımı için sihirbaz mevcut bir risk değerlendirmesi üzerinden açılmalıdır.
+                Kayıtlı riskler Profilim &gt; Risklerim kütüphanenizden aktarılır; mevcut değerlendirme üzerinden açıldıysa editör satırları da desteklenir.
               </p>
             ) : null}
 
