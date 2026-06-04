@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 export type OsgbRole = "igu" | "hekim" | "dsp";
 export type OsgbComplianceStatus = "compliant" | "warning" | "overdue" | "missing" | "not_applicable";
@@ -6,6 +7,7 @@ export type OsgbComplianceStatus = "compliant" | "warning" | "overdue" | "missin
 export interface OsgbWorkspaceCompanyOption {
   id: string;
   companyName: string;
+  sgkNo: string | null;
   hazardClass: string;
   employeeCount: number;
   complianceStatus: OsgbComplianceStatus;
@@ -44,6 +46,95 @@ export interface OsgbWorkspacePersonnelRecord {
   monthly_capacity_minutes: number;
   is_active: boolean;
   certificate_expiry_date: string | null;
+}
+
+export interface OsgbCompanyEmployeeRecord {
+  id: string;
+  organizationId: string;
+  userId: string;
+  companyId: string;
+  companyName: string;
+  fullName: string;
+  tcNumber: string | null;
+  jobTitle: string | null;
+  department: string | null;
+  phone: string | null;
+  email: string | null;
+  startDate: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbCompanyEmployeeInput {
+  organizationId: string;
+  userId: string;
+  companyId: string;
+  fullName: string;
+  tcNumber?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  startDate?: string | null;
+}
+
+
+export interface OsgbCompanyPortalAccountRecord {
+  id: string;
+  userId: string;
+  organizationId: string;
+  companyId: string;
+  companyName: string;
+  username: string;
+  passwordPlain: string | null;
+  passwordHash: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbCompanyPortalAccountInput {
+  userId: string;
+  organizationId: string;
+  companyId: string;
+  username: string;
+  passwordPlain?: string | null;
+  passwordHash?: string | null;
+  isActive?: boolean;
+}
+
+export interface OsgbCompanyPortalAccountUpdate {
+  username?: string;
+  passwordPlain?: string | null;
+  passwordHash?: string | null;
+  isActive?: boolean;
+}
+
+export interface OsgbArchiveFileRecord {
+  id: string;
+  userId: string;
+  organizationId: string | null;
+  companyId: string;
+  companyName: string;
+  folderPath: string;
+  fileName: string;
+  fileType: string | null;
+  fileSize: number;
+  storageBucket: string;
+  storagePath: string;
+  uploadedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbArchiveUploadInput {
+  userId: string;
+  organizationId: string | null;
+  companyId: string;
+  folderPath: string;
+  file: File;
 }
 
 export interface OsgbComplianceCompanyRecord {
@@ -466,7 +557,7 @@ export const listOsgbWorkspaceCompanies = async (
   const [companiesResponse, complianceResponse, contractsResponse] = await Promise.all([
     (supabase as any)
       .from("isgkatip_companies")
-      .select("id, company_name, hazard_class, employee_count")
+      .select("id, company_name, sgk_no, hazard_class, employee_count")
       .eq("org_id", organizationId)
       .eq("is_deleted", false)
       .eq("is_osgb_managed", true)
@@ -523,6 +614,7 @@ export const listOsgbWorkspaceCompanies = async (
     return {
       id: company.id,
       companyName: company.company_name || "Firma",
+      sgkNo: company.sgk_no || null,
       hazardClass: compliance?.hazard_class || company.hazard_class || "Bilinmiyor",
       employeeCount: compliance?.employee_count || company.employee_count || 0,
       complianceStatus: normalizeComplianceStatus(compliance?.compliance_status),
@@ -568,6 +660,340 @@ export const listOsgbWorkspacePersonnel = async (
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as OsgbWorkspacePersonnelRecord[];
+};
+
+const mapOsgbCompanyPortalAccount = (row: any): OsgbCompanyPortalAccountRecord => ({
+  id: row.id,
+  userId: row.user_id,
+  organizationId: row.organization_id,
+  companyId: row.company_id,
+  companyName: row.company?.company_name || "Firma",
+  username: row.username,
+  passwordPlain: row.password_plain || null,
+  passwordHash: row.password_hash || null,
+  isActive: Boolean(row.is_active),
+  lastLoginAt: row.last_login_at || null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const osgbCompanyPortalAccountSelect = `
+  id,
+  user_id,
+  organization_id,
+  company_id,
+  username,
+  password_plain,
+  password_hash,
+  is_active,
+  last_login_at,
+  created_at,
+  updated_at,
+  company:isgkatip_companies(company_name)
+`;
+
+export const listOsgbCompanyPortalAccounts = async (
+  organizationId: string,
+): Promise<OsgbCompanyPortalAccountRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .select(osgbCompanyPortalAccountSelect)
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapOsgbCompanyPortalAccount);
+};
+
+export const createOsgbCompanyPortalAccount = async (
+  input: OsgbCompanyPortalAccountInput,
+): Promise<OsgbCompanyPortalAccountRecord> => {
+  const payload = {
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId,
+    username: input.username.trim(),
+    password_plain: input.passwordPlain?.trim() || null,
+    password_hash: input.passwordHash || null,
+    is_active: input.isActive ?? true,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .insert(payload)
+    .select(osgbCompanyPortalAccountSelect)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbCompanyPortalAccount(data);
+};
+
+export const updateOsgbCompanyPortalAccount = async (
+  id: string,
+  updates: OsgbCompanyPortalAccountUpdate,
+): Promise<OsgbCompanyPortalAccountRecord> => {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  if (updates.username !== undefined) payload.username = updates.username.trim();
+  if (updates.passwordPlain !== undefined) payload.password_plain = updates.passwordPlain?.trim() || null;
+  if (updates.passwordHash !== undefined) payload.password_hash = updates.passwordHash;
+  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .update(payload)
+    .eq("id", id)
+    .select(osgbCompanyPortalAccountSelect)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbCompanyPortalAccount(data);
+};
+
+export const deleteOsgbCompanyPortalAccount = async (id: string) => {
+  const { error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
+export const listOsgbCompanyEmployees = async (
+  organizationId: string,
+): Promise<OsgbCompanyEmployeeRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .select(`
+      id,
+      organization_id,
+      user_id,
+      company_id,
+      full_name,
+      tc_number,
+      job_title,
+      department,
+      phone,
+      email,
+      start_date,
+      is_active,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .eq("organization_id", organizationId)
+    .eq("is_active", true)
+    .order("full_name", { ascending: true });
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    userId: row.user_id,
+    companyId: row.company_id,
+    companyName: row.company?.company_name || "Firma",
+    fullName: row.full_name,
+    tcNumber: row.tc_number || null,
+    jobTitle: row.job_title || null,
+    department: row.department || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    startDate: row.start_date || null,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
+};
+
+export const createOsgbCompanyEmployee = async (
+  input: OsgbCompanyEmployeeInput,
+): Promise<OsgbCompanyEmployeeRecord> => {
+  const payload = {
+    organization_id: input.organizationId,
+    user_id: input.userId,
+    company_id: input.companyId,
+    full_name: input.fullName.trim(),
+    tc_number: input.tcNumber?.trim() || null,
+    job_title: input.jobTitle?.trim() || null,
+    department: input.department?.trim() || null,
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim() || null,
+    start_date: input.startDate || null,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .insert(payload)
+    .select(`
+      id,
+      organization_id,
+      user_id,
+      company_id,
+      full_name,
+      tc_number,
+      job_title,
+      department,
+      phone,
+      email,
+      start_date,
+      is_active,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    organizationId: data.organization_id,
+    userId: data.user_id,
+    companyId: data.company_id,
+    companyName: data.company?.company_name || "Firma",
+    fullName: data.full_name,
+    tcNumber: data.tc_number || null,
+    jobTitle: data.job_title || null,
+    department: data.department || null,
+    phone: data.phone || null,
+    email: data.email || null,
+    startDate: data.start_date || null,
+    isActive: Boolean(data.is_active),
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  };
+};
+
+const OSGB_ARCHIVE_BUCKET = "safety_documents";
+
+const sanitizeArchivePathPart = (value: string) =>
+  value
+    .trim()
+    .replace(/[\\:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\.+$/g, "")
+    .trim();
+
+const sanitizeArchiveFileName = (value: string) => sanitizeArchivePathPart(value) || "dosya";
+
+const mapOsgbArchiveFile = (row: any): OsgbArchiveFileRecord => ({
+  id: row.id,
+  userId: row.user_id,
+  organizationId: row.organization_id || null,
+  companyId: row.company_id,
+  companyName: row.company?.company_name || "Firma",
+  folderPath: row.folder_path || "",
+  fileName: row.file_name,
+  fileType: row.file_type || null,
+  fileSize: Number(row.file_size || 0),
+  storageBucket: row.storage_bucket || OSGB_ARCHIVE_BUCKET,
+  storagePath: row.storage_path,
+  uploadedAt: row.uploaded_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+export const listOsgbArchiveFiles = async (
+  organizationId: string,
+): Promise<OsgbArchiveFileRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_archive_files")
+    .select(`
+      id,
+      user_id,
+      organization_id,
+      company_id,
+      folder_path,
+      file_name,
+      file_type,
+      file_size,
+      storage_bucket,
+      storage_path,
+      uploaded_at,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .eq("organization_id", organizationId)
+    .order("uploaded_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapOsgbArchiveFile);
+};
+
+export const uploadOsgbArchiveFile = async (
+  input: OsgbArchiveUploadInput,
+): Promise<OsgbArchiveFileRecord> => {
+  const safeFolderPath = input.folderPath
+    .split("/")
+    .map(sanitizeArchivePathPart)
+    .filter(Boolean)
+    .join("/");
+  const safeFileName = sanitizeArchiveFileName(input.file.name);
+  const folderSegment = safeFolderPath ? `/${safeFolderPath}` : "";
+  const storagePath = `osgb-archive/${input.companyId}${folderSegment}/${Date.now()}-${safeFileName}`;
+
+  await uploadFileOptimized(OSGB_ARCHIVE_BUCKET, storagePath, input.file);
+
+  const payload = {
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId,
+    folder_path: safeFolderPath,
+    file_name: input.file.name,
+    file_type: input.file.type || null,
+    file_size: input.file.size,
+    storage_bucket: OSGB_ARCHIVE_BUCKET,
+    storage_path: storagePath,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_archive_files")
+    .insert(payload)
+    .select(`
+      id,
+      user_id,
+      organization_id,
+      company_id,
+      folder_path,
+      file_name,
+      file_type,
+      file_size,
+      storage_bucket,
+      storage_path,
+      uploaded_at,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbArchiveFile(data);
+};
+
+export const deleteOsgbArchiveFile = async (file: OsgbArchiveFileRecord) => {
+  const { error: storageError } = await supabase.storage.from(file.storageBucket).remove([file.storagePath]);
+  if (storageError) throw storageError;
+
+  const { error } = await (supabase as any).from("osgb_archive_files").delete().eq("id", file.id);
+  if (error) throw error;
+};
+
+export const downloadOsgbArchiveFile = async (file: OsgbArchiveFileRecord) => {
+  const { data, error } = await supabase.storage.from(file.storageBucket).download(file.storagePath);
+  if (error) throw error;
+
+  const url = window.URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = sanitizeArchiveFileName(file.fileName);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 export const listOsgbWorkspaceAssignmentsPage = async (

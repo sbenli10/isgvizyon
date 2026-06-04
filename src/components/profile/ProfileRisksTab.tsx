@@ -1,1 +1,1 @@
-export { ProfileRisksTab as default, ProfileRisksTab } from "./ProfileFeatureTabs";
+export { ProfileRisksTab as default, ProfileRisksTab } from "./ProfileRisksOfficialTab";
