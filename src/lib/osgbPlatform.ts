@@ -79,6 +79,39 @@ export interface OsgbCompanyEmployeeInput {
   startDate?: string | null;
 }
 
+
+export interface OsgbCompanyPortalAccountRecord {
+  id: string;
+  userId: string;
+  organizationId: string;
+  companyId: string;
+  companyName: string;
+  username: string;
+  passwordPlain: string | null;
+  passwordHash: string | null;
+  isActive: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbCompanyPortalAccountInput {
+  userId: string;
+  organizationId: string;
+  companyId: string;
+  username: string;
+  passwordPlain?: string | null;
+  passwordHash?: string | null;
+  isActive?: boolean;
+}
+
+export interface OsgbCompanyPortalAccountUpdate {
+  username?: string;
+  passwordPlain?: string | null;
+  passwordHash?: string | null;
+  isActive?: boolean;
+}
+
 export interface OsgbArchiveFileRecord {
   id: string;
   userId: string;
@@ -627,6 +660,103 @@ export const listOsgbWorkspacePersonnel = async (
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as OsgbWorkspacePersonnelRecord[];
+};
+
+const mapOsgbCompanyPortalAccount = (row: any): OsgbCompanyPortalAccountRecord => ({
+  id: row.id,
+  userId: row.user_id,
+  organizationId: row.organization_id,
+  companyId: row.company_id,
+  companyName: row.company?.company_name || "Firma",
+  username: row.username,
+  passwordPlain: row.password_plain || null,
+  passwordHash: row.password_hash || null,
+  isActive: Boolean(row.is_active),
+  lastLoginAt: row.last_login_at || null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const osgbCompanyPortalAccountSelect = `
+  id,
+  user_id,
+  organization_id,
+  company_id,
+  username,
+  password_plain,
+  password_hash,
+  is_active,
+  last_login_at,
+  created_at,
+  updated_at,
+  company:isgkatip_companies(company_name)
+`;
+
+export const listOsgbCompanyPortalAccounts = async (
+  organizationId: string,
+): Promise<OsgbCompanyPortalAccountRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .select(osgbCompanyPortalAccountSelect)
+    .eq("organization_id", organizationId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapOsgbCompanyPortalAccount);
+};
+
+export const createOsgbCompanyPortalAccount = async (
+  input: OsgbCompanyPortalAccountInput,
+): Promise<OsgbCompanyPortalAccountRecord> => {
+  const payload = {
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId,
+    username: input.username.trim(),
+    password_plain: input.passwordPlain?.trim() || null,
+    password_hash: input.passwordHash || null,
+    is_active: input.isActive ?? true,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .insert(payload)
+    .select(osgbCompanyPortalAccountSelect)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbCompanyPortalAccount(data);
+};
+
+export const updateOsgbCompanyPortalAccount = async (
+  id: string,
+  updates: OsgbCompanyPortalAccountUpdate,
+): Promise<OsgbCompanyPortalAccountRecord> => {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  if (updates.username !== undefined) payload.username = updates.username.trim();
+  if (updates.passwordPlain !== undefined) payload.password_plain = updates.passwordPlain?.trim() || null;
+  if (updates.passwordHash !== undefined) payload.password_hash = updates.passwordHash;
+  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .update(payload)
+    .eq("id", id)
+    .select(osgbCompanyPortalAccountSelect)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbCompanyPortalAccount(data);
+};
+
+export const deleteOsgbCompanyPortalAccount = async (id: string) => {
+  const { error } = await (supabase as any)
+    .from("osgb_company_portal_accounts")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
 };
 
 export const listOsgbCompanyEmployees = async (

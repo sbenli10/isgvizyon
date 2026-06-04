@@ -29,12 +29,12 @@ import {
 import { OSGBCompaniesPanel } from "@/components/osgb/OSGBCompaniesPanel";
 import { OSGBCompanyEmployeesPanel } from "@/components/osgb/OSGBCompanyEmployeesPanel";
 import { OSGBArchivePanel } from "@/components/osgb/OSGBArchivePanel";
+import { OSGBCompanyAuthorizationPanel } from "@/components/osgb/OSGBCompanyAuthorizationPanel";
 
 const OSGBPersonnel = lazy(() => import("@/pages/OSGBPersonnel"));
 const OSGBCompanyTracking = lazy(() => import("@/pages/OSGBCompanyTracking"));
 const OSGBFinance = lazy(() => import("@/pages/Finance"));
 const OSGBAssignments = lazy(() => import("@/pages/OSGBAssignments"));
-const OsgbClientPortal = lazy(() => import("@/pages/OsgbClientPortal"));
 const OSGBFieldVisits = lazy(() => import("@/pages/FieldVisits"));
 const OsgbKatipSyncCenter = lazy(() => import("@/pages/OsgbKatipSyncCenter"));
 
@@ -300,7 +300,7 @@ function renderTab(tab: OsgbManagementTab, refreshKey: number) {
     case "assignments":
       return <OSGBAssignments />;
     case "authorization":
-      return <OsgbClientPortal />;
+      return <OSGBCompanyAuthorizationPanel refreshKey={refreshKey} />;
     case "visits":
       return <OSGBFieldVisits />;
     case "archive":
