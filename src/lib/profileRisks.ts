@@ -101,6 +101,7 @@ export interface SavedRiskExcelParseResult {
 const db = supabase as any;
 
 const clean = (value: unknown) => String(value ?? "").replace(/\s+/g, " ").trim();
+
 const emptyToNull = (value?: string | null) => {
   const cleaned = clean(value);
   return cleaned ? cleaned : null;
@@ -108,11 +109,17 @@ const emptyToNull = (value?: string | null) => {
 
 const toIntegerOrNull = (value: unknown) => {
   if (value === null || value === undefined || clean(value) === "") return null;
+
   const parsed = Number(clean(value).replace(",", "."));
   return Number.isFinite(parsed) ? Math.round(parsed) : null;
 };
 
-const calculateScore = (probability?: number | null, frequency?: number | null, severity?: number | null, score?: number | null) => {
+const calculateScore = (
+  probability?: number | null,
+  frequency?: number | null,
+  severity?: number | null,
+  score?: number | null,
+) => {
   if (score !== null && score !== undefined) return score;
   if (probability && frequency && severity) return probability * frequency * severity;
   return null;
@@ -131,8 +138,10 @@ export const parseSavedRiskDate = (value: unknown): string | null => {
 
   const text = clean(value);
   if (!text) return null;
+
   const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+
   const tr = text.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
   if (tr) return `${tr[3]}-${tr[2].padStart(2, "0")}-${tr[1].padStart(2, "0")}`;
 
@@ -174,12 +183,13 @@ const normalizeHeader = (value: unknown) =>
     .replace(/Ö/g, "O")
     .replace(/Ç/g, "C")
     .replace(/[\r\n\t]+/g, " ")
-    .replace(/[.:;,_()\[\]{}]+/g, " ")
+    .replace(/[.:;,_()[\]{}]+/g, " ")
     .replace(/[\\/]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-const includesAny = (header: string, aliases: string[]) => aliases.some((alias) => header === alias || header.includes(alias));
+const includesAny = (header: string, aliases: string[]) =>
+  aliases.some((alias) => header === alias || header.includes(alias));
 
 const isProbabilityHeader = (header: string) => ["O", "OLASILIK", "OLASILIK O"].includes(header);
 const isFrequencyHeader = (header: string) => ["F", "FREKANS", "FREKANS F"].includes(header);
@@ -188,8 +198,13 @@ const isScoreHeader = (header: string) => ["R", "RISK SKORU", "RISK PUANI", "RIS
 
 const firstScoreIndex = (headers: string[]) => {
   const indexes = headers
-    .map((header, index) => (isProbabilityHeader(header) || isFrequencyHeader(header) || isSeverityHeader(header) || isScoreHeader(header) ? index : -1))
+    .map((header, index) =>
+      isProbabilityHeader(header) || isFrequencyHeader(header) || isSeverityHeader(header) || isScoreHeader(header)
+        ? index
+        : -1,
+    )
     .filter((index) => index >= 0);
+
   return indexes.length ? Math.min(...indexes) : Number.POSITIVE_INFINITY;
 };
 
@@ -219,27 +234,48 @@ const buildColumnMap = (headerRow: unknown[]): SavedRiskColumnMap => {
   const headers = headerRow.map(normalizeHeader);
   const scoreStart = firstScoreIndex(headers);
   const columnMap: SavedRiskColumnMap = {};
+
   assignScoreColumns(headers, columnMap);
 
   headers.forEach((header, index) => {
     if (!header) return;
+
     const assignIfEmpty = (key: SavedRiskColumnKey) => {
       if (columnMap[key] === undefined) columnMap[key] = index;
     };
 
-    if (includesAny(header, ["FAALIYET", "IS FAALIYET", "ISLEM", "SUREC"])) assignIfEmpty("activity");
-    else if (includesAny(header, ["TEHLIKE", "TEHLIKE KAYNAGI"])) assignIfEmpty("hazard");
-    else if (includesAny(header, ["MEVCUT DURUM", "MEVCUT ONLEM", "MEVCUT KONTROL", "MEVCUT TEDBIR"])) assignIfEmpty("currentStatus");
-    else if (includesAny(header, ["TESPIT TARIHI", "TARIH"])) assignIfEmpty("detectionDate");
-    else if (includesAny(header, ["OLASI SONUC", "SONUC", "ETKI"])) assignIfEmpty("possibleConsequence");
-    else if (includesAny(header, ["DUZELTICI ONLEYICI FAALIYET", "DOF", "DUZELTICI FAALIYET", "ONLEYICI FAALIYET", "ALINACAK ONLEM"])) assignIfEmpty("correctivePreventiveAction");
-    else if (includesAny(header, ["DOF SONRASI RISK", "KALAN RISK", "ARTIK RISK", "RISKIN TANIMI DOF SONRASI"])) assignIfEmpty("riskDefinitionAfter");
-    else if (includesAny(header, ["TERMIN", "TERMIN TARIHI", "BITIS TARIHI"])) assignIfEmpty("deadline");
-    else if (includesAny(header, ["SORUMLU", "SORUMLU KISI", "SORUMLU BIRIM"])) assignIfEmpty("responsible");
-    else if (includesAny(header, ["RISKIN TANIMI", "RISK TANIMI", "RISK ACIKLAMASI"])) {
+    if (includesAny(header, ["FAALIYET", "IS FAALIYET", "ISLEM", "SUREC"])) {
+      assignIfEmpty("activity");
+    } else if (includesAny(header, ["TEHLIKE", "TEHLIKE KAYNAGI"])) {
+      assignIfEmpty("hazard");
+    } else if (header === "RISK") {
+      assignIfEmpty("risk");
+    } else if (includesAny(header, ["MEVCUT DURUM", "MEVCUT ONLEM", "MEVCUT KONTROL", "MEVCUT TEDBIR"])) {
+      assignIfEmpty("currentStatus");
+    } else if (includesAny(header, ["TESPIT TARIHI", "TARIH"])) {
+      assignIfEmpty("detectionDate");
+    } else if (includesAny(header, ["OLASI SONUC", "SONUC", "ETKI"])) {
+      assignIfEmpty("possibleConsequence");
+    } else if (
+      includesAny(header, [
+        "DUZELTICI ONLEYICI FAALIYET",
+        "DOF",
+        "DUZELTICI FAALIYET",
+        "ONLEYICI FAALIYET",
+        "ALINACAK ONLEM",
+      ])
+    ) {
+      assignIfEmpty("correctivePreventiveAction");
+    } else if (includesAny(header, ["DOF SONRASI RISK", "KALAN RISK", "ARTIK RISK", "RISKIN TANIMI DOF SONRASI"])) {
+      assignIfEmpty("riskDefinitionAfter");
+    } else if (includesAny(header, ["TERMIN", "TERMIN TARIHI", "BITIS TARIHI"])) {
+      assignIfEmpty("deadline");
+    } else if (includesAny(header, ["SORUMLU", "SORUMLU KISI", "SORUMLU BIRIM"])) {
+      assignIfEmpty("responsible");
+    } else if (includesAny(header, ["RISKIN TANIMI", "RISK TANIMI", "RISK ACIKLAMASI"])) {
       if (index < scoreStart && columnMap.risk === undefined) assignIfEmpty("risk");
       else assignIfEmpty("riskDefinitionBefore");
-    } else if (header === "RISK") assignIfEmpty("risk");
+    }
   });
 
   return columnMap;
@@ -249,14 +285,13 @@ const requiredMissing = (columnMap: SavedRiskColumnMap) =>
   ([
     ["FAALİYET", columnMap.activity],
     ["TEHLİKE", columnMap.hazard],
-    ["RİSK", columnMap.risk],
   ] as const)
     .filter(([, index]) => index === undefined)
     .map(([label]) => label);
 
 const headerScore = (row: unknown[]) => {
   const columnMap = buildColumnMap(row);
-  const requiredFound = 3 - requiredMissing(columnMap).length;
+  const requiredFound = 2 - requiredMissing(columnMap).length;
   const optionalFound = Object.keys(columnMap).length - requiredFound;
   return requiredFound * 4 + optionalFound;
 };
@@ -264,6 +299,7 @@ const headerScore = (row: unknown[]) => {
 const findHeaderRowIndex = (rows: unknown[][]) => {
   let bestIndex = -1;
   let bestScore = 0;
+
   rows.slice(0, 30).forEach((row, index) => {
     const score = headerScore(row);
     if (score > bestScore) {
@@ -271,6 +307,7 @@ const findHeaderRowIndex = (rows: unknown[][]) => {
       bestIndex = index;
     }
   });
+
   return bestScore >= 8 ? bestIndex : -1;
 };
 
@@ -279,44 +316,52 @@ const valueAt = (row: unknown[], columnMap: SavedRiskColumnMap, key: SavedRiskCo
   return index === undefined ? "" : row[index];
 };
 
-const validateNumber = (errors: string[], label: string, original: unknown, parsed: number | null) => {
-  if (clean(original) && parsed === null) errors.push(`${label} sayısal olmalı.`);
-};
-
-const validateDate = (errors: string[], label: string, original: unknown, parsed: string | null) => {
-  if (clean(original) && parsed === null) errors.push(`${label} geçerli tarih olmalı.`);
-};
-
-const mapRowToInput = (row: unknown[], rowNumber: number, columnMap: SavedRiskColumnMap, userId: string, organizationId?: string | null): SavedRiskExcelRow => {
+const mapRowToInput = (
+  row: unknown[],
+  rowNumber: number,
+  columnMap: SavedRiskColumnMap,
+  userId: string,
+  organizationId?: string | null,
+): SavedRiskExcelRow => {
   const probabilityBefore = toIntegerOrNull(valueAt(row, columnMap, "probabilityBefore"));
   const frequencyBefore = toIntegerOrNull(valueAt(row, columnMap, "frequencyBefore"));
   const severityBefore = toIntegerOrNull(valueAt(row, columnMap, "severityBefore"));
+  const riskScoreBeforeRaw = toIntegerOrNull(valueAt(row, columnMap, "riskScoreBefore"));
+
   const probabilityAfter = toIntegerOrNull(valueAt(row, columnMap, "probabilityAfter"));
   const frequencyAfter = toIntegerOrNull(valueAt(row, columnMap, "frequencyAfter"));
   const severityAfter = toIntegerOrNull(valueAt(row, columnMap, "severityAfter"));
-  const detectionDate = parseSavedRiskDate(valueAt(row, columnMap, "detectionDate"));
-  const deadline = parseSavedRiskDate(valueAt(row, columnMap, "deadline"));
+  const riskScoreAfterRaw = toIntegerOrNull(valueAt(row, columnMap, "riskScoreAfter"));
+
+  const riskDefinitionBefore = emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionBefore")));
+  const possibleConsequence = emptyToNull(clean(valueAt(row, columnMap, "possibleConsequence")));
+  const riskFallback =
+    clean(valueAt(row, columnMap, "risk")) ||
+    riskDefinitionBefore ||
+    possibleConsequence ||
+    clean(valueAt(row, columnMap, "hazard"));
+
   const input: SavedRiskInput = {
     userId,
     organizationId: organizationId || null,
     activity: clean(valueAt(row, columnMap, "activity")),
     hazard: clean(valueAt(row, columnMap, "hazard")),
-    risk: clean(valueAt(row, columnMap, "risk")),
+    risk: riskFallback,
     currentStatus: emptyToNull(clean(valueAt(row, columnMap, "currentStatus"))),
-    detectionDate,
+    detectionDate: parseSavedRiskDate(valueAt(row, columnMap, "detectionDate")),
     probabilityBefore,
     frequencyBefore,
     severityBefore,
-    riskScoreBefore: calculateScore(probabilityBefore, frequencyBefore, severityBefore, toIntegerOrNull(valueAt(row, columnMap, "riskScoreBefore"))),
-    riskDefinitionBefore: emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionBefore"))),
-    possibleConsequence: emptyToNull(clean(valueAt(row, columnMap, "possibleConsequence"))),
+    riskScoreBefore: calculateScore(probabilityBefore, frequencyBefore, severityBefore, riskScoreBeforeRaw),
+    riskDefinitionBefore,
+    possibleConsequence,
     correctivePreventiveAction: emptyToNull(clean(valueAt(row, columnMap, "correctivePreventiveAction"))),
     probabilityAfter,
     frequencyAfter,
     severityAfter,
-    riskScoreAfter: calculateScore(probabilityAfter, frequencyAfter, severityAfter, toIntegerOrNull(valueAt(row, columnMap, "riskScoreAfter"))),
+    riskScoreAfter: calculateScore(probabilityAfter, frequencyAfter, severityAfter, riskScoreAfterRaw),
     riskDefinitionAfter: emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionAfter"))),
-    deadline,
+    deadline: parseSavedRiskDate(valueAt(row, columnMap, "deadline")),
     responsible: emptyToNull(clean(valueAt(row, columnMap, "responsible"))),
     source: "excel",
   };
@@ -324,23 +369,15 @@ const mapRowToInput = (row: unknown[], rowNumber: number, columnMap: SavedRiskCo
   const errors: string[] = [];
   if (!input.activity) errors.push("FAALİYET zorunlu.");
   if (!input.hazard) errors.push("TEHLİKE zorunlu.");
-  if (!input.risk) errors.push("RİSK zorunlu.");
-
-  validateNumber(errors, "O", valueAt(row, columnMap, "probabilityBefore"), probabilityBefore);
-  validateNumber(errors, "F", valueAt(row, columnMap, "frequencyBefore"), frequencyBefore);
-  validateNumber(errors, "Ş", valueAt(row, columnMap, "severityBefore"), severityBefore);
-  validateNumber(errors, "R", valueAt(row, columnMap, "riskScoreBefore"), input.riskScoreBefore ?? null);
-  validateNumber(errors, "DÖF sonrası O", valueAt(row, columnMap, "probabilityAfter"), probabilityAfter);
-  validateNumber(errors, "DÖF sonrası F", valueAt(row, columnMap, "frequencyAfter"), frequencyAfter);
-  validateNumber(errors, "DÖF sonrası Ş", valueAt(row, columnMap, "severityAfter"), severityAfter);
-  validateNumber(errors, "DÖF sonrası R", valueAt(row, columnMap, "riskScoreAfter"), input.riskScoreAfter ?? null);
-  validateDate(errors, "TESPİT TARİHİ", valueAt(row, columnMap, "detectionDate"), detectionDate);
-  validateDate(errors, "TERMİN", valueAt(row, columnMap, "deadline"), deadline);
 
   return { rowNumber, input, errors };
 };
 
-export const parseSavedRiskExcel = async (file: File, userId: string, organizationId?: string | null): Promise<SavedRiskExcelParseResult> => {
+export const parseSavedRiskExcel = async (
+  file: File,
+  userId: string,
+  organizationId?: string | null,
+): Promise<SavedRiskExcelParseResult> => {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = sheetName ? workbook.Sheets[sheetName] : null;
@@ -352,13 +389,14 @@ export const parseSavedRiskExcel = async (file: File, userId: string, organizati
       totalRows: 0,
       validRows: [],
       invalidRows: [],
-      missingHeaders: ["Başlık satırı bulunamadı. İlk 30 satırda FAALİYET, TEHLİKE ve RİSK başlıklarını içeren satır bulunamadı."],
+      missingHeaders: ["Başlık satırı bulunamadı. İlk 30 satırda FAALİYET ve TEHLİKE başlıklarını içeren satır bulunamadı."],
     };
   }
 
   const columnMap = buildColumnMap(rows[headerRowIndex] ?? []);
   const missingRequiredHeaders = requiredMissing(columnMap);
   const missingHeaders = missingRequiredHeaders.length ? [`Şu zorunlu kolonlar eksik: ${missingRequiredHeaders.join(", ")}`] : [];
+
   const dataRows = rows.slice(headerRowIndex + 1).filter((row) => row.some((cell) => clean(cell)));
   const parsedRows = dataRows.map((row, index) => mapRowToInput(row, headerRowIndex + index + 2, columnMap, userId, organizationId));
 
@@ -407,6 +445,7 @@ const mapSavedRisk = (row: any): SavedRiskItem => ({
 const toPayload = (input: SavedRiskInput) => {
   const beforeScore = calculateScore(input.probabilityBefore, input.frequencyBefore, input.severityBefore, input.riskScoreBefore);
   const afterScore = calculateScore(input.probabilityAfter, input.frequencyAfter, input.severityAfter, input.riskScoreAfter);
+
   return {
     user_id: input.userId,
     organization_id: input.organizationId || null,
@@ -434,6 +473,7 @@ const toPayload = (input: SavedRiskInput) => {
     responsible: input.responsible || null,
     source: input.source || "manual",
     is_active: true,
+
     hazard_source: input.hazard.trim(),
     risk_description: input.risk.trim(),
     current_measures: input.currentStatus || null,
@@ -452,6 +492,7 @@ export const listSavedRiskItems = async (userId: string): Promise<SavedRiskItem[
     .eq("user_id", userId)
     .eq("is_active", true)
     .order("created_at", { ascending: false });
+
   if (error) throw error;
   return (data ?? []).map(mapSavedRisk);
 };
@@ -463,7 +504,13 @@ export const createSavedRiskItem = async (input: SavedRiskInput): Promise<SavedR
 };
 
 export const updateSavedRiskItem = async (id: string, input: SavedRiskInput): Promise<SavedRiskItem> => {
-  const { data, error } = await db.from("saved_risk_items").update({ ...toPayload(input), updated_at: new Date().toISOString() }).eq("id", id).select("*").single();
+  const { data, error } = await db
+    .from("saved_risk_items")
+    .update({ ...toPayload(input), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("*")
+    .single();
+
   if (error) throw error;
   return mapSavedRisk(data);
 };
@@ -475,23 +522,29 @@ export const deleteSavedRiskItem = async (id: string) => {
 
 export const bulkDeleteSavedRiskItems = async (ids: string[]) => {
   if (ids.length === 0) return;
+
   const { error } = await db.from("saved_risk_items").update({ is_active: false, updated_at: new Date().toISOString() }).in("id", ids);
   if (error) throw error;
 };
 
 export const bulkCreateSavedRiskItems = async (inputs: SavedRiskInput[], existing: SavedRiskItem[] = []) => {
-  const known = new Set(existing.map((item) => `${item.activity}|${item.hazard}|${item.risk}|${item.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR")));
+  const known = new Set(
+    existing.map((item) => `${item.activity}|${item.hazard}|${item.risk}|${item.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR")),
+  );
+
   const uniqueInputs = inputs.filter((input) => {
     const key = `${input.activity}|${input.hazard}|${input.risk}|${input.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR");
     if (known.has(key)) return false;
     known.add(key);
     return true;
   });
+
   const skipped = inputs.length - uniqueInputs.length;
   if (uniqueInputs.length === 0) return { inserted: [], skipped };
 
   const { data, error } = await db.from("saved_risk_items").insert(uniqueInputs.map(toPayload)).select("*");
   if (error) throw error;
+
   return { inserted: (data ?? []).map(mapSavedRisk), skipped };
 };
 
@@ -517,10 +570,14 @@ export const downloadSavedRiskTemplate = () => {
     "2026-06-30",
     "Şantiye Şefi",
   ];
+
   const worksheet = XLSX.utils.aoa_to_sheet([
     [...SAVED_RISK_EXCEL_HEADERS],
     example,
-  ]);  worksheet["!cols"] = SAVED_RISK_EXCEL_HEADERS.map(() => ({ wch: 24 }));
+  ]);
+
+  worksheet["!cols"] = SAVED_RISK_EXCEL_HEADERS.map(() => ({ wch: 24 }));
+
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Risklerim Şablonu");
   XLSX.writeFile(workbook, "risklerim-resmi-sablon.xlsx");
