@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 
 export type OsgbRole = "igu" | "hekim" | "dsp";
 export type OsgbComplianceStatus = "compliant" | "warning" | "overdue" | "missing" | "not_applicable";
@@ -76,6 +77,31 @@ export interface OsgbCompanyEmployeeInput {
   phone?: string | null;
   email?: string | null;
   startDate?: string | null;
+}
+
+export interface OsgbArchiveFileRecord {
+  id: string;
+  userId: string;
+  organizationId: string | null;
+  companyId: string;
+  companyName: string;
+  folderPath: string;
+  fileName: string;
+  fileType: string | null;
+  fileSize: number;
+  storageBucket: string;
+  storagePath: string;
+  uploadedAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbArchiveUploadInput {
+  userId: string;
+  organizationId: string | null;
+  companyId: string;
+  folderPath: string;
+  file: File;
 }
 
 export interface OsgbComplianceCompanyRecord {
@@ -707,6 +733,137 @@ export const createOsgbCompanyEmployee = async (
     createdAt: data.created_at,
     updatedAt: data.updated_at,
   };
+};
+
+const OSGB_ARCHIVE_BUCKET = "safety_documents";
+
+const sanitizeArchivePathPart = (value: string) =>
+  value
+    .trim()
+    .replace(/[\\:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .replace(/^\/+|\/+$/g, "")
+    .replace(/\.+$/g, "")
+    .trim();
+
+const sanitizeArchiveFileName = (value: string) => sanitizeArchivePathPart(value) || "dosya";
+
+const mapOsgbArchiveFile = (row: any): OsgbArchiveFileRecord => ({
+  id: row.id,
+  userId: row.user_id,
+  organizationId: row.organization_id || null,
+  companyId: row.company_id,
+  companyName: row.company?.company_name || "Firma",
+  folderPath: row.folder_path || "",
+  fileName: row.file_name,
+  fileType: row.file_type || null,
+  fileSize: Number(row.file_size || 0),
+  storageBucket: row.storage_bucket || OSGB_ARCHIVE_BUCKET,
+  storagePath: row.storage_path,
+  uploadedAt: row.uploaded_at,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+export const listOsgbArchiveFiles = async (
+  organizationId: string,
+): Promise<OsgbArchiveFileRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_archive_files")
+    .select(`
+      id,
+      user_id,
+      organization_id,
+      company_id,
+      folder_path,
+      file_name,
+      file_type,
+      file_size,
+      storage_bucket,
+      storage_path,
+      uploaded_at,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .eq("organization_id", organizationId)
+    .order("uploaded_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(mapOsgbArchiveFile);
+};
+
+export const uploadOsgbArchiveFile = async (
+  input: OsgbArchiveUploadInput,
+): Promise<OsgbArchiveFileRecord> => {
+  const safeFolderPath = input.folderPath
+    .split("/")
+    .map(sanitizeArchivePathPart)
+    .filter(Boolean)
+    .join("/");
+  const safeFileName = sanitizeArchiveFileName(input.file.name);
+  const folderSegment = safeFolderPath ? `/${safeFolderPath}` : "";
+  const storagePath = `osgb-archive/${input.companyId}${folderSegment}/${Date.now()}-${safeFileName}`;
+
+  await uploadFileOptimized(OSGB_ARCHIVE_BUCKET, storagePath, input.file);
+
+  const payload = {
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId,
+    folder_path: safeFolderPath,
+    file_name: input.file.name,
+    file_type: input.file.type || null,
+    file_size: input.file.size,
+    storage_bucket: OSGB_ARCHIVE_BUCKET,
+    storage_path: storagePath,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_archive_files")
+    .insert(payload)
+    .select(`
+      id,
+      user_id,
+      organization_id,
+      company_id,
+      folder_path,
+      file_name,
+      file_type,
+      file_size,
+      storage_bucket,
+      storage_path,
+      uploaded_at,
+      created_at,
+      updated_at,
+      company:isgkatip_companies(company_name)
+    `)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbArchiveFile(data);
+};
+
+export const deleteOsgbArchiveFile = async (file: OsgbArchiveFileRecord) => {
+  const { error: storageError } = await supabase.storage.from(file.storageBucket).remove([file.storagePath]);
+  if (storageError) throw storageError;
+
+  const { error } = await (supabase as any).from("osgb_archive_files").delete().eq("id", file.id);
+  if (error) throw error;
+};
+
+export const downloadOsgbArchiveFile = async (file: OsgbArchiveFileRecord) => {
+  const { data, error } = await supabase.storage.from(file.storageBucket).download(file.storagePath);
+  if (error) throw error;
+
+  const url = window.URL.createObjectURL(data);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = sanitizeArchiveFileName(file.fileName);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 export const listOsgbWorkspaceAssignmentsPage = async (
