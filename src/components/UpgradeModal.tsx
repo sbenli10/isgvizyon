@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -217,13 +217,19 @@ function PlanCard({
 export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { plan, status, plans, isOrganizationAdmin } = useSubscription();
+  const { plan, status, plans, isOrganizationAdmin, isDemoActive } = useSubscription();
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [hideAgain, setHideAgain] = useState(false);
 
+  useEffect(() => {
+    if (open && isDemoActive) {
+      onOpenChange(false);
+    }
+  }, [isDemoActive, onOpenChange, open]);
+
   const hasOrganization = Boolean(profile?.organization_id);
   const canPurchasePremium = !hasOrganization || isOrganizationAdmin;
-  const hasPremiumAccess = status === "trial" || plan === "premium" || plan === "osgb";
+  const hasPremiumAccess = isDemoActive || status === "trial" || plan === "premium" || plan === "osgb";
 
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
   const osgbPlan = plans.find((entry) => entry.planCode === "osgb");
@@ -271,7 +277,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     plan === "osgb" ? "OSGB Aktif" : !hasOrganization ? "Organizasyon Oluştur" : "OSGB Paketi Seç";
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open && !isDemoActive} onOpenChange={handleOpenChange}>
       <DialogContent className="flex max-h-[88vh] w-[calc(100vw-24px)] max-w-[760px] overflow-hidden rounded-2xl border border-sky-200/70 bg-sky-50 p-0 text-white shadow-2xl shadow-blue-950/20 dark:border-slate-700/80 dark:bg-[#08111f] dark:shadow-black/40">
         <div className="flex min-h-0 w-full flex-col overflow-hidden">
           <DialogHeader className="shrink-0 border-b border-sky-200/70 bg-gradient-to-br from-sky-100 via-blue-100 to-indigo-100 px-5 py-4 text-center dark:border-slate-700/80 dark:bg-none dark:bg-[#0f1d33] sm:px-6">

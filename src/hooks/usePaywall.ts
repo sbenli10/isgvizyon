@@ -11,7 +11,7 @@ const legacyFeatureMap = {
 } as const;
 
 export function usePaywall() {
-  const { isFeatureAllowed, status, isTrialExpired, features } = useSubscription();
+  const { isFeatureAllowed, status, isTrialExpired, features, isDemoActive } = useSubscription();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<UpgradeReason>("manual");
 
@@ -25,7 +25,7 @@ export function usePaywall() {
     feature: keyof typeof legacyFeatureMap,
     featureName: string,
   ): boolean => {
-    if (status === "trial" && isTrialExpired) {
+    if (!isDemoActive && status === "trial" && isTrialExpired) {
       setUpgradeReason("trial_expired");
       setShowUpgradeModal(true);
       toast.error("Deneme suresi sona erdi", {

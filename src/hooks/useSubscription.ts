@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getBillingCatalog, getBillingOverview } from "@/lib/billing";
+import { getOsgbDemoState, getOsgbDemoSubscription } from "@/lib/demoSubscription";
+import type { OsgbDemoSubscription } from "@/lib/demoSubscription";
 import type {
   BillingCatalogPlan,
   BillingOverview,
@@ -87,11 +89,26 @@ function catalogFeaturesToEntitlements(plan: BillingCatalogPlan | undefined): Su
   }));
 }
 
+function isOsgbFeature(feature: FeatureKey | string) {
+  const normalized = String(feature).toLocaleLowerCase("tr-TR");
+
+  return normalized === "osgb"
+    || normalized === "osgb_module"
+    || normalized === "osgb_panel"
+    || normalized.startsWith("osgb_")
+    || normalized.startsWith("osgb.");
+}
+
+function isActiveAccessStatus(status: SubscriptionStatus) {
+  return status === "premium" || status === "trial";
+}
+
 export function useSubscription() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
   const [catalogPlans, setCatalogPlans] = useState<BillingCatalogPlan[]>([]);
+  const [demoSubscription, setDemoSubscription] = useState<OsgbDemoSubscription | null>(null);
 
   const refetch = useCallback(async () => {
     if (authLoading) {
@@ -102,13 +119,26 @@ export function useSubscription() {
     if (!user) {
       setOverview(null);
       setCatalogPlans([]);
+      setDemoSubscription(null);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+
+    const loadDemoSubscription = async () => {
+      try {
+        const demo = await getOsgbDemoSubscription(user.id);
+        setDemoSubscription(demo);
+      } catch (error) {
+        console.error("Demo subscription fetch error:", error);
+        setDemoSubscription(null);
+      }
+    };
+
     if (!profile?.organization_id) {
       try {
-        const catalog = await getBillingCatalog();
+        const [catalog] = await Promise.all([getBillingCatalog(), loadDemoSubscription()]);
         setCatalogPlans(catalog.map((entry) => ({ ...entry, isCurrent: entry.planCode === "free" })));
         setOverview(null);
       } catch (error) {
@@ -121,9 +151,8 @@ export function useSubscription() {
       return;
     }
 
-    setLoading(true);
     try {
-      const nextOverview = await getBillingOverview();
+      const [nextOverview] = await Promise.all([getBillingOverview(), loadDemoSubscription()]);
       setOverview(nextOverview);
       setCatalogPlans(nextOverview.plans ?? []);
     } catch (error) {
@@ -194,11 +223,15 @@ export function useSubscription() {
     return "free";
   }, [personalPlan, profile?.organization_id, profile?.subscription_status]);
 
+  const demoState = useMemo(() => getOsgbDemoState(demoSubscription), [demoSubscription]);
+  const isDemoActive = demoState.isActive;
+  const demoDaysLeft = demoState.daysLeft;
+
   const status = useMemo(
     () => (profile?.organization_id ? normalizeStatus(overview) : personalStatus),
     [overview, personalStatus, profile?.organization_id],
   );
-  const plan = useMemo<SubscriptionPlan>(() => {
+  const subscriptionPlan = useMemo<SubscriptionPlan>(() => {
     if (!profile?.organization_id) {
       if (personalStatus === "trial") {
         return personalDaysLeftInTrial > 0 ? "premium" : "free";
@@ -221,6 +254,7 @@ export function useSubscription() {
 
     return "free";
   }, [overview?.daysLeftInTrial, overview?.planCode, personalDaysLeftInTrial, personalPlan, personalStatus, profile?.organization_id, status]);
+  const plan = useMemo<SubscriptionPlan>(() => (isDemoActive ? "osgb" : subscriptionPlan), [isDemoActive, subscriptionPlan]);
   const personalEntitlements = useMemo(
     () => catalogFeaturesToEntitlements(catalogPlans.find((entry) => entry.planCode === plan)),
     [catalogPlans, plan],
@@ -235,9 +269,15 @@ export function useSubscription() {
     : personalTrialEndsAt;
   const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
   const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
-  const isPremiumPlan = plan === "premium" || plan === "osgb" || status === "trial";
-  const isOsgbPlan = plan === "osgb";
-  const isPaidPlan = plan === "premium" || plan === "osgb";
+  const hasActiveSubscriptionStatus = isActiveAccessStatus(status) && !isTrialExpired;
+  const isPremiumActive = subscriptionPlan === "premium" && hasActiveSubscriptionStatus;
+  const isOsgbActive = subscriptionPlan === "osgb" && hasActiveSubscriptionStatus;
+  const isPaidSubscriptionActive = isPremiumActive || isOsgbActive;
+  const canAccessPremium = isPremiumActive || isOsgbActive || isDemoActive;
+  const canAccessOsgb = isOsgbActive || isDemoActive;
+  const isPremiumPlan = canAccessPremium;
+  const isOsgbPlan = canAccessOsgb;
+  const isPaidPlan = isPaidSubscriptionActive;
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
   const currentPlans = useMemo(() => {
     const activePlanCode = plan;
@@ -254,7 +294,11 @@ export function useSubscription() {
 
   const isFeatureAllowed = useCallback(
     (feature: keyof SubscriptionFeatures | FeatureKey | string) => {
-      if (plan === "osgb") {
+      if (isOsgbFeature(feature)) {
+        return canAccessOsgb;
+      }
+
+      if (canAccessPremium) {
         return true;
       }
 
@@ -265,12 +309,22 @@ export function useSubscription() {
 
       return featureMap[feature]?.allowed ?? false;
     },
-    [featureMap, features],
+    [canAccessOsgb, canAccessPremium, featureMap, features],
   );
 
   return {
     loading,
     overview,
+    demoSubscription,
+    demoState,
+    isDemoActive,
+    demoDaysLeft,
+    isPremiumActive,
+    isOsgbActive,
+    isPaidSubscriptionActive,
+    canAccessPremium,
+    canAccessOsgb,
+    subscriptionPlan,
     status,
     rawStatus: profile?.organization_id ? overview?.status ?? "active" : profile?.subscription_status ?? "free",
     plan,

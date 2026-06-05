@@ -24,11 +24,18 @@ export function FeatureAccessGate({
     plan,
     status,
     isTrialExpired,
+    canAccessPremium,
+    isDemoActive,
     hasAccess,
   } = usePlanLimits();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  const isOsgbFeature = featureKey === "osgb.access";
+  const normalizedFeatureKey = String(featureKey).toLocaleLowerCase("tr-TR");
+  const isOsgbFeature = normalizedFeatureKey === "osgb.access"
+    || normalizedFeatureKey === "osgb"
+    || normalizedFeatureKey === "osgb_module"
+    || normalizedFeatureKey.startsWith("osgb_")
+    || normalizedFeatureKey.startsWith("osgb.");
   const access = hasAccess(featureKey);
 
   const isLocked = useMemo(() => {
@@ -36,12 +43,12 @@ export function FeatureAccessGate({
       return false;
     }
 
-    if (status === "trial" && isTrialExpired) {
+    if (!isDemoActive && status === "trial" && isTrialExpired) {
       return true;
     }
 
     return !access.allowed;
-  }, [access.allowed, isTrialExpired, loading, status]);
+  }, [access.allowed, isDemoActive, isTrialExpired, loading, status]);
 
   if (loading) {
     return (
@@ -69,9 +76,11 @@ export function FeatureAccessGate({
   const lockSummary =
     status === "trial" && isTrialExpired
       ? "Deneme süreniz sona erdi. Uygun planı yeniden etkinleştirerek bu modülü kullanmaya devam edebilirsiniz."
-      : isOsgbFeature
-        ? "Bu ekran yalnızca OSGB planında açılır. Upgrade ekranında Free, Premium ve OSGB plan farklarını birlikte görebilirsiniz."
-        : "Bu ekran ücretli plan kapsamındadır. Upgrade ekranında modül farklarını, AI kotalarını ve limit artışlarını karşılaştırabilirsiniz.";
+      : isOsgbFeature && canAccessPremium
+        ? "OSGB Modülü ayrı paket kapsamındadır. OSGB paketine geçerek firma, atama, arşiv ve İSG-KATİP yönetimini kullanabilirsiniz."
+        : isOsgbFeature
+          ? "Bu ekran yalnızca OSGB planında açılır. Upgrade ekranında Free, Premium ve OSGB plan farklarını birlikte görebilirsiniz."
+          : "Bu ekran ücretli plan kapsamındadır. Upgrade ekranında modül farklarını, AI kotalarını ve limit artışlarını karşılaştırabilirsiniz.";
   const cardTitle = isOsgbFeature ? "OSGB planı ile açılır" : "Premium ile açılır";
   const cardDescription = isOsgbFeature
     ? "Firma havuzu, görevlendirme, kapasite, portal ve OSGB operasyon ekranları"
