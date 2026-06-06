@@ -89,6 +89,22 @@ function catalogFeaturesToEntitlements(plan: BillingCatalogPlan | undefined): Su
   }));
 }
 
+function isOsgbFeature(feature: FeatureKey | string) {
+  const normalized = String(feature).toLocaleLowerCase("tr-TR");
+
+  return (
+    normalized === "osgb" ||
+    normalized === "osgb_module" ||
+    normalized === "osgb_panel" ||
+    normalized.startsWith("osgb_") ||
+    normalized.startsWith("osgb.")
+  );
+}
+
+function isActiveAccessStatus(status: SubscriptionStatus) {
+  return status === "premium" || status === "trial";
+}
+
 export function useSubscription() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -164,6 +180,7 @@ export function useSubscription() {
     () => (!profile?.organization_id && profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null),
     [profile?.organization_id, profile?.trial_ends_at],
   );
+
   const personalDaysLeftInTrial = useMemo(() => {
     if (!personalTrialEndsAt) {
       return 0;
@@ -171,6 +188,7 @@ export function useSubscription() {
 
     return Math.min(7, Math.max(0, Math.ceil((personalTrialEndsAt.getTime() - Date.now()) / 86_400_000)));
   }, [personalTrialEndsAt]);
+
   const personalPlan = useMemo<SubscriptionPlan>(() => {
     if (profile?.subscription_plan === "osgb") {
       return "osgb";
@@ -182,6 +200,7 @@ export function useSubscription() {
 
     return "free";
   }, [profile?.subscription_plan]);
+
   const personalStatus = useMemo<SubscriptionStatus>(() => {
     if (profile?.organization_id) {
       return "free";
@@ -217,11 +236,8 @@ export function useSubscription() {
     () => (profile?.organization_id ? normalizeStatus(overview) : personalStatus),
     [overview, personalStatus, profile?.organization_id],
   );
-  const plan = useMemo<SubscriptionPlan>(() => {
-    if (isDemoActive) {
-      return "osgb";
-    }
 
+  const subscriptionPlan = useMemo<SubscriptionPlan>(() => {
     if (!profile?.organization_id) {
       if (personalStatus === "trial") {
         return personalDaysLeftInTrial > 0 ? "premium" : "free";
@@ -243,25 +259,49 @@ export function useSubscription() {
     }
 
     return "free";
-  }, [isDemoActive, overview?.daysLeftInTrial, overview?.planCode, personalDaysLeftInTrial, personalPlan, personalStatus, profile?.organization_id, status]);
+  }, [
+    overview?.daysLeftInTrial,
+    overview?.planCode,
+    personalDaysLeftInTrial,
+    personalPlan,
+    personalStatus,
+    profile?.organization_id,
+    status,
+  ]);
+
+  const plan = useMemo<SubscriptionPlan>(() => (isDemoActive ? "osgb" : subscriptionPlan), [isDemoActive, subscriptionPlan]);
+
   const personalEntitlements = useMemo(
     () => catalogFeaturesToEntitlements(catalogPlans.find((entry) => entry.planCode === plan)),
     [catalogPlans, plan],
   );
+
   const entitlements = profile?.organization_id ? overview?.entitlements ?? [] : personalEntitlements;
   const featureMap = useMemo(() => entitlementMap(entitlements), [entitlements]);
   const features = useMemo(() => deriveLegacyFeatures(entitlements, plan), [entitlements, plan]);
+
   const trialEndsAt = profile?.organization_id
     ? overview?.trialEndsAt
       ? new Date(overview.trialEndsAt)
       : null
     : personalTrialEndsAt;
+
   const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
   const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
-  const isPremiumPlan = plan === "premium" || plan === "osgb" || status === "trial";
-  const isOsgbPlan = plan === "osgb";
-  const isPaidPlan = plan === "premium" || plan === "osgb";
+  const hasActiveSubscriptionStatus = isActiveAccessStatus(status) && !isTrialExpired;
+
+  const isPremiumActive = subscriptionPlan === "premium" && hasActiveSubscriptionStatus;
+  const isOsgbActive = subscriptionPlan === "osgb" && hasActiveSubscriptionStatus;
+  const isPaidSubscriptionActive = isPremiumActive || isOsgbActive;
+
+  const canAccessPremium = isPremiumActive || isOsgbActive || isDemoActive;
+  const canAccessOsgb = isOsgbActive || isDemoActive;
+
+  const isPremiumPlan = canAccessPremium;
+  const isOsgbPlan = canAccessOsgb;
+  const isPaidPlan = isPaidSubscriptionActive;
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
+
   const currentPlans = useMemo(() => {
     const activePlanCode = plan;
     return (overview?.plans ?? catalogPlans).map((entry) => ({
@@ -277,7 +317,11 @@ export function useSubscription() {
 
   const isFeatureAllowed = useCallback(
     (feature: keyof SubscriptionFeatures | FeatureKey | string) => {
-      if (isDemoActive || plan === "osgb") {
+      if (isOsgbFeature(feature)) {
+        return canAccessOsgb;
+      }
+
+      if (canAccessPremium) {
         return true;
       }
 
@@ -288,7 +332,7 @@ export function useSubscription() {
 
       return featureMap[feature]?.allowed ?? false;
     },
-    [featureMap, features, isDemoActive, plan],
+    [canAccessOsgb, canAccessPremium, featureMap, features],
   );
 
   return {
@@ -298,6 +342,12 @@ export function useSubscription() {
     demoState,
     isDemoActive,
     demoDaysLeft,
+    isPremiumActive,
+    isOsgbActive,
+    isPaidSubscriptionActive,
+    canAccessPremium,
+    canAccessOsgb,
+    subscriptionPlan,
     status,
     rawStatus: profile?.organization_id ? overview?.status ?? "active" : profile?.subscription_status ?? "free",
     plan,

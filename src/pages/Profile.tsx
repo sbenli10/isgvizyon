@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Archive,
@@ -56,16 +56,29 @@ const tabIds = new Set(PROFILE_TABS.map((tab) => tab.id));
 export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
-  const { loading: demoLoading, demoState, refetch: refetchSubscription } = useSubscription();
+ const {
+  loading: subscriptionLoading,
+  overview,
+  demoState,
+  isDemoActive,
+  refetch: refetchSubscription,
+} = useSubscription();
+
+const activePlanName = String(overview?.planName || "").toLocaleLowerCase("tr-TR");
+
+const isPremiumActive = activePlanName.includes("premium");
+const isOsgbActive = activePlanName.includes("osgb");
+const isPaidSubscriptionActive = Boolean(isPremiumActive || isOsgbActive);
   const [confirmDemoOpen, setConfirmDemoOpen] = useState(false);
   const [startingDemo, setStartingDemo] = useState(false);
+
   const activeTab = useMemo<ProfileTab>(() => {
     const tab = searchParams.get("tab") as ProfileTab | null;
     return tab && tabIds.has(tab) ? tab : "overview";
   }, [searchParams]);
 
   const demoButtonLabel = useMemo(() => {
-    if (demoLoading) {
+    if (subscriptionLoading) {
       return "Demo kontrol ediliyor...";
     }
 
@@ -82,13 +95,28 @@ export default function Profile() {
     }
 
     return "30 Günlük Demo Üyelik Başlat";
-  }, [demoLoading, demoState.daysLeft, demoState.hasDemo, demoState.hasExpired, demoState.isActive, startingDemo]);
+  }, [
+    subscriptionLoading,
+    demoState.daysLeft,
+    demoState.hasDemo,
+    demoState.hasExpired,
+    demoState.isActive,
+    startingDemo,
+  ]);
 
-  const isDemoButtonDisabled = demoLoading || startingDemo || !user || demoState.hasDemo;
+  const showDemoStartButton = !subscriptionLoading && !isPaidSubscriptionActive && !demoState.hasDemo;
+  const showDemoStatusBadge = !subscriptionLoading && !isPaidSubscriptionActive && demoState.hasDemo;
+  const showDemoControl = showDemoStartButton || showDemoStatusBadge;
 
   const handleConfirmStartDemo = async () => {
     if (!user) {
       toast.error("Demo üyelik başlatmak için giriş yapmalısınız.");
+      return;
+    }
+
+    if (isPaidSubscriptionActive || demoState.hasDemo) {
+      toast.error("Aktif üyeliği olan veya daha önce demo kullanmış kullanıcı demo başlatamaz.");
+      setConfirmDemoOpen(false);
       return;
     }
 
@@ -156,25 +184,29 @@ export default function Profile() {
               sekmeli merkezde yönetilir.
             </p>
           </div>
+
           <div className="flex flex-wrap justify-start gap-2 text-center text-xs font-bold lg:max-w-[430px] lg:justify-end">
             {["Tek Merkez", "Canlı Veri", "Koyu Tema"].map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-slate-100">
                 {item}
               </div>
             ))}
-            <Button
-              type="button"
-              disabled={isDemoButtonDisabled}
-              onClick={() => setConfirmDemoOpen(true)}
-              className={`min-h-11 rounded-2xl px-4 text-xs font-black shadow-lg transition ${
-                demoState.isActive || (demoState.hasDemo && demoState.hasExpired)
-                  ? "border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/10 disabled:opacity-80"
-                  : "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:from-amber-300 hover:to-yellow-400"
-              }`}
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              {demoButtonLabel}
-            </Button>
+
+            {showDemoControl ? (
+              <Button
+                type="button"
+                disabled={!showDemoStartButton || startingDemo || !user}
+                onClick={() => setConfirmDemoOpen(true)}
+                className={`min-h-11 rounded-2xl px-4 text-xs font-black shadow-lg transition ${
+                  showDemoStatusBadge
+                    ? "border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/10 disabled:opacity-80"
+                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:from-amber-300 hover:to-yellow-400"
+                }`}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {demoButtonLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -191,6 +223,7 @@ export default function Profile() {
               Demo süresince OSGB modülü ve platform özelliklerini 30 gün boyunca kullanabilirsiniz. Bu hak yalnızca bir kez kullanılabilir.
             </DialogDescription>
           </DialogHeader>
+
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
