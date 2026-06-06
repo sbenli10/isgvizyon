@@ -21,6 +21,12 @@ const FEATURE_ALIASES: Record<string, FeatureKey | string> = {
   osgb_finance: "osgb.finance",
   osgb_katip: "osgb.katip",
   osgb_portal: "osgb.portal",
+  osgb_company_tracking: "osgb.company_tracking",
+  osgb_tracking: "osgb.company_tracking",
+  osgb_company_follow: "osgb.company_tracking",
+  osgb_firma_takibi: "osgb.company_tracking",
+  company_tracking: "osgb.company_tracking",
+  firma_takibi: "osgb.company_tracking",
   isg_bot: "isg_bot.access",
   isgbot: "isg_bot.access",
   risk_assessment: "risk_assessments.count",
@@ -41,14 +47,31 @@ function normalizeFeatureName(featureName: FeatureKey | string) {
   return FEATURE_ALIASES[featureName] ?? featureName;
 }
 
+function normalizeFeatureToken(featureKey: FeatureKey | string) {
+  return String(featureKey)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[ıİ]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function isOsgbFeature(featureKey: FeatureKey | string) {
   const normalized = String(featureKey).toLocaleLowerCase("tr-TR");
+  const token = normalizeFeatureToken(featureKey);
 
   return normalized === "osgb"
     || normalized === "osgb_module"
     || normalized === "osgb.access"
     || normalized.startsWith("osgb_")
-    || normalized.startsWith("osgb.");
+    || normalized.startsWith("osgb.")
+    || token.startsWith("osgb")
+    || token.includes("companytracking")
+    || token.includes("firmatakibi")
+    || token.includes("tracking");
 }
 
 export function usePlanLimits() {

@@ -21,7 +21,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOsgbAccess } from "@/hooks/useOsgbAccess";
+import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { invokeEdgeFunction } from "@/lib/ai/invokeEdgeFunction";
 import {
   createOsgbTrackingReminderTask,
@@ -322,7 +322,7 @@ function parseAiText(response: unknown) {
 export default function OSGBCompanyTracking() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { hasAccess, loading: accessLoading } = useOsgbAccess();
+  const { canAccessOsgb, isOsgbActive, isDemoActive, loading: accessLoading } = usePlanLimits();
   const organizationId = profile?.organization_id || null;
   const [workspace, setWorkspace] = useState<OsgbCompanyTrackingWorkspaceData | null>(null);
   const [documents, setDocuments] = useState<OsgbRequiredDocumentsWorkspaceData | null>(null);
@@ -408,7 +408,7 @@ export default function OSGBCompanyTracking() {
   };
 
   if (accessLoading || loading) return <div className="grid min-h-[420px] place-items-center bg-[#0b1426]"><Loader2 className="h-8 w-8 animate-spin text-cyan-300" /></div>;
-  if (!hasAccess) return <EmptyState>OSGB Firma Takibi için aktif OSGB erişimi gerekir.</EmptyState>;
+  if (!(canAccessOsgb || isOsgbActive || isDemoActive)) return <EmptyState>OSGB Firma Takibi ayrı OSGB paketi kapsamındadır.</EmptyState>;
   if (!organizationId) return <EmptyState>OSGB Firma Takibi organizasyon bazlı çalışır.</EmptyState>;
   if (error) return <EmptyState>{error}</EmptyState>;
 
