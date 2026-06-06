@@ -31,11 +31,23 @@ export function FeatureAccessGate({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const normalizedFeatureKey = String(featureKey).toLocaleLowerCase("tr-TR");
+  const normalizedFeatureToken = normalizedFeatureKey
+    .replace(/[ıİ]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[^a-z0-9]/g, "");
   const isOsgbFeature = normalizedFeatureKey === "osgb.access"
     || normalizedFeatureKey === "osgb"
     || normalizedFeatureKey === "osgb_module"
     || normalizedFeatureKey.startsWith("osgb_")
-    || normalizedFeatureKey.startsWith("osgb.");
+    || normalizedFeatureKey.startsWith("osgb.")
+    || normalizedFeatureToken.startsWith("osgb")
+    || normalizedFeatureToken.includes("companytracking")
+    || normalizedFeatureToken.includes("firmatakibi")
+    || normalizedFeatureToken.includes("tracking");
   const access = hasAccess(featureKey);
 
   const isLocked = useMemo(() => {

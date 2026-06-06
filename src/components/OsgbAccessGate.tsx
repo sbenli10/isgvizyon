@@ -55,8 +55,9 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { profile, loading: authLoading } = useAuth();
   const { loading: roleLoading, role } = useAccessRole();
-  const { loading: planLoading, hasAccess } = usePlanLimits();
+  const { loading: planLoading, canAccessOsgb, isOsgbActive, isDemoActive, hasAccess } = usePlanLimits();
   const osgbAccess = hasAccess("osgb_module");
+  const hasOsgbAccess = canAccessOsgb || isOsgbActive || isDemoActive || osgbAccess.allowed;
 
   if (authLoading || roleLoading || planLoading) {
     return (
@@ -66,7 +67,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!osgbAccess.allowed) {
+  if (!hasOsgbAccess) {
     return (
       <div className="container mx-auto py-6">
         <Card className="overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(15,23,42,0.92))] text-white shadow-[0_24px_70px_rgba(245,158,11,0.12)]">

@@ -89,16 +89,49 @@ function catalogFeaturesToEntitlements(plan: BillingCatalogPlan | undefined): Su
   }));
 }
 
+function normalizeAccessToken(value: unknown) {
+  return String(value || "")
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[ıİ]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function isOsgbPlanCode(value: unknown) {
+  const normalized = normalizeAccessToken(value);
+  return normalized === "osgb"
+    || normalized === "osgbplan"
+    || normalized === "osgbpro"
+    || normalized === "osgbuyelik"
+    || normalized === "osgbpaketi"
+    || normalized.includes("osgb");
+}
+
+function isPremiumPlanCode(value: unknown) {
+  const normalized = normalizeAccessToken(value);
+  return normalized === "premium"
+    || normalized === "premiumplan"
+    || normalized === "premiumpaketi"
+    || normalized === "premiumuyelik";
+}
+
 function isOsgbFeature(feature: FeatureKey | string) {
   const normalized = String(feature).toLocaleLowerCase("tr-TR");
+  const token = normalizeAccessToken(feature);
 
-  return (
-    normalized === "osgb" ||
-    normalized === "osgb_module" ||
-    normalized === "osgb_panel" ||
-    normalized.startsWith("osgb_") ||
-    normalized.startsWith("osgb.")
-  );
+  return normalized === "osgb"
+    || normalized === "osgb_module"
+    || normalized === "osgb_panel"
+    || normalized.startsWith("osgb_")
+    || normalized.startsWith("osgb.")
+    || token.startsWith("osgb")
+    || token.includes("companytracking")
+    || token.includes("firmatakibi")
+    || token.includes("tracking");
 }
 
 function isActiveAccessStatus(status: SubscriptionStatus) {
@@ -180,7 +213,6 @@ export function useSubscription() {
     () => (!profile?.organization_id && profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null),
     [profile?.organization_id, profile?.trial_ends_at],
   );
-
   const personalDaysLeftInTrial = useMemo(() => {
     if (!personalTrialEndsAt) {
       return 0;
@@ -188,19 +220,17 @@ export function useSubscription() {
 
     return Math.min(7, Math.max(0, Math.ceil((personalTrialEndsAt.getTime() - Date.now()) / 86_400_000)));
   }, [personalTrialEndsAt]);
-
   const personalPlan = useMemo<SubscriptionPlan>(() => {
-    if (profile?.subscription_plan === "osgb") {
+    if (isOsgbPlanCode(profile?.subscription_plan)) {
       return "osgb";
     }
 
-    if (profile?.subscription_plan === "premium") {
+    if (isPremiumPlanCode(profile?.subscription_plan)) {
       return "premium";
     }
 
     return "free";
   }, [profile?.subscription_plan]);
-
   const personalStatus = useMemo<SubscriptionStatus>(() => {
     if (profile?.organization_id) {
       return "free";
@@ -236,7 +266,6 @@ export function useSubscription() {
     () => (profile?.organization_id ? normalizeStatus(overview) : personalStatus),
     [overview, personalStatus, profile?.organization_id],
   );
-
   const subscriptionPlan = useMemo<SubscriptionPlan>(() => {
     if (!profile?.organization_id) {
       if (personalStatus === "trial") {
@@ -247,61 +276,44 @@ export function useSubscription() {
     }
 
     if (status === "trial" && (overview?.daysLeftInTrial ?? 0) > 0) {
-      return overview?.planCode === "osgb" ? "osgb" : "premium";
+      return isOsgbPlanCode(overview?.planCode) ? "osgb" : "premium";
     }
 
-    if (overview?.planCode === "osgb") {
+    if (isOsgbPlanCode(overview?.planCode)) {
       return "osgb";
     }
 
-    if (overview?.planCode === "premium") {
+    if (isPremiumPlanCode(overview?.planCode)) {
       return "premium";
     }
 
     return "free";
-  }, [
-    overview?.daysLeftInTrial,
-    overview?.planCode,
-    personalDaysLeftInTrial,
-    personalPlan,
-    personalStatus,
-    profile?.organization_id,
-    status,
-  ]);
-
+  }, [overview?.daysLeftInTrial, overview?.planCode, personalDaysLeftInTrial, personalPlan, personalStatus, profile?.organization_id, status]);
   const plan = useMemo<SubscriptionPlan>(() => (isDemoActive ? "osgb" : subscriptionPlan), [isDemoActive, subscriptionPlan]);
-
   const personalEntitlements = useMemo(
     () => catalogFeaturesToEntitlements(catalogPlans.find((entry) => entry.planCode === plan)),
     [catalogPlans, plan],
   );
-
   const entitlements = profile?.organization_id ? overview?.entitlements ?? [] : personalEntitlements;
   const featureMap = useMemo(() => entitlementMap(entitlements), [entitlements]);
   const features = useMemo(() => deriveLegacyFeatures(entitlements, plan), [entitlements, plan]);
-
   const trialEndsAt = profile?.organization_id
     ? overview?.trialEndsAt
       ? new Date(overview.trialEndsAt)
       : null
     : personalTrialEndsAt;
-
   const daysLeftInTrial = profile?.organization_id ? overview?.daysLeftInTrial ?? 0 : personalDaysLeftInTrial;
   const isTrialExpired = status === "trial" && daysLeftInTrial <= 0;
   const hasActiveSubscriptionStatus = isActiveAccessStatus(status) && !isTrialExpired;
-
   const isPremiumActive = subscriptionPlan === "premium" && hasActiveSubscriptionStatus;
   const isOsgbActive = subscriptionPlan === "osgb" && hasActiveSubscriptionStatus;
   const isPaidSubscriptionActive = isPremiumActive || isOsgbActive;
-
   const canAccessPremium = isPremiumActive || isOsgbActive || isDemoActive;
   const canAccessOsgb = isOsgbActive || isDemoActive;
-
   const isPremiumPlan = canAccessPremium;
   const isOsgbPlan = canAccessOsgb;
   const isPaidPlan = isPaidSubscriptionActive;
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
-
   const currentPlans = useMemo(() => {
     const activePlanCode = plan;
     return (overview?.plans ?? catalogPlans).map((entry) => ({
