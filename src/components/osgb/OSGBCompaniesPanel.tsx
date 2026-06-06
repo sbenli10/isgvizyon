@@ -38,6 +38,17 @@ const inputClass = "h-9 border-slate-700/70 bg-slate-900/70 text-slate-100 place
 const selectTriggerClass = "h-9 min-w-[128px] border-slate-700/70 bg-slate-900/70 text-xs font-bold text-slate-100 focus:ring-blue-500/40";
 const selectContentClass = "z-[130] border-slate-700 bg-slate-900 text-slate-100";
 
+const formatNumber = (value: number | string | null | undefined) => {
+  const numericValue =
+    typeof value === "number"
+      ? value
+      : Number(String(value ?? 0).replace(",", "."));
+
+  if (!Number.isFinite(numericValue)) return "0";
+
+  return new Intl.NumberFormat("tr-TR").format(numericValue);
+};
+
 const normalizeHazard = (value: string) => value.toLocaleLowerCase("tr-TR");
 
 const isLowHazard = (value: string) => normalizeHazard(value).includes("az");
