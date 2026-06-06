@@ -2496,6 +2496,7 @@ export interface OsgbManagedCompanyRecord {
   id: string;
   organizationId: string;
   companyName: string;
+  branchName: string | null;
   sgkNo: string | null;
   taxNumber: string | null;
   employeeCount: number;
@@ -2504,6 +2505,7 @@ export interface OsgbManagedCompanyRecord {
   phone: string | null;
   email: string | null;
   contactName: string | null;
+  naceCode: string | null;
   assignmentMode: string;
   visitFrequency: string;
   notes: string | null;
@@ -2513,7 +2515,8 @@ export interface OsgbManagedCompanyRecord {
   contractStart: string | null;
   contractEnd: string | null;
   monthlyFee: number;
-  assignmentApprovalStatus?: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees" | null;  totalRequiredMinutes: number;
+  assignmentApprovalStatus?: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees" | null;
+  totalRequiredMinutes: number;
   totalAssignedMinutes: number;
   requiredMinutesByRole: Record<OsgbRole, number>;
   assignedMinutesByRole: Record<OsgbRole, number>;
@@ -2554,6 +2557,7 @@ export interface OsgbCompanyTrackingWorkspaceData {
 
 export interface OsgbCompanyManagementInput {
   companyName: string;
+  branchName?: string | null;
   sgkNo?: string | null;
   taxNumber?: string | null;
   employeeCount?: number;
@@ -2582,10 +2586,16 @@ export interface OsgbCompanyManagementInput {
 }
 
 const deriveAssignmentApprovalStatus = (row: any, assignedMinutes: number) => {
+  const explicitStatus = String(row.assignment_approval_status || "");
+  if (["approved", "pending_personnel", "pending_workplace", "missing_contract", "planned", "zero_employees"].includes(explicitStatus)) {
+    return explicitStatus as "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees";
+  }
+
   const assignedPersonApproval = String(row.assigned_person_approval_status || "").toLocaleLowerCase("tr-TR");
   const receiverApproval = String(row.service_receiver_approval_status || "").toLocaleLowerCase("tr-TR");
   const contractStatus = String(row.contract_status || "").toLocaleLowerCase("tr-TR");
 
+  if (Number(row.employee_count || 0) === 0) return "zero_employees" as const;
   if (assignedMinutes <= 0) return "missing_contract" as const;
   if (contractStatus.includes("plan")) return "planned" as const;
   if (assignedPersonApproval && !assignedPersonApproval.includes("approve")) return "pending_personnel" as const;
@@ -2610,6 +2620,7 @@ const normalizeManagedCompany = (
     id: row.id,
     organizationId: row.org_id,
     companyName: row.company_name || "Firma",
+    branchName: row.branch_name || null,
     sgkNo: row.sgk_no || null,
     taxNumber: row.tax_number || null,
     employeeCount: Number(row.employee_count || 0),
@@ -2618,6 +2629,7 @@ const normalizeManagedCompany = (
     phone: row.phone || null,
     email: row.email || null,
     contactName: row.contact_name || null,
+    naceCode: row.nace_code || null,
     assignmentMode: row.assignment_mode || "automatic",
     visitFrequency: row.visit_frequency || "monthly_once",
     notes: row.notes || null,
@@ -2736,6 +2748,7 @@ export const listOsgbCompanyTrackingWorkspace = async (
         id,
         org_id,
         company_name,
+        branch_name,
         sgk_no,
         tax_number,
         employee_count,
@@ -2754,6 +2767,7 @@ export const listOsgbCompanyTrackingWorkspace = async (
         contract_end,
         assigned_person_approval_status,
         service_receiver_approval_status,
+        assignment_approval_status,
         contract_status,
         nace_code
       `)
@@ -2834,7 +2848,7 @@ export const upsertOsgbManagedCompany = async (
   const companyPayload = {
     org_id: organizationId,
     company_name: input.companyName,
-    branch_name: (input as any).branchName?.trim() || null, // ✅ yeni alan
+    branch_name: input.branchName?.trim() || null,
     sgk_no: input.sgkNo?.trim() || `MANUAL-${Date.now()}`,
     tax_number: input.taxNumber?.trim() || null,
     employee_count: Math.max(0, Number(input.employeeCount || 0)),
@@ -2847,6 +2861,9 @@ export const upsertOsgbManagedCompany = async (
     assignment_approval_status: input.assignmentApprovalStatus || null,
     visit_frequency: input.visitFrequency || "monthly_once",
     notes: input.notes?.trim() || null,
+    is_deleted: false,
+    deleted_at: null,
+    deleted_by: null,
     is_osgb_managed: true,
     management_source: input.managementSource || "manual",
     managed_at: new Date().toISOString(),
@@ -2862,8 +2879,24 @@ export const upsertOsgbManagedCompany = async (
     last_synced_at: new Date().toISOString(),
   };
 
-  const query = existingCompanyId
-    ? (supabase as any).from("isgkatip_companies").update(companyPayload).eq("id", existingCompanyId).eq("org_id", organizationId)
+  let targetCompanyId = existingCompanyId || null;
+  const sgkNo = input.sgkNo?.trim();
+
+  if (!targetCompanyId && sgkNo) {
+    const { data: existingBySgk, error: existingBySgkError } = await (supabase as any)
+      .from("isgkatip_companies")
+      .select("id")
+      .eq("org_id", organizationId)
+      .eq("sgk_no", sgkNo)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingBySgkError) throw existingBySgkError;
+    targetCompanyId = existingBySgk?.id || null;
+  }
+
+  const query = targetCompanyId
+    ? (supabase as any).from("isgkatip_companies").update(companyPayload).eq("id", targetCompanyId).eq("org_id", organizationId)
     : (supabase as any).from("isgkatip_companies").insert(companyPayload);
 
   const { data, error } = await query.select("id").single();
@@ -2872,6 +2905,62 @@ export const upsertOsgbManagedCompany = async (
   await ensureOsgbCompanyContract(userId, organizationId, data.id, input);
   await refreshOsgbMonthlyCompliance(organizationId);
   return data.id as string;
+};
+
+export const deleteOsgbManagedCompany = async (organizationId: string, companyId: string, deletedBy?: string | null) => {
+  const { error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .update({
+      is_osgb_managed: false,
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: deletedBy || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", companyId)
+    .eq("org_id", organizationId);
+
+  if (error) throw error;
+  await refreshOsgbMonthlyCompliance(organizationId);
+};
+
+export interface OsgbCompanyBulkUpsertResult {
+  inserted: number;
+  updated: number;
+  total: number;
+}
+
+export const upsertOsgbManagedCompaniesFromExcel = async (
+  userId: string,
+  organizationId: string,
+  rows: OsgbCompanyManagementInput[],
+): Promise<OsgbCompanyBulkUpsertResult> => {
+  let inserted = 0;
+  let updated = 0;
+
+  for (const row of rows) {
+    const sgkNo = row.sgkNo?.trim();
+    let existingId: string | null = null;
+
+    if (sgkNo) {
+      const { data: existing, error } = await (supabase as any)
+        .from("isgkatip_companies")
+        .select("id")
+        .eq("org_id", organizationId)
+        .eq("sgk_no", sgkNo)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      existingId = existing?.id || null;
+    }
+
+    await upsertOsgbManagedCompany(userId, organizationId, { ...row, managementSource: row.managementSource || "import" }, existingId || undefined);
+    if (existingId) updated += 1;
+    else inserted += 1;
+  }
+
+  return { inserted, updated, total: inserted + updated };
 };
 
 export const importOsgbCompaniesFromKatip = async (
