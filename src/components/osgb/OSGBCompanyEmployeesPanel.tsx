@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { utils as xlsxUtils, writeFile, read } from "xlsx";
+import { utils as xlsxUtils, writeFile, read, type WorkSheet } from "xlsx";
 import {
   Calendar,
   Download,
@@ -126,7 +126,7 @@ const templateHeaders = [
 ];
 
 function normalizeHeader(value: string) {
-  return value
+  return String(value ?? "")
     .toLocaleLowerCase("tr-TR")
     .replace(/[ıİ]/g, "i")
     .replace(/[ğĞ]/g, "g")
@@ -137,8 +137,111 @@ function normalizeHeader(value: string) {
     .replace(/[^a-z0-9]/g, "");
 }
 
-function getCell(row: Record<string, unknown>, aliases: string[]) {
-  const aliasSet = new Set(aliases.map(normalizeHeader));
+const FIELD_ALIASES = {
+  firstName: [
+    "Ad",
+    "Adı",
+    "Adi",
+    "İsim",
+    "Isim",
+    "First Name",
+    "firstname",
+    "first_name",
+    "personel adı",
+    "personel adi",
+    "calisan adi",
+    "çalışan adı",
+  ],
+  lastName: [
+    "Soyad",
+    "Soyadı",
+    "Soyadi",
+    "Last Name",
+    "lastname",
+    "last_name",
+    "personel soyadı",
+    "personel soyadi",
+    "calisan soyadi",
+    "çalışan soyadı",
+  ],
+  tcNumber: [
+    "Tc No",
+    "TC No",
+    "T.C. No",
+    "T.C. Kimlik No",
+    "TC Kimlik No",
+    "Kimlik No",
+    "TCKN",
+    "tc_number",
+    "tcnumber",
+    "sicil tc",
+    "personel tc",
+    "TC",
+  ],
+  startDate: [
+    "İşe Giriş T.",
+    "Ise Giris T.",
+    "İşe Giriş",
+    "Ise Giris",
+    "İşe Giriş Tarihi",
+    "Ise Giris Tarihi",
+    "Başlama Tarihi",
+    "Baslama Tarihi",
+    "Start Date",
+    "start_date",
+  ],
+  position: [
+    "Pozisyon",
+    "Görev",
+    "Gorev",
+    "Ünvan",
+    "Unvan",
+    "Görevi",
+    "Gorevi",
+    "Meslek",
+    "Job Title",
+    "job_title",
+    "position",
+  ],
+  department: [
+    "Bölüm",
+    "Bolum",
+    "Departman",
+    "Birim",
+    "Çalıştığı Bölüm",
+    "Calistigi Bolum",
+    "department",
+  ],
+  gender: ["Cinsiyet", "gender"],
+  birthDate: ["Doğum Tarihi", "Dogum Tarihi", "Doğum T.", "Dogum T.", "birth_date"],
+  periodicExamDate: [
+    "Periyodik Muayene",
+    "Periyodik Muayene Tarihi",
+    "Per. Muayene",
+    "Per. Muayene Tarihi",
+    "EK2",
+    "EK-2",
+    "periodic_exam_date",
+  ],
+  age: ["Yaş", "Yas", "age"],
+  trainingDate: ["Eğitim Tarihi", "Egitim Tarihi", "training_date"],
+  upperBodySize: ["Üst Beden No", "Ust Beden No", "üst beden", "ust beden"],
+  shoeSize: ["Ayakkabı No", "Ayakkabi No", "ayakkabı", "ayakkabi"],
+  trainingTopic: ["Eğitim Konusu", "Egitim Konusu", "training_topic"],
+  occupation: ["Meslek", "occupation"],
+  phone: ["Telefon", "phone", "gsm", "cep telefonu"],
+  email: ["E-posta", "Email", "Eposta", "e_mail", "mail"],
+  notes: ["Notlar", "Not", "notes", "açıklama", "aciklama"],
+} as const;
+
+type EmployeeExcelField = keyof typeof FIELD_ALIASES;
+
+const FIELD_ALIAS_SETS = Object.fromEntries(
+  Object.entries(FIELD_ALIASES).map(([key, aliases]) => [key, new Set(aliases.map(normalizeHeader))]),
+) as Record<EmployeeExcelField, Set<string>>;
+
+function getCell(row: Record<string, unknown>, field: EmployeeExcelField) {
+  const aliasSet = FIELD_ALIAS_SETS[field];
   const entry = Object.entries(row).find(([key]) => aliasSet.has(normalizeHeader(key)));
   const value = entry?.[1];
   return value === undefined || value === null ? "" : String(value).trim();
@@ -146,12 +249,16 @@ function getCell(row: Record<string, unknown>, aliases: string[]) {
 
 function normalizeTc(value: unknown) {
   const raw = value === undefined || value === null ? "" : String(value).trim();
-  const digits = raw.replace(/\.0$/, "").replace(/\D/g, "");
-  return digits.length > 11 ? digits.slice(-11) : digits.padStart(raw.startsWith("0") ? 11 : digits.length, "0");
+  return raw.replace(/\.0$/, "").replace(/\D/g, "");
 }
 
 function parseOptionalDate(value: unknown) {
   if (!value) return { value: "", warning: false };
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime())
+      ? { value: "", warning: true }
+      : { value: value.toISOString().slice(0, 10), warning: false };
+  }
   if (typeof value === "number") {
     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
     excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
@@ -166,6 +273,49 @@ function parseOptionalDate(value: unknown) {
     return { value: `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`, warning: false };
   }
   return { value: "", warning: true };
+}
+
+function isBlankExcelRow(row: unknown[]) {
+  return row.every((cell) => cell === undefined || cell === null || String(cell).trim() === "");
+}
+
+function findHeaderRow(rows: unknown[][]) {
+  const rowsToScan = rows.slice(0, 20);
+  let bestIndex = -1;
+  let bestScore = 0;
+
+  rowsToScan.forEach((row, index) => {
+    const normalizedCells = row.map((cell) => normalizeHeader(String(cell ?? "")));
+    const hasField = (field: EmployeeExcelField) => normalizedCells.some((cell) => FIELD_ALIAS_SETS[field].has(cell));
+    const score = ["tcNumber", "firstName", "lastName"].filter((field) => hasField(field as EmployeeExcelField)).length;
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore >= 2 ? bestIndex : -1;
+}
+
+function rowsFromWorksheet(sheet: WorkSheet) {
+  const rawRows = xlsxUtils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "", raw: true });
+  const headerIndex = findHeaderRow(rawRows);
+
+  if (headerIndex === -1) {
+    throw new Error("Excel başlık satırı bulunamadı. Ad, Soyad ve TC başlıklarından en az ikisi ilk 20 satırda yer almalı.");
+  }
+
+  const headers = rawRows[headerIndex].map((cell) => String(cell ?? "").trim());
+  const dataRows = rawRows.slice(headerIndex + 1).filter((row) => !isBlankExcelRow(row));
+
+  return dataRows.map((row, index) => ({
+    rowNumber: headerIndex + index + 2,
+    row: headers.reduce<Record<string, unknown>>((acc, header, cellIndex) => {
+      if (header) acc[header] = row[cellIndex];
+      return acc;
+    }, {}),
+  }));
 }
 
 function formatDate(value?: string | null) {
@@ -384,30 +534,31 @@ function BulkUploadDialog({ open, onOpenChange, companies, onSaved }: { open: bo
     const buffer = await file.arrayBuffer();
     const workbook = read(buffer, { type: "array", cellDates: true });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rows = xlsxUtils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+    const rows = rowsFromWorksheet(sheet);
 
-    const parsed: BulkPreviewRow[] = rows.map((row, index) => {
+    const parsed: BulkPreviewRow[] = rows.map(({ row, rowNumber }) => {
       const errors: string[] = [];
       const warnings: string[] = [];
-      const tcNumber = normalizeTc(getCell(row, ["TC Kimlik No", "TC", "Tc No"]));
-      const firstName = getCell(row, ["Ad", "İsim", "Isim"]);
-      const lastName = getCell(row, ["Soyad", "Soyisim"]);
-      if (!tcNumber) errors.push("TC Kimlik No boş.");
+      const tcNumber = normalizeTc(getCell(row, "tcNumber"));
+      const firstName = getCell(row, "firstName");
+      const lastName = getCell(row, "lastName");
+      if (!tcNumber) errors.push("TC Kimlik No zorunlu.");
       else if (!/^\d{11}$/.test(tcNumber)) errors.push("TC Kimlik No 11 haneli olmalı.");
-      if (!firstName) errors.push("Ad boş.");
-      if (!lastName) errors.push("Soyad boş.");
+      if (!firstName) errors.push("Ad zorunlu.");
+      if (!lastName) errors.push("Soyad zorunlu.");
 
-      const birthDate = parseOptionalDate(getCell(row, ["Doğum Tarihi", "Dogum Tarihi"]));
-      const startDate = parseOptionalDate(getCell(row, ["İşe Giriş Tarihi", "Ise Giris Tarihi"]));
-      const trainingDate = parseOptionalDate(getCell(row, ["Eğitim Tarihi", "Egitim Tarihi"]));
-      const periodicExamDate = parseOptionalDate(getCell(row, ["Periyodik Muayene Tarihi", "Periyodik Muayene", "EK2"]));
+      const birthDate = parseOptionalDate(getCell(row, "birthDate"));
+      const startDate = parseOptionalDate(getCell(row, "startDate"));
+      const trainingDate = parseOptionalDate(getCell(row, "trainingDate"));
+      const periodicExamDate = parseOptionalDate(getCell(row, "periodicExamDate"));
       if (birthDate.warning) warnings.push("Doğum tarihi okunamadı, boş aktarılacak.");
       if (startDate.warning) warnings.push("İşe giriş tarihi okunamadı, boş aktarılacak.");
       if (trainingDate.warning) warnings.push("Eğitim tarihi okunamadı, boş aktarılacak.");
       if (periodicExamDate.warning) warnings.push("Periyodik muayene tarihi okunamadı, boş aktarılacak.");
 
-      const ageRaw = getCell(row, ["Yaş", "Yas"]);
+      const ageRaw = getCell(row, "age");
       const age = ageRaw && Number.isFinite(Number(ageRaw)) ? Number(ageRaw) : null;
+      const position = getCell(row, "position");
       const input: OsgbCompanyEmployeeInput | null = errors.length ? null : {
         organizationId,
         userId: user.id,
@@ -415,25 +566,25 @@ function BulkUploadDialog({ open, onOpenChange, companies, onSaved }: { open: bo
         tcNumber,
         firstName,
         lastName,
-        position: getCell(row, ["Pozisyon"]),
-        jobTitle: getCell(row, ["Pozisyon"]),
+        position,
+        jobTitle: position,
         birthDate: birthDate.value || null,
         age,
-        gender: getCell(row, ["Cinsiyet"]),
+        gender: getCell(row, "gender"),
         startDate: startDate.value || null,
-        department: getCell(row, ["Çalıştığı Bölüm", "Calistigi Bolum", "Bölüm", "Bolum"]),
+        department: getCell(row, "department"),
         trainingDate: trainingDate.value || null,
         periodicExamDate: periodicExamDate.value || null,
-        upperBodySize: getCell(row, ["Üst Beden No", "Ust Beden No"]),
-        shoeSize: getCell(row, ["Ayakkabı No", "Ayakkabi No"]),
-        trainingTopic: getCell(row, ["Eğitim Konusu", "Egitim Konusu"]),
-        occupation: getCell(row, ["Meslek"]),
-        phone: getCell(row, ["Telefon"]),
-        email: getCell(row, ["E-posta", "Email", "Eposta"]),
-        notes: getCell(row, ["Notlar", "Not"]),
+        upperBodySize: getCell(row, "upperBodySize"),
+        shoeSize: getCell(row, "shoeSize"),
+        trainingTopic: getCell(row, "trainingTopic"),
+        occupation: getCell(row, "occupation"),
+        phone: getCell(row, "phone"),
+        email: getCell(row, "email"),
+        notes: getCell(row, "notes"),
       };
 
-      return { rowNumber: index + 2, valid: errors.length === 0, errors, warnings, input };
+      return { rowNumber, valid: errors.length === 0, errors, warnings, input };
     });
     setPreviewRows(parsed);
   };
@@ -466,7 +617,7 @@ function BulkUploadDialog({ open, onOpenChange, companies, onSaved }: { open: bo
           <div className="space-y-2"><Label className="text-slate-300">Çalışanların Ekleneceği Firma *</Label><Select value={companyId} onValueChange={setCompanyId}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Firma seçin" /></SelectTrigger><SelectContent className={selectContentClass}>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}</SelectContent></Select></div>
           <div className="flex flex-wrap gap-2"><Button type="button" onClick={downloadTemplate} className="bg-slate-800 text-slate-100 hover:bg-slate-700"><Download className="mr-2 h-4 w-4" />Şablon Excel İndir</Button><label className="inline-flex h-10 cursor-pointer items-center rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-500"><Upload className="mr-2 h-4 w-4" />Excel Dosyası Seç<input type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) void parseFile(file); event.currentTarget.value = ""; }} /></label>{fileName ? <span className="inline-flex items-center rounded-xl border border-slate-700 px-3 text-sm text-slate-300">{fileName}</span> : null}</div>
           <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 p-3 text-sm text-blue-100">Firma kolonu şablonda bulunur fakat yükleme sırasında seçtiğiniz firma esas alınır. TC Kimlik No, Ad ve Soyad zorunludur.</div>
-          {previewRows.length ? <div className="rounded-2xl border border-slate-700 bg-slate-950/40 p-3"><div className="mb-3 flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-200">Geçerli: {validRows.length}</span><span className="rounded-full bg-rose-500/15 px-3 py-1 text-rose-200">Hatalı: {invalidRows.length}</span><span className="rounded-full bg-slate-800 px-3 py-1 text-slate-300">Firma: {selectedCompany?.companyName || "-"}</span></div><div className="max-h-72 overflow-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="text-slate-400"><tr><th className="p-2">Satır</th><th className="p-2">Durum</th><th className="p-2">TC</th><th className="p-2">Ad Soyad</th><th className="p-2">Uyarı/Hata</th></tr></thead><tbody>{previewRows.map((row) => <tr key={row.rowNumber} className="border-t border-slate-800"><td className="p-2">{row.rowNumber}</td><td className={cn("p-2 font-bold", row.valid ? "text-emerald-300" : "text-rose-300")}>{row.valid ? "Geçerli" : "Hatalı"}</td><td className="p-2">{row.input?.tcNumber || "-"}</td><td className="p-2">{row.input ? `${row.input.firstName} ${row.input.lastName}` : "-"}</td><td className="p-2 text-slate-400">{[...row.errors, ...row.warnings].join(" · ") || "-"}</td></tr>)}</tbody></table></div></div> : null}
+          {previewRows.length ? <div className="rounded-2xl border border-slate-700 bg-slate-950/40 p-3"><div className="mb-3 flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-slate-800 px-3 py-1 text-slate-300">Okunan: {previewRows.length}</span><span className="rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-200">Geçerli: {validRows.length}</span><span className="rounded-full bg-rose-500/15 px-3 py-1 text-rose-200">Hatalı: {invalidRows.length}</span><span className="rounded-full bg-slate-800 px-3 py-1 text-slate-300">Firma: {selectedCompany?.companyName || "-"}</span></div><div className="max-h-72 overflow-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead className="text-slate-400"><tr><th className="p-2">Satır</th><th className="p-2">Durum</th><th className="p-2">TC</th><th className="p-2">Ad Soyad</th><th className="p-2">Uyarı/Hata</th></tr></thead><tbody>{previewRows.map((row) => <tr key={row.rowNumber} className="border-t border-slate-800"><td className="p-2">{row.rowNumber}</td><td className={cn("p-2 font-bold", row.valid ? "text-emerald-300" : "text-rose-300")}>{row.valid ? "Geçerli" : "Hatalı"}</td><td className="p-2">{row.input?.tcNumber || "-"}</td><td className="p-2">{row.input ? `${row.input.firstName} ${row.input.lastName}` : "-"}</td><td className="p-2 text-slate-400">{[...row.errors, ...row.warnings].join(" · ") || "-"}</td></tr>)}</tbody></table></div></div> : null}
         </div>
         <div className="flex shrink-0 justify-end gap-2 border-t border-slate-700 bg-slate-950/50 p-4"><Button type="button" disabled={uploading} onClick={() => onOpenChange(false)} className="bg-slate-700 text-white hover:bg-slate-600">İptal</Button><Button type="button" disabled={uploading || validRows.length === 0} onClick={() => void handleUpload()} className="bg-violet-600 text-white hover:bg-violet-500">{uploading ? "Yükleniyor..." : "Yükle"}</Button></div>
       </DialogContent>
