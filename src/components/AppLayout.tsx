@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/AppSidebar";
 import NotificationBell from "@/components/NotificationBell";
+import { OrganizationCreateButton } from "@/components/OrganizationCreateButton";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -39,8 +40,8 @@ const NAVBAR_HEIGHT = "5.25rem";
 
 function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const { state } = useSidebar();
-  const { user, signOut } = useAuth();
-  const { plan, status, isPaidPlan } = useSubscription();
+  const { user, profile, signOut } = useAuth();
+  const { plan, status, isPaidPlan, canAccessOsgb, loading: subscriptionLoading } = useSubscription();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -65,6 +66,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
   const membershipLabel = plan === "osgb" ? "OSGB" : plan === "premium" ? "Premium" : null;
   const isCollapsed = state === "collapsed";
   const desktopOffset = isCollapsed ? DESKTOP_SIDEBAR_COLLAPSED_WIDTH : DESKTOP_SIDEBAR_WIDTH;
+  const showOrganizationCreateCta = !subscriptionLoading && !profile?.organization_id && canAccessOsgb;
 
   useEffect(() => {
     console.log("AppLayoutShell MOUNTED", {
@@ -148,6 +150,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Panel
                 </Button>
+                {showOrganizationCreateCta ? <OrganizationCreateButton nextPath="/osgb" className="hidden xl:inline-flex" /> : null}
                 <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 py-2 shadow-sm md:flex">
                   <NotificationBell />
                   <ThemeToggle />
@@ -263,6 +266,7 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                 >
                   <LayoutDashboard className="h-4 w-4" />
                 </Button>
+                {showOrganizationCreateCta ? <OrganizationCreateButton nextPath="/osgb" compact /> : null}
                 <NotificationBell />
                 <ThemeToggle />
               </div>

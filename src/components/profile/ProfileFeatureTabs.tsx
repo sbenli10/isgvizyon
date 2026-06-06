@@ -39,6 +39,7 @@ import { ProfileMetricCard } from "./ProfileMetricCard";
 import SettingsPage from "@/pages/Settings";
 import { cn } from "@/lib/utils";
 import { parseStorageObjectRef } from "@/lib/storageObject";
+import { useSubscription } from "@/hooks/useSubscription";
 
 type CompanyRow = {
   id: string;
@@ -2607,12 +2608,55 @@ export function ProfileVisitsTab() {
 }
 
 export function ProfileSubscriptionTab() {
+  const { loading, status, demoState, isPremiumActive, isOsgbActive, isPaidSubscriptionActive } = useSubscription();
+  const demoEndsAt = demoState.endsAt ? new Date(demoState.endsAt) : null;
+  const demoEndDateLabel = demoEndsAt && Number.isFinite(demoEndsAt.getTime())
+    ? demoEndsAt.toLocaleDateString("tr-TR")
+    : "-";
+  const planLabel = demoState.isActive
+    ? "OSGB Demo Üyelik"
+    : isOsgbActive
+      ? "OSGB Üyelik"
+      : isPremiumActive
+        ? "Premium Üyelik"
+        : "Ücretsiz";
+  const statusLabel = demoState.isActive
+    ? `Demo Aktif • ${demoState.daysLeft} gün kaldı`
+    : isPaidSubscriptionActive
+      ? "Aktif kullanım"
+      : demoState.hasDemo && demoState.hasExpired
+        ? "Demo Süresi Doldu"
+        : status === "trial"
+          ? "Deneme aktif"
+          : "Free kullanım";
+  const showDemoInfo = demoState.hasDemo && !isPaidSubscriptionActive;
+
   return (
     <PanelShell title="Abonelik" description="Paket, kullanım limitleri ve yükseltme işlemleri.">
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5"><CreditCard className="h-6 w-6 text-cyan-300" /><p className="mt-3 font-bold">Mevcut Paket</p><p className="text-sm text-slate-400">Profil ve abonelik bilgileri</p></div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5"><CheckCircle2 className="h-6 w-6 text-emerald-300" /><p className="mt-3 font-bold">Durum</p><p className="text-sm text-slate-400">Aktif kullanım</p></div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5"><Button className="w-full rounded-xl bg-blue-600 text-white">Paket Yükselt</Button></div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+          <CreditCard className="h-6 w-6 text-cyan-300" />
+          <p className="mt-3 font-bold">Mevcut Paket</p>
+          <p className="text-sm text-slate-400">{loading ? "Yükleniyor..." : planLabel}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+          <CheckCircle2 className="h-6 w-6 text-emerald-300" />
+          <p className="mt-3 font-bold">Durum</p>
+          <p className="text-sm text-slate-400">{loading ? "Kontrol ediliyor..." : statusLabel}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
+          {showDemoInfo ? (
+            <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-50">
+              <p className="font-black">{demoState.isActive ? "OSGB Demo Üyelik" : "Demo Süresi Doldu"}</p>
+              <p className="mt-2 text-xs text-amber-100/85">Bitiş: {demoEndDateLabel}</p>
+              <p className="mt-1 text-xs text-amber-100/85">
+                {demoState.isActive ? `Kalan: ${demoState.daysLeft} gün` : "Üyeliğe geçerek OSGB erişimini sürdürebilirsiniz."}
+              </p>
+            </div>
+          ) : (
+            <Button className="w-full rounded-xl bg-blue-600 text-white">Paket Yükselt</Button>
+          )}
+        </div>
       </div>
     </PanelShell>
   );
