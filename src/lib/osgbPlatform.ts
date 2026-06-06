@@ -2735,6 +2735,45 @@ const ensureOsgbCompanyContract = async (
   if (accountError) throw accountError;
 };
 
+
+export const createOsgbTrackingReminderTask = async (input: {
+  userId: string;
+  organizationId: string;
+  companyId?: string | null;
+  title: string;
+  description?: string | null;
+  priority?: "low" | "medium" | "high" | "critical";
+  dueDate?: string | null;
+}) => {
+  const { data: duplicateRows, error: duplicateError } = await (supabase as any)
+    .from("osgb_tasks")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", input.userId)
+    .eq("title", input.title)
+    .neq("status", "cancelled")
+    .limit(1);
+
+  if (duplicateError) throw duplicateError;
+  if ((duplicateRows ?? []).length > 0) return false;
+
+  const { error } = await (supabase as any).from("osgb_tasks").insert({
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId || null,
+    title: input.title,
+    description: input.description || null,
+    priority: input.priority || "high",
+    status: "open",
+    due_date: input.dueDate || null,
+    source: "company_tracking",
+    created_by: input.userId,
+  });
+
+  if (error) throw error;
+  return true;
+};
+
 export const listOsgbCompanyTrackingWorkspace = async (
   organizationId: string,
   serviceMonth = getServiceMonth(),
