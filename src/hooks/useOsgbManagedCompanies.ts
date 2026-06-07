@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  listOsgbWorkspaceCompanies,
-  type OsgbWorkspaceCompanyOption,
+  listOsgbManagedCompanyOptions,
+  type OsgbManagedCompanyOption,
 } from "@/lib/osgbPlatform";
 
 export const useOsgbManagedCompanies = (organizationId: string | null) => {
-  const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
+  const [companies, setCompanies] = useState<OsgbManagedCompanyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,7 +19,7 @@ export const useOsgbManagedCompanies = (organizationId: string | null) => {
 
     setLoading(true);
     try {
-      const rows = await listOsgbWorkspaceCompanies(organizationId);
+      const rows = await listOsgbManagedCompanyOptions(organizationId);
       setCompanies(rows);
       setError(null);
     } catch (err) {

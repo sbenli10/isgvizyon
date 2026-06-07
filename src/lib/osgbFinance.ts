@@ -4,198 +4,245 @@ export type OsgbFinanceStatus = "pending" | "paid" | "overdue";
 
 export interface OsgbFinanceRecord {
   id: string;
-  organization_id: string;
-  company_id: string;
-  company_name: string | null;
+  organizationId: string;
+  companyId: string;
+  companyName: string | null;
   period: string;
   amount: number;
-  invoice_no: string | null;
-  due_date: string | null;
+  invoiceNo: string | null;
+  dueDate: string | null;
   status: OsgbFinanceStatus;
   notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OsgbFinanceInput {
-  organization_id: string;
-  company_id: string;
-  company_name?: string | null;
+  companyId: string;
+  companyName?: string | null;
   period: string;
   amount: number;
-  invoice_no?: string | null;
-  due_date?: string | null;
+  invoiceNo?: string | null;
+  dueDate?: string | null;
   status?: OsgbFinanceStatus;
   notes?: string | null;
-  created_by?: string | null;
 }
 
-export interface OsgbFinanceFilters {
-  search?: string;
-  status?: OsgbFinanceStatus | "ALL";
-  companyId?: string | "ALL";
-  period?: string;
-}
+const FINANCE_SELECT = `
+  id,
+  organization_id,
+  company_id,
+  company_name,
+  period,
+  amount,
+  invoice_no,
+  due_date,
+  status,
+  notes,
+  created_by,
+  created_at,
+  updated_at,
+  company:isgkatip_companies(company_name)
+`;
 
-const table = () => (supabase as any).from("osgb_finance_records");
+const PERIOD_PATTERN = /^\d{4}-\d{2}$/;
 
-const normalizeRecord = (row: any): OsgbFinanceRecord => ({
-  ...row,
+const mapFinanceRecord = (row: any): OsgbFinanceRecord => ({
+  id: row.id,
+  organizationId: row.organization_id,
+  companyId: row.company_id,
+  companyName: row.company_name || row.company?.company_name || null,
+  period: row.period,
   amount: Number(row.amount || 0),
+  invoiceNo: row.invoice_no || null,
+  dueDate: row.due_date || null,
+  status: (row.status || "pending") as OsgbFinanceStatus,
+  notes: row.notes || null,
+  createdBy: row.created_by || null,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
 
-const normalizePeriod = (period: string) => {
-  if (!/^\d{4}-\d{2}$/.test(period)) {
-    throw new Error("Dönem YYYY-AA formatında olmalıdır.");
+const assertValidPeriod = (period: string) => {
+  if (!PERIOD_PATTERN.test(period)) {
+    throw new Error("Dönem YYYY-MM formatında olmalı.");
   }
-  return period;
+};
+
+const buildFinancePayload = (organizationId: string, input: OsgbFinanceInput) => {
+  assertValidPeriod(input.period);
+
+  return {
+    organization_id: organizationId,
+    company_id: input.companyId,
+    company_name: input.companyName?.trim() || null,
+    period: input.period,
+    amount: Number(input.amount || 0),
+    invoice_no: input.invoiceNo?.trim() || null,
+    due_date: input.dueDate || null,
+    status: input.status || "pending",
+    notes: input.notes?.trim() || null,
+  };
 };
 
 const addOneMonthToPeriod = (period: string) => {
-  normalizePeriod(period);
+  assertValidPeriod(period);
   const [year, month] = period.split("-").map(Number);
-  const next = new Date(Date.UTC(year, month, 1));
-  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}`;
+  const date = new Date(Date.UTC(year, month - 1, 1));
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
-const addOneMonthToDate = (value: string | null) => {
-  if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
-  if (!year || !month || !day) return null;
-  const lastDayOfTargetMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const safeDay = Math.min(day, lastDayOfTargetMonth);
-  return `${year + Math.floor(month / 12)}-${String((month % 12) + 1).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+const addOneMonthToDate = (dateValue: string | null) => {
+  if (!dateValue) return null;
+
+  const date = new Date(`${dateValue}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const originalDay = date.getUTCDate();
+  date.setUTCMonth(date.getUTCMonth() + 1);
+  if (date.getUTCDate() !== originalDay) {
+    date.setUTCDate(0);
+  }
+
+  return date.toISOString().slice(0, 10);
 };
 
-const getNextInvoiceNo = async (organizationId: string, period: string) => {
+const generateInvoiceNo = async (organizationId: string, period: string) => {
   const year = period.slice(0, 4);
-  const { data, error } = await table()
+  const prefix = `IST-${year}-`;
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_finance_records")
     .select("invoice_no")
     .eq("organization_id", organizationId)
-    .ilike("invoice_no", `IST-${year}-%`);
+    .ilike("invoice_no", `${prefix}%`);
 
   if (error) throw error;
 
-  const maxNo = (data ?? []).reduce((max: number, row: { invoice_no: string | null }) => {
-    const match = row.invoice_no?.match(new RegExp(`^IST-${year}-(\\d+)$`));
-    return match ? Math.max(max, Number(match[1])) : max;
+  const maxSequence = (data || []).reduce((max: number, row: any) => {
+    const suffix = String(row.invoice_no || "").replace(prefix, "");
+    const sequence = Number.parseInt(suffix, 10);
+    return Number.isFinite(sequence) ? Math.max(max, sequence) : max;
   }, 0);
 
-  return `IST-${year}-${String(maxNo + 1).padStart(3, "0")}`;
+  return `${prefix}${String(maxSequence + 1).padStart(3, "0")}`;
 };
 
-export const listOsgbFinanceRecords = async (
-  organizationId: string,
-  filters: OsgbFinanceFilters = {},
-): Promise<OsgbFinanceRecord[]> => {
-  let query = table()
-    .select("*")
+export const listOsgbFinanceRecords = async (organizationId: string): Promise<OsgbFinanceRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_finance_records")
+    .select(FINANCE_SELECT)
     .eq("organization_id", organizationId)
     .order("period", { ascending: false })
-    .order("due_date", { ascending: true });
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
-  if (filters.status && filters.status !== "ALL") query = query.eq("status", filters.status);
-  if (filters.companyId && filters.companyId !== "ALL") query = query.eq("company_id", filters.companyId);
-  if (filters.period?.trim()) query = query.eq("period", filters.period.trim());
-  if (filters.search?.trim()) {
-    const needle = filters.search.trim();
-    query = query.or(`company_name.ilike.%${needle}%,invoice_no.ilike.%${needle}%,notes.ilike.%${needle}%`);
-  }
-
-  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map(normalizeRecord);
+  return (data || []).map(mapFinanceRecord);
 };
 
-export const createOsgbFinanceRecord = async (input: OsgbFinanceInput): Promise<OsgbFinanceRecord> => {
-  normalizePeriod(input.period);
+export const createOsgbFinanceRecord = async (
+  userId: string,
+  organizationId: string,
+  input: OsgbFinanceInput,
+): Promise<OsgbFinanceRecord> => {
   const payload = {
-    organization_id: input.organization_id,
-    company_id: input.company_id,
-    company_name: input.company_name || null,
-    period: input.period,
-    amount: input.amount,
-    invoice_no: input.invoice_no || null,
-    due_date: input.due_date || null,
-    status: input.status || "pending",
-    notes: input.notes || null,
-    created_by: input.created_by || null,
+    ...buildFinancePayload(organizationId, input),
+    created_by: userId,
   };
 
-  const { data, error } = await table().insert(payload).select("*").single();
-  if (error) {
-    if (error.code === "23505") throw new Error("Bu firma için ilgili dönem kaydı zaten mevcut.");
-    throw error;
-  }
-  return normalizeRecord(data);
+  const { data, error } = await (supabase as any)
+    .from("osgb_finance_records")
+    .insert(payload)
+    .select(FINANCE_SELECT)
+    .single();
+
+  if (error) throw error;
+  return mapFinanceRecord(data);
 };
 
 export const updateOsgbFinanceRecord = async (
   id: string,
-  input: Partial<OsgbFinanceInput>,
+  organizationId: string,
+  input: OsgbFinanceInput,
 ): Promise<OsgbFinanceRecord> => {
-  if (input.period) normalizePeriod(input.period);
-  const { data, error } = await table()
-    .update({
-      company_id: input.company_id,
-      company_name: input.company_name,
-      period: input.period,
-      amount: input.amount,
-      invoice_no: input.invoice_no,
-      due_date: input.due_date,
-      status: input.status,
-      notes: input.notes,
-    })
+  const { data, error } = await (supabase as any)
+    .from("osgb_finance_records")
+    .update(buildFinancePayload(organizationId, input))
     .eq("id", id)
-    .select("*")
+    .eq("organization_id", organizationId)
+    .select(FINANCE_SELECT)
     .single();
 
-  if (error) {
-    if (error.code === "23505") throw new Error("Bu firma için ilgili dönem kaydı zaten mevcut.");
-    throw error;
-  }
-  return normalizeRecord(data);
+  if (error) throw error;
+  return mapFinanceRecord(data);
 };
 
-export const deleteOsgbFinanceRecord = async (id: string) => {
-  const { error } = await table().delete().eq("id", id);
+export const deleteOsgbFinanceRecord = async (id: string, organizationId: string): Promise<void> => {
+  const { error } = await (supabase as any)
+    .from("osgb_finance_records")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
+
   if (error) throw error;
 };
 
-export const markFinancePaid = (id: string) => updateOsgbFinanceRecord(id, { status: "paid" });
+const markFinanceStatus = async (
+  id: string,
+  organizationId: string,
+  status: OsgbFinanceStatus,
+): Promise<OsgbFinanceRecord> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_finance_records")
+    .update({ status })
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .select(FINANCE_SELECT)
+    .single();
 
-export const markFinanceOverdue = (id: string) => updateOsgbFinanceRecord(id, { status: "overdue" });
+  if (error) throw error;
+  return mapFinanceRecord(data);
+};
+
+export const markFinancePaid = (id: string, organizationId: string) => markFinanceStatus(id, organizationId, "paid");
+export const markFinancePending = (id: string, organizationId: string) =>
+  markFinanceStatus(id, organizationId, "pending");
+export const markFinanceOverdue = (id: string, organizationId: string) =>
+  markFinanceStatus(id, organizationId, "overdue");
 
 export const duplicateFinanceNextMonth = async (
+  userId: string,
+  organizationId: string,
   record: OsgbFinanceRecord,
-  createdBy?: string | null,
 ): Promise<OsgbFinanceRecord> => {
   const nextPeriod = addOneMonthToPeriod(record.period);
 
-  const { data: existing, error: existingError } = await table()
+  const { data: existing, error: existingError } = await (supabase as any)
+    .from("osgb_finance_records")
     .select("id")
-    .eq("organization_id", record.organization_id)
-    .eq("company_id", record.company_id)
+    .eq("organization_id", organizationId)
+    .eq("company_id", record.companyId)
     .eq("period", nextPeriod)
-    .limit(1);
+    .maybeSingle();
 
   if (existingError) throw existingError;
-  if ((existing ?? []).length > 0) {
+  if (existing) {
     throw new Error("Bu firma için ilgili dönem kaydı zaten mevcut.");
   }
 
-  const invoiceNo = await getNextInvoiceNo(record.organization_id, nextPeriod);
-  return createOsgbFinanceRecord({
-    organization_id: record.organization_id,
-    company_id: record.company_id,
-    company_name: record.company_name,
+  const invoiceNo = await generateInvoiceNo(organizationId, nextPeriod);
+
+  return createOsgbFinanceRecord(userId, organizationId, {
+    companyId: record.companyId,
+    companyName: record.companyName,
     period: nextPeriod,
     amount: record.amount,
-    invoice_no: invoiceNo,
-    due_date: addOneMonthToDate(record.due_date),
+    invoiceNo,
+    dueDate: addOneMonthToDate(record.dueDate),
     status: "pending",
     notes: record.notes,
-    created_by: createdBy || record.created_by,
   });
 };

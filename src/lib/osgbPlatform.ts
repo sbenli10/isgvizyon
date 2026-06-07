@@ -882,8 +882,9 @@ function buildOsgbCompanyEmployeePayload(input: OsgbCompanyEmployeeInput | OsgbC
   if (input.phone !== undefined) payload.phone = input.phone?.trim() || null;
   if (input.email !== undefined) payload.email = input.email?.trim() || null;
   if (input.notes !== undefined) payload.notes = input.notes?.trim() || null;
-  if (input.isActive !== undefined) payload.is_active = input.isActive;
-
+  if ("isActive" in input && input.isActive !== undefined) {
+    payload.is_active = input.isActive;
+  }
   return payload;
 }
 
@@ -2494,6 +2495,7 @@ export const listOsgbFinanceWorkspace = async (
 
 export interface OsgbManagedCompanyRecord {
   id: string;
+  deficitMinutes: number;
   organizationId: string;
   companyName: string;
   branchName: string | null;
@@ -2619,6 +2621,7 @@ const normalizeManagedCompany = (
   return {
     id: row.id,
     organizationId: row.org_id,
+    deficitMinutes: Math.max(0, (iguRequired + hekimRequired + dspRequired) - totalAssignedMinutes),
     companyName: row.company_name || "Firma",
     branchName: row.branch_name || null,
     sgkNo: row.sgk_no || null,

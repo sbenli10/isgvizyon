@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { Label } from "@/components/ui/label";
 import {
   AlertTriangle,
   BellRing,
@@ -19,7 +20,6 @@ import {
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
@@ -40,85 +40,6 @@ import { cn } from "@/lib/utils";
 
 type RiskLabel = "Düşük" | "Orta" | "Yüksek" | "Kritik";
 type StatusKey = "missing" | "planned" | "inProgress" | "completed" | "exempt";
-
-const getCompanyDeficitMinutes = (company: OsgbManagedCompanyRecord) =>
-  Math.max(
-    0,
-    Number(company.totalRequiredMinutes || 0) - Number(company.totalAssignedMinutes || 0),
-  );
-
- const renderAiInsight = (text?: string) => {
-  if (!text || !text.trim()) {
-    return <p className="text-sm text-amber-50/80">Yeterli veri yok.</p>;
-  }
-
-  const cleanText = text
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
-
-  try {
-    const parsed = JSON.parse(cleanText);
-
-    const paragraph =
-      parsed.paragraph ||
-      parsed.text ||
-      parsed.message ||
-      parsed.summary ||
-      "";
-
-    const suggestions = Array.isArray(parsed.suggestions)
-      ? parsed.suggestions
-      : Array.isArray(parsed.items)
-        ? parsed.items
-        : Array.isArray(parsed.recommendations)
-          ? parsed.recommendations
-          : [];
-
-    if (!paragraph && suggestions.length === 0) {
-      return (
-        <pre className="whitespace-pre-wrap text-sm leading-6 text-amber-50">
-          {cleanText}
-        </pre>
-      );
-    }
-
-    return (
-      <div className="space-y-4">
-        {paragraph && (
-          <p className="text-sm leading-6 text-amber-50">
-            {paragraph}
-          </p>
-        )}
-
-        {suggestions.length > 0 && (
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-amber-200">
-              Öneriler
-            </div>
-
-            <ul className="space-y-2">
-              {suggestions.map((suggestion: string, index: number) => (
-                <li
-                  key={index}
-                  className="rounded-lg border border-amber-400/20 bg-slate-950/30 px-3 py-2 text-sm leading-6 text-amber-50"
-                >
-                  {suggestion}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    );
-  } catch {
-    return (
-      <p className="whitespace-pre-line text-sm leading-6 text-amber-50">
-        {cleanText}
-      </p>
-    );
-  }
-};
 
 type CompanyRisk = {
   company: OsgbManagedCompanyRecord;
@@ -291,7 +212,7 @@ function buildAnalysis(
     planned: visitRows.filter((visit) => visit.status === "planned").length + companies.filter((company) => company.assignmentApprovalStatus === "planned").length,
     inProgress: docs.filter((doc) => doc.status === "submitted").length + visitRows.filter((visit) => visit.status === "in_progress").length,
     completed: docs.filter((doc) => doc.status === "approved").length + visitRows.filter((visit) => visit.status === "completed").length + companies.filter((company) => company.assignmentApprovalStatus === "approved").length,
-    exempt: visitRows.filter((visit) => visit.status === "cancelled").length,
+    exempt: 0 + visitRows.filter((visit) => visit.status === "cancelled").length,
   };
 
   const risks: CompanyRisk[] = companies.map((company) => {
@@ -302,7 +223,7 @@ function buildAnalysis(
     const criticalDocs = companyDocs.filter((doc) => doc.status === "missing" && (doc.riskLevel === "critical" || doc.riskLevel === "high")).length;
     const overdueDocs = companyDocs.filter((doc) => doc.status === "missing" && doc.delayDays > 0).length;
     const overdueVisits = companyVisits.filter((visit) => visit.status !== "completed" && visit.status !== "cancelled" && new Date(visit.plannedAt) < now).length;
-    const deficit = getCompanyDeficitMinutes(company);
+    const deficit = company.deficitMinutes || 0;
     const overdueBalance = companyFinance?.overdueBalance || 0;
     const reasons: string[] = [];
     let score = 0;
@@ -342,9 +263,8 @@ function buildAnalysis(
     if (contractDays !== null && contractDays <= 30) {
       reminders.push({ id: `contract-${risk.company.id}`, title: contractDays < 0 ? "Sözleşme süresi doldu" : "Sözleşme bitişi yaklaşıyor", companyName: risk.company.companyName, companyId: risk.company.id, dueDate: risk.company.contractEnd, risk: contractDays < 0 ? "Kritik" : "Yüksek", action: "Firma Detayı" });
     }
-    const deficitMinutes = getCompanyDeficitMinutes(risk.company);
-    if (deficitMinutes > 0) {
-      reminders.push({ id: `deficit-${risk.company.id}`, title: "Eksik atama/hizmet süresi", companyName: risk.company.companyName, companyId: risk.company.id, dueDate: null, risk: deficitMinutes > 240 ? "Kritik" : "Yüksek", action: "Hatırlat" });
+    if ((risk.company.deficitMinutes || 0) > 0) {
+      reminders.push({ id: `deficit-${risk.company.id}`, title: "Eksik atama/hizmet süresi", companyName: risk.company.companyName, companyId: risk.company.id, dueDate: null, risk: risk.company.deficitMinutes > 240 ? "Kritik" : "Yüksek", action: "Hatırlat" });
     }
   }
   for (const doc of docs.filter((doc) => doc.status === "missing" && (doc.delayDays > 0 || doc.riskLevel === "critical" || doc.riskLevel === "high")).slice(0, 8)) {
@@ -362,7 +282,7 @@ function buildAnalysis(
       companyCount: hazardRisks.length,
       avgCompliance: hazardRisks.length ? Math.round(hazardRisks.reduce((sum, item) => sum + item.compliance, 0) / hazardRisks.length) : 0,
       criticalCount: hazardRisks.filter((risk) => risk.label === "Kritik").length,
-      deficitMinutes: hazardRisks.reduce((sum, risk) => sum + getCompanyDeficitMinutes(risk.company), 0),
+      deficitMinutes: hazardRisks.reduce((sum, risk) => sum + (risk.company.deficitMinutes || 0), 0),
     };
   });
 
@@ -540,37 +460,10 @@ export default function OSGBCompanyTracking() {
         <Panel title="Kritik Hatırlatmalar" icon={BellRing}>
           {analysis.reminders.length ? <div className="space-y-3">{analysis.reminders.slice(0, 6).map((reminder) => <div key={reminder.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-bold text-white">{reminder.title}</p><p className="mt-1 text-xs text-slate-400">{reminder.companyName} • {formatDate(reminder.dueDate)}</p></div><span className={cn("rounded-full border px-2 py-1 text-xs font-black", riskBadge[reminder.risk])}>{reminder.risk}</span></div><Button type="button" size="sm" className="mt-3 bg-slate-800 text-slate-100 hover:bg-cyan-600" onClick={() => reminder.action === "Evrak Takip" ? navigate("/osgb/documents") : reminder.action === "Hatırlat" ? void createReminder() : setSelectedCompanyId(reminder.companyId || "all")}>{reminder.action}</Button></div>)}</div> : <EmptyState>Aktif hatırlatma bulunmuyor.</EmptyState>}
         </Panel>
-        <Panel
-         title="AI Genel Öneri"
-        icon={Bot}
-        action={
-          <Button
-            type="button"
-            size="sm"
-            disabled={aiLoading}
-            onClick={() => void requestAiInsight()}
-            className="bg-amber-500 text-slate-950 hover:bg-amber-400"
-          >
-            <Sparkles className="mr-2 h-4 w-4" />
-            AI Öneri Al
-          </Button>
-        }
-      >
-        <div className="min-h-[96px] rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
-          {aiLoading ? (
-            <p className="text-sm leading-6 text-amber-50">
-              AI önerisi hazırlanıyor...
-            </p>
-          ) : (
-            renderAiInsight(aiInsight?.text)
-          )}
-        </div>
-
-        <p className="mt-3 text-xs text-slate-400">
-          Kaynak: {aiInsight?.source || "system analizi"} •{" "}
-          {aiInsight?.createdAt || new Date().toLocaleString("tr-TR")}
-        </p>
-      </Panel>
+        <Panel title="AI Genel Öneri" icon={Bot} action={<Button type="button" size="sm" disabled={aiLoading} onClick={() => void requestAiInsight()} className="bg-amber-500 text-slate-950 hover:bg-amber-400"><Sparkles className="mr-2 h-4 w-4" />AI Öneri Al</Button>}>
+          <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50 whitespace-pre-line">{aiLoading ? "AI önerisi hazırlanıyor..." : aiInsight?.text || "Yeterli veri yok."}</div>
+          <p className="mt-3 text-xs text-slate-500">Kaynak: {aiInsight?.source || "system analizi"} • {aiInsight?.createdAt || new Date().toLocaleString("tr-TR")}</p>
+        </Panel>
       </div>
 
       <Panel title="Sistem Analizi" icon={Wallet}>

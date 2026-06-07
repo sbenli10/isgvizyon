@@ -2608,40 +2608,27 @@ export function ProfileVisitsTab() {
 }
 
 export function ProfileSubscriptionTab() {
-  const { loading, plan, status, demoState } = useSubscription();
-
-  const normalizedPlan = String(plan || "free").toLocaleLowerCase("tr-TR");
-  const normalizedStatus = String(status || "free").toLocaleLowerCase("tr-TR");
-  const paidStatusActive = !["free", "cancelled", "canceled", "past_due"].includes(normalizedStatus);
-
-  const isPremiumActive = normalizedPlan === "premium" && paidStatusActive;
-  const isOsgbActive = normalizedPlan === "osgb" && paidStatusActive;
-  const isPaidSubscriptionActive = isPremiumActive || isOsgbActive;
-
+  const { loading, status, demoState, isPremiumActive, isOsgbActive, isPaidSubscriptionActive } = useSubscription();
   const demoEndsAt = demoState.endsAt ? new Date(demoState.endsAt) : null;
-  const demoEndDateLabel =
-    demoEndsAt && Number.isFinite(demoEndsAt.getTime())
-      ? demoEndsAt.toLocaleDateString("tr-TR")
-      : "-";
-
+  const demoEndDateLabel = demoEndsAt && Number.isFinite(demoEndsAt.getTime())
+    ? demoEndsAt.toLocaleDateString("tr-TR")
+    : "-";
   const planLabel = demoState.isActive
     ? "OSGB Demo Üyelik"
     : isOsgbActive
       ? "OSGB Üyelik"
       : isPremiumActive
-        ? "Uzman / Premium"
+        ? "Premium Üyelik"
         : "Ücretsiz";
-
   const statusLabel = demoState.isActive
     ? `Demo Aktif • ${demoState.daysLeft} gün kaldı`
     : isPaidSubscriptionActive
       ? "Aktif kullanım"
       : demoState.hasDemo && demoState.hasExpired
         ? "Demo Süresi Doldu"
-        : normalizedStatus === "trial"
+        : status === "trial"
           ? "Deneme aktif"
           : "Free kullanım";
-
   const showDemoInfo = demoState.hasDemo && !isPaidSubscriptionActive;
 
   return (
@@ -2652,28 +2639,22 @@ export function ProfileSubscriptionTab() {
           <p className="mt-3 font-bold">Mevcut Paket</p>
           <p className="text-sm text-slate-400">{loading ? "Yükleniyor..." : planLabel}</p>
         </div>
-
         <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
           <CheckCircle2 className="h-6 w-6 text-emerald-300" />
           <p className="mt-3 font-bold">Durum</p>
           <p className="text-sm text-slate-400">{loading ? "Kontrol ediliyor..." : statusLabel}</p>
         </div>
-
         <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5">
           {showDemoInfo ? (
             <div className="rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm text-amber-50">
               <p className="font-black">{demoState.isActive ? "OSGB Demo Üyelik" : "Demo Süresi Doldu"}</p>
               <p className="mt-2 text-xs text-amber-100/85">Bitiş: {demoEndDateLabel}</p>
               <p className="mt-1 text-xs text-amber-100/85">
-                {demoState.isActive
-                  ? `Kalan: ${demoState.daysLeft} gün`
-                  : "Üyeliğe geçerek OSGB erişimini sürdürebilirsiniz."}
+                {demoState.isActive ? `Kalan: ${demoState.daysLeft} gün` : "Üyeliğe geçerek OSGB erişimini sürdürebilirsiniz."}
               </p>
             </div>
           ) : (
-            <Button className="w-full rounded-xl bg-blue-600 text-white hover:bg-blue-500">
-              Paket Yükselt
-            </Button>
+            <Button className="w-full rounded-xl bg-blue-600 text-white">Paket Yükselt</Button>
           )}
         </div>
       </div>

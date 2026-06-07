@@ -54,20 +54,6 @@ type ViewMode = "list" | "grid";
 type SortMode = "title" | "employee_desc" | "fee_desc";
 type AssignmentStatus = NonNullable<OsgbCompanyManagementInput["assignmentApprovalStatus"]> | "automatic";
 
-type PersistedAssignmentStatus = Exclude<AssignmentStatus, "automatic">;
-
-const toPersistedAssignmentStatus = (
-  value: AssignmentStatus,
-): PersistedAssignmentStatus | null => {
-  return value === "automatic" ? null : value;
-};
-
-const getCompanyDeficitMinutes = (company: OsgbManagedCompanyRecord) =>
-  Math.max(
-    0,
-    Number(company.totalRequiredMinutes || 0) -
-      Number(company.totalAssignedMinutes || 0),
-  );
 type CompanyFormState = {
   companyName: string;
   branchName: string;
@@ -498,7 +484,7 @@ function BulkCompanyUploadDialog({ open, onOpenChange, userId, organizationId, o
         contractStart: contractStart.value || null,
         contractEnd: contractEnd.value || null,
         monthlyFee: parseMoney(getCell(row, "monthlyFee")),
-        assignmentApprovalStatus: toPersistedAssignmentStatus(normalizeAssignmentStatus(getCell(row, "assignmentApprovalStatus"))),
+        assignmentApprovalStatus: normalizeAssignmentStatus(getCell(row, "assignmentApprovalStatus")) === "automatic" ? null : normalizeAssignmentStatus(getCell(row, "assignmentApprovalStatus")),
         visitFrequency: normalizeVisitFrequency(getCell(row, "visitFrequency")),
         notes: getCell(row, "notes") || null,
         managementSource: "import",
@@ -527,9 +513,9 @@ function BulkCompanyUploadDialog({ open, onOpenChange, userId, organizationId, o
 }
 
 function MissingAssignmentsDialog({ open, onOpenChange, companies, onOpenBulkAssignment }: { open: boolean; onOpenChange: (open: boolean) => void; companies: OsgbManagedCompanyRecord[]; onOpenBulkAssignment: () => void }) {
-  const missingCompanies = companies.filter((company) => getCompanyDeficitMinutes(company) > 0);
+  const missingCompanies = companies.filter((company) => company.deficitMinutes > 0);
   const copySgkNumbers = async () => { const value = missingCompanies.map((company) => company.sgkNo).filter(Boolean).join("\n"); if (!value) return toast.info("Kopyalanacak SGK No bulunamadı."); await navigator.clipboard.writeText(value); toast.success("SGK numaraları kopyalandı."); };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent overlayClassName="z-[100] bg-slate-950/80" className="z-[120] flex h-[75vh] max-w-[1100px] flex-col gap-0 overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950 p-0 text-slate-50 shadow-2xl [&>button.absolute]:hidden"><DialogTitle className="sr-only">Eksik Ataması Olan Firmalar</DialogTitle><DialogDescription className="sr-only">Eksik ataması olan firmaları filtreleyin.</DialogDescription><div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/70 p-5"><div className="flex items-center gap-4"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/20 text-amber-300"><AlertTriangle className="h-6 w-6" /></div><div><h2 className="text-xl font-black text-white">Eksik Ataması Olan Firmalar</h2><p className="mt-1 text-sm text-slate-400">Toplam {missingCompanies.length} firmada hizmet eksikliği tespit edildi</p></div></div><DialogClose asChild><button type="button" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></DialogClose></div><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-950 px-5 py-4"><Button type="button" variant="outline" className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 hover:text-white" onClick={copySgkNumbers}><Copy className="mr-2 h-4 w-4" />Tüm SGK No Kopyala</Button><Button type="button" className="bg-slate-500 text-white hover:bg-slate-400" onClick={onOpenBulkAssignment}><UserPlus className="mr-2 h-4 w-4" />Çoklu Atama Yap ({missingCompanies.length})</Button></div><div className="grid flex-1 place-items-center bg-slate-950 p-8 text-center">{missingCompanies.length === 0 ? <div><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-400"><CheckCircle2 className="h-9 w-9" /></div><h3 className="mt-5 text-xl font-black text-white">Harika!</h3><p className="mt-2 text-sm text-slate-400">Şu an için ataması eksik olan herhangi bir firma bulunmuyor.</p></div> : <div className="w-full max-w-3xl space-y-2 text-left">{missingCompanies.map((company) => <div key={company.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/70 p-3"><div><p className="font-bold text-white">{company.companyName}</p><p className="text-xs text-slate-400">{company.sgkNo || "SGK yok"} · Eksik {getCompanyDeficitMinutes(company)} dk</p></div><span className="text-sm font-black text-rose-300">{getCompanyDeficitMinutes(company)} dk</span></div>)}</div>}</div><div className="flex justify-end border-t border-slate-800 bg-slate-900/60 p-4"><DialogClose asChild><Button type="button" className="bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button></DialogClose></div></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent overlayClassName="z-[100] bg-slate-950/80" className="z-[120] flex h-[75vh] max-w-[1100px] flex-col gap-0 overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950 p-0 text-slate-50 shadow-2xl [&>button.absolute]:hidden"><DialogTitle className="sr-only">Eksik Ataması Olan Firmalar</DialogTitle><DialogDescription className="sr-only">Eksik ataması olan firmaları filtreleyin.</DialogDescription><div className="flex items-start justify-between border-b border-slate-800 bg-slate-900/70 p-5"><div className="flex items-center gap-4"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-amber-500/20 text-amber-300"><AlertTriangle className="h-6 w-6" /></div><div><h2 className="text-xl font-black text-white">Eksik Ataması Olan Firmalar</h2><p className="mt-1 text-sm text-slate-400">Toplam {missingCompanies.length} firmada hizmet eksikliği tespit edildi</p></div></div><DialogClose asChild><button type="button" className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button></DialogClose></div><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-950 px-5 py-4"><Button type="button" variant="outline" className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 hover:text-white" onClick={copySgkNumbers}><Copy className="mr-2 h-4 w-4" />Tüm SGK No Kopyala</Button><Button type="button" className="bg-slate-500 text-white hover:bg-slate-400" onClick={onOpenBulkAssignment}><UserPlus className="mr-2 h-4 w-4" />Çoklu Atama Yap ({missingCompanies.length})</Button></div><div className="grid flex-1 place-items-center bg-slate-950 p-8 text-center">{missingCompanies.length === 0 ? <div><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-emerald-400"><CheckCircle2 className="h-9 w-9" /></div><h3 className="mt-5 text-xl font-black text-white">Harika!</h3><p className="mt-2 text-sm text-slate-400">Şu an için ataması eksik olan herhangi bir firma bulunmuyor.</p></div> : <div className="w-full max-w-3xl space-y-2 text-left">{missingCompanies.map((company) => <div key={company.id} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/70 p-3"><div><p className="font-bold text-white">{company.companyName}</p><p className="text-xs text-slate-400">{company.sgkNo || "SGK yok"} · Eksik {company.deficitMinutes} dk</p></div><span className="text-sm font-black text-rose-300">{company.deficitMinutes} dk</span></div>)}</div>}</div><div className="flex justify-end border-t border-slate-800 bg-slate-900/60 p-4"><DialogClose asChild><Button type="button" className="bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button></DialogClose></div></DialogContent></Dialog>;
 }
 
 function BulkAssignmentDialog({ open, onOpenChange, companies, personnel }: { open: boolean; onOpenChange: (open: boolean) => void; companies: OsgbManagedCompanyRecord[]; personnel: OsgbWorkspacePersonnelRecord[] }) {

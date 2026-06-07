@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Archive,
@@ -56,32 +56,15 @@ const tabIds = new Set(PROFILE_TABS.map((tab) => tab.id));
 export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
- const {
-  loading: subscriptionLoading,
-  overview,
-  demoState,
-  isDemoActive,
-  refetch: refetchSubscription,
-} = useSubscription();
-
-const activePlanName = String(overview?.planName || "").toLocaleLowerCase("tr-TR");
-
-const isPremiumActive = activePlanName.includes("premium");
-const isOsgbActive = activePlanName.includes("osgb");
-const isPaidSubscriptionActive = Boolean(isPremiumActive || isOsgbActive);
+  const { loading: subscriptionLoading, demoState, isPaidSubscriptionActive, refetch: refetchSubscription } = useSubscription();
   const [confirmDemoOpen, setConfirmDemoOpen] = useState(false);
   const [startingDemo, setStartingDemo] = useState(false);
-
   const activeTab = useMemo<ProfileTab>(() => {
     const tab = searchParams.get("tab") as ProfileTab | null;
     return tab && tabIds.has(tab) ? tab : "overview";
   }, [searchParams]);
 
   const demoButtonLabel = useMemo(() => {
-    if (subscriptionLoading) {
-      return "Demo kontrol ediliyor...";
-    }
-
     if (startingDemo) {
       return "Başlatılıyor...";
     }
@@ -95,14 +78,7 @@ const isPaidSubscriptionActive = Boolean(isPremiumActive || isOsgbActive);
     }
 
     return "30 Günlük Demo Üyelik Başlat";
-  }, [
-    subscriptionLoading,
-    demoState.daysLeft,
-    demoState.hasDemo,
-    demoState.hasExpired,
-    demoState.isActive,
-    startingDemo,
-  ]);
+  }, [demoState.daysLeft, demoState.hasDemo, demoState.hasExpired, demoState.isActive, startingDemo]);
 
   const showDemoStartButton = !subscriptionLoading && !isPaidSubscriptionActive && !demoState.hasDemo;
   const showDemoStatusBadge = !subscriptionLoading && !isPaidSubscriptionActive && demoState.hasDemo;
@@ -184,14 +160,12 @@ const isPaidSubscriptionActive = Boolean(isPremiumActive || isOsgbActive);
               sekmeli merkezde yönetilir.
             </p>
           </div>
-
           <div className="flex flex-wrap justify-start gap-2 text-center text-xs font-bold lg:max-w-[430px] lg:justify-end">
             {["Tek Merkez", "Canlı Veri", "Koyu Tema"].map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-slate-100">
                 {item}
               </div>
             ))}
-
             {showDemoControl ? (
               <Button
                 type="button"
@@ -223,7 +197,6 @@ const isPaidSubscriptionActive = Boolean(isPremiumActive || isOsgbActive);
               Demo süresince OSGB modülü ve platform özelliklerini 30 gün boyunca kullanabilirsiniz. Bu hak yalnızca bir kez kullanılabilir.
             </DialogDescription>
           </DialogHeader>
-
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               type="button"
