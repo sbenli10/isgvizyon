@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Archive,
@@ -11,10 +11,14 @@ import {
   MapPin,
   Settings,
   ShieldCheck,
+  Sparkles,
   TriangleAlert,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ProfileTabs, type ProfileTab, type ProfileTabConfig } from "@/components/profile/ProfileTabs";
 import { ProfileOverview } from "@/components/profile/ProfileOverview";
 import { ProfileCompaniesTab } from "@/components/profile/ProfileCompaniesTab";
@@ -28,6 +32,9 @@ import { ProfileReportsTab } from "@/components/profile/ProfileReportsTab";
 import { ProfileVisitsTab } from "@/components/profile/ProfileVisitsTab";
 import { ProfileSubscriptionTab } from "@/components/profile/ProfileSubscriptionTab";
 import { ProfileSettingsTab } from "@/components/profile/ProfileSettingsTab";
+import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import { startOsgbDemoSubscription } from "@/lib/demoSubscription";
 
 const PROFILE_TABS: ProfileTabConfig[] = [
   { id: "overview", label: "Genel Bakış", icon: LayoutGrid },
@@ -48,10 +55,60 @@ const tabIds = new Set(PROFILE_TABS.map((tab) => tab.id));
 
 export default function Profile() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { user, profile } = useAuth();
+  const { loading: subscriptionLoading, demoState, isPaidSubscriptionActive, refetch: refetchSubscription } = useSubscription();
+  const [confirmDemoOpen, setConfirmDemoOpen] = useState(false);
+  const [startingDemo, setStartingDemo] = useState(false);
   const activeTab = useMemo<ProfileTab>(() => {
     const tab = searchParams.get("tab") as ProfileTab | null;
     return tab && tabIds.has(tab) ? tab : "overview";
   }, [searchParams]);
+
+  const demoButtonLabel = useMemo(() => {
+    if (startingDemo) {
+      return "Başlatılıyor...";
+    }
+
+    if (demoState.isActive) {
+      return `Demo Aktif • ${demoState.daysLeft} gün kaldı`;
+    }
+
+    if (demoState.hasDemo && demoState.hasExpired) {
+      return "Demo Süresi Doldu";
+    }
+
+    return "30 Günlük Demo Üyelik Başlat";
+  }, [demoState.daysLeft, demoState.hasDemo, demoState.hasExpired, demoState.isActive, startingDemo]);
+
+  const showDemoStartButton = !subscriptionLoading && !isPaidSubscriptionActive && !demoState.hasDemo;
+  const showDemoStatusBadge = !subscriptionLoading && !isPaidSubscriptionActive && demoState.hasDemo;
+  const showDemoControl = showDemoStartButton || showDemoStatusBadge;
+
+  const handleConfirmStartDemo = async () => {
+    if (!user) {
+      toast.error("Demo üyelik başlatmak için giriş yapmalısınız.");
+      return;
+    }
+
+    if (isPaidSubscriptionActive || demoState.hasDemo) {
+      toast.error("Aktif üyeliği olan veya daha önce demo kullanmış kullanıcı demo başlatamaz.");
+      setConfirmDemoOpen(false);
+      return;
+    }
+
+    setStartingDemo(true);
+    try {
+      await startOsgbDemoSubscription(user.id, profile?.organization_id ?? null);
+      await refetchSubscription();
+      toast.success("Demo üyeliğiniz başlatıldı. 30 gün boyunca tüm özellikleri kullanabilirsiniz.");
+      setConfirmDemoOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Demo üyelik başlatılamadı.";
+      toast.error(message);
+    } finally {
+      setStartingDemo(false);
+    }
+  };
 
   const handleTabChange = (tab: ProfileTab) => {
     const nextParams = new URLSearchParams(searchParams);
@@ -103,12 +160,27 @@ export default function Profile() {
               sekmeli merkezde yönetilir.
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+          <div className="flex flex-wrap justify-start gap-2 text-center text-xs font-bold lg:max-w-[430px] lg:justify-end">
             {["Tek Merkez", "Canlı Veri", "Koyu Tema"].map((item) => (
               <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-slate-100">
                 {item}
               </div>
             ))}
+            {showDemoControl ? (
+              <Button
+                type="button"
+                disabled={!showDemoStartButton || startingDemo || !user}
+                onClick={() => setConfirmDemoOpen(true)}
+                className={`min-h-11 rounded-2xl px-4 text-xs font-black shadow-lg transition ${
+                  showDemoStatusBadge
+                    ? "border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/10 disabled:opacity-80"
+                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:from-amber-300 hover:to-yellow-400"
+                }`}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {demoButtonLabel}
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>
@@ -116,6 +188,36 @@ export default function Profile() {
       <ProfileTabs tabs={PROFILE_TABS} activeTab={activeTab} onChange={handleTabChange} />
 
       <section className="min-h-[520px]">{renderActiveTab()}</section>
+
+      <Dialog open={confirmDemoOpen} onOpenChange={setConfirmDemoOpen}>
+        <DialogContent className="border-slate-800 bg-slate-950 text-white sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>30 Günlük OSGB Demo Üyeliği Başlatılsın mı?</DialogTitle>
+            <DialogDescription className="text-slate-300">
+              Demo süresince OSGB modülü ve platform özelliklerini 30 gün boyunca kullanabilirsiniz. Bu hak yalnızca bir kez kullanılabilir.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={startingDemo}
+              onClick={() => setConfirmDemoOpen(false)}
+              className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 hover:text-white"
+            >
+              İptal
+            </Button>
+            <Button
+              type="button"
+              disabled={startingDemo}
+              onClick={() => void handleConfirmStartDemo()}
+              className="bg-gradient-to-r from-amber-400 to-yellow-500 font-black text-slate-950 hover:from-amber-300 hover:to-yellow-400"
+            >
+              {startingDemo ? "Başlatılıyor..." : "Demoyu Başlat"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

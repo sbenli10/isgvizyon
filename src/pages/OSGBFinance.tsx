@@ -1,30 +1,47 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BadgeDollarSign,
+  BarChart3,
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Clock3,
+  Copy,
   CreditCard,
-  Edit,
+  Download,
+  Edit3,
+  FileText,
+  Loader2,
   Plus,
   RefreshCcw,
   Search,
+  ShieldAlert,
+  SlidersHorizontal,
   Trash2,
+  Wallet,
+  X,
 } from "lucide-react";
+import { utils, writeFile } from "xlsx";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageDataTiming } from "@/hooks/usePageDataTiming";
-import { usePersistentDraft } from "@/hooks/usePersistentDraft";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -32,747 +49,545 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
-import { useAccessRole } from "@/hooks/useAccessRole";
-import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
-import { downloadCsv } from "@/lib/csvExport";
-import {
-  deleteOsgbFinance,
-  getOsgbFinanceOverview,
-  listOsgbFinancePage,
-  type OsgbFinanceCalendarItem,
+  createOsgbFinanceRecord,
+  deleteOsgbFinanceRecord,
+  duplicateFinanceNextMonth,
+  listOsgbFinanceRecords,
+  markFinanceOverdue,
+  markFinancePaid,
+  markFinancePending,
+  updateOsgbFinanceRecord,
   type OsgbFinanceInput,
-  type OsgbFinanceOverview,
   type OsgbFinanceRecord,
-  upsertOsgbFinance,
-} from "@/lib/osgbOperations";
+  type OsgbFinanceStatus,
+} from "@/lib/osgbFinance";
+import { listOsgbCompanyTrackingWorkspace, type OsgbManagedCompanyRecord } from "@/lib/osgbPlatform";
+import { cn } from "@/lib/utils";
 
 type FinanceFormState = {
   companyId: string;
-  invoiceNo: string;
-  servicePeriod: string;
-  invoiceDate: string;
-  dueDate: string;
+  period: string;
   amount: string;
-  currency: string;
-  status: OsgbFinanceRecord["status"];
-  paidAt: string;
-  paymentNote: string;
+  dueDate: string;
+  invoiceNo: string;
+  status: OsgbFinanceStatus;
+  notes: string;
 };
 
-type FinanceDraft = {
-  mode: "create" | "edit";
-  editingId: string | null;
-  form: FinanceFormState;
-};
+const defaultPeriod = () => new Date().toISOString().slice(0, 7);
 
-const emptyForm: FinanceFormState = {
+const emptyForm = (): FinanceFormState => ({
   companyId: "",
-  invoiceNo: "",
-  servicePeriod: "",
-  invoiceDate: "",
-  dueDate: "",
+  period: defaultPeriod(),
   amount: "",
-  currency: "TRY",
+  dueDate: "",
+  invoiceNo: "",
   status: "pending",
-  paidAt: "",
-  paymentNote: "",
-};
+  notes: "",
+});
 
-const statusLabel: Record<OsgbFinanceRecord["status"], string> = {
-  pending: "Bekliyor",
+const statusLabels: Record<OsgbFinanceStatus, string> = {
+  pending: "Beklemede",
   paid: "Ödendi",
-  overdue: "Gecikmiş",
-  cancelled: "İptal",
+  overdue: "Gecikti",
 };
 
-const statusClass: Record<OsgbFinanceRecord["status"], string> = {
-  pending: "bg-yellow-500/15 text-yellow-200 border-yellow-400/20",
-  paid: "bg-emerald-500/15 text-emerald-200 border-emerald-400/20",
-  overdue: "bg-red-500/15 text-red-200 border-red-400/20",
-  cancelled: "bg-slate-500/15 text-slate-200 border-slate-400/20",
+const statusClasses: Record<OsgbFinanceStatus, string> = {
+  pending: "border-slate-500/30 bg-slate-400/10 text-slate-200",
+  paid: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+  overdue: "border-rose-400/30 bg-rose-400/10 text-rose-200",
 };
+
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: "TRY",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
 
 const formatDate = (value: string | null) => {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("tr-TR");
+  return date.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const formatMoney = (value: number, currency: string) =>
-  new Intl.NumberFormat("tr-TR", { style: "currency", currency }).format(value || 0);
+const parseAmount = (value: string) => {
+  const normalized = value.replace(/\./g, "").replace(",", ".").replace(/[^0-9.]/g, "");
+  return Number(normalized || 0);
+};
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const getCacheKey = (userId: string) => `finance:${userId}`;
-const FINANCE_PAGE_SIZE = 20;
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
+const isPastDue = (record: OsgbFinanceRecord) =>
+  record.status !== "paid" && !!record.dueDate && record.dueDate < todayIso();
+
+const isDueToday = (record: OsgbFinanceRecord) =>
+  record.status !== "paid" && !!record.dueDate && record.dueDate === todayIso();
+
+const isDueNextSevenDays = (record: OsgbFinanceRecord) => {
+  if (record.status === "paid" || !record.dueDate) return false;
+  const due = new Date(`${record.dueDate}T00:00:00`);
+  const today = new Date(`${todayIso()}T00:00:00`);
+  const diffDays = Math.ceil((due.getTime() - today.getTime()) / 86_400_000);
+  return diffDays > 0 && diffDays <= 7;
+};
+
+const financeSearchText = (record: OsgbFinanceRecord) =>
+  [record.companyName, record.period, record.invoiceNo, record.notes].filter(Boolean).join(" ").toLocaleLowerCase("tr-TR");
+
+const KpiCard = ({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  tone = "cyan",
+}: {
+  title: string;
+  value: string;
+  subtitle: string;
+  icon: typeof Wallet;
+  tone?: "cyan" | "emerald" | "amber" | "rose" | "blue";
+}) => {
+  const tones = {
+    cyan: "bg-cyan-500/10 text-cyan-300",
+    emerald: "bg-emerald-500/10 text-emerald-300",
+    amber: "bg-amber-500/10 text-amber-300",
+    rose: "bg-rose-500/10 text-rose-300",
+    blue: "bg-blue-500/10 text-blue-300",
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-800 bg-[#080f22] p-4 shadow-lg shadow-slate-950/30">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">{title}</p>
+          <p className="mt-3 text-xl font-black text-white">{value}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-400">{subtitle}</p>
+        </div>
+        <span className={cn("rounded-xl p-2", tones[tone])}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+    </div>
+  );
+};
+
+const RadarCard = ({ title, count, amount, description, icon: Icon }: { title: string; count: number; amount: number; description: string; icon: typeof Wallet }) => (
+  <div className="rounded-xl border border-slate-700/70 bg-[#0b1428] p-4">
+    <div className="flex items-center justify-between">
+      <p className="text-[10px] font-black uppercase tracking-[0.26em] text-slate-500">{title}</p>
+      <span className="rounded-full bg-slate-950 p-2 text-slate-300">
+        <Icon className="h-4 w-4" />
+      </span>
+    </div>
+    <p className="mt-2 text-2xl font-black text-white">{count}</p>
+    <p className="mt-1 text-xs font-semibold text-slate-300">{formatCurrency(amount)}</p>
+    <p className="mt-3 text-xs text-slate-400">{description}</p>
+  </div>
+);
 
 export default function OSGBFinance() {
   const { user, profile } = useAuth();
-  const { canManage } = useAccessRole();
   const organizationId = profile?.organization_id || null;
-  const [searchParams] = useSearchParams();
   const [records, setRecords] = useState<OsgbFinanceRecord[]>([]);
-  const { companies } = useOsgbManagedCompanies(organizationId);
-  const [calendarItems, setCalendarItems] = useState<OsgbFinanceCalendarItem[]>([]);
-  const [overview, setOverview] = useState<OsgbFinanceOverview | null>(null);
+  const [companies, setCompanies] = useState<OsgbManagedCompanyRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  usePageDataTiming(loading);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<OsgbFinanceRecord | null>(null);
-  const [form, setForm] = useState<FinanceFormState>(emptyForm);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
-  const [companyFilter, setCompanyFilter] = useState<string>("ALL");
   const [search, setSearch] = useState("");
-  const [calendarView, setCalendarView] = useState<"weekly" | "monthly">("monthly");
-  const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [pendingRestoredEditingId, setPendingRestoredEditingId] = useState<string | null>(null);
-  const draftScope = useMemo(
-    () => ({
-      userId: user?.id,
-      orgId: organizationId,
-    }),
-    [organizationId, user?.id],
-  );
-  const {
-    clearDraft: clearFinanceDraft,
-    restoreDraft: restoreFinanceDraft,
-  } = usePersistentDraft<FinanceDraft>({
-    key: `osgb-finance:dialog:${companyFilter}`,
-    enabled: Boolean(user?.id && dialogOpen),
-    autoRestore: false,
-    version: 1,
-    storage: "localStorage",
-    ttlMs: 14 * 24 * 60 * 60 * 1000,
-    debounceMs: 400,
-    scope: draftScope,
-    value: {
-      mode: editing?.id ? "edit" : "create",
-      editingId: editing?.id ?? null,
-      form,
-    },
-  });
+  const [statusFilter, setStatusFilter] = useState<OsgbFinanceStatus | "all">("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<OsgbFinanceRecord | null>(null);
+  const [form, setForm] = useState<FinanceFormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<OsgbFinanceRecord | null>(null);
+  usePageDataTiming(loading);
 
-  useEffect(() => {
-    const status = searchParams.get("status");
-    if (status && ["pending", "paid", "overdue", "cancelled"].includes(status)) {
-      setStatusFilter(status);
+  const loadData = useCallback(async () => {
+    if (!organizationId) {
+      setLoading(false);
+      return;
     }
-  }, [searchParams]);
 
-  const loadData = async (silent = false) => {
-    if (!user?.id) return;
-    if (!silent) setLoading(true);
+    setLoading(true);
     try {
-      const cacheKey = `${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`;
-      const [financeResult, financeOverview] = await Promise.all([
-        listOsgbFinancePage(user.id, {
-          page,
-          pageSize: FINANCE_PAGE_SIZE,
-          status: statusFilter,
-          companyId: companyFilter,
-          search,
-        }),
-        getOsgbFinanceOverview(user.id),
+      const [financeRows, companyWorkspace] = await Promise.all([
+        listOsgbFinanceRecords(organizationId),
+        listOsgbCompanyTrackingWorkspace(organizationId),
       ]);
-      setRecords(financeResult.rows);
-      setCalendarItems(financeOverview.calendarItems);
-      setOverview(financeOverview);
-      setTotalCount(financeResult.count);
-      writeOsgbPageCache(cacheKey, {
-        records: financeResult.rows,
-        calendarItems: financeOverview.calendarItems,
-        overview: financeOverview,
-        totalCount: financeResult.count,
-      });
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "OSGB finans kayıtları yüklenemedi.");
+      setRecords(financeRows);
+      setCompanies(companyWorkspace.companies);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Finans kayıtları yüklenemedi.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [organizationId]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    const cached = readOsgbPageCache<{
-      records: OsgbFinanceRecord[];
-      calendarItems: OsgbFinanceCalendarItem[];
-      overview: OsgbFinanceOverview;
-      totalCount: number;
-    }>(`${getCacheKey(user.id)}:${statusFilter}:${companyFilter}:${search}:${page}`, CACHE_TTL_MS);
-    if (cached) {
-      setRecords(cached.records);
-      setCalendarItems(cached.calendarItems);
-      setOverview(cached.overview);
-      setTotalCount(cached.totalCount);
-      setLoading(false);
-      void loadData(true);
-      return;
-    }
     void loadData();
-  }, [companyFilter, page, search, statusFilter, user?.id]);
+  }, [loadData]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [companyFilter, search, statusFilter]);
-
-  const summary = useMemo(() => {
-    return {
-      pending: overview?.pendingAmount || 0,
-      paid: overview?.paidAmount || 0,
-      overdue: overview?.overdueAmount || 0,
-    };
-  }, [overview]);
+  const periods = useMemo(() => Array.from(new Set(records.map((record) => record.period))).sort().reverse(), [records]);
 
   const filteredRecords = useMemo(() => {
-    return records;
+    const term = search.trim().toLocaleLowerCase("tr-TR");
+    return records.filter((record) => {
+      if (statusFilter !== "all" && record.status !== statusFilter) return false;
+      if (companyFilter !== "all" && record.companyId !== companyFilter) return false;
+      if (periodFilter !== "all" && record.period !== periodFilter) return false;
+      if (term && !financeSearchText(record).includes(term)) return false;
+      return true;
+    });
+  }, [companyFilter, periodFilter, records, search, statusFilter]);
+
+  const stats = useMemo(() => {
+    const total = records.reduce((sum, record) => sum + record.amount, 0);
+    const paid = records.filter((record) => record.status === "paid").reduce((sum, record) => sum + record.amount, 0);
+    const overdueRows = records.filter((record) => record.status === "overdue" || isPastDue(record));
+    const overdue = overdueRows.reduce((sum, record) => sum + record.amount, 0);
+    const pendingRows = records.filter((record) => record.status === "pending" && !isPastDue(record));
+    const pending = pendingRows.reduce((sum, record) => sum + record.amount, 0);
+    const ratio = total > 0 ? Math.round((paid / total) * 100) : 0;
+
+    return { total, paid, pending, overdue, ratio, overdueRows, pendingRows };
   }, [records]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / FINANCE_PAGE_SIZE));
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const draft = restoreFinanceDraft();
-    if (!draft?.form) return;
-    const hasContent = Boolean(
-      draft.editingId ||
-        draft.form.companyId ||
-        draft.form.invoiceNo.trim() ||
-        draft.form.servicePeriod.trim() ||
-        draft.form.invoiceDate ||
-        draft.form.dueDate ||
-        draft.form.amount ||
-        draft.form.paidAt ||
-        draft.form.paymentNote.trim(),
-    );
-    if (!hasContent) return;
-
-    setForm(draft.form);
-    setPendingRestoredEditingId(draft.mode === "edit" ? draft.editingId || null : null);
-    setDialogOpen(true);
-    toast.info("Kaydedilmemiş finans taslağı geri yüklendi.");
-  }, [restoreFinanceDraft, user?.id]);
-
-  useEffect(() => {
-    if (!pendingRestoredEditingId || records.length === 0) return;
-
-    const restoredRecord =
-      records.find((record) => record.id === pendingRestoredEditingId) || null;
-    setEditing(restoredRecord);
-    if (!restoredRecord) {
-      clearFinanceDraft();
-    }
-    setPendingRestoredEditingId(null);
-  }, [clearFinanceDraft, pendingRestoredEditingId, records]);
-
-  const groupedCalendar = useMemo(() => {
-    const getWeekLabel = (value: string) => {
-      const date = new Date(value);
-      const day = date.getDay();
-      const diff = date.getDate() - (day === 0 ? 6 : day - 1);
-      const monday = new Date(date);
-      monday.setDate(diff);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      return `${monday.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })} - ${sunday.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`;
+  const radar = useMemo(() => {
+    const dueToday = records.filter(isDueToday);
+    const nextSeven = records.filter(isDueNextSevenDays);
+    const paidRows = records.filter((record) => record.status === "paid");
+    return {
+      overdue: stats.overdueRows,
+      today: dueToday,
+      nextSeven,
+      pending: stats.pendingRows,
+      paid: paidRows,
     };
+  }, [records, stats.overdueRows, stats.pendingRows]);
 
-    return calendarItems.reduce<Record<string, OsgbFinanceCalendarItem[]>>((acc, item) => {
-      const key = calendarView === "monthly" ? item.monthLabel : getWeekLabel(item.dueDate);
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(item);
-      return acc;
-    }, {});
-  }, [calendarItems, calendarView]);
+  const lastSixPeriods = useMemo(() => {
+    const base = new Date(`${defaultPeriod()}-01T00:00:00`);
+    return Array.from({ length: 6 }, (_, index) => {
+      const date = new Date(base);
+      date.setMonth(base.getMonth() - (5 - index));
+      const period = date.toISOString().slice(0, 7);
+      const paidAmount = records
+        .filter((record) => record.period === period && record.status === "paid")
+        .reduce((sum, record) => sum + record.amount, 0);
+      return { period, paidAmount };
+    });
+  }, [records]);
 
-  const weeklyWorkload = useMemo(() => {
-    const rows = Object.entries(
-      calendarItems.reduce<Record<string, { label: string; totalAmount: number; count: number; overdueCount: number }>>((acc, item) => {
-        const date = new Date(item.dueDate);
-        const day = date.getDay();
-        const diff = date.getDate() - (day === 0 ? 6 : day - 1);
-        const monday = new Date(date);
-        monday.setDate(diff);
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
-        const key = monday.toISOString().slice(0, 10);
-        if (!acc[key]) {
-          acc[key] = {
-            label: `${monday.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })} - ${sunday.toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}`,
-            totalAmount: 0,
-            count: 0,
-            overdueCount: 0,
-          };
-        }
-        acc[key].totalAmount += item.amount;
-        acc[key].count += 1;
-        if (item.isOverdue) acc[key].overdueCount += 1;
-        return acc;
-      }, {}),
-    );
+  const maxLastSixAmount = Math.max(1, ...lastSixPeriods.map((item) => item.paidAmount));
 
-    return rows.sort(([a], [b]) => a.localeCompare(b)).map(([, value]) => value);
-  }, [calendarItems]);
-
-  const openCreate = () => {
-    if (!canManage) {
-      toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-      return;
-    }
-    const draft = restoreFinanceDraft();
-    if (draft?.form && draft.mode === "create") {
-      const hasContent = Boolean(
-        draft.editingId ||
-          draft.form.companyId ||
-          draft.form.invoiceNo.trim() ||
-          draft.form.servicePeriod.trim() ||
-          draft.form.invoiceDate ||
-          draft.form.dueDate ||
-          draft.form.amount ||
-          draft.form.paidAt ||
-          draft.form.paymentNote.trim(),
-      );
-      if (hasContent) {
-        setForm(draft.form);
-        setPendingRestoredEditingId(null);
-        setDialogOpen(true);
-        toast.info("Kaydedilmemiş finans taslağı geri yüklendi.");
-        return;
-      }
-    }
-    setEditing(null);
-    setForm(emptyForm);
+  const openCreateDialog = () => {
+    setEditingRecord(null);
+    setForm({ ...emptyForm(), companyId: companyFilter !== "all" ? companyFilter : companies[0]?.id || "" });
     setDialogOpen(true);
   };
 
-  const openEdit = (record: OsgbFinanceRecord) => {
-    const restoredDraft = restoreFinanceDraft();
-    if (
-      restoredDraft?.form &&
-      restoredDraft.mode === "edit" &&
-      restoredDraft.editingId === record.id
-    ) {
-      setEditing(record);
-      setForm(restoredDraft.form);
-      setDialogOpen(true);
-      toast.info("Kaydedilmemiş düzenleme taslağı geri yüklendi.");
-      return;
-    }
-
-    setEditing(record);
+  const openEditDialog = (record: OsgbFinanceRecord) => {
+    setEditingRecord(record);
     setForm({
-      companyId: record.company_id,
-      invoiceNo: record.invoice_no || "",
-      servicePeriod: record.service_period || "",
-      invoiceDate: record.invoice_date || "",
-      dueDate: record.due_date || "",
-      amount: String(record.amount || ""),
-      currency: record.currency || "TRY",
+      companyId: record.companyId,
+      period: record.period,
+      amount: String(record.amount),
+      dueDate: record.dueDate || "",
+      invoiceNo: record.invoiceNo || "",
       status: record.status,
-      paidAt: record.paid_at ? record.paid_at.slice(0, 10) : "",
-      paymentNote: record.payment_note || "",
+      notes: record.notes || "",
     });
     setDialogOpen(true);
   };
 
-  const handleCalendarOpen = (calendarItem: OsgbFinanceCalendarItem) => {
-    const matched = records.find((record) => record.id === calendarItem.id);
-    if (!matched) {
-      toast.error("İlgili finans kaydı bulunamadı.");
-      return;
-    }
-    openEdit(matched);
-  };
+  const selectedCompany = companies.find((company) => company.id === form.companyId) || null;
+
+  const buildInput = (): OsgbFinanceInput => ({
+    companyId: form.companyId,
+    companyName: selectedCompany?.companyName || null,
+    period: form.period,
+    amount: parseAmount(form.amount),
+    invoiceNo: form.invoiceNo || null,
+    dueDate: form.dueDate || null,
+    status: form.status,
+    notes: form.notes || null,
+  });
 
   const handleSave = async () => {
-    if (!canManage) {
-      toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-      return;
-    }
-    if (!user?.id || !form.companyId || !form.amount) {
-      toast.error("Firma ve tutar alanları zorunludur.");
-      return;
-    }
-    if (Number(form.amount) <= 0) {
-      toast.error("Tutar sıfırdan büyük olmalıdır.");
-      return;
-    }
-    if (form.invoiceDate && form.dueDate && new Date(form.invoiceDate) > new Date(form.dueDate)) {
-      toast.error("Vade tarihi fatura tarihinden önce olamaz.");
-      return;
-    }
-    if (form.status === "paid" && !form.paidAt) {
-      toast.error("Ödenen kayıt için ödeme tarihi girilmelidir.");
+    if (!organizationId || !user?.id) return;
+    if (!form.companyId || !form.period || !form.amount) {
+      toast.error("Firma, dönem ve tutar zorunlu.");
       return;
     }
 
     setSaving(true);
     try {
-      const payload: OsgbFinanceInput = {
-        companyId: form.companyId,
-        invoiceNo: form.invoiceNo,
-        servicePeriod: form.servicePeriod,
-        invoiceDate: form.invoiceDate,
-        dueDate: form.dueDate,
-        amount: Number(form.amount),
-        currency: form.currency || "TRY",
-        status: form.status,
-        paidAt: form.paidAt,
-        paymentNote: form.paymentNote,
-      };
-
-      await upsertOsgbFinance(user.id, payload, editing?.id);
-      await loadData(true);
+      if (editingRecord) {
+        await updateOsgbFinanceRecord(editingRecord.id, organizationId, buildInput());
+        toast.success("Finans kaydı güncellendi.");
+      } else {
+        await createOsgbFinanceRecord(user.id, organizationId, buildInput());
+        toast.success("Finans kaydı eklendi.");
+      }
       setDialogOpen(false);
-      setEditing(null);
-      setForm(emptyForm);
-      clearFinanceDraft();
-      toast.success(editing ? "Finans kaydı güncellendi." : "Finans kaydı oluşturuldu.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Finans kaydı kaydedilemedi.");
+      await loadData();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Finans kaydı kaydedilemedi.");
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!canManage) {
-      toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-      return;
-    }
-    if (!confirm("Bu finans kaydını silmek istiyor musunuz?")) return;
+  const runRecordAction = async (record: OsgbFinanceRecord, action: () => Promise<unknown>, message: string) => {
+    setActionLoadingId(record.id);
     try {
-      await deleteOsgbFinance(id);
-      await loadData(true);
-      toast.success("Finans kaydı silindi.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Finans kaydı silinemedi.");
+      await action();
+      await loadData();
+      toast.success(message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "İşlem tamamlanamadı.");
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
+  const handleDelete = async () => {
+    if (!organizationId || !deleteTarget) return;
+    await runRecordAction(deleteTarget, () => deleteOsgbFinanceRecord(deleteTarget.id, organizationId), "Finans kaydı silindi.");
+    setDeleteTarget(null);
+  };
+
+  const exportStatement = () => {
+    const rows = filteredRecords.map((record) => ({
+      Firma: record.companyName || "-",
+      Dönem: record.period,
+      Tutar: record.amount,
+      Vade: record.dueDate || "-",
+      Durum: statusLabels[record.status],
+      Not: record.notes || "-",
+    }));
+    const worksheet = utils.json_to_sheet(rows);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, "OSGB Finans");
+    writeFile(workbook, `osgb-finans-ekstre-${todayIso()}.xlsx`);
+  };
+
+  if (!organizationId) {
+    return (
+      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-100">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5" />
+          <div>
+            <h2 className="font-black">Organizasyon bağlantısı gerekli</h2>
+            <p className="mt-1 text-sm text-amber-100/80">Finans ekranı için önce bir organizasyon/çalışma alanı oluşturun.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto space-y-6 py-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
-              <CreditCard className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">Finans Yönetimi</h1>
-              <p className="text-sm text-slate-400">Firma bazlı tahsilat, geciken ödeme ve fatura görünümü.</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#111c2e] p-3 text-slate-100 sm:p-4">
+      <div className="space-y-4">
+        <div className="grid rounded-xl border border-slate-700/70 bg-[#050a18] p-1 sm:grid-cols-2">
+          <button className="rounded-lg bg-[#1a273c] px-4 py-3 text-sm font-black text-white shadow-inner">
+            <span className="inline-flex items-center gap-2"><CreditCard className="h-4 w-4" /> Tahsilatlar / Gelirler</span>
+          </button>
+          <button disabled className="rounded-lg px-4 py-3 text-sm font-bold text-slate-400">
+            <span className="inline-flex items-center gap-2"><BarChart3 className="h-4 w-4" /> Sabit Giderler</span>
+          </button>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() =>
-              downloadCsv(
-                "osgb-finans.csv",
-                ["Firma", "Fatura No", "Hizmet Dönemi", "Vade", "Tutar", "Durum"],
-                filteredRecords.map((record) => [
-                  record.company?.company_name || "",
-                  record.invoice_no || "",
-                  record.service_period || "",
-                  record.due_date || "",
-                  record.amount,
-                  statusLabel[record.status],
-                ]),
-              )
-            }
-          >
-            Dışa Aktar
-          </Button>
-          <Button variant="outline" onClick={() => void loadData()}>
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Yenile
-          </Button>
-          <Button onClick={openCreate} disabled={!canManage}>
-            <Plus className="mr-2 h-4 w-4" />
-            Yeni kayıt
-          </Button>
-        </div>
-      </div>
 
-      {error ? (
-        <Alert variant="destructive" className="border-red-500/20 bg-red-500/10 text-red-100">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Finans verisi yüklenemedi</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <button type="button" onClick={() => setStatusFilter("pending")} className="text-left">
-          <Card className="border-slate-800 bg-slate-900/70 transition hover:border-yellow-500/30">
-            <CardHeader className="pb-3"><CardDescription>Bekleyen tahsilat</CardDescription><CardTitle className="mt-2 text-3xl text-white">{formatMoney(summary.pending, "TRY")}</CardTitle></CardHeader>
-          </Card>
-        </button>
-        <button type="button" onClick={() => setStatusFilter("paid")} className="text-left">
-          <Card className="border-slate-800 bg-slate-900/70 transition hover:border-emerald-500/30">
-            <CardHeader className="pb-3"><CardDescription>Tahsil edilen</CardDescription><CardTitle className="mt-2 text-3xl text-white">{formatMoney(summary.paid, "TRY")}</CardTitle></CardHeader>
-          </Card>
-        </button>
-        <button type="button" onClick={() => setStatusFilter("overdue")} className="text-left">
-            <Card className="border-slate-800 bg-slate-900/70 transition hover:border-red-500/30">
-              <CardHeader className="pb-3"><CardDescription>Geciken tahsilat</CardDescription><CardTitle className="mt-2 text-3xl text-white">{formatMoney(summary.overdue, "TRY")}</CardTitle></CardHeader>
-            </Card>
-        </button>
-      </div>
-
-      <Card className="border-slate-800 bg-slate-900/70">
-        <CardHeader>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <CardTitle className="text-white">Ödeme durumu takvimi</CardTitle>
-              <CardDescription>Gecikmiş ve önümüzdeki 60 gün içindeki tahsilatlar kronolojik görünür.</CardDescription>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+          <KpiCard title="Toplam Alacak" value={formatCurrency(stats.total)} subtitle={`${records.length} kayıt`} icon={Wallet} />
+          <KpiCard title="Tahsil Edilen" value={formatCurrency(stats.paid)} subtitle={`${radar.paid.length} tahsilat kapandı`} icon={BadgeDollarSign} tone="emerald" />
+          <KpiCard title="Bekleyen Tahsilat" value={formatCurrency(stats.pending)} subtitle={`${radar.pending.length} kayıt takipte`} icon={Clock3} tone="amber" />
+          <KpiCard title="Geciken Tahsilat" value={formatCurrency(stats.overdue)} subtitle={`${radar.overdue.length} kritik kayıt`} icon={ShieldAlert} tone="rose" />
+          <KpiCard title="Tahsilat Oranı" value={`%${stats.ratio}`} subtitle={stats.total ? "Portföy tahsilat performansı" : "Henüz portföy yok"} icon={BarChart3} tone="blue" />
+          <div className="rounded-xl border border-slate-800 bg-[#080f22] p-4 shadow-lg shadow-slate-950/30">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Son 6 Dönem</p>
+                <p className="mt-3 text-base font-black text-white">Tahsilat Akışı</p>
+                <p className="mt-1 text-xs text-slate-400">Dönem bazlı tahsil edilen kısım</p>
+              </div>
+              <span className="rounded-xl bg-slate-700/30 p-2 text-slate-300"><BarChart3 className="h-4 w-4" /></span>
             </div>
-            <div className="flex gap-2">
-              <Button variant={calendarView === "weekly" ? "default" : "outline"} size="sm" onClick={() => setCalendarView("weekly")}>
-                Haftalık
-              </Button>
-              <Button variant={calendarView === "monthly" ? "default" : "outline"} size="sm" onClick={() => setCalendarView("monthly")}>
-                Aylık
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {calendarItems.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-sm text-slate-400">
-              Takvimde gösterilecek finans kaydı bulunamadı.
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {Object.entries(groupedCalendar).map(([month, items]) => (
-                <div key={month} className="space-y-3">
-                  <div className="text-sm font-semibold uppercase tracking-wide text-slate-300">{month}</div>
-                  <div className="grid gap-3 xl:grid-cols-2">
-                    {items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleCalendarOpen(item)}
-                        className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-left transition hover:border-cyan-500/30 hover:bg-slate-950/70"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-medium text-white">{item.companyName}</div>
-                            <div className="mt-1 text-xs text-slate-400">{item.invoiceNo || item.servicePeriod || "Fatura kaydı"}</div>
-                          </div>
-                          <Badge className={cn("border", item.isOverdue ? statusClass.overdue : statusClass.pending)}>
-                            {item.isOverdue ? "Gecikmiş" : item.dayLabel}
-                          </Badge>
-                        </div>
-                        <div className="mt-3 flex items-end justify-between">
-                          <div className="text-xs text-slate-500">Vade: {formatDate(item.dueDate)}</div>
-                          <div className="text-sm font-semibold text-white">{formatMoney(item.amount, item.currency)}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+            <div className="mt-4 flex h-12 items-end gap-1 border-t border-dashed border-slate-700 pt-2">
+              {lastSixPeriods.map((item) => (
+                <div key={item.period} className="flex flex-1 flex-col items-center gap-1">
+                  <div className="w-full rounded-t bg-cyan-400/70" style={{ height: `${Math.max(4, (item.paidAmount / maxLastSixAmount) * 34)}px` }} />
+                  <span className="text-[9px] text-slate-500">{item.period.slice(5)}</span>
                 </div>
               ))}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
 
-      <Card className="border-slate-800 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="text-white">Haftalık iş yükü görünümü</CardTitle>
-          <CardDescription>Tahsilat ekibinin hafta bazında yoğunluğunu ve gecikmiş kayıt baskısını gösterir.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {weeklyWorkload.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/40 p-6 text-sm text-slate-400">
-              Haftalık iş yükü için uygun finans kaydı bulunamadı.
+        <section className="rounded-xl border border-slate-800 bg-[#080f22] p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Tahsilat Radarı</p>
+              <h2 className="text-sm font-black text-white">Günlük operasyonu öne çeken hızlı akışları seçin</h2>
             </div>
-          ) : (
-            <div className="grid gap-3 xl:grid-cols-3">
-              {weeklyWorkload.map((week) => (
-                <div key={week.label} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                  <div className="text-sm font-semibold text-white">{week.label}</div>
-                  <div className="mt-3 space-y-1 text-sm text-slate-400">
-                    <div>Planlanan tahsilat: <span className="text-slate-200">{week.count}</span></div>
-                    <div>Toplam tutar: <span className="text-slate-200">{formatMoney(week.totalAmount, "TRY")}</span></div>
-                    <div>Gecikmiş kayıt: <span className={cn("font-medium", week.overdueCount > 0 ? "text-red-300" : "text-emerald-300")}>{week.overdueCount}</span></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <Badge className="border-slate-700 bg-slate-800 text-slate-200">Sorumlu Kayıtlar</Badge>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+            <RadarCard title="Geciken" count={radar.overdue.length} amount={stats.overdue} description="Vadesi geçmiş veya gecikti olarak işaretlenmiş kayıtlar." icon={ShieldAlert} />
+            <RadarCard title="Bugün" count={radar.today.length} amount={radar.today.reduce((sum, row) => sum + row.amount, 0)} description="Bugün vadesi gelen kayıtlar." icon={Calendar} />
+            <RadarCard title="7 Gün" count={radar.nextSeven.length} amount={radar.nextSeven.reduce((sum, row) => sum + row.amount, 0)} description="Önümüzdeki 7 gün içinde vadesi gelecek kayıtlar." icon={Clock3} />
+            <RadarCard title="Bekleyen" count={radar.pending.length} amount={stats.pending} description="Takipte olan ancak gecikmemiş kayıtlar." icon={AlertTriangle} />
+            <RadarCard title="Ödendi" count={radar.paid.length} amount={stats.paid} description="Tahsilatı tamamlanan kayıtlar." icon={CheckCircle2} />
+          </div>
+        </section>
 
-      <Card className="border-slate-800 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="text-white">Finans kayıtları</CardTitle>
-          <CardDescription>OSGB müşteri tahsilat akışı ve ödeme durumu.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 lg:flex-row">
+        <section className="rounded-xl border border-slate-800 bg-[#070d1f] p-3 sm:p-4">
+          <div className="flex flex-col gap-3 xl:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" placeholder="Fatura no, firma, dönem veya not ara" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Firma, dönem, fatura no veya not ara" className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] pl-10 text-slate-100 placeholder:text-slate-500" />
             </div>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as OsgbFinanceStatus | "all")}>
+              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Tüm durumlar</SelectItem><SelectItem value="pending">Beklemede</SelectItem><SelectItem value="paid">Ödendi</SelectItem><SelectItem value="overdue">Gecikti</SelectItem></SelectContent>
+            </Select>
             <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="w-full lg:w-[240px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tüm firmalar</SelectItem>
-                {companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}
-              </SelectContent>
+              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-44"><SelectValue placeholder="Tüm firmalar" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Tüm firmalar</SelectItem>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}</SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full lg:w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Tüm durumlar</SelectItem>
-                <SelectItem value="pending">Bekliyor</SelectItem>
-                <SelectItem value="paid">Ödendi</SelectItem>
-                <SelectItem value="overdue">Gecikmiş</SelectItem>
-                <SelectItem value="cancelled">İptal</SelectItem>
-              </SelectContent>
+            <Select value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40"><SelectValue placeholder="Tüm dönemler" /></SelectTrigger>
+              <SelectContent><SelectItem value="all">Tüm dönemler</SelectItem>{periods.map((period) => <SelectItem key={period} value={period}>{period}</SelectItem>)}</SelectContent>
             </Select>
-            <Button variant="outline" onClick={() => { setSearch(""); setCompanyFilter("ALL"); setStatusFilter("ALL"); }}>
-              Filtreyi temizle
+            <Button type="button" variant="secondary" onClick={() => { setSearch(""); setStatusFilter("all"); setCompanyFilter("all"); setPeriodFilter("all"); }} className="h-11 rounded-xl bg-slate-800 text-slate-100 hover:bg-slate-700">
+              <SlidersHorizontal className="mr-2 h-4 w-4" /> Filtreleri Sıfırla
+            </Button>
+            <Button type="button" onClick={exportStatement} disabled={filteredRecords.length === 0} className="h-11 rounded-xl bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25 disabled:opacity-50">
+              <Download className="mr-2 h-4 w-4" /> Ekstre İndir
+            </Button>
+            <Button type="button" onClick={openCreateDialog} disabled={companies.length === 0} className="h-11 rounded-xl bg-cyan-500 text-slate-950 shadow-[0_0_0_2px_rgba(255,255,255,.9)] hover:bg-cyan-400 disabled:opacity-50">
+              <Plus className="mr-2 h-4 w-4" /> Yeni Kayıt
             </Button>
           </div>
+          <p className="mt-3 text-xs font-semibold text-slate-400">{filteredRecords.length} kayıt görünüyor • Toplam portföy {formatCurrency(stats.total)}</p>
 
-          <Table>
-            <TableHeader>
-              <TableRow className="border-slate-800 hover:bg-transparent">
-                <TableHead>Firma</TableHead>
-                <TableHead>Fatura No</TableHead>
-                <TableHead>Dönem</TableHead>
-                <TableHead>Tutar</TableHead>
-                <TableHead>Vade</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead className="text-right">İşlem</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={7} className="py-12 text-center text-sm text-slate-400">Yükleniyor...</TableCell></TableRow>
-              ) : filteredRecords.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="py-12 text-center text-sm text-slate-400">Eşleşen finans kaydı bulunamadı.</TableCell></TableRow>
-              ) : (
-                filteredRecords.map((record) => (
-                  <TableRow key={record.id} className="border-slate-800">
-                    <TableCell className="font-medium text-white">{record.company?.company_name || "Firma"}</TableCell>
-                    <TableCell>{record.invoice_no || "-"}</TableCell>
-                    <TableCell>{record.service_period || "-"}</TableCell>
-                    <TableCell>{formatMoney(record.amount, record.currency || "TRY")}</TableCell>
-                    <TableCell>{formatDate(record.due_date)}</TableCell>
-                    <TableCell>
-                      <Badge className={cn("border", statusClass[record.status])}>{statusLabel[record.status]}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button size="icon" variant="outline" onClick={() => openEdit(record)}><Edit className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="outline" onClick={() => handleDelete(record.id)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-          {totalCount > FINANCE_PAGE_SIZE ? (
-            <div className="mt-4 flex items-center justify-between text-sm text-slate-400">
-              <span>Sayfa {page} / {totalPages} • Toplam kayıt {totalCount}</span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  disabled={page === 1}
-                >
-                  Önceki
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                  disabled={page === totalPages}
-                >
-                  Sonraki
-                </Button>
-              </div>
+          {companies.length === 0 && (
+            <Alert className="mt-4 border-amber-500/50 bg-amber-500/10 text-amber-100">
+              <Building2 className="h-4 w-4" />
+              <AlertTitle>Finans kaydı eklemek için önce bir OSGB firması gerekli.</AlertTitle>
+              <AlertDescription>Firma listesi oluştuktan sonra bu alan aylık tahsilat masası gibi çalışacak.</AlertDescription>
+            </Alert>
+          )}
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#050a18]">
+          {loading ? (
+            <div className="flex min-h-[220px] items-center justify-center text-slate-300"><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Finans kayıtları yükleniyor...</div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="flex min-h-[220px] flex-col items-center justify-center px-4 text-center">
+              <div className="rounded-2xl bg-slate-800 p-4 text-slate-300"><Search className="h-7 w-7" /></div>
+              <h3 className="mt-4 text-base font-black text-white">Henüz finans kaydı eklenmedi</h3>
+              <p className="mt-2 max-w-lg text-sm text-slate-400">İlk kaydı eklediğinizde üstteki özet, radar ve operasyon listesi anında oluşacak.</p>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-[1180px] w-full text-left text-sm">
+                <thead className="bg-[#070d1f] text-xs font-bold text-slate-300">
+                  <tr>
+                    <th className="px-4 py-3">Firma</th><th className="px-4 py-3">Dönem</th><th className="px-4 py-3 text-right">Tutar</th><th className="px-4 py-3">Vade</th><th className="px-4 py-3">Durum</th><th className="px-4 py-3">Not</th><th className="px-4 py-3 text-right">Hızlı İşlemler</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRecords.map((record) => (
+                    <tr key={record.id} className="border-t border-slate-800 text-slate-200 hover:bg-slate-900/50">
+                      <td className="px-4 py-4"><div className="font-black text-white"><Building2 className="mr-2 inline h-4 w-4 text-cyan-300" />{record.companyName || "-"}</div><div className="mt-1 text-xs text-slate-500">Fatura {record.invoiceNo || "-"}</div></td>
+                      <td className="px-4 py-4 font-semibold">{record.period}</td>
+                      <td className="px-4 py-4 text-right font-black text-white">{formatCurrency(record.amount)}</td>
+                      <td className="px-4 py-4"><Calendar className="mr-2 inline h-4 w-4 text-slate-400" />{formatDate(record.dueDate)}</td>
+                      <td className="px-4 py-4"><Badge className={cn("rounded-full", statusClasses[record.status])}>{statusLabels[record.status]}</Badge></td>
+                      <td className="max-w-[220px] truncate px-4 py-4 text-slate-400">{record.notes || "-"}</td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button size="sm" disabled={actionLoadingId === record.id || record.status === "paid"} onClick={() => runRecordAction(record, () => markFinancePaid(record.id, organizationId), "Kayıt ödendi olarak işaretlendi.")} className="h-7 rounded-full bg-slate-800 px-3 text-xs text-slate-100 hover:bg-emerald-700">Ödendi</Button>
+                          <Button size="sm" disabled={actionLoadingId === record.id || record.status === "pending"} onClick={() => runRecordAction(record, () => markFinancePending(record.id, organizationId), "Kayıt beklemede olarak işaretlendi.")} className="h-7 rounded-full bg-slate-800 px-3 text-xs text-slate-100 hover:bg-slate-700">Beklemede</Button>
+                          <Button size="sm" disabled={actionLoadingId === record.id || record.status === "overdue"} onClick={() => runRecordAction(record, () => markFinanceOverdue(record.id, organizationId), "Kayıt gecikti olarak işaretlendi.")} className="h-7 rounded-full bg-slate-800 px-3 text-xs text-slate-100 hover:bg-rose-700">Gecikti</Button>
+                          <Button size="sm" disabled={actionLoadingId === record.id || !user?.id} onClick={() => user?.id && runRecordAction(record, () => duplicateFinanceNextMonth(user.id, organizationId, record), "Sonraki ay kaydı oluşturuldu.")} className="h-7 rounded-full bg-cyan-500/15 px-3 text-xs text-cyan-100 hover:bg-cyan-500/25"><Copy className="mr-1 h-3 w-3" /> Sonraki Ay</Button>
+                          <Button size="sm" onClick={() => openEditDialog(record)} className="h-7 rounded-full bg-slate-800 px-3 text-xs text-slate-100 hover:bg-blue-700"><Edit3 className="mr-1 h-3 w-3" /> Detay</Button>
+                          <Button size="sm" onClick={() => setDeleteTarget(record)} className="h-7 rounded-full bg-rose-500/20 px-3 text-xs text-rose-100 hover:bg-rose-700"><Trash2 className="mr-1 h-3 w-3" /> Sil</Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Finans kaydını düzenle" : "Yeni finans kaydı"}</DialogTitle>
-            <DialogDescription>Firma bazlı tahsilat ve ödeme takibini yönetin.</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 md:grid-cols-2">
+        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-hidden rounded-3xl border-slate-700 bg-[#060b1d] p-0 text-slate-100 shadow-2xl sm:max-w-[380px]">
+          <div className="flex items-start justify-between border-b border-slate-800 px-5 py-5">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Yeni Tahsilat</p>
+              <h2 className="mt-2 text-lg font-black text-white">{editingRecord ? "Finans kaydını düzenle" : "Yeni finans kaydı ekle"}</h2>
+              <p className="mt-1 text-sm text-slate-400">Liste görünürken kaydı hemen düzenleyin ve optimistik olarak işleyin.</p>
+            </div>
+            <button type="button" onClick={() => setDialogOpen(false)} className="rounded-full bg-slate-800 p-2 text-slate-300 hover:bg-slate-700"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-5 py-5">
             <div className="space-y-2">
-              <Label>Firma</Label>
-              <Select value={form.companyId} onValueChange={(value) => setForm((prev) => ({ ...prev, companyId: value }))}>
-                <SelectTrigger><SelectValue placeholder="Firma seçin" /></SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}
-                </SelectContent>
+              <Label className="text-slate-200"><Building2 className="mr-2 inline h-4 w-4" />Firma *</Label>
+              <Select value={form.companyId || undefined} onValueChange={(value) => setForm((current) => ({ ...current, companyId: value }))}>
+                <SelectTrigger className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100"><SelectValue placeholder="Firma seçin" /></SelectTrigger>
+                <SelectContent>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-2"><Label>Fatura No</Label><Input value={form.invoiceNo} onChange={(e) => setForm((prev) => ({ ...prev, invoiceNo: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Hizmet Dönemi</Label><Input value={form.servicePeriod} onChange={(e) => setForm((prev) => ({ ...prev, servicePeriod: e.target.value }))} placeholder="2026 Mart" /></div>
-            <div className="space-y-2"><Label>Tutar</Label><Input type="number" value={form.amount} onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Fatura Tarihi</Label><Input type="date" value={form.invoiceDate} onChange={(e) => setForm((prev) => ({ ...prev, invoiceDate: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Vade Tarihi</Label><Input type="date" value={form.dueDate} onChange={(e) => setForm((prev) => ({ ...prev, dueDate: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Durum</Label><Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as OsgbFinanceRecord["status"] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">Bekliyor</SelectItem><SelectItem value="paid">Ödendi</SelectItem><SelectItem value="overdue">Gecikmiş</SelectItem><SelectItem value="cancelled">İptal</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Ödeme Tarihi</Label><Input type="date" value={form.paidAt} onChange={(e) => setForm((prev) => ({ ...prev, paidAt: e.target.value }))} /></div>
-            <div className="space-y-2 md:col-span-2"><Label>Not</Label><Textarea value={form.paymentNote} onChange={(e) => setForm((prev) => ({ ...prev, paymentNote: e.target.value }))} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2"><Label>Dönem *</Label><Input type="month" value={form.period} onChange={(event) => setForm((current) => ({ ...current, period: event.target.value }))} className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100" /></div>
+              <div className="space-y-2"><Label><CreditCard className="mr-2 inline h-4 w-4" />Tutar *</Label><Input value={form.amount} onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))} className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100" /></div>
+              <div className="space-y-2"><Label>Vade Tarihi</Label><Input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100" /></div>
+              <div className="space-y-2"><Label>Fatura No</Label><Input value={form.invoiceNo} onChange={(event) => setForm((current) => ({ ...current, invoiceNo: event.target.value }))} placeholder="IST-2026-001" className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100" /></div>
+            </div>
+            <div className="space-y-2">
+              <Label>Durum</Label>
+              <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as OsgbFinanceStatus }))}>
+                <SelectTrigger className="h-11 rounded-xl border-slate-600 bg-[#101a2e] text-slate-100"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="pending">Beklemede</SelectItem><SelectItem value="paid">Ödendi</SelectItem><SelectItem value="overdue">Gecikti</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label><FileText className="mr-2 inline h-4 w-4" />Notlar</Label>
+              <Textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Tahsilat notu, mutabakat bilgisi veya operasyon açıklaması..." className="min-h-[100px] rounded-xl border-slate-600 bg-[#101a2e] text-slate-100" />
+            </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDialogOpen(false);
-                setEditing(null);
-                setForm(emptyForm);
-                clearFinanceDraft();
-              }}
-            >
-              Vazgeç
+          <div className="grid grid-cols-2 gap-3 border-t border-slate-800 px-5 py-4">
+            <Button type="button" onClick={() => setDialogOpen(false)} className="rounded-xl bg-slate-800 text-white hover:bg-slate-700">Vazgeç</Button>
+            <Button type="button" onClick={handleSave} disabled={saving} className="rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}{editingRecord ? "Güncelle" : "Kaydı Ekle"}
             </Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? "Kaydediliyor..." : "Kaydet"}</Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent className="border-slate-700 bg-[#060b1d] text-slate-100">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finans kaydı silinsin mi?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">Bu tahsilat kaydı silinecek. Bu işlem geri alınamaz.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">İptal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-rose-600 text-white hover:bg-rose-500">Sil</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
-
-
-

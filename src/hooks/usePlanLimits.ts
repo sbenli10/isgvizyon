@@ -14,6 +14,19 @@ export type PlanAccessResult = {
 const FEATURE_ALIASES: Record<string, FeatureKey | string> = {
   osgb_module: "osgb.access",
   osgb: "osgb.access",
+  osgb_panel: "osgb.access",
+  osgb_companies: "osgb.companies",
+  osgb_personnel: "osgb.personnel",
+  osgb_archive: "osgb.archive",
+  osgb_finance: "osgb.finance",
+  osgb_katip: "osgb.katip",
+  osgb_portal: "osgb.portal",
+  osgb_company_tracking: "osgb.company_tracking",
+  osgb_tracking: "osgb.company_tracking",
+  osgb_company_follow: "osgb.company_tracking",
+  osgb_firma_takibi: "osgb.company_tracking",
+  company_tracking: "osgb.company_tracking",
+  firma_takibi: "osgb.company_tracking",
   isg_bot: "isg_bot.access",
   isgbot: "isg_bot.access",
   risk_assessment: "risk_assessments.count",
@@ -28,11 +41,37 @@ const FEATURE_ALIASES: Record<string, FeatureKey | string> = {
   form_builder: "form_builder.access",
 };
 
-const PREMIUM_LOCKED_FEATURES = new Set(["osgb.access"]);
-const FREE_LOCKED_FEATURES = new Set(["osgb.access", "isg_bot.access"]);
+const FREE_LOCKED_FEATURES = new Set(["isg_bot.access"]);
 
 function normalizeFeatureName(featureName: FeatureKey | string) {
   return FEATURE_ALIASES[featureName] ?? featureName;
+}
+
+function normalizeFeatureToken(featureKey: FeatureKey | string) {
+  return String(featureKey)
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[ıİ]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function isOsgbFeature(featureKey: FeatureKey | string) {
+  const normalized = String(featureKey).toLocaleLowerCase("tr-TR");
+  const token = normalizeFeatureToken(featureKey);
+
+  return normalized === "osgb"
+    || normalized === "osgb_module"
+    || normalized === "osgb.access"
+    || normalized.startsWith("osgb_")
+    || normalized.startsWith("osgb.")
+    || token.startsWith("osgb")
+    || token.includes("companytracking")
+    || token.includes("firmatakibi")
+    || token.includes("tracking");
 }
 
 export function usePlanLimits() {
@@ -42,6 +81,8 @@ export function usePlanLimits() {
     plan,
     daysLeftInTrial,
     getFeatureEntitlement,
+    canAccessPremium,
+    canAccessOsgb,
   } = subscription;
 
   const currentPlan = useMemo<SubscriptionPlan>(() => {
@@ -57,22 +98,23 @@ export function usePlanLimits() {
       const featureKey = normalizeFeatureName(featureName);
       const entitlement = getFeatureEntitlement(featureKey);
 
-      if (currentPlan === "osgb") {
-        return { allowed: true, reason: "allowed", currentPlan, featureKey };
+      if (isOsgbFeature(featureKey)) {
+        return {
+          allowed: canAccessOsgb,
+          reason: canAccessOsgb ? "allowed" : "upgrade_to_osgb",
+          currentPlan,
+          featureKey,
+        };
       }
 
-      if (currentPlan === "premium") {
-        if (PREMIUM_LOCKED_FEATURES.has(featureKey)) {
-          return { allowed: false, reason: "upgrade_to_osgb", currentPlan, featureKey };
-        }
-
+      if (canAccessPremium) {
         return { allowed: true, reason: "allowed", currentPlan, featureKey };
       }
 
       if (FREE_LOCKED_FEATURES.has(featureKey)) {
         return {
           allowed: false,
-          reason: featureKey === "osgb.access" ? "upgrade_to_osgb" : "upgrade_to_premium",
+          reason: "upgrade_to_premium",
           currentPlan,
           featureKey,
         };
@@ -89,7 +131,7 @@ export function usePlanLimits() {
 
       return { allowed: true, reason: "allowed", currentPlan, featureKey };
     },
-    [currentPlan, getFeatureEntitlement],
+    [canAccessOsgb, canAccessPremium, currentPlan, getFeatureEntitlement],
   );
 
   return {

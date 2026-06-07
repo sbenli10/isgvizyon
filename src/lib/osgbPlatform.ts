@@ -55,12 +55,25 @@ export interface OsgbCompanyEmployeeRecord {
   companyId: string;
   companyName: string;
   fullName: string;
+  firstName: string | null;
+  lastName: string | null;
   tcNumber: string | null;
+  position: string | null;
   jobTitle: string | null;
+  birthDate: string | null;
+  age: number | null;
+  gender: string | null;
+  startDate: string | null;
   department: string | null;
+  trainingDate: string | null;
+  periodicExamDate: string | null;
+  upperBodySize: string | null;
+  shoeSize: string | null;
+  trainingTopic: string | null;
+  occupation: string | null;
   phone: string | null;
   email: string | null;
-  startDate: string | null;
+  notes: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -70,14 +83,31 @@ export interface OsgbCompanyEmployeeInput {
   organizationId: string;
   userId: string;
   companyId: string;
-  fullName: string;
-  tcNumber?: string | null;
+  tcNumber: string;
+  firstName: string;
+  lastName: string;
+  fullName?: string;
+  position?: string | null;
   jobTitle?: string | null;
+  birthDate?: string | null;
+  age?: number | null;
+  gender?: string | null;
+  startDate?: string | null;
   department?: string | null;
+  trainingDate?: string | null;
+  periodicExamDate?: string | null;
+  upperBodySize?: string | null;
+  shoeSize?: string | null;
+  trainingTopic?: string | null;
+  occupation?: string | null;
   phone?: string | null;
   email?: string | null;
-  startDate?: string | null;
+  notes?: string | null;
 }
+
+export type OsgbCompanyEmployeeUpdate = Partial<Omit<OsgbCompanyEmployeeInput, "organizationId" | "userId">> & {
+  isActive?: boolean;
+};
 
 
 export interface OsgbCompanyPortalAccountRecord {
@@ -759,51 +789,116 @@ export const deleteOsgbCompanyPortalAccount = async (id: string) => {
   if (error) throw error;
 };
 
+
+const osgbCompanyEmployeeSelect = `
+  id,
+  organization_id,
+  user_id,
+  company_id,
+  full_name,
+  first_name,
+  last_name,
+  tc_number,
+  position,
+  job_title,
+  birth_date,
+  age,
+  gender,
+  start_date,
+  department,
+  training_date,
+  periodic_exam_date,
+  upper_body_size,
+  shoe_size,
+  training_topic,
+  occupation,
+  phone,
+  email,
+  notes,
+  is_active,
+  created_at,
+  updated_at,
+  company:isgkatip_companies(company_name)
+`;
+
+const mapOsgbCompanyEmployee = (row: any): OsgbCompanyEmployeeRecord => ({
+  id: row.id,
+  organizationId: row.organization_id,
+  userId: row.user_id,
+  companyId: row.company_id,
+  companyName: row.company?.company_name || "Firma",
+  fullName: row.full_name,
+  firstName: row.first_name || null,
+  lastName: row.last_name || null,
+  tcNumber: row.tc_number || null,
+  position: row.position || row.job_title || null,
+  jobTitle: row.job_title || row.position || null,
+  birthDate: row.birth_date || null,
+  age: typeof row.age === "number" ? row.age : null,
+  gender: row.gender || null,
+  startDate: row.start_date || null,
+  department: row.department || null,
+  trainingDate: row.training_date || null,
+  periodicExamDate: row.periodic_exam_date || null,
+  upperBodySize: row.upper_body_size || null,
+  shoeSize: row.shoe_size || null,
+  trainingTopic: row.training_topic || null,
+  occupation: row.occupation || null,
+  phone: row.phone || null,
+  email: row.email || null,
+  notes: row.notes || null,
+  isActive: Boolean(row.is_active),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+function buildOsgbCompanyEmployeePayload(input: OsgbCompanyEmployeeInput | OsgbCompanyEmployeeUpdate) {
+  const payload: Record<string, unknown> = {};
+  const firstName = input.firstName?.trim();
+  const lastName = input.lastName?.trim();
+  const fullName = input.fullName?.trim() || [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  if ("companyId" in input && input.companyId !== undefined) payload.company_id = input.companyId;
+  if (fullName) payload.full_name = fullName;
+  if (firstName !== undefined) payload.first_name = firstName || null;
+  if (lastName !== undefined) payload.last_name = lastName || null;
+  if (input.tcNumber !== undefined) payload.tc_number = input.tcNumber.trim();
+  if (input.position !== undefined || input.jobTitle !== undefined) {
+    const position = input.position?.trim() || input.jobTitle?.trim() || null;
+    payload.position = position;
+    payload.job_title = input.jobTitle?.trim() || position;
+  }
+  if (input.birthDate !== undefined) payload.birth_date = input.birthDate || null;
+  if (input.age !== undefined) payload.age = input.age ?? null;
+  if (input.gender !== undefined) payload.gender = input.gender?.trim() || null;
+  if (input.startDate !== undefined) payload.start_date = input.startDate || null;
+  if (input.department !== undefined) payload.department = input.department?.trim() || null;
+  if (input.trainingDate !== undefined) payload.training_date = input.trainingDate || null;
+  if (input.periodicExamDate !== undefined) payload.periodic_exam_date = input.periodicExamDate || null;
+  if (input.upperBodySize !== undefined) payload.upper_body_size = input.upperBodySize?.trim() || null;
+  if (input.shoeSize !== undefined) payload.shoe_size = input.shoeSize?.trim() || null;
+  if (input.trainingTopic !== undefined) payload.training_topic = input.trainingTopic?.trim() || null;
+  if (input.occupation !== undefined) payload.occupation = input.occupation?.trim() || null;
+  if (input.phone !== undefined) payload.phone = input.phone?.trim() || null;
+  if (input.email !== undefined) payload.email = input.email?.trim() || null;
+  if (input.notes !== undefined) payload.notes = input.notes?.trim() || null;
+  if (input.isActive !== undefined) payload.is_active = input.isActive;
+
+  return payload;
+}
+
 export const listOsgbCompanyEmployees = async (
   organizationId: string,
 ): Promise<OsgbCompanyEmployeeRecord[]> => {
   const { data, error } = await (supabase as any)
     .from("osgb_company_employees")
-    .select(`
-      id,
-      organization_id,
-      user_id,
-      company_id,
-      full_name,
-      tc_number,
-      job_title,
-      department,
-      phone,
-      email,
-      start_date,
-      is_active,
-      created_at,
-      updated_at,
-      company:isgkatip_companies(company_name)
-    `)
+    .select(osgbCompanyEmployeeSelect)
     .eq("organization_id", organizationId)
     .eq("is_active", true)
     .order("full_name", { ascending: true });
 
   if (error) throw error;
-
-  return (data ?? []).map((row: any) => ({
-    id: row.id,
-    organizationId: row.organization_id,
-    userId: row.user_id,
-    companyId: row.company_id,
-    companyName: row.company?.company_name || "Firma",
-    fullName: row.full_name,
-    tcNumber: row.tc_number || null,
-    jobTitle: row.job_title || null,
-    department: row.department || null,
-    phone: row.phone || null,
-    email: row.email || null,
-    startDate: row.start_date || null,
-    isActive: Boolean(row.is_active),
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  return (data ?? []).map(mapOsgbCompanyEmployee);
 };
 
 export const createOsgbCompanyEmployee = async (
@@ -812,57 +907,70 @@ export const createOsgbCompanyEmployee = async (
   const payload = {
     organization_id: input.organizationId,
     user_id: input.userId,
-    company_id: input.companyId,
-    full_name: input.fullName.trim(),
-    tc_number: input.tcNumber?.trim() || null,
-    job_title: input.jobTitle?.trim() || null,
-    department: input.department?.trim() || null,
-    phone: input.phone?.trim() || null,
-    email: input.email?.trim() || null,
-    start_date: input.startDate || null,
+    ...buildOsgbCompanyEmployeePayload(input),
+    is_active: true,
   };
 
   const { data, error } = await (supabase as any)
     .from("osgb_company_employees")
     .insert(payload)
-    .select(`
-      id,
-      organization_id,
-      user_id,
-      company_id,
-      full_name,
-      tc_number,
-      job_title,
-      department,
-      phone,
-      email,
-      start_date,
-      is_active,
-      created_at,
-      updated_at,
-      company:isgkatip_companies(company_name)
-    `)
+    .select(osgbCompanyEmployeeSelect)
     .single();
 
   if (error) throw error;
+  return mapOsgbCompanyEmployee(data);
+};
 
-  return {
-    id: data.id,
-    organizationId: data.organization_id,
-    userId: data.user_id,
-    companyId: data.company_id,
-    companyName: data.company?.company_name || "Firma",
-    fullName: data.full_name,
-    tcNumber: data.tc_number || null,
-    jobTitle: data.job_title || null,
-    department: data.department || null,
-    phone: data.phone || null,
-    email: data.email || null,
-    startDate: data.start_date || null,
-    isActive: Boolean(data.is_active),
-    createdAt: data.created_at,
-    updatedAt: data.updated_at,
-  };
+export const updateOsgbCompanyEmployee = async (
+  id: string,
+  updates: OsgbCompanyEmployeeUpdate,
+): Promise<OsgbCompanyEmployeeRecord> => {
+  const payload = buildOsgbCompanyEmployeePayload(updates);
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .update(payload)
+    .eq("id", id)
+    .select(osgbCompanyEmployeeSelect)
+    .single();
+
+  if (error) throw error;
+  return mapOsgbCompanyEmployee(data);
+};
+
+export const deleteOsgbCompanyEmployee = async (id: string) => {
+  const { error } = await (supabase as any)
+    .from("osgb_company_employees")
+    .update({ is_active: false })
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
+export const upsertOsgbCompanyEmployeesFromExcel = async (
+  rows: OsgbCompanyEmployeeInput[],
+): Promise<OsgbCompanyEmployeeRecord[]> => {
+  const savedRows: OsgbCompanyEmployeeRecord[] = [];
+
+  for (const row of rows) {
+    const { data: existing, error: lookupError } = await (supabase as any)
+      .from("osgb_company_employees")
+      .select("id")
+      .eq("company_id", row.companyId)
+      .eq("tc_number", row.tcNumber)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+
+    if (existing?.id) {
+      savedRows.push(await updateOsgbCompanyEmployee(existing.id, row));
+    } else {
+      savedRows.push(await createOsgbCompanyEmployee(row));
+    }
+  }
+
+  return savedRows;
 };
 
 const OSGB_ARCHIVE_BUCKET = "safety_documents";
@@ -2388,6 +2496,7 @@ export interface OsgbManagedCompanyRecord {
   id: string;
   organizationId: string;
   companyName: string;
+  branchName: string | null;
   sgkNo: string | null;
   taxNumber: string | null;
   employeeCount: number;
@@ -2396,6 +2505,7 @@ export interface OsgbManagedCompanyRecord {
   phone: string | null;
   email: string | null;
   contactName: string | null;
+  naceCode: string | null;
   assignmentMode: string;
   visitFrequency: string;
   notes: string | null;
@@ -2405,7 +2515,8 @@ export interface OsgbManagedCompanyRecord {
   contractStart: string | null;
   contractEnd: string | null;
   monthlyFee: number;
-  assignmentApprovalStatus?: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees" | null;  totalRequiredMinutes: number;
+  assignmentApprovalStatus?: "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees" | null;
+  totalRequiredMinutes: number;
   totalAssignedMinutes: number;
   requiredMinutesByRole: Record<OsgbRole, number>;
   assignedMinutesByRole: Record<OsgbRole, number>;
@@ -2446,6 +2557,7 @@ export interface OsgbCompanyTrackingWorkspaceData {
 
 export interface OsgbCompanyManagementInput {
   companyName: string;
+  branchName?: string | null;
   sgkNo?: string | null;
   taxNumber?: string | null;
   employeeCount?: number;
@@ -2474,10 +2586,16 @@ export interface OsgbCompanyManagementInput {
 }
 
 const deriveAssignmentApprovalStatus = (row: any, assignedMinutes: number) => {
+  const explicitStatus = String(row.assignment_approval_status || "");
+  if (["approved", "pending_personnel", "pending_workplace", "missing_contract", "planned", "zero_employees"].includes(explicitStatus)) {
+    return explicitStatus as "approved" | "pending_personnel" | "pending_workplace" | "missing_contract" | "planned" | "zero_employees";
+  }
+
   const assignedPersonApproval = String(row.assigned_person_approval_status || "").toLocaleLowerCase("tr-TR");
   const receiverApproval = String(row.service_receiver_approval_status || "").toLocaleLowerCase("tr-TR");
   const contractStatus = String(row.contract_status || "").toLocaleLowerCase("tr-TR");
 
+  if (Number(row.employee_count || 0) === 0) return "zero_employees" as const;
   if (assignedMinutes <= 0) return "missing_contract" as const;
   if (contractStatus.includes("plan")) return "planned" as const;
   if (assignedPersonApproval && !assignedPersonApproval.includes("approve")) return "pending_personnel" as const;
@@ -2502,6 +2620,7 @@ const normalizeManagedCompany = (
     id: row.id,
     organizationId: row.org_id,
     companyName: row.company_name || "Firma",
+    branchName: row.branch_name || null,
     sgkNo: row.sgk_no || null,
     taxNumber: row.tax_number || null,
     employeeCount: Number(row.employee_count || 0),
@@ -2510,6 +2629,7 @@ const normalizeManagedCompany = (
     phone: row.phone || null,
     email: row.email || null,
     contactName: row.contact_name || null,
+    naceCode: row.nace_code || null,
     assignmentMode: row.assignment_mode || "automatic",
     visitFrequency: row.visit_frequency || "monthly_once",
     notes: row.notes || null,
@@ -2615,6 +2735,45 @@ const ensureOsgbCompanyContract = async (
   if (accountError) throw accountError;
 };
 
+
+export const createOsgbTrackingReminderTask = async (input: {
+  userId: string;
+  organizationId: string;
+  companyId?: string | null;
+  title: string;
+  description?: string | null;
+  priority?: "low" | "medium" | "high" | "critical";
+  dueDate?: string | null;
+}) => {
+  const { data: duplicateRows, error: duplicateError } = await (supabase as any)
+    .from("osgb_tasks")
+    .select("id")
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", input.userId)
+    .eq("title", input.title)
+    .neq("status", "cancelled")
+    .limit(1);
+
+  if (duplicateError) throw duplicateError;
+  if ((duplicateRows ?? []).length > 0) return false;
+
+  const { error } = await (supabase as any).from("osgb_tasks").insert({
+    user_id: input.userId,
+    organization_id: input.organizationId,
+    company_id: input.companyId || null,
+    title: input.title,
+    description: input.description || null,
+    priority: input.priority || "high",
+    status: "open",
+    due_date: input.dueDate || null,
+    source: "company_tracking",
+    created_by: input.userId,
+  });
+
+  if (error) throw error;
+  return true;
+};
+
 export const listOsgbCompanyTrackingWorkspace = async (
   organizationId: string,
   serviceMonth = getServiceMonth(),
@@ -2628,6 +2787,7 @@ export const listOsgbCompanyTrackingWorkspace = async (
         id,
         org_id,
         company_name,
+        branch_name,
         sgk_no,
         tax_number,
         employee_count,
@@ -2646,6 +2806,7 @@ export const listOsgbCompanyTrackingWorkspace = async (
         contract_end,
         assigned_person_approval_status,
         service_receiver_approval_status,
+        assignment_approval_status,
         contract_status,
         nace_code
       `)
@@ -2726,7 +2887,7 @@ export const upsertOsgbManagedCompany = async (
   const companyPayload = {
     org_id: organizationId,
     company_name: input.companyName,
-    branch_name: (input as any).branchName?.trim() || null, // ✅ yeni alan
+    branch_name: input.branchName?.trim() || null,
     sgk_no: input.sgkNo?.trim() || `MANUAL-${Date.now()}`,
     tax_number: input.taxNumber?.trim() || null,
     employee_count: Math.max(0, Number(input.employeeCount || 0)),
@@ -2739,6 +2900,9 @@ export const upsertOsgbManagedCompany = async (
     assignment_approval_status: input.assignmentApprovalStatus || null,
     visit_frequency: input.visitFrequency || "monthly_once",
     notes: input.notes?.trim() || null,
+    is_deleted: false,
+    deleted_at: null,
+    deleted_by: null,
     is_osgb_managed: true,
     management_source: input.managementSource || "manual",
     managed_at: new Date().toISOString(),
@@ -2754,8 +2918,24 @@ export const upsertOsgbManagedCompany = async (
     last_synced_at: new Date().toISOString(),
   };
 
-  const query = existingCompanyId
-    ? (supabase as any).from("isgkatip_companies").update(companyPayload).eq("id", existingCompanyId).eq("org_id", organizationId)
+  let targetCompanyId = existingCompanyId || null;
+  const sgkNo = input.sgkNo?.trim();
+
+  if (!targetCompanyId && sgkNo) {
+    const { data: existingBySgk, error: existingBySgkError } = await (supabase as any)
+      .from("isgkatip_companies")
+      .select("id")
+      .eq("org_id", organizationId)
+      .eq("sgk_no", sgkNo)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingBySgkError) throw existingBySgkError;
+    targetCompanyId = existingBySgk?.id || null;
+  }
+
+  const query = targetCompanyId
+    ? (supabase as any).from("isgkatip_companies").update(companyPayload).eq("id", targetCompanyId).eq("org_id", organizationId)
     : (supabase as any).from("isgkatip_companies").insert(companyPayload);
 
   const { data, error } = await query.select("id").single();
@@ -2764,6 +2944,62 @@ export const upsertOsgbManagedCompany = async (
   await ensureOsgbCompanyContract(userId, organizationId, data.id, input);
   await refreshOsgbMonthlyCompliance(organizationId);
   return data.id as string;
+};
+
+export const deleteOsgbManagedCompany = async (organizationId: string, companyId: string, deletedBy?: string | null) => {
+  const { error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .update({
+      is_osgb_managed: false,
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: deletedBy || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", companyId)
+    .eq("org_id", organizationId);
+
+  if (error) throw error;
+  await refreshOsgbMonthlyCompliance(organizationId);
+};
+
+export interface OsgbCompanyBulkUpsertResult {
+  inserted: number;
+  updated: number;
+  total: number;
+}
+
+export const upsertOsgbManagedCompaniesFromExcel = async (
+  userId: string,
+  organizationId: string,
+  rows: OsgbCompanyManagementInput[],
+): Promise<OsgbCompanyBulkUpsertResult> => {
+  let inserted = 0;
+  let updated = 0;
+
+  for (const row of rows) {
+    const sgkNo = row.sgkNo?.trim();
+    let existingId: string | null = null;
+
+    if (sgkNo) {
+      const { data: existing, error } = await (supabase as any)
+        .from("isgkatip_companies")
+        .select("id")
+        .eq("org_id", organizationId)
+        .eq("sgk_no", sgkNo)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      existingId = existing?.id || null;
+    }
+
+    await upsertOsgbManagedCompany(userId, organizationId, { ...row, managementSource: row.managementSource || "import" }, existingId || undefined);
+    if (existingId) updated += 1;
+    else inserted += 1;
+  }
+
+  return { inserted, updated, total: inserted + updated };
 };
 
 export const importOsgbCompaniesFromKatip = async (

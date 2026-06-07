@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Building2, CircleHelp, Crown, ShieldAlert, ShieldCheck, Users } from "lucide-react";
+import { OrganizationCreateButton } from "@/components/OrganizationCreateButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccessRole } from "@/hooks/useAccessRole";
@@ -54,8 +55,9 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { profile, loading: authLoading } = useAuth();
   const { loading: roleLoading, role } = useAccessRole();
-  const { loading: planLoading, hasAccess, status } = usePlanLimits();
+  const { loading: planLoading, canAccessOsgb, isOsgbActive, isDemoActive, hasAccess } = usePlanLimits();
   const osgbAccess = hasAccess("osgb_module");
+  const hasOsgbAccess = canAccessOsgb || isOsgbActive || isDemoActive || osgbAccess.allowed;
 
   if (authLoading || roleLoading || planLoading) {
     return (
@@ -65,7 +67,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!osgbAccess.allowed) {
+  if (!hasOsgbAccess) {
     return (
       <div className="container mx-auto py-6">
         <Card className="overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(15,23,42,0.92))] text-white shadow-[0_24px_70px_rgba(245,158,11,0.12)]">
@@ -101,24 +103,20 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
               <Building2 className="h-5 w-5" />
               Organizasyon Kaydı Gerekli
             </div>
+            <div className="flex flex-col gap-3 rounded-2xl border border-cyan-300/15 bg-cyan-300/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-cyan-50">Başlamak için önce çalışma alanınızı oluşturun.</p>
+              <OrganizationCreateButton nextPath="/osgb" className="w-full sm:w-auto" />
+            </div>
             <p className="text-sm leading-6 text-cyan-100/90">
-              {status === "trial"
-                ? "OSGB demonuz aktiftir. Ancak bu modülü kullanabilmek için bir organizasyon (kurum) kurmanız gerekmektedir."
-                : "OSGB planınız aktiftir. Ancak bu modülü kullanabilmek için bir organizasyon (kurum) kurmanız gerekmektedir."}
+              OSGB planınız aktif. Ancak bu modülü kullanabilmek için önce bir organizasyon/çalışma alanı oluşturmanız gerekir.
+            </p>
+            <p className="text-sm leading-6 text-cyan-100/75">
+              Organizasyon, firmalarınızı, çalışanlarınızı, evraklarınızı ve OSGB süreçlerinizi güvenli şekilde tek çatı altında tutar.
             </p>
           </CardHeader>
           <CardContent>
             <OrganizationInfoCard />
-            <Button
-              onClick={() =>
-                navigate(
-                  `/profile?tab=workspace&action=create&next=${encodeURIComponent("/osgb")}`,
-                )
-              }
-              className="mt-5 bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-            >
-              Şimdi Organizasyon Oluştur
-            </Button>
+            <OrganizationCreateButton nextPath="/osgb" className="mt-5" />
           </CardContent>
         </Card>
       </div>

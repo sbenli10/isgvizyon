@@ -78,7 +78,7 @@ const OSGBCompanyTracking = lazyWithRetry("osgb-company-tracking", () => import(
 const OSGBCapacity = lazyWithRetry("osgb-capacity", () => import("./pages/OSGBCapacity"));
 const OSGBAlerts = lazyWithRetry("osgb-alerts", () => import("./pages/OSGBAlerts"));
 const OSGBFieldVisits = lazyWithRetry("osgb-field-visits", () => import("./pages/FieldVisits"));
-const OSGBFinance = lazyWithRetry("osgb-finance", () => import("./pages/Finance"));
+const OSGBFinance = lazyWithRetry("osgb-finance", () => import("./pages/OSGBFinance"));
 const OSGBDocuments = lazyWithRetry("osgb-documents", () => import("./pages/ObligationsDocuments"));
 const OSGBTasks = lazyWithRetry("osgb-tasks", () => import("./pages/OSGBTasks"));
 const OSGBNotes = lazyWithRetry("osgb-notes", () => import("./pages/OSGBNotes"));

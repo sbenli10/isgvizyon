@@ -23,9 +23,9 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { cn } from "@/lib/utils";
 import {
   getOsgbPlatformDashboard,
-  listOsgbFinanceWorkspace,
   listOsgbRequiredDocumentsWorkspace,
 } from "@/lib/osgbPlatform";
+import { listOsgbFinanceRecords, type OsgbFinanceRecord } from "@/lib/osgbFinance";
 import { OSGBCompaniesPanel } from "@/components/osgb/OSGBCompaniesPanel";
 import { OSGBCompanyEmployeesPanel } from "@/components/osgb/OSGBCompanyEmployeesPanel";
 import { OSGBArchivePanel } from "@/components/osgb/OSGBArchivePanel";
@@ -33,7 +33,7 @@ import { OSGBCompanyAuthorizationPanel } from "@/components/osgb/OSGBCompanyAuth
 
 const OSGBPersonnel = lazy(() => import("@/pages/OSGBPersonnel"));
 const OSGBCompanyTracking = lazy(() => import("@/pages/OSGBCompanyTracking"));
-const OSGBFinance = lazy(() => import("@/pages/Finance"));
+const OSGBFinance = lazy(() => import("@/pages/OSGBFinance"));
 const OSGBAssignments = lazy(() => import("@/pages/OSGBAssignments"));
 const OSGBFieldVisits = lazy(() => import("@/pages/FieldVisits"));
 const OsgbKatipSyncCenter = lazy(() => import("@/pages/OsgbKatipSyncCenter"));
@@ -139,13 +139,13 @@ function OSGBDialogDashboard({ refreshKey }: { refreshKey: number }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dashboard, setDashboard] = useState<Awaited<ReturnType<typeof getOsgbPlatformDashboard>> | null>(null);
-  const [finance, setFinance] = useState<Awaited<ReturnType<typeof listOsgbFinanceWorkspace>> | null>(null);
+  const [finance, setFinance] = useState<OsgbFinanceRecord[]>([]);
   const [documents, setDocuments] = useState<Awaited<ReturnType<typeof listOsgbRequiredDocumentsWorkspace>> | null>(null);
 
   const loadData = useCallback(async () => {
     if (!organizationId) {
       setDashboard(null);
-      setFinance(null);
+      setFinance([]);
       setDocuments(null);
       setLoading(false);
       return;
@@ -155,7 +155,7 @@ function OSGBDialogDashboard({ refreshKey }: { refreshKey: number }) {
     try {
       const [dashboardData, financeData, documentData] = await Promise.all([
         getOsgbPlatformDashboard(organizationId, { refreshCompliance: false }),
-        user?.id ? listOsgbFinanceWorkspace(organizationId, user.id) : Promise.resolve(null),
+        listOsgbFinanceRecords(organizationId),
         user?.id ? listOsgbRequiredDocumentsWorkspace(organizationId, user.id) : Promise.resolve(null),
       ]);
       setDashboard(dashboardData);
@@ -190,9 +190,9 @@ function OSGBDialogDashboard({ refreshKey }: { refreshKey: number }) {
   if (loading) return <LoadingTab />;
   if (error) return <EmptyDashboard message={error} />;
 
-  const paidAmount = finance?.entries.filter((entry) => entry.status === "paid").reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
-  const totalFinance = finance?.entries.reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
-  const pendingFinance = finance?.entries.filter((entry) => entry.status !== "paid").reduce((sum, entry) => sum + entry.amount, 0) ?? 0;
+  const paidAmount = finance.filter((entry) => entry.status === "paid").reduce((sum, entry) => sum + entry.amount, 0);
+  const totalFinance = finance.reduce((sum, entry) => sum + entry.amount, 0);
+  const pendingFinance = finance.filter((entry) => entry.status !== "paid").reduce((sum, entry) => sum + entry.amount, 0);
   const activeDocuments = documents?.documents.filter((document) => document.status === "approved" || document.status === "submitted").length ?? 0;
   const missingDocuments = documents?.overview.missing ?? 0;
 
