@@ -35,6 +35,11 @@ import { downloadAnnualWorkPlanPdf } from "@/lib/annualWorkPlanPdf";
 import { downloadAnnualEvaluationPdf } from "@/lib/annualEvaluationPdf";
 import { downloadAnnualTrainingPlanOfficialDocx } from "@/lib/annualTrainingPlanOfficialDocx";
 import { downloadAnnualTrainingPlanPdf } from "@/lib/annualTrainingPlanPdf";
+import {
+  buildAnnualPlanPrefillFromOsgbProfile,
+  getOsgbCompanyDocumentProfile,
+} from "@/lib/osgbPlatform";
+import { getProfileCompanyDocumentFields } from "@/lib/companyDocumentPrefill";
 
 const MONTH_HEADERS = [
   "OCAK",
@@ -57,6 +62,12 @@ type CompanyOption = {
   address: string | null;
   tax_number: string | null;
   registry_no?: string | null;
+  sgk_workplace_number?: string | null;
+  workplace_registration_number?: string | null;
+  employer_representative_name?: string | null;
+  occupational_safety_specialist_name?: string | null;
+  workplace_doctor_name?: string | null;
+  employee_representative_name?: string | null;
 };
 
 type StoredAnnualPlanData = {
@@ -595,8 +606,9 @@ const normalizeLoadedRows = (incoming: unknown): AnnualWorkPlanRow[] => {
 };
 
 export default function AnnualPlans() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
+  const activeWorkspaceId = ((profile as any)?.active_workspace_id || profile?.organization_id || null) as string | null;
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedCompanyId, setSelectedCompanyId] = useState(searchParams.get("companyId") || "");
   const [selectedTrainingCompanyId, setSelectedTrainingCompanyId] = useState(searchParams.get("companyId") || "");
@@ -726,6 +738,36 @@ export default function AnnualPlans() {
           const company = (companiesRes.data as CompanyOption[]).find((item) => item.id === targetCompanyId);
           if (company) {
             applyCompany(company);
+          } else if (activeWorkspaceId) {
+            const osgbRecord = await getOsgbCompanyDocumentProfile(activeWorkspaceId, targetCompanyId);
+            const prefill = buildAnnualPlanPrefillFromOsgbProfile(osgbRecord);
+            setSelectedCompanyId(osgbRecord.companyId);
+            setSelectedTrainingCompanyId(osgbRecord.companyId);
+            setCompanyForm({
+              companyName: prefill.company.title,
+              address: prefill.company.address,
+              registrationNumber: prefill.company.registryNo,
+              year: prefill.company.year || selectedYear,
+            });
+            setAnnualEvaluationCompanyForm((previous) => ({
+              ...previous,
+              isyeriUnvani: prefill.company.title,
+              sgkSicilNo: prefill.company.registryNo,
+              adres: prefill.company.address,
+              telFax: prefill.company.phone,
+              eposta: prefill.company.email,
+              iskolu: prefill.company.hazardClass,
+              calisanToplam: String(prefill.company.employeeCount || ""),
+            }));
+            setAnnualTrainingPlanForm((previous) => ({
+              ...previous,
+              isYeriUnvani: prefill.company.title,
+              isYeriAdresi: prefill.company.address,
+              isYeriSicilNo: prefill.company.registryNo,
+              isGuvenligiUzmani: prefill.signers.safetyExpert,
+              isyeriHekimi: prefill.signers.workplaceDoctor,
+              isverenVekili: prefill.signers.employerRepresentative,
+            }));
           }
         }
       } catch (error: any) {
@@ -743,12 +785,30 @@ export default function AnnualPlans() {
   }, [selectedYear, user?.id]);
 
   const applyCompany = (company: CompanyOption) => {
+    const documentFields = getProfileCompanyDocumentFields(company as any);
+    const registryNo = company.registry_no || company.tax_number || company.sgk_workplace_number || company.workplace_registration_number || "";
     setSelectedCompanyId(company.id);
+    setSelectedTrainingCompanyId(company.id);
     setCompanyForm((previous) => ({
       ...previous,
       companyName: company.name || "",
       address: company.address || "",
-      registrationNumber: company.registry_no || company.tax_number || "",
+      registrationNumber: registryNo,
+    }));
+    setAnnualEvaluationCompanyForm((previous) => ({
+      ...previous,
+      isyeriUnvani: company.name || previous.isyeriUnvani,
+      sgkSicilNo: registryNo || previous.sgkSicilNo,
+      adres: company.address || previous.adres,
+    }));
+    setAnnualTrainingPlanForm((previous) => ({
+      ...previous,
+      isYeriUnvani: company.name || previous.isYeriUnvani,
+      isYeriAdresi: company.address || previous.isYeriAdresi,
+      isYeriSicilNo: registryNo || previous.isYeriSicilNo,
+      isGuvenligiUzmani: documentFields.occupationalSafetySpecialistName || previous.isGuvenligiUzmani,
+      isyeriHekimi: documentFields.workplaceDoctorName || previous.isyeriHekimi,
+      isverenVekili: documentFields.employerRepresentativeName || previous.isverenVekili,
     }));
   };
 

@@ -61,6 +61,7 @@ import { generateIncidentInvestigationReportWord } from "@/lib/incidentInvestiga
 import type { Company, Employee } from "@/types/companies";
 import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef } from "@/lib/storageObject";
+import { getProfileCompanyDocumentFields, getProfileCompanyRegistryNo } from "@/lib/companyDocumentPrefill";
 
 interface CompanyRecord extends Company {
   logo_url?: string | null;
@@ -355,6 +356,20 @@ function mapCompany(row: any): CompanyRecord {
     employee_count: Number(row.employee_count || 0),
     logo_url: row.logo_url || null,
   };
+}
+
+function buildTrainingInstructorsFromCompany(company?: CompanyRecord | null, fallback = defaultTrainingInstructors) {
+  const fields = getProfileCompanyDocumentFields(company);
+  const names = [
+    { full_name: fields.occupationalSafetySpecialistName, title: "İş Güvenliği Uzmanı" },
+    { full_name: fields.workplaceDoctorName, title: "İşyeri Hekimi" },
+    { full_name: fields.employerRepresentativeName, title: "İşveren / İşveren Vekili" },
+  ].filter((item) => item.full_name);
+
+  return fallback.map((item, index) => {
+    const source = names[index];
+    return source ? { ...item, full_name: item.full_name || source.full_name, title: item.title || source.title } : item;
+  });
 }
 
 function mapEmployee(row: any): Employee {
@@ -1811,7 +1826,10 @@ export default function AssignmentLetters() {
             const next = { ...prev, ...patch };
 
             if (patch.company_id) {
+              const company = companies.find((item) => item.id === patch.company_id);
+              const fields = getProfileCompanyDocumentFields(company);
               next.employee_id = "";
+              next.safety_expert_name = fields.occupationalSafetySpecialistName || next.safety_expert_name;
             }
 
             if (patch.employee_id) {
@@ -1848,11 +1866,13 @@ export default function AssignmentLetters() {
 
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
+              const registryNo = getProfileCompanyRegistryNo(company);
 
               if (company) {
                 next.organization_name = company.company_name || next.organization_name;
                 next.address = [company.address, company.district, company.city].filter(Boolean).join(", ") || next.address;
-                next.sgk_registration_no = company.sgk_workplace_number || next.sgk_registration_no;
+                next.sgk_registration_no = registryNo || next.sgk_registration_no;
+                next.instructors = buildTrainingInstructorsFromCompany(company, next.instructors);
               }
 
               next.employee_id = "";
@@ -1920,8 +1940,12 @@ export default function AssignmentLetters() {
 
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
+              const fields = getProfileCompanyDocumentFields(company);
               next.employee_id = "";
               next.unit_name = company?.company_name || next.unit_name;
+              next.safety_expert_name = fields.occupationalSafetySpecialistName || next.safety_expert_name;
+              next.workplace_doctor_name = fields.workplaceDoctorName || next.workplace_doctor_name;
+              next.board_member_name = fields.employeeRepresentativeName || next.board_member_name;
             }
 
             if (patch.employee_id) {
@@ -1989,7 +2013,11 @@ export default function AssignmentLetters() {
             const next = { ...prev, ...patch };
 
             if (patch.company_id) {
+              const company = companies.find((item) => item.id === patch.company_id);
+              const fields = getProfileCompanyDocumentFields(company);
               next.employee_id = "";
+              next.safety_officer_name = fields.occupationalSafetySpecialistName || next.safety_officer_name;
+              next.signer_name = fields.employerRepresentativeName || next.signer_name;
             }
 
             if (patch.company_mode === "manual") {
@@ -2091,12 +2119,19 @@ export default function AssignmentLetters() {
 
             if (patch.company_id) {
               const company = companies.find((item) => item.id === patch.company_id);
+              const fields = getProfileCompanyDocumentFields(company);
+              const registryNo = getProfileCompanyRegistryNo(company);
 
               if (company) {
                 next.workplace_title = company.company_name || next.workplace_title;
                 next.workplace_address =
                   [company.address, company.district, company.city].filter(Boolean).join(", ") || next.workplace_address;
-                next.sgk_registration_no = company.sgk_workplace_number || next.sgk_registration_no;
+                next.sgk_registration_no = registryNo || next.sgk_registration_no;
+                next.employer_name = fields.employerRepresentativeName || next.employer_name;
+                next.employer_title = fields.employerRepresentativeName ? "İşveren / İşveren Vekili" : next.employer_title;
+                next.representative_name = fields.employeeRepresentativeName || next.representative_name;
+                next.representative_title = fields.employeeRepresentativeName ? "Çalışan Temsilcisi" : next.representative_title;
+                next.employee_signature_name = fields.employeeRepresentativeName || next.employee_signature_name;
               }
 
               next.employee_id = "";

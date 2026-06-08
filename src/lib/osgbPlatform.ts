@@ -20,6 +20,17 @@ export interface OsgbWorkspaceCompanyOption {
   assignedMinutesByRole: Record<OsgbRole, number>;
 }
 
+export interface OsgbCompanyMapLocationRecord {
+  id: string;
+  companyName: string;
+  city: string | null;
+  visitAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  locationSource: string | null;
+  locationUpdatedAt: string | null;
+}
+
 export interface OsgbWorkspaceAssignmentRecord {
   id: string;
   organization_id: string | null;
@@ -423,6 +434,9 @@ export interface OsgbWorkspaceAssignmentRecommendation {
 }
 
 const getServiceMonth = (value?: Date | string | null) => {
+  if (typeof value === "string" && /^\d{4}-\d{2}$/.test(value)) {
+    return `${value}-01`;
+  }
   const date = value ? new Date(value) : new Date();
   return new Date(date.getFullYear(), date.getMonth(), 1).toISOString().slice(0, 10);
 };
@@ -611,14 +625,12 @@ export const listOsgbWorkspaceCompanies = async (
         company:isgkatip_companies(company_name)
       `)
       .eq("organization_id", organizationId)
-      .in("company_id", managedCompanyIds)
       .eq("service_month", serviceMonth)
       .order("deficit_minutes", { ascending: false }),
     (supabase as any)
       .from("osgb_service_contracts")
       .select("company_id, ends_on, contract_status")
       .eq("organization_id", organizationId)
-      .in("company_id", managedCompanyIds)
       .in("contract_status", ["active", "paused"])
       .order("updated_at", { ascending: false }),
   ]);
@@ -1719,6 +1731,150 @@ export const listOsgbFieldVisitsWorkspace = async (
   };
 };
 
+export const listOsgbFieldVisitPlannerWorkspace = async (
+  organizationId: string,
+  options?: { serviceMonth?: string },
+): Promise<OsgbFieldVisitWorkspaceData> => {
+  const serviceMonth = getServiceMonth(options?.serviceMonth);
+  const serviceMonthEnd = getServiceMonthEnd(serviceMonth);
+
+  const [companiesResponse, visitsResponse, personnel] = await Promise.all([
+    (supabase as any)
+      .from("isgkatip_companies")
+      .select("id, company_name, sgk_no, hazard_class, employee_count, compliance_status, contract_end")
+      .eq("org_id", organizationId)
+      .eq("is_deleted", false)
+      .eq("is_osgb_managed", true)
+      .order("company_name", { ascending: true }),
+    (supabase as any)
+      .from("osgb_field_visits")
+      .select(`
+        *,
+        company:isgkatip_companies(company_name),
+        visit_personnel:osgb_visit_personnel(
+          id,
+          personnel_id,
+          profile_id,
+          planned_role,
+          attended,
+          checked_in_at,
+          checked_out_at,
+          signed_at,
+          personnel:osgb_personnel(id, full_name, role),
+          profile:profiles(id, full_name)
+        ),
+        evidence:osgb_visit_evidence(
+          id,
+          evidence_type,
+          title,
+          file_url,
+          payload,
+          captured_at
+        )
+      `)
+      .eq("organization_id", organizationId)
+      .gte("planned_start_at", `${serviceMonth}T00:00:00`)
+      .lte("planned_start_at", `${serviceMonthEnd}T23:59:59`)
+      .order("planned_start_at", { ascending: true }),
+    listOsgbWorkspacePersonnel(organizationId, true),
+  ]);
+
+  if (companiesResponse.error) throw companiesResponse.error;
+  if (visitsResponse.error) throw visitsResponse.error;
+
+  const companies: OsgbWorkspaceCompanyOption[] = (companiesResponse.data ?? []).map((row: any) => ({
+    id: row.id,
+    companyName: row.company_name || "Firma",
+    sgkNo: row.sgk_no || null,
+    hazardClass: row.hazard_class || "Bilinmiyor",
+    employeeCount: row.employee_count || 0,
+    complianceStatus: row.compliance_status || "not_applicable",
+    contractEnd: row.contract_end || null,
+    totalRequiredMinutes: 0,
+    totalAssignedMinutes: 0,
+    deficitMinutes: 0,
+    overtimeMinutes: 0,
+    requiredMinutesByRole: emptyRoleMap(),
+    assignedMinutesByRole: emptyRoleMap(),
+  }));
+
+  const managedCompanyIds = new Set(companies.map((company) => company.id));
+  const visits: OsgbFieldVisitRecord[] = (visitsResponse.data ?? [])
+    .filter((row: any) => managedCompanyIds.has(row.company_id))
+    .map((row: any) => {
+      const evidence: OsgbFieldVisitEvidenceRecord[] = (row.evidence ?? []).map((item: any) => ({
+        id: item.id,
+        type: item.evidence_type,
+        title: item.title,
+        fileUrl: item.file_url || null,
+        metadata: item.payload || {},
+        capturedAt: item.captured_at,
+      }));
+
+      const assignedPersonnel: OsgbFieldVisitPersonnelRecord[] = (row.visit_personnel ?? []).map((item: any) => ({
+        id: item.id,
+        personnelId: item.personnel_id || item.personnel?.id || null,
+        profileId: item.profile_id || item.profile?.id || null,
+        fullName: item.personnel?.full_name || item.profile?.full_name || "Atanmamış personel",
+        role: item.planned_role || item.personnel?.role || "igu",
+        attended: !!item.attended,
+        checkedInAt: item.checked_in_at || null,
+        checkedOutAt: item.checked_out_at || null,
+        signedAt: item.signed_at || null,
+      }));
+
+      const baseVisit = {
+        startedAt: row.actual_start_at || null,
+        completedAt: row.actual_end_at || null,
+        checkInLocation: buildLocationText(row.check_in_lat, row.check_in_lng),
+        checkOutLocation: buildLocationText(row.check_out_lat, row.check_out_lng),
+      };
+      const proof = calculateProofState(baseVisit, evidence, assignedPersonnel);
+
+      return {
+        id: row.id,
+        organizationId: row.organization_id,
+        companyId: row.company_id,
+        companyName: row.company?.company_name || "Firma",
+        contractId: row.contract_id || null,
+        plannedAt: row.planned_start_at,
+        plannedEndAt: row.planned_end_at || null,
+        startedAt: row.actual_start_at || null,
+        completedAt: row.actual_end_at || null,
+        status: row.visit_status,
+        visitType: row.visit_type,
+        visitAddress: row.visit_address || null,
+        checkInLocation: baseVisit.checkInLocation,
+        checkOutLocation: baseVisit.checkOutLocation,
+        durationMinutes: calculateVisitDuration(row.actual_start_at, row.actual_end_at),
+        notes: row.service_summary || null,
+        nextActionSummary: row.next_action_summary || null,
+        complianceImpactMinutes: Number(row.compliance_impact_minutes || 0),
+        createdBy: row.created_by || null,
+        assignedPersonnel,
+        evidence,
+        proofScore: proof.score,
+        proofLevel: proof.level,
+        proofMissingReasons: proof.reasons,
+        hasEnoughEvidence: proof.score >= 45,
+      };
+    });
+
+  return {
+    serviceMonth,
+    summary: {
+      totalVisits: visits.length,
+      completedVisits: visits.filter((visit) => visit.status === "completed").length,
+      inProgressVisits: visits.filter((visit) => visit.status === "in_progress").length,
+      missingProofVisits: visits.filter((visit) => visit.status === "completed" && !visit.hasEnoughEvidence).length,
+      totalComplianceImpactMinutes: visits.reduce((sum, visit) => sum + visit.complianceImpactMinutes, 0),
+    },
+    visits,
+    companies,
+    personnel,
+  };
+};
+
 export const upsertOsgbFieldVisitWorkspace = async (
   userId: string,
   organizationId: string,
@@ -2524,6 +2680,56 @@ export interface OsgbManagedCompanyRecord {
   assignedMinutesByRole: Record<OsgbRole, number>;
 }
 
+export type OsgbEmergencyTeamKey = "fire" | "rescue" | "protection" | "firstAid";
+
+export interface OsgbDocumentProfilePerson {
+  fullName: string;
+  title: string;
+  tcNo: string;
+  phone: string;
+  email: string;
+  certificateNo: string;
+  trainingDate: string;
+  department: string;
+}
+
+export interface OsgbDocumentProfileEmergencyTeam {
+  leader: OsgbDocumentProfilePerson;
+  members: OsgbDocumentProfilePerson[];
+}
+
+export interface OsgbCompanyDocumentProfile {
+  employerRepresentative: OsgbDocumentProfilePerson;
+  occupationalSafetySpecialist: OsgbDocumentProfilePerson;
+  workplaceDoctor: OsgbDocumentProfilePerson;
+  employeeRepresentative: OsgbDocumentProfilePerson;
+  supportStaff: OsgbDocumentProfilePerson[];
+  emergencyTeams: Record<OsgbEmergencyTeamKey, OsgbDocumentProfileEmergencyTeam>;
+  documentDefaults: {
+    riskMethod: string;
+    annualPlanYear: string;
+    activityScope: string;
+    preparedAt: string;
+    revisionNo: string;
+  };
+}
+
+export interface OsgbCompanyDocumentProfileRecord {
+  companyId: string;
+  companyName: string;
+  sgkNo: string | null;
+  taxNumber: string | null;
+  hazardClass: string;
+  employeeCount: number;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  naceCode: string | null;
+  sector: string | null;
+  profile: OsgbCompanyDocumentProfile;
+  updatedAt: string | null;
+}
+
 export interface OsgbCompanyImportCandidate {
   id: string;
   companyName: string;
@@ -2586,6 +2792,271 @@ export interface OsgbCompanyManagementInput {
   managementSource?: "manual" | "import" | "isgkatip" | "extension";
   naceCode?: string | null;
 }
+
+const emptyDocumentProfilePerson = (title = ""): OsgbDocumentProfilePerson => ({
+  fullName: "",
+  title,
+  tcNo: "",
+  phone: "",
+  email: "",
+  certificateNo: "",
+  trainingDate: "",
+  department: "",
+});
+
+const emptyDocumentProfileTeam = (leaderTitle: string): OsgbDocumentProfileEmergencyTeam => ({
+  leader: emptyDocumentProfilePerson(leaderTitle),
+  members: [],
+});
+
+export const createEmptyOsgbCompanyDocumentProfile = (): OsgbCompanyDocumentProfile => ({
+  employerRepresentative: emptyDocumentProfilePerson("İşveren / İşveren Vekili"),
+  occupationalSafetySpecialist: emptyDocumentProfilePerson("İş Güvenliği Uzmanı"),
+  workplaceDoctor: emptyDocumentProfilePerson("İşyeri Hekimi"),
+  employeeRepresentative: emptyDocumentProfilePerson("Çalışan Temsilcisi"),
+  supportStaff: [],
+  emergencyTeams: {
+    fire: emptyDocumentProfileTeam("Söndürme Ekibi Başkanı"),
+    rescue: emptyDocumentProfileTeam("Kurtarma Ekibi Başkanı"),
+    protection: emptyDocumentProfileTeam("Koruma Ekibi Başkanı"),
+    firstAid: emptyDocumentProfileTeam("İlk Yardım Ekibi Başkanı"),
+  },
+  documentDefaults: {
+    riskMethod: "FINE KINNEY",
+    annualPlanYear: String(new Date().getFullYear()),
+    activityScope: "",
+    preparedAt: new Date().toISOString().slice(0, 10),
+    revisionNo: "00",
+  },
+});
+
+const normalizeDocumentProfilePerson = (value: any, fallbackTitle = ""): OsgbDocumentProfilePerson => ({
+  ...emptyDocumentProfilePerson(fallbackTitle),
+  ...(value && typeof value === "object" ? value : {}),
+  title: value?.title || fallbackTitle,
+});
+
+const normalizeDocumentProfileTeam = (value: any, fallbackTitle: string): OsgbDocumentProfileEmergencyTeam => ({
+  leader: normalizeDocumentProfilePerson(value?.leader, fallbackTitle),
+  members: Array.isArray(value?.members)
+    ? value.members.map((member: any) => normalizeDocumentProfilePerson(member))
+    : [],
+});
+
+export const normalizeOsgbCompanyDocumentProfile = (value: unknown): OsgbCompanyDocumentProfile => {
+  const base = createEmptyOsgbCompanyDocumentProfile();
+  const source = value && typeof value === "object" ? (value as any) : {};
+  return {
+    employerRepresentative: normalizeDocumentProfilePerson(source.employerRepresentative, base.employerRepresentative.title),
+    occupationalSafetySpecialist: normalizeDocumentProfilePerson(source.occupationalSafetySpecialist, base.occupationalSafetySpecialist.title),
+    workplaceDoctor: normalizeDocumentProfilePerson(source.workplaceDoctor, base.workplaceDoctor.title),
+    employeeRepresentative: normalizeDocumentProfilePerson(source.employeeRepresentative, base.employeeRepresentative.title),
+    supportStaff: Array.isArray(source.supportStaff)
+      ? source.supportStaff.map((person: any) => normalizeDocumentProfilePerson(person))
+      : [],
+    emergencyTeams: {
+      fire: normalizeDocumentProfileTeam(source.emergencyTeams?.fire, base.emergencyTeams.fire.leader.title),
+      rescue: normalizeDocumentProfileTeam(source.emergencyTeams?.rescue, base.emergencyTeams.rescue.leader.title),
+      protection: normalizeDocumentProfileTeam(source.emergencyTeams?.protection, base.emergencyTeams.protection.leader.title),
+      firstAid: normalizeDocumentProfileTeam(source.emergencyTeams?.firstAid, base.emergencyTeams.firstAid.leader.title),
+    },
+    documentDefaults: {
+      ...base.documentDefaults,
+      ...(source.documentDefaults && typeof source.documentDefaults === "object" ? source.documentDefaults : {}),
+    },
+  };
+};
+
+export const getOsgbCompanyDocumentProfile = async (
+  organizationId: string,
+  companyId: string,
+): Promise<OsgbCompanyDocumentProfileRecord> => {
+  const { data, error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .select(`
+      id,
+      company_name,
+      sgk_no,
+      tax_number,
+      hazard_class,
+      employee_count,
+      address,
+      phone,
+      email,
+      nace_code,
+      work_period,
+      osgb_document_profile,
+      osgb_document_profile_updated_at
+    `)
+    .eq("org_id", organizationId)
+    .eq("id", companyId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) throw new Error("Firma evrak profili bulunamadı.");
+
+  return {
+    companyId: data.id,
+    companyName: data.company_name || "Firma",
+    sgkNo: data.sgk_no || null,
+    taxNumber: data.tax_number || null,
+    hazardClass: data.hazard_class || "Tehlikeli",
+    employeeCount: Number(data.employee_count || 0),
+    address: data.address || null,
+    phone: data.phone || null,
+    email: data.email || null,
+    naceCode: data.nace_code || null,
+    sector: data.work_period || null,
+    profile: normalizeOsgbCompanyDocumentProfile(data.osgb_document_profile),
+    updatedAt: data.osgb_document_profile_updated_at || null,
+  };
+};
+
+export const updateOsgbCompanyDocumentProfile = async (
+  organizationId: string,
+  companyId: string,
+  profile: OsgbCompanyDocumentProfile,
+) => {
+  const { error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .update({
+      osgb_document_profile: profile,
+      osgb_document_profile_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", organizationId)
+    .eq("id", companyId);
+
+  if (error) throw error;
+};
+
+export const buildRiskWizardPrefillFromOsgbProfile = (record: OsgbCompanyDocumentProfileRecord) => ({
+  companyInfo: {
+    companyTitle: record.companyName,
+    address: record.address || "",
+    workplaceRegistryNo: record.sgkNo || "",
+    hazardClass: record.hazardClass,
+    employeeCount: String(record.employeeCount || ""),
+    activityScope: record.profile.documentDefaults.activityScope || record.sector || "",
+    riskMethod: record.profile.documentDefaults.riskMethod,
+    assessmentDate: record.profile.documentDefaults.preparedAt,
+  },
+  teamInfo: {
+    employer: {
+      fullName: record.profile.employerRepresentative.fullName,
+      title: record.profile.employerRepresentative.title,
+      tcNo: record.profile.employerRepresentative.tcNo,
+      phone: record.profile.employerRepresentative.phone,
+    },
+    employeeRepresentative: {
+      fullName: record.profile.employeeRepresentative.fullName,
+      title: record.profile.employeeRepresentative.title,
+      tcNo: record.profile.employeeRepresentative.tcNo,
+      phone: record.profile.employeeRepresentative.phone,
+    },
+    safetyExpert: {
+      fullName: record.profile.occupationalSafetySpecialist.fullName,
+      title: record.profile.occupationalSafetySpecialist.title,
+      tcNo: record.profile.occupationalSafetySpecialist.tcNo,
+      phone: record.profile.occupationalSafetySpecialist.phone,
+      certificateNo: record.profile.occupationalSafetySpecialist.certificateNo,
+    },
+    workplaceDoctor: {
+      fullName: record.profile.workplaceDoctor.fullName,
+      title: record.profile.workplaceDoctor.title,
+      tcNo: record.profile.workplaceDoctor.tcNo,
+      phone: record.profile.workplaceDoctor.phone,
+      certificateNo: record.profile.workplaceDoctor.certificateNo,
+    },
+  },
+});
+
+const toAdepPerson = (person: OsgbDocumentProfilePerson) => ({
+  ad_soyad: person.fullName,
+  tc_no: person.tcNo,
+  telefon: person.phone,
+});
+
+const toAdepProfessional = (person: OsgbDocumentProfilePerson) => ({
+  ...toAdepPerson(person),
+  belge_no: person.certificateNo,
+});
+
+export const buildAdepPrefillFromOsgbProfile = (record: OsgbCompanyDocumentProfileRecord) => ({
+  company: {
+    companyName: record.companyName,
+    hazardClass: record.hazardClass,
+    employeeCount: record.employeeCount,
+    sector: record.profile.documentDefaults.activityScope || record.sector || "",
+    address: record.address || "",
+    phone: record.phone || "",
+    email: record.email || "",
+    sgkNo: record.sgkNo || "",
+  },
+  planDataPatch: {
+    genel_bilgiler: {
+      isyeri_unvani: record.companyName,
+      adres: record.address || "",
+      telefon: record.phone || "",
+      eposta: record.email || "",
+      sgk_sicil_no: record.sgkNo || "",
+      tehlike_sinifi: record.hazardClass,
+      calisan_sayisi: String(record.employeeCount || ""),
+      faaliyet_alani: record.profile.documentDefaults.activityScope || record.sector || "",
+      hazirlanma_tarihi: record.profile.documentDefaults.preparedAt,
+    },
+    yetkililer: {
+      isveren_vekil: toAdepPerson(record.profile.employerRepresentative),
+      isg_uzmani: {
+        ...toAdepProfessional(record.profile.occupationalSafetySpecialist),
+        unvan: record.profile.occupationalSafetySpecialist.title,
+        egitim_tarihi: record.profile.occupationalSafetySpecialist.trainingDate,
+      },
+      isyeri_hekimi: {
+        ...toAdepProfessional(record.profile.workplaceDoctor),
+        unvan: record.profile.workplaceDoctor.title,
+        egitim_tarihi: record.profile.workplaceDoctor.trainingDate,
+      },
+    },
+    ekipler: {
+      sondurme: {
+        ekip_baskani: toAdepPerson(record.profile.emergencyTeams.fire.leader),
+        uyeler: record.profile.emergencyTeams.fire.members.map(toAdepPerson),
+      },
+      kurtarma: {
+        ekip_baskani: toAdepPerson(record.profile.emergencyTeams.rescue.leader),
+        uyeler: record.profile.emergencyTeams.rescue.members.map(toAdepPerson),
+      },
+      koruma: {
+        ekip_baskani: toAdepPerson(record.profile.emergencyTeams.protection.leader),
+        uyeler: record.profile.emergencyTeams.protection.members.map(toAdepPerson),
+      },
+      ilkyardim: {
+        ekip_baskani: toAdepPerson(record.profile.emergencyTeams.firstAid.leader),
+        uyeler: record.profile.emergencyTeams.firstAid.members.map(toAdepPerson),
+      },
+    },
+  },
+});
+
+export const buildAnnualPlanPrefillFromOsgbProfile = (record: OsgbCompanyDocumentProfileRecord) => ({
+  company: {
+    title: record.companyName,
+    address: record.address || "",
+    registryNo: record.sgkNo || "",
+    phone: record.phone || "",
+    email: record.email || "",
+    hazardClass: record.hazardClass,
+    employeeCount: record.employeeCount,
+    year: Number(record.profile.documentDefaults.annualPlanYear || new Date().getFullYear()),
+  },
+  signers: {
+    safetyExpert: record.profile.occupationalSafetySpecialist.fullName,
+    workplaceDoctor: record.profile.workplaceDoctor.fullName,
+    employerRepresentative: record.profile.employerRepresentative.fullName,
+    employeeRepresentative: record.profile.employeeRepresentative.fullName,
+  },
+});
 
 const deriveAssignmentApprovalStatus = (row: any, assignedMinutes: number) => {
   const explicitStatus = String(row.assignment_approval_status || "");
@@ -3139,6 +3610,79 @@ export const listOsgbManagedCompanyOptions = async (
     companyName: row.company_name || "Firma",
     hazardClass: row.hazard_class || "Bilinmiyor",
   }));
+};
+
+export const listOsgbCompanyMapLocations = async (
+  organizationId: string,
+): Promise<OsgbCompanyMapLocationRecord[]> => {
+  const baseQuery = (columns: string) =>
+    (supabase as any)
+      .from("isgkatip_companies")
+      .select(columns)
+      .eq("org_id", organizationId)
+      .eq("is_deleted", false)
+      .eq("is_osgb_managed", true)
+      .order("company_name", { ascending: true });
+
+  let response = await baseQuery(
+    "id, company_name, service_receiver_city, osgb_visit_address, osgb_location_lat, osgb_location_lng, osgb_location_source, osgb_location_updated_at",
+  );
+
+  if (response.error) {
+    response = await baseQuery("id, company_name, service_receiver_city");
+  }
+
+  if (response.error) throw response.error;
+
+  return (response.data ?? []).map((row: any) => ({
+    id: row.id,
+    companyName: row.company_name || "Firma",
+    city: row.service_receiver_city || null,
+    visitAddress: row.osgb_visit_address || null,
+    latitude: row.osgb_location_lat == null ? null : Number(row.osgb_location_lat),
+    longitude: row.osgb_location_lng == null ? null : Number(row.osgb_location_lng),
+    locationSource: row.osgb_location_source || null,
+    locationUpdatedAt: row.osgb_location_updated_at || null,
+  }));
+};
+
+export const updateOsgbCompanyVisitAddress = async (
+  organizationId: string,
+  companyId: string,
+  visitAddress: string | null,
+) => {
+  const { error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .update({
+      osgb_visit_address: visitAddress?.trim() || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", organizationId)
+    .eq("id", companyId);
+
+  if (error) throw error;
+};
+
+export const updateOsgbCompanyMapLocation = async (
+  organizationId: string,
+  companyId: string,
+  latitude: number,
+  longitude: number,
+  source = "manual",
+) => {
+  const { error } = await (supabase as any)
+    .from("isgkatip_companies")
+    .update({
+      osgb_location_lat: latitude,
+      osgb_location_lng: longitude,
+      osgb_location_source: source,
+      osgb_location_updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("org_id", organizationId)
+    .eq("id", companyId);
+
+  if (error) throw error;
 };
 
 export const listOsgbTasksWorkspace = async (

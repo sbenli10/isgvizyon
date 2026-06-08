@@ -162,6 +162,17 @@ const makeInvoiceNo = (period: string, count: number) => {
   return `IST-${year}-${String(count + 1).padStart(3, "0")}`;
 };
 
+const FINANCE_DEBUG = true;
+
+const financeDebugLog = (event: string, payload?: Record<string, unknown>) => {
+  if (!FINANCE_DEBUG) return;
+  console.groupCollapsed(`[OSGBFinance] ${event}`);
+  if (payload) {
+    console.table(payload);
+  }
+  console.groupEnd();
+};
+
 const sumAmounts = (rows: OsgbFinanceRecord[]) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
 const buildStats = (rows: OsgbFinanceRecord[]) => {
@@ -394,18 +405,49 @@ export default function OSGBFinance() {
     () => (companies as ManagedCompany[]).find((company) => company.id === form.companyId) || null,
     [companies, form.companyId],
   );
+  const dialogPortalContainer = typeof document !== "undefined" ? document.body : null;
+
+  useEffect(() => {
+    financeDebugLog("dialog state changed", {
+      dialogOpen,
+      editingRecordId: editingRecord?.id || null,
+      formCompanyId: form.companyId || null,
+      formPeriod: form.period,
+      companiesCount: companies.length,
+    });
+  }, [companies.length, dialogOpen, editingRecord?.id, form.companyId, form.period]);
 
   const openCreateDialog = () => {
+    financeDebugLog("new record button clicked", {
+      organizationId,
+      userId: user?.id || null,
+      companiesCount: companies.length,
+      companyFilter,
+      periodFilter,
+      recordsCount: records.length,
+      currentDialogOpen: dialogOpen,
+    });
+
     const filteredCompanyExists = companies.some((company) => company.id === companyFilter);
     const firstCompanyId = companyFilter !== "all" && filteredCompanyExists ? companyFilter : companies[0]?.id || "";
     const period = periodFilter !== "all" ? periodFilter : currentPeriod();
-    setEditingRecord(null);
-    setForm({
+    const nextForm = {
       ...emptyForm(),
       companyId: firstCompanyId,
       period,
       invoiceNo: makeInvoiceNo(period, records.length),
+    };
+
+    financeDebugLog("new record dialog prepared", {
+      filteredCompanyExists,
+      firstCompanyId: firstCompanyId || null,
+      period,
+      invoiceNo: nextForm.invoiceNo,
+      willOpenDialog: true,
     });
+
+    setEditingRecord(null);
+    setForm(nextForm);
     setDialogOpen(true);
   };
 
@@ -678,16 +720,24 @@ export default function OSGBFinance() {
         <section className="rounded-xl border border-slate-800 bg-[#070d1f] p-3 sm:p-4">
           <div className="flex flex-col gap-3 xl:flex-row">
             <div className="relative flex-1">
+              <Label htmlFor="osgb-finance-search" className="sr-only">
+                Arama
+              </Label>
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
+                id="osgb-finance-search"
+                name="osgb_finance_search"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Firma, dönem, fatura no veya not ara"
                 className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] pl-10 text-slate-100 placeholder:text-slate-500"
               />
             </div>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as OsgbFinanceStatus | "all")}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
+            <Label htmlFor="osgb-finance-status-filter" className="sr-only">
+              Durum filtresi
+            </Label>
+            <Select name="osgb_finance_status_filter" value={statusFilter} onValueChange={(value) => setStatusFilter(value as OsgbFinanceStatus | "all")}>
+              <SelectTrigger id="osgb-finance-status-filter" aria-label="Durum filtresi" className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -697,8 +747,11 @@ export default function OSGBFinance() {
                 <SelectItem value="overdue">Gecikti</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={companyFilter} onValueChange={setCompanyFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-44">
+            <Label htmlFor="osgb-finance-company-filter" className="sr-only">
+              Firma filtresi
+            </Label>
+            <Select name="osgb_finance_company_filter" value={companyFilter} onValueChange={setCompanyFilter}>
+              <SelectTrigger id="osgb-finance-company-filter" aria-label="Firma filtresi" className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-44">
                 <SelectValue placeholder="Tüm firmalar" />
               </SelectTrigger>
               <SelectContent>
@@ -710,8 +763,11 @@ export default function OSGBFinance() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={periodFilter} onValueChange={setPeriodFilter}>
-              <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
+            <Label htmlFor="osgb-finance-period-filter" className="sr-only">
+              Dönem filtresi
+            </Label>
+            <Select name="osgb_finance_period_filter" value={periodFilter} onValueChange={setPeriodFilter}>
+              <SelectTrigger id="osgb-finance-period-filter" aria-label="Dönem filtresi" className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
                 <SelectValue placeholder="Tüm dönemler" />
               </SelectTrigger>
               <SelectContent>
@@ -917,7 +973,21 @@ export default function OSGBFinance() {
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-[22px] border-[#1b2942] bg-[#050a18] p-0 text-slate-100 shadow-2xl shadow-slate-950/60 sm:max-w-[350px] [&>button:last-child]:hidden">
+        <DialogContent
+          container={dialogPortalContainer}
+          overlayClassName="z-[110] bg-slate-950/80 backdrop-blur-sm"
+          className="z-[120] max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-[22px] border-[#1b2942] bg-[#050a18] p-0 text-slate-100 shadow-2xl shadow-slate-950/60 sm:max-w-[350px] [&>button.absolute]:hidden"
+        >
+          {dialogOpen &&
+            (() => {
+              financeDebugLog("dialog content rendered", {
+                companiesCount: companies.length,
+                formCompanyId: form.companyId || null,
+                formPeriod: form.period,
+                formInvoiceNo: form.invoiceNo || null,
+              });
+              return null;
+            })()}
           <DialogHeader className="sr-only">
             <DialogTitle>{editingRecord ? "Finans kaydını düzenle" : "Yeni finans kaydı ekle"}</DialogTitle>
             <DialogDescription>Firma, dönem, tutar, vade, durum ve not bilgileriyle finans kaydı formu.</DialogDescription>
@@ -951,13 +1021,13 @@ export default function OSGBFinance() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-200">
+              <Label htmlFor="osgb-finance-company-id" className="text-xs font-bold text-slate-200">
                 <Building2 className="mr-2 inline h-3.5 w-3.5" />
                 Firma *
               </Label>
               {companies.length > 0 ? (
-              <Select value={form.companyId || companies[0]?.id} onValueChange={(value) => setForm((current) => ({ ...current, companyId: value }))}>
-                <SelectTrigger className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
+              <Select name="osgb_finance_company_id" value={form.companyId || companies[0]?.id} onValueChange={(value) => setForm((current) => ({ ...current, companyId: value }))}>
+                <SelectTrigger id="osgb-finance-company-id" aria-label="Firma" className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
                   <SelectValue placeholder="Firma seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -969,18 +1039,20 @@ export default function OSGBFinance() {
                 </SelectContent>
               </Select>
               ) : (
-                <div className="flex h-9 items-center rounded-xl border border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-500">
+                <div id="osgb-finance-company-id" className="flex h-9 items-center rounded-xl border border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-500">
                   Firma seçin
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-200">
+                <Label htmlFor="osgb-finance-period" className="text-xs font-bold text-slate-200">
                   <Calendar className="mr-2 inline h-3.5 w-3.5" />
                   Dönem
                 </Label>
                 <Input
+                  id="osgb-finance-period"
+                  name="osgb_finance_period"
                   type="month"
                   value={form.period}
                   onChange={(event) => setForm((current) => ({ ...current, period: event.target.value }))}
@@ -988,11 +1060,14 @@ export default function OSGBFinance() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-200">
+                <Label htmlFor="osgb-finance-amount" className="text-xs font-bold text-slate-200">
                   <CreditCard className="mr-2 inline h-3.5 w-3.5" />
                   Tutar *
                 </Label>
                 <Input
+                  id="osgb-finance-amount"
+                  name="osgb_finance_amount"
+                  inputMode="decimal"
                   value={form.amount}
                   onChange={(event) => setForm((current) => ({ ...current, amount: event.target.value }))}
                   placeholder="15.000"
@@ -1000,8 +1075,10 @@ export default function OSGBFinance() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-200">Vade Tarihi</Label>
+                <Label htmlFor="osgb-finance-due-date" className="text-xs font-bold text-slate-200">Vade Tarihi</Label>
                 <Input
+                  id="osgb-finance-due-date"
+                  name="osgb_finance_due_date"
                   type="date"
                   value={form.dueDate}
                   onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
@@ -1009,8 +1086,10 @@ export default function OSGBFinance() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold text-slate-200">Fatura No</Label>
+                <Label htmlFor="osgb-finance-invoice-no" className="text-xs font-bold text-slate-200">Fatura No</Label>
                 <Input
+                  id="osgb-finance-invoice-no"
+                  name="osgb_finance_invoice_no"
                   value={form.invoiceNo}
                   onChange={(event) => setForm((current) => ({ ...current, invoiceNo: event.target.value }))}
                   placeholder="IST-2026-001"
@@ -1019,27 +1098,49 @@ export default function OSGBFinance() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-200">Durum</Label>
+              <Label htmlFor="osgb-finance-status" className="text-xs font-bold text-slate-200">Durum</Label>
               <Select
+                name="osgb_finance_status"
                 value={form.status}
                 onValueChange={(value) => setForm((current) => ({ ...current, status: value as OsgbFinanceStatus }))}
               >
-                <SelectTrigger className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
+                <SelectTrigger
+                  id="osgb-finance-status"
+                  aria-label="Durum"
+                  className="h-9 rounded-full border-cyan-400 bg-[#111a2d] px-3 text-sm font-semibold text-slate-100 focus:ring-1 focus:ring-cyan-400 focus:ring-offset-0"
+                >
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="pending">Beklemede</SelectItem>
-                  <SelectItem value="paid">Ödendi</SelectItem>
-                  <SelectItem value="overdue">Gecikti</SelectItem>
+                <SelectContent className="z-[140] rounded-none border border-slate-300 bg-[#111a2d] p-0 text-white shadow-xl">
+                  <SelectItem
+                    value="pending"
+                    className="rounded-none py-2 pl-3 pr-3 text-sm font-semibold text-white focus:bg-blue-600 focus:text-white data-[state=checked]:bg-blue-600 data-[state=checked]:text-white [&>span:first-child]:hidden"
+                  >
+                    Beklemede
+                  </SelectItem>
+                  <SelectItem
+                    value="paid"
+                    className="rounded-none py-2 pl-3 pr-3 text-sm font-semibold text-white focus:bg-blue-600 focus:text-white data-[state=checked]:bg-blue-600 data-[state=checked]:text-white [&>span:first-child]:hidden"
+                  >
+                    Ödendi
+                  </SelectItem>
+                  <SelectItem
+                    value="overdue"
+                    className="rounded-none py-2 pl-3 pr-3 text-sm font-semibold text-white focus:bg-blue-600 focus:text-white data-[state=checked]:bg-blue-600 data-[state=checked]:text-white [&>span:first-child]:hidden"
+                  >
+                    Gecikti
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs font-bold text-slate-200">
+              <Label htmlFor="osgb-finance-notes" className="text-xs font-bold text-slate-200">
                 <FileText className="mr-2 inline h-3.5 w-3.5" />
                 Notlar
               </Label>
               <Textarea
+                id="osgb-finance-notes"
+                name="osgb_finance_notes"
                 value={form.notes}
                 onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
                 placeholder="Tahsilat notu, mutabakat bilgisi veya operasyon açıklaması..."

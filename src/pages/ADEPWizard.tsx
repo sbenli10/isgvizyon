@@ -44,6 +44,11 @@ import {
   type HazardClass,
 } from "@/lib/adepPlanSchema";
 import {
+  buildAdepPrefillFromOsgbProfile,
+  getOsgbCompanyDocumentProfile,
+} from "@/lib/osgbPlatform";
+import { getProfileCompanyDocumentFields } from "@/lib/companyDocumentPrefill";
+import {
   loadSavedEvacuationProjects,
   type SavedEvacuationProject,
 } from "@/lib/evacuationProjectStorage";
@@ -59,6 +64,11 @@ interface CompanyOption {
   hazard_class?: string | null;
   tax_number?: string | null;
   phone?: string | null;
+  employer_representative_name?: string | null;
+  occupational_safety_specialist_name?: string | null;
+  workplace_doctor_name?: string | null;
+  employee_representative_name?: string | null;
+  knowledgeable_employee_name?: string | null;
 }
 
 const inputClassName =
@@ -131,7 +141,7 @@ export default function ADEPWizard() {
         const [companiesRes, planRes] = await Promise.all([
           (supabase as any)
             .from("companies")
-            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone")
+            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone, employer_representative_name, occupational_safety_specialist_name, workplace_doctor_name, employee_representative_name, knowledgeable_employee_name")
             .eq("is_active", true)
             .order("name"),
           planId
@@ -157,6 +167,60 @@ export default function ADEPWizard() {
           : null;
         if (routeCompany) {
           applyCompany(routeCompany, false);
+        } else if (selectedCompanyId && activeWorkspaceId) {
+          const osgbRecord = await getOsgbCompanyDocumentProfile(activeWorkspaceId, selectedCompanyId);
+          const prefill = buildAdepPrefillFromOsgbProfile(osgbRecord);
+          setSelectedCompanyId(osgbRecord.companyId);
+          setPlanData((previous) =>
+            mergeADEPPlanData({
+              ...previous,
+              firma_bilgileri: {
+                ...previous.firma_bilgileri,
+                unvan: prefill.company.companyName,
+                adres: prefill.company.address,
+                sgk_sicil_no: prefill.company.sgkNo,
+                tehlike_sinifi:
+                  HAZARD_CLASSES.find((hazardClass) => hazardClass === prefill.company.hazardClass) ||
+                  previous.firma_bilgileri.tehlike_sinifi,
+                calisan_sayisi: prefill.company.employeeCount,
+              },
+              isyeri_bilgileri: {
+                ...previous.isyeri_bilgileri,
+                adres: prefill.company.address,
+                telefon: prefill.company.phone,
+                sgk_sicil_no: prefill.company.sgkNo,
+                tehlike_sinifi: prefill.company.hazardClass,
+                is_kolu: prefill.company.sector,
+              },
+              genel_bilgiler: {
+                ...previous.genel_bilgiler,
+                hazirlanma_tarihi: prefill.planDataPatch.genel_bilgiler.hazirlanma_tarihi,
+              },
+              yetkililer: {
+                ...previous.yetkililer,
+                ...prefill.planDataPatch.yetkililer,
+              },
+              gorevli_bilgileri: {
+                ...previous.gorevli_bilgileri,
+                isveren_vekil: {
+                  ...previous.gorevli_bilgileri.isveren_vekil,
+                  ...prefill.planDataPatch.yetkililer.isveren_vekil,
+                },
+                isg_uzmani: {
+                  ...previous.gorevli_bilgileri.isg_uzmani,
+                  ...prefill.planDataPatch.yetkililer.isg_uzmani,
+                },
+                isyeri_hekimi: {
+                  ...previous.gorevli_bilgileri.isyeri_hekimi,
+                  ...prefill.planDataPatch.yetkililer.isyeri_hekimi,
+                },
+              },
+              ekipler: {
+                ...previous.ekipler,
+                ...prefill.planDataPatch.ekipler,
+              },
+            }),
+          );
         }
       } catch (error: any) {
         console.error("ADEP load failed:", error);
@@ -177,6 +241,7 @@ export default function ADEPWizard() {
   };
 
   const applyCompany = (company: CompanyOption, showToast = true) => {
+    const documentFields = getProfileCompanyDocumentFields(company as any);
     setSelectedCompanyId(company.id);
     updatePlanData((previous) => ({
       ...previous,
@@ -252,6 +317,44 @@ export default function ADEPWizard() {
         [role]: {
           ...previous[group][role],
           [field]: value,
+        },
+      },
+      yetkililer: {
+        ...previous.yetkililer,
+        isveren_vekil: {
+          ...previous.yetkililer.isveren_vekil,
+          ad_soyad: documentFields.employerRepresentativeName || previous.yetkililer.isveren_vekil.ad_soyad,
+        },
+        isg_uzmani: {
+          ...previous.yetkililer.isg_uzmani,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.yetkililer.isg_uzmani.ad_soyad,
+        },
+        isyeri_hekimi: {
+          ...previous.yetkililer.isyeri_hekimi,
+          ad_soyad: documentFields.workplaceDoctorName || previous.yetkililer.isyeri_hekimi.ad_soyad,
+        },
+      },
+      gorevli_bilgileri: {
+        ...previous.gorevli_bilgileri,
+        isveren_vekil: {
+          ...previous.gorevli_bilgileri.isveren_vekil,
+          ad_soyad: documentFields.employerRepresentativeName || previous.gorevli_bilgileri.isveren_vekil.ad_soyad,
+        },
+        isg_uzmani: {
+          ...previous.gorevli_bilgileri.isg_uzmani,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.gorevli_bilgileri.isg_uzmani.ad_soyad,
+        },
+        isyeri_hekimi: {
+          ...previous.gorevli_bilgileri.isyeri_hekimi,
+          ad_soyad: documentFields.workplaceDoctorName || previous.gorevli_bilgileri.isyeri_hekimi.ad_soyad,
+        },
+        calisan_temsilcisi: {
+          ...previous.gorevli_bilgileri.calisan_temsilcisi,
+          ad_soyad: documentFields.employeeRepresentativeName || previous.gorevli_bilgileri.calisan_temsilcisi.ad_soyad,
+        },
+        bilgi_sahibi_kisi: {
+          ...previous.gorevli_bilgileri.bilgi_sahibi_kisi,
+          ad_soyad: documentFields.knowledgeableEmployeeName || previous.gorevli_bilgileri.bilgi_sahibi_kisi.ad_soyad,
         },
       },
     }));
