@@ -255,6 +255,76 @@ export default function ADEPWizard() {
           previous.firma_bilgileri.tehlike_sinifi,
         calisan_sayisi: company.employee_count || 0,
       },
+      isyeri_bilgileri: {
+        ...previous.isyeri_bilgileri,
+        adres: company.address || previous.isyeri_bilgileri.adres,
+        telefon: company.phone || previous.isyeri_bilgileri.telefon,
+        sgk_sicil_no: company.tax_number || previous.isyeri_bilgileri.sgk_sicil_no,
+        tehlike_sinifi: company.hazard_class || previous.isyeri_bilgileri.tehlike_sinifi,
+        is_kolu: company.industry || previous.isyeri_bilgileri.is_kolu,
+      },
+      yetkililer: {
+        ...previous.yetkililer,
+        isveren_vekil: {
+          ...previous.yetkililer.isveren_vekil,
+          ad_soyad: documentFields.employerRepresentativeName || previous.yetkililer.isveren_vekil.ad_soyad,
+        },
+        isg_uzmani: {
+          ...previous.yetkililer.isg_uzmani,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.yetkililer.isg_uzmani.ad_soyad,
+        },
+        isyeri_hekimi: {
+          ...previous.yetkililer.isyeri_hekimi,
+          ad_soyad: documentFields.workplaceDoctorName || previous.yetkililer.isyeri_hekimi.ad_soyad,
+        },
+      },
+      gorevli_bilgileri: {
+        ...previous.gorevli_bilgileri,
+        isveren_vekil: {
+          ...previous.gorevli_bilgileri.isveren_vekil,
+          ad_soyad: documentFields.employerRepresentativeName || previous.gorevli_bilgileri.isveren_vekil.ad_soyad,
+        },
+        isg_uzmani: {
+          ...previous.gorevli_bilgileri.isg_uzmani,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.gorevli_bilgileri.isg_uzmani.ad_soyad,
+        },
+        isyeri_hekimi: {
+          ...previous.gorevli_bilgileri.isyeri_hekimi,
+          ad_soyad: documentFields.workplaceDoctorName || previous.gorevli_bilgileri.isyeri_hekimi.ad_soyad,
+        },
+        calisan_temsilcisi: {
+          ...previous.gorevli_bilgileri.calisan_temsilcisi,
+          ad_soyad: documentFields.employeeRepresentativeName || previous.gorevli_bilgileri.calisan_temsilcisi.ad_soyad,
+        },
+        bilgi_sahibi_kisi: {
+          ...previous.gorevli_bilgileri.bilgi_sahibi_kisi,
+          ad_soyad: documentFields.knowledgeableEmployeeName || previous.gorevli_bilgileri.bilgi_sahibi_kisi.ad_soyad,
+        },
+      },
+      ekipler: {
+        ...previous.ekipler,
+        sondurme: {
+          ...previous.ekipler.sondurme,
+          ekip_baskani: {
+            ...previous.ekipler.sondurme.ekip_baskani,
+            ad_soyad: documentFields.fireSupportPersonName || previous.ekipler.sondurme.ekip_baskani.ad_soyad,
+          },
+        },
+        ilkyardim: {
+          ...previous.ekipler.ilkyardim,
+          ekip_baskani: {
+            ...previous.ekipler.ilkyardim.ekip_baskani,
+            ad_soyad: documentFields.firstAidSupportPersonName || previous.ekipler.ilkyardim.ekip_baskani.ad_soyad,
+          },
+        },
+        kurtarma: {
+          ...previous.ekipler.kurtarma,
+          ekip_baskani: {
+            ...previous.ekipler.kurtarma.ekip_baskani,
+            ad_soyad: documentFields.evacuationSupportPersonName || previous.ekipler.kurtarma.ekip_baskani.ad_soyad,
+          },
+        },
+      },
     }));
 
     const nextParams = new URLSearchParams(searchParams);
@@ -317,44 +387,6 @@ export default function ADEPWizard() {
         [role]: {
           ...previous[group][role],
           [field]: value,
-        },
-      },
-      yetkililer: {
-        ...previous.yetkililer,
-        isveren_vekil: {
-          ...previous.yetkililer.isveren_vekil,
-          ad_soyad: documentFields.employerRepresentativeName || previous.yetkililer.isveren_vekil.ad_soyad,
-        },
-        isg_uzmani: {
-          ...previous.yetkililer.isg_uzmani,
-          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.yetkililer.isg_uzmani.ad_soyad,
-        },
-        isyeri_hekimi: {
-          ...previous.yetkililer.isyeri_hekimi,
-          ad_soyad: documentFields.workplaceDoctorName || previous.yetkililer.isyeri_hekimi.ad_soyad,
-        },
-      },
-      gorevli_bilgileri: {
-        ...previous.gorevli_bilgileri,
-        isveren_vekil: {
-          ...previous.gorevli_bilgileri.isveren_vekil,
-          ad_soyad: documentFields.employerRepresentativeName || previous.gorevli_bilgileri.isveren_vekil.ad_soyad,
-        },
-        isg_uzmani: {
-          ...previous.gorevli_bilgileri.isg_uzmani,
-          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.gorevli_bilgileri.isg_uzmani.ad_soyad,
-        },
-        isyeri_hekimi: {
-          ...previous.gorevli_bilgileri.isyeri_hekimi,
-          ad_soyad: documentFields.workplaceDoctorName || previous.gorevli_bilgileri.isyeri_hekimi.ad_soyad,
-        },
-        calisan_temsilcisi: {
-          ...previous.gorevli_bilgileri.calisan_temsilcisi,
-          ad_soyad: documentFields.employeeRepresentativeName || previous.gorevli_bilgileri.calisan_temsilcisi.ad_soyad,
-        },
-        bilgi_sahibi_kisi: {
-          ...previous.gorevli_bilgileri.bilgi_sahibi_kisi,
-          ad_soyad: documentFields.knowledgeableEmployeeName || previous.gorevli_bilgileri.bilgi_sahibi_kisi.ad_soyad,
         },
       },
     }));

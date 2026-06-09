@@ -735,20 +735,8 @@ export default function CAPA() {
 
       const findingsQuery = supabase
         .from("findings")
-        .select(`
-          *,
-          inspection:inspections!inner(
-            id,
-            location_name,
-            user_id,
-            media_urls,
-            notes,
-            risk_definition,
-            corrective_action,
-            preventive_action
-          )
-        `)
-        .eq("inspection.user_id", user.id)
+        .select("*")
+        .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
       let escalationQuery: any = Promise.resolve({ data: [], error: null });
@@ -785,6 +773,27 @@ export default function CAPA() {
       const profile = profileRes.data;
       setCurrentProfileName(profile?.full_name || user.email || "");
 
+      const findingsRows = (findingsRes.data || []) as any[];
+      const inspectionIds = Array.from(
+        new Set(findingsRows.map((finding) => finding.inspection_id).filter(Boolean)),
+      );
+      const inspectionMap = new Map<string, any>();
+
+      if (inspectionIds.length > 0) {
+        const { data: inspectionRows, error: inspectionsError } = await supabase
+          .from("inspections")
+          .select("id, location_name, user_id, media_urls, notes, risk_definition, corrective_action, preventive_action")
+          .in("id", inspectionIds);
+
+        if (inspectionsError) {
+          console.warn("Findings inspection details could not be loaded:", inspectionsError);
+        } else {
+          (inspectionRows || []).forEach((inspection: any) => {
+            inspectionMap.set(inspection.id, inspection);
+          });
+        }
+      }
+
       const capaRecords: CAPARecord[] = (capaRes.data || []).map((record: any) => ({
         ...record,
         company_id: record.company_id || null,
@@ -797,8 +806,8 @@ export default function CAPA() {
         notes: record.notes || "",
       }));
 
-      const findingsAsCapa: CAPARecord[] = (findingsRes.data || []).map((finding: any) => {
-        const inspection = finding.inspection;
+      const findingsAsCapa: CAPARecord[] = findingsRows.map((finding: any) => {
+        const inspection = inspectionMap.get(finding.inspection_id);
         return {
           id: finding.id,
           org_id: profile?.organization_id || user.id,
