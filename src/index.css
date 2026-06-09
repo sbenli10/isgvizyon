@@ -183,6 +183,64 @@
   color: hsl(var(--foreground));
 }
 
+.dark :is(input, textarea, select, [role="combobox"], [data-radix-select-trigger]) {
+  color: hsl(var(--foreground)) !important;
+  caret-color: hsl(var(--foreground));
+}
+
+.dark :is(input, textarea, select, [role="combobox"], [data-radix-select-trigger])::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+  opacity: 1;
+}
+
+.dark :is(
+  input[class*="bg-slate-"],
+  textarea[class*="bg-slate-"],
+  select[class*="bg-slate-"],
+  [role="combobox"][class*="bg-slate-"],
+  [data-radix-select-trigger][class*="bg-slate-"],
+  input[class*="bg-zinc-"],
+  textarea[class*="bg-zinc-"],
+  select[class*="bg-zinc-"],
+  [role="combobox"][class*="bg-zinc-"],
+  [data-radix-select-trigger][class*="bg-zinc-"],
+  input[class*="bg-black"],
+  textarea[class*="bg-black"],
+  select[class*="bg-black"],
+  [role="combobox"][class*="bg-black"],
+  [data-radix-select-trigger][class*="bg-black"]
+),
+.dark :is(
+  input[class*="bg-slate-"],
+  textarea[class*="bg-slate-"],
+  select[class*="bg-slate-"],
+  [role="combobox"][class*="bg-slate-"],
+  [data-radix-select-trigger][class*="bg-slate-"],
+  input[class*="bg-zinc-"],
+  textarea[class*="bg-zinc-"],
+  select[class*="bg-zinc-"],
+  [role="combobox"][class*="bg-zinc-"],
+  [data-radix-select-trigger][class*="bg-zinc-"],
+  input[class*="bg-black"],
+  textarea[class*="bg-black"],
+  select[class*="bg-black"],
+  [role="combobox"][class*="bg-black"],
+  [data-radix-select-trigger][class*="bg-black"]
+) :is(span, div) {
+  color: hsl(var(--foreground)) !important;
+}
+
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark textarea:-webkit-autofill:hover,
+.dark textarea:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(var(--foreground)) !important;
+  caret-color: hsl(var(--foreground));
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /*
   Okunabilirlik önceliği:
   Durum rozetleri ve istatistik kartları dahil, light modda koyu metin;
