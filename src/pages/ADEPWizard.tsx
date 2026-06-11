@@ -89,6 +89,7 @@ const mutedInputClassName =
 
 const createPerson = (): ADEPPerson => ({ ad_soyad: "", tc_no: "", telefon: "" });
 const createMaterial = (): ADEPMaterial => ({ equipment_name: "", quantity: "", location: "" });
+const emptyPersonForRender = createPerson();
 
 const teamMeta: Array<{ key: ADEPTeamKey; title: string; description: string }> = [
   {
@@ -880,7 +881,7 @@ export default function ADEPWizard() {
                 <PersonFields person={planData.yetkililer.isyeri_hekimi} showCertificate onChange={(field, value) => updatePerson("yetkililer", "isyeri_hekimi", field, value)} />
               </PersonCard>
               <PersonCard title="Çalışan Temsilcisi" description="Plan ve görevli bilgi alanlarında kullanılacak temsilci.">
-                <PersonFields person={planData.yetkililer.calisan_temsilcisi} onChange={(field, value) => updatePerson("yetkililer", "calisan_temsilcisi", field, value)} />
+                <PersonFields person={planData.yetkililer.calisan_temsilcisi || emptyPersonForRender} onChange={(field, value) => updatePerson("yetkililer", "calisan_temsilcisi", field, value)} />
               </PersonCard>
             </div>
           </TabsContent>

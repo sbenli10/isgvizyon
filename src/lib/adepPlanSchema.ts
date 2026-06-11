@@ -313,6 +313,7 @@ export const mergeADEPPlanData = (incoming: unknown): ADEPPlanData => {
       isveren_vekil: normalizePerson(raw.yetkililer?.isveren_vekil || legacyResponsible.isveren_vekil),
       isg_uzmani: normalizeProfessional(raw.yetkililer?.isg_uzmani || legacyResponsible.isg_uzmani),
       isyeri_hekimi: normalizeProfessional(raw.yetkililer?.isyeri_hekimi || legacyResponsible.isyeri_hekimi),
+      calisan_temsilcisi: normalizePerson(raw.yetkililer?.calisan_temsilcisi || legacyResponsible.calisan_temsilcisi),
     },
     ekipler: {
       sondurme: normalizeTeam(raw.ekipler?.sondurme),
@@ -356,7 +357,7 @@ export const mergeADEPPlanData = (incoming: unknown): ADEPPlanData => {
       isveren_vekil: withRole({ ...emptyProfessional, ...core.yetkililer.isveren_vekil }, "İşveren / İşveren Vekili"),
       isg_uzmani: withRole(core.yetkililer.isg_uzmani, "İş Güvenliği Uzmanı"),
       isyeri_hekimi: withRole(core.yetkililer.isyeri_hekimi, "İşyeri Hekimi"),
-      calisan_temsilcisi: withRole(emptyProfessional, "Çalışan Temsilcisi"),
+      calisan_temsilcisi: withRole({ ...emptyProfessional, ...core.yetkililer.calisan_temsilcisi }, "Çalışan Temsilcisi"),
       destek_elemani: withRole(emptyProfessional, "Destek Elemanı"),
       bilgi_sahibi_kisi: withRole(emptyProfessional, "Bilgi Sahibi Kişi"),
     },
