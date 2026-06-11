@@ -49,15 +49,16 @@ import {
 } from "@/lib/osgbOperations";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useAccessRole } from "@/hooks/useAccessRole";
-import { useOsgbManagedCompanies } from "@/hooks/useOsgbManagedCompanies";
 import { downloadCsv } from "@/lib/csvExport";
 import {
   getOsgbWorkspaceAssignmentRecommendation,
   getOsgbWorkspaceCompanyAssignedMinutesTotal,
   getOsgbWorkspacePersonnelAssignedMinutesTotal,
+  listOsgbWorkspaceCompanies,
   listOsgbWorkspaceAssignmentsPage,
   listOsgbWorkspacePersonnel,
   type OsgbWorkspaceAssignmentRecord,
+  type OsgbWorkspaceCompanyOption,
   type OsgbWorkspacePersonnelRecord,
   upsertOsgbAssignmentWorkspace,
 } from "@/lib/osgbPlatform";
@@ -120,14 +121,18 @@ const formatDate = (value: string | null) => {
 const CACHE_TTL_MS = 5 * 60 * 1000;
 const getCacheKey = (organizationId: string) => `assignments:${organizationId}`;
 const ASSIGNMENT_PAGE_SIZE = 20;
+const roleMinutes = (
+  minutesByRole: Partial<Record<AssignmentFormState["assignedRole"], number>> | null | undefined,
+  role: AssignmentFormState["assignedRole"],
+) => Number(minutesByRole?.[role] || 0);
 
 export default function OSGBAssignments() {
   const { user, profile } = useAuth();
   const organizationId = profile?.organization_id || null;
   const { canManage } = useAccessRole();
   const [records, setRecords] = useState<OsgbWorkspaceAssignmentRecord[]>([]);
+  const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
   const [personnel, setPersonnel] = useState<OsgbWorkspacePersonnelRecord[]>([]);
-  const { companies } = useOsgbManagedCompanies(organizationId);
   const [loading, setLoading] = useState(true);
   usePageDataTiming(loading);
   const [personnelLoading, setPersonnelLoading] = useState(false);
@@ -168,6 +173,31 @@ export default function OSGBAssignments() {
       form,
     },
   });
+
+  useEffect(() => {
+    if (!organizationId) {
+      setCompanies([]);
+      return;
+    }
+
+    let active = true;
+    void listOsgbWorkspaceCompanies(organizationId)
+      .then((rows) => {
+        if (active) {
+          setCompanies(rows);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setCompanies([]);
+          toast.error(err instanceof Error ? err.message : "OSGB firma listesi yüklenemedi.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
 
   const loadData = async (silent = false) => {
     if (!organizationId) {
@@ -354,7 +384,7 @@ export default function OSGBAssignments() {
 
     const requested = Number(form.assignedMinutes || 0);
     const totalProjected = companyAssignedMinutes + requested;
-    const required = selected.requiredMinutesByRole[form.assignedRole] || 0;
+    const required = roleMinutes(selected.requiredMinutesByRole, form.assignedRole);
     const gap = Math.max(0, required - totalProjected);
     const ratio = required > 0 ? Math.round((totalProjected / required) * 100) : 0;
 

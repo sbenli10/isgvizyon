@@ -54,9 +54,19 @@ type CompanyRow = {
   visit_frequency?: string | null;
   used_minutes?: number | null;
   employer_representative_name?: string | null;
+  employer_representative_tc_no?: string | null;
+  employer_representative_phone?: string | null;
   occupational_safety_specialist_name?: string | null;
+  occupational_safety_specialist_tc_no?: string | null;
+  occupational_safety_specialist_phone?: string | null;
+  occupational_safety_specialist_certificate_no?: string | null;
   workplace_doctor_name?: string | null;
+  workplace_doctor_tc_no?: string | null;
+  workplace_doctor_phone?: string | null;
+  workplace_doctor_certificate_no?: string | null;
   employee_representative_name?: string | null;
+  employee_representative_tc_no?: string | null;
+  employee_representative_phone?: string | null;
   knowledgeable_employee_name?: string | null;
 };
 
@@ -79,6 +89,61 @@ type EmployeeRow = {
 type GenericRecord = Record<string, any>;
 
 const db = supabase as any;
+
+type AssignmentDetailRole =
+  | "employer_representative"
+  | "occupational_safety_specialist"
+  | "workplace_doctor"
+  | "employee_representative";
+
+type AssignmentDetailForm = {
+  employer_representative_name: string;
+  employer_representative_tc_no: string;
+  employer_representative_phone: string;
+  occupational_safety_specialist_name: string;
+  occupational_safety_specialist_tc_no: string;
+  occupational_safety_specialist_phone: string;
+  occupational_safety_specialist_certificate_no: string;
+  workplace_doctor_name: string;
+  workplace_doctor_tc_no: string;
+  workplace_doctor_phone: string;
+  workplace_doctor_certificate_no: string;
+  employee_representative_name: string;
+  employee_representative_tc_no: string;
+  employee_representative_phone: string;
+};
+
+const assignmentDetailRoles: Array<{
+  role: AssignmentDetailRole;
+  title: string;
+  description: string;
+  showCertificate: boolean;
+}> = [
+  {
+    role: "employer_representative",
+    title: "İşveren / Vekili",
+    description: "ADEP ve imza alanlarında işveren temsilcisi olarak kullanılır.",
+    showCertificate: false,
+  },
+  {
+    role: "occupational_safety_specialist",
+    title: "İş Güvenliği Uzmanı",
+    description: "Uzman adı, iletişimi ve sertifika bilgisi evraklara aktarılır.",
+    showCertificate: true,
+  },
+  {
+    role: "workplace_doctor",
+    title: "İşyeri Hekimi",
+    description: "Hekim adı, iletişimi ve sertifika bilgisi evraklara aktarılır.",
+    showCertificate: true,
+  },
+  {
+    role: "employee_representative",
+    title: "Çalışan Temsilcisi",
+    description: "Çalışan temsilcisi bilgileri kurul ve plan evraklarında kullanılır.",
+    showCertificate: false,
+  },
+];
 
 const emptyText = "Henüz kayıt yok";
 
@@ -283,9 +348,19 @@ async function loadCompanyById(companyId: string): Promise<CompanyRow | null> {
       visit_frequency: data.visit_frequency || null,
       used_minutes: typeof data.used_minutes === "number" ? data.used_minutes : null,
       employer_representative_name: data.employer_representative_name || null,
+      employer_representative_tc_no: data.employer_representative_tc_no || null,
+      employer_representative_phone: data.employer_representative_phone || null,
       occupational_safety_specialist_name: data.occupational_safety_specialist_name || null,
+      occupational_safety_specialist_tc_no: data.occupational_safety_specialist_tc_no || null,
+      occupational_safety_specialist_phone: data.occupational_safety_specialist_phone || null,
+      occupational_safety_specialist_certificate_no: data.occupational_safety_specialist_certificate_no || null,
       workplace_doctor_name: data.workplace_doctor_name || null,
+      workplace_doctor_tc_no: data.workplace_doctor_tc_no || null,
+      workplace_doctor_phone: data.workplace_doctor_phone || null,
+      workplace_doctor_certificate_no: data.workplace_doctor_certificate_no || null,
       employee_representative_name: data.employee_representative_name || null,
+      employee_representative_tc_no: data.employee_representative_tc_no || null,
+      employee_representative_phone: data.employee_representative_phone || null,
       knowledgeable_employee_name: data.knowledgeable_employee_name || null,
     };
   } catch (error) {
@@ -314,9 +389,19 @@ async function loadProfileCompanies(orgId?: string | null, userId?: string | nul
         visit_frequency: row.visit_frequency || null,
         used_minutes: typeof row.used_minutes === "number" ? row.used_minutes : null,
         employer_representative_name: row.employer_representative_name || null,
+        employer_representative_tc_no: row.employer_representative_tc_no || null,
+        employer_representative_phone: row.employer_representative_phone || null,
         occupational_safety_specialist_name: row.occupational_safety_specialist_name || null,
+        occupational_safety_specialist_tc_no: row.occupational_safety_specialist_tc_no || null,
+        occupational_safety_specialist_phone: row.occupational_safety_specialist_phone || null,
+        occupational_safety_specialist_certificate_no: row.occupational_safety_specialist_certificate_no || null,
         workplace_doctor_name: row.workplace_doctor_name || null,
+        workplace_doctor_tc_no: row.workplace_doctor_tc_no || null,
+        workplace_doctor_phone: row.workplace_doctor_phone || null,
+        workplace_doctor_certificate_no: row.workplace_doctor_certificate_no || null,
         employee_representative_name: row.employee_representative_name || null,
+        employee_representative_tc_no: row.employee_representative_tc_no || null,
+        employee_representative_phone: row.employee_representative_phone || null,
         knowledgeable_employee_name: row.knowledgeable_employee_name || null,
       }));
     } catch (error) {
@@ -535,9 +620,19 @@ export function ProfileCompaniesTab() {
     hazard_class: "Az Tehlikeli",
     visit_frequency: "Ayda 1 Defa",
     employer_representative_name: "",
+    employer_representative_tc_no: "",
+    employer_representative_phone: "",
     occupational_safety_specialist_name: "",
+    occupational_safety_specialist_tc_no: "",
+    occupational_safety_specialist_phone: "",
+    occupational_safety_specialist_certificate_no: "",
     workplace_doctor_name: "",
+    workplace_doctor_tc_no: "",
+    workplace_doctor_phone: "",
+    workplace_doctor_certificate_no: "",
     employee_representative_name: "",
+    employee_representative_tc_no: "",
+    employee_representative_phone: "",
     knowledgeable_employee_name: "",
   });
 
@@ -566,9 +661,19 @@ export function ProfileCompaniesTab() {
       hazard_class: company?.hazard_class || "Az Tehlikeli",
       visit_frequency: company?.visit_frequency || "Ayda 1 Defa",
       employer_representative_name: company?.employer_representative_name || "",
+      employer_representative_tc_no: company?.employer_representative_tc_no || "",
+      employer_representative_phone: company?.employer_representative_phone || "",
       occupational_safety_specialist_name: company?.occupational_safety_specialist_name || "",
+      occupational_safety_specialist_tc_no: company?.occupational_safety_specialist_tc_no || "",
+      occupational_safety_specialist_phone: company?.occupational_safety_specialist_phone || "",
+      occupational_safety_specialist_certificate_no: company?.occupational_safety_specialist_certificate_no || "",
       workplace_doctor_name: company?.workplace_doctor_name || "",
+      workplace_doctor_tc_no: company?.workplace_doctor_tc_no || "",
+      workplace_doctor_phone: company?.workplace_doctor_phone || "",
+      workplace_doctor_certificate_no: company?.workplace_doctor_certificate_no || "",
       employee_representative_name: company?.employee_representative_name || "",
+      employee_representative_tc_no: company?.employee_representative_tc_no || "",
+      employee_representative_phone: company?.employee_representative_phone || "",
       knowledgeable_employee_name: company?.knowledgeable_employee_name || "",
     });
     setDialogOpen(true);
@@ -595,9 +700,19 @@ export function ProfileCompaniesTab() {
       hazard_class: companyForm.hazard_class,
       visit_frequency: companyForm.visit_frequency,
       employer_representative_name: companyForm.employer_representative_name.trim() || null,
+      employer_representative_tc_no: companyForm.employer_representative_tc_no.trim() || null,
+      employer_representative_phone: companyForm.employer_representative_phone.trim() || null,
       occupational_safety_specialist_name: companyForm.occupational_safety_specialist_name.trim() || null,
+      occupational_safety_specialist_tc_no: companyForm.occupational_safety_specialist_tc_no.trim() || null,
+      occupational_safety_specialist_phone: companyForm.occupational_safety_specialist_phone.trim() || null,
+      occupational_safety_specialist_certificate_no: companyForm.occupational_safety_specialist_certificate_no.trim() || null,
       workplace_doctor_name: companyForm.workplace_doctor_name.trim() || null,
+      workplace_doctor_tc_no: companyForm.workplace_doctor_tc_no.trim() || null,
+      workplace_doctor_phone: companyForm.workplace_doctor_phone.trim() || null,
+      workplace_doctor_certificate_no: companyForm.workplace_doctor_certificate_no.trim() || null,
       employee_representative_name: companyForm.employee_representative_name.trim() || null,
+      employee_representative_tc_no: companyForm.employee_representative_tc_no.trim() || null,
+      employee_representative_phone: companyForm.employee_representative_phone.trim() || null,
       knowledgeable_employee_name: companyForm.knowledgeable_employee_name.trim() || null,
       user_id: user?.id,
       organization_id: profile?.organization_id || null,
@@ -864,14 +979,53 @@ export function ProfileCompaniesTab() {
             </div>
           ) : dialogTab === "assignments" ? (
             <div className="space-y-5">
-              <div>
-                <p className="border-l-4 border-blue-500 pl-3 text-sm font-black text-white">Risk Değerlendirme Ekibi</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <Input placeholder="İşveren / Vekili" value={companyForm.employer_representative_name} onChange={(e) => setCompanyForm({ ...companyForm, employer_representative_name: e.target.value })} />
-                  <Input placeholder="İş Güvenliği Uzmanı" value={companyForm.occupational_safety_specialist_name} onChange={(e) => setCompanyForm({ ...companyForm, occupational_safety_specialist_name: e.target.value })} />
-                  <Input placeholder="İşyeri Hekimi" value={companyForm.workplace_doctor_name} onChange={(e) => setCompanyForm({ ...companyForm, workplace_doctor_name: e.target.value })} />
-                  <Input placeholder="Çalışan Temsilcisi" value={companyForm.employee_representative_name} onChange={(e) => setCompanyForm({ ...companyForm, employee_representative_name: e.target.value })} />
-                </div>
+              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+                <p className="text-sm font-black text-white">Risk Değerlendirme ve ADEP Yetkilileri</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Bu bilgiler firma seçildiğinde Risk Analiz, Acil Durum Planı ve atama evraklarına otomatik aktarılır.
+                </p>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {assignmentDetailRoles.map((item) => {
+                  const nameKey = `${item.role}_name` as keyof AssignmentDetailForm;
+                  const tcKey = `${item.role}_tc_no` as keyof AssignmentDetailForm;
+                  const phoneKey = `${item.role}_phone` as keyof AssignmentDetailForm;
+                  const certificateKey = `${item.role}_certificate_no` as keyof AssignmentDetailForm;
+
+                  return (
+                    <div key={item.role} className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4 shadow-sm">
+                      <div className="mb-4 flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-200">
+                          <Users className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <p className="font-black text-white">{item.title}</p>
+                          <p className="mt-1 text-xs leading-relaxed text-slate-400">{item.description}</p>
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1.5 sm:col-span-2">
+                          <Label>Ad Soyad</Label>
+                          <Input value={companyForm[nameKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [nameKey]: event.target.value })} placeholder={`${item.title} ad soyad`} className="rounded-xl border-slate-700 bg-slate-800" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>T.C. Kimlik No</Label>
+                          <Input maxLength={11} inputMode="numeric" value={companyForm[tcKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [tcKey]: event.target.value.replace(/\D/g, "").slice(0, 11) })} placeholder="11 haneli" className="rounded-xl border-slate-700 bg-slate-800" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Telefon</Label>
+                          <Input value={companyForm[phoneKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [phoneKey]: event.target.value })} placeholder="Telefon" className="rounded-xl border-slate-700 bg-slate-800" />
+                        </div>
+                        {item.showCertificate ? (
+                          <div className="space-y-1.5 sm:col-span-2">
+                            <Label>Sertifika No / Ek Bilgi</Label>
+                            <Input value={companyForm[certificateKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [certificateKey]: event.target.value })} placeholder="Sertifika no veya ek bilgi" className="rounded-xl border-slate-700 bg-slate-800" />
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <div>
                 <p className="border-l-4 border-emerald-500 pl-3 text-sm font-black text-white">Destek Elemanları Atamaları</p>

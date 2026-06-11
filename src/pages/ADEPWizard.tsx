@@ -65,9 +65,19 @@ interface CompanyOption {
   tax_number?: string | null;
   phone?: string | null;
   employer_representative_name?: string | null;
+  employer_representative_tc_no?: string | null;
+  employer_representative_phone?: string | null;
   occupational_safety_specialist_name?: string | null;
+  occupational_safety_specialist_tc_no?: string | null;
+  occupational_safety_specialist_phone?: string | null;
+  occupational_safety_specialist_certificate_no?: string | null;
   workplace_doctor_name?: string | null;
+  workplace_doctor_tc_no?: string | null;
+  workplace_doctor_phone?: string | null;
+  workplace_doctor_certificate_no?: string | null;
   employee_representative_name?: string | null;
+  employee_representative_tc_no?: string | null;
+  employee_representative_phone?: string | null;
   knowledgeable_employee_name?: string | null;
 }
 
@@ -141,7 +151,7 @@ export default function ADEPWizard() {
         const [companiesRes, planRes] = await Promise.all([
           (supabase as any)
             .from("companies")
-            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone, employer_representative_name, occupational_safety_specialist_name, workplace_doctor_name, employee_representative_name, knowledgeable_employee_name")
+            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone, employer_representative_name, employer_representative_tc_no, employer_representative_phone, occupational_safety_specialist_name, occupational_safety_specialist_tc_no, occupational_safety_specialist_phone, occupational_safety_specialist_certificate_no, workplace_doctor_name, workplace_doctor_tc_no, workplace_doctor_phone, workplace_doctor_certificate_no, employee_representative_name, employee_representative_tc_no, employee_representative_phone, knowledgeable_employee_name")
             .eq("is_active", true)
             .order("name"),
           planId
@@ -267,34 +277,58 @@ export default function ADEPWizard() {
         ...previous.yetkililer,
         isveren_vekil: {
           ...previous.yetkililer.isveren_vekil,
-          ad_soyad: documentFields.employerRepresentativeName || previous.yetkililer.isveren_vekil.ad_soyad,
+          ad_soyad: documentFields.employerRepresentativeName || "",
+          tc_no: documentFields.employerRepresentativeTcNo || "",
+          telefon: documentFields.employerRepresentativePhone || "",
         },
         isg_uzmani: {
           ...previous.yetkililer.isg_uzmani,
-          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.yetkililer.isg_uzmani.ad_soyad,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || "",
+          tc_no: documentFields.occupationalSafetySpecialistTcNo || "",
+          telefon: documentFields.occupationalSafetySpecialistPhone || "",
+          belge_no: documentFields.occupationalSafetySpecialistCertificateNo || "",
         },
         isyeri_hekimi: {
           ...previous.yetkililer.isyeri_hekimi,
-          ad_soyad: documentFields.workplaceDoctorName || previous.yetkililer.isyeri_hekimi.ad_soyad,
+          ad_soyad: documentFields.workplaceDoctorName || "",
+          tc_no: documentFields.workplaceDoctorTcNo || "",
+          telefon: documentFields.workplaceDoctorPhone || "",
+          belge_no: documentFields.workplaceDoctorCertificateNo || "",
+        },
+        calisan_temsilcisi: {
+          ...previous.yetkililer.calisan_temsilcisi,
+          ad_soyad: documentFields.employeeRepresentativeName || "",
+          tc_no: documentFields.employeeRepresentativeTcNo || "",
+          telefon: documentFields.employeeRepresentativePhone || "",
         },
       },
       gorevli_bilgileri: {
         ...previous.gorevli_bilgileri,
         isveren_vekil: {
           ...previous.gorevli_bilgileri.isveren_vekil,
-          ad_soyad: documentFields.employerRepresentativeName || previous.gorevli_bilgileri.isveren_vekil.ad_soyad,
+          ad_soyad: documentFields.employerRepresentativeName || "",
+          tc_no: documentFields.employerRepresentativeTcNo || "",
+          telefon: documentFields.employerRepresentativePhone || "",
         },
         isg_uzmani: {
           ...previous.gorevli_bilgileri.isg_uzmani,
-          ad_soyad: documentFields.occupationalSafetySpecialistName || previous.gorevli_bilgileri.isg_uzmani.ad_soyad,
+          ad_soyad: documentFields.occupationalSafetySpecialistName || "",
+          tc_no: documentFields.occupationalSafetySpecialistTcNo || "",
+          telefon: documentFields.occupationalSafetySpecialistPhone || "",
+          belge_no: documentFields.occupationalSafetySpecialistCertificateNo || "",
         },
         isyeri_hekimi: {
           ...previous.gorevli_bilgileri.isyeri_hekimi,
-          ad_soyad: documentFields.workplaceDoctorName || previous.gorevli_bilgileri.isyeri_hekimi.ad_soyad,
+          ad_soyad: documentFields.workplaceDoctorName || "",
+          tc_no: documentFields.workplaceDoctorTcNo || "",
+          telefon: documentFields.workplaceDoctorPhone || "",
+          belge_no: documentFields.workplaceDoctorCertificateNo || "",
         },
         calisan_temsilcisi: {
           ...previous.gorevli_bilgileri.calisan_temsilcisi,
-          ad_soyad: documentFields.employeeRepresentativeName || previous.gorevli_bilgileri.calisan_temsilcisi.ad_soyad,
+          ad_soyad: documentFields.employeeRepresentativeName || "",
+          tc_no: documentFields.employeeRepresentativeTcNo || "",
+          telefon: documentFields.employeeRepresentativePhone || "",
         },
         bilgi_sahibi_kisi: {
           ...previous.gorevli_bilgileri.bilgi_sahibi_kisi,
@@ -835,7 +869,7 @@ export default function ADEPWizard() {
           </TabsContent>
 
           <TabsContent value="professionals">
-            <div className="grid gap-5 lg:grid-cols-3">
+            <div className="grid gap-5 lg:grid-cols-4">
               <PersonCard title="İşveren / İşveren Vekili" description="İmza ve detaylı kimlik kartında kullanılacak kişi.">
                 <PersonFields person={planData.yetkililer.isveren_vekil} onChange={(field, value) => updatePerson("yetkililer", "isveren_vekil", field, value)} />
               </PersonCard>
@@ -844,6 +878,9 @@ export default function ADEPWizard() {
               </PersonCard>
               <PersonCard title="İşyeri Hekimi" description="Sertifika numarası Word şablonunda ayrıca basılır.">
                 <PersonFields person={planData.yetkililer.isyeri_hekimi} showCertificate onChange={(field, value) => updatePerson("yetkililer", "isyeri_hekimi", field, value)} />
+              </PersonCard>
+              <PersonCard title="Çalışan Temsilcisi" description="Plan ve görevli bilgi alanlarında kullanılacak temsilci.">
+                <PersonFields person={planData.yetkililer.calisan_temsilcisi} onChange={(field, value) => updatePerson("yetkililer", "calisan_temsilcisi", field, value)} />
               </PersonCard>
             </div>
           </TabsContent>
@@ -1016,7 +1053,7 @@ function PersonFields({
   return (
     <div className={`grid gap-3 ${compact ? "md:grid-cols-3" : "md:grid-cols-1"}`}>
       <Input className={inputClassName} placeholder="Ad Soyad" value={person.ad_soyad} onChange={(event) => onChange("ad_soyad", event.target.value)} />
-      <Input className={inputClassName} placeholder="T.C. Kimlik No" value={person.tc_no} onChange={(event) => onChange("tc_no", event.target.value)} />
+      <Input className={inputClassName} maxLength={11} inputMode="numeric" placeholder="T.C. Kimlik No" value={person.tc_no} onChange={(event) => onChange("tc_no", event.target.value.replace(/\D/g, "").slice(0, 11))} />
       <Input className={inputClassName} placeholder="Telefon" value={person.telefon} onChange={(event) => onChange("telefon", event.target.value)} />
       {showCertificate && (
         <Input className={inputClassName} placeholder="Sertifika / Belge No" value={person.belge_no || ""} onChange={(event) => onChange("belge_no", event.target.value)} />

@@ -58,6 +58,7 @@ export const adepPlanDataSchema = z.object({
       isveren_vekil: adepPersonSchema.default({ ad_soyad: "", tc_no: "", telefon: "" }),
       isg_uzmani: adepProfessionalSchema.default({ ad_soyad: "", tc_no: "", telefon: "", belge_no: "" }),
       isyeri_hekimi: adepProfessionalSchema.default({ ad_soyad: "", tc_no: "", telefon: "", belge_no: "" }),
+      calisan_temsilcisi: adepPersonSchema.default({ ad_soyad: "", tc_no: "", telefon: "" }),
     })
     .default({}),
   ekipler: z

@@ -461,6 +461,11 @@ const emptyRoleMap = (): Record<OsgbRole, number> => ({
   dsp: 0,
 });
 
+const getRoleMinutes = (
+  minutesByRole: Partial<Record<OsgbRole, number>> | null | undefined,
+  role: OsgbRole,
+) => Number(minutesByRole?.[role] || 0);
+
 const normalizeComplianceStatus = (value: string | null | undefined): OsgbComplianceStatus => {
   const normalized = String(value || "").toLowerCase();
   if (normalized === "warning") return "warning";
@@ -1367,7 +1372,7 @@ export const getOsgbWorkspaceAssignmentRecommendation = (
 ): OsgbWorkspaceAssignmentRecommendation | null => {
   if (!company) return null;
 
-  const recommendedMinutes = company.requiredMinutesByRole[role] || 0;
+  const recommendedMinutes = getRoleMinutes(company.requiredMinutesByRole, role);
   const remainingGapMinutes = Math.max(0, recommendedMinutes - currentAssignedMinutes);
   const roleName = role === "igu" ? "İSG uzmanı" : role === "hekim" ? "işyeri hekimi" : "DSP";
 
