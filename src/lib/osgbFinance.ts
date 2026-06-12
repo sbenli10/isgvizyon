@@ -1,6 +1,26 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type OsgbFinanceStatus = "pending" | "paid" | "overdue";
+export type OsgbFixedExpenseStatus = "pending" | "paid" | "overdue";
+
+export const OSGB_FIXED_EXPENSE_ITEMS = [
+  "Kira",
+  "Personel Maaş",
+  "Muhasebe",
+  "SGK Primi",
+  "Vergi",
+  "İletişim",
+  "Ulaşım",
+  "Yemek",
+  "Ofis Gideri",
+  "Elektrik",
+  "Su",
+  "İnternet",
+  "Sigorta",
+  "Diğer",
+] as const;
+
+export type OsgbFixedExpenseItem = (typeof OSGB_FIXED_EXPENSE_ITEMS)[number];
 
 export interface OsgbFinanceRecord {
   id: string;
@@ -29,6 +49,38 @@ export interface OsgbFinanceInput {
   notes?: string | null;
 }
 
+export interface OsgbFixedExpenseRecord {
+  id: string;
+  organizationId: string;
+  companyId: string | null;
+  expenseItem: string;
+  periodMonth: number;
+  periodYear: number;
+  period: string;
+  amount: number;
+  dueDate: string | null;
+  status: OsgbFixedExpenseStatus;
+  notes: string | null;
+  isRecurring: boolean;
+  recurringGroupId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OsgbFixedExpenseInput {
+  companyId?: string | null;
+  expenseItem: string;
+  periodMonth: number;
+  periodYear: number;
+  amount: number;
+  dueDate?: string | null;
+  status?: OsgbFixedExpenseStatus;
+  notes?: string | null;
+  isRecurring?: boolean;
+  recurringGroupId?: string | null;
+}
+
 const FINANCE_SELECT = `
   id,
   organization_id,
@@ -48,6 +100,24 @@ const FINANCE_SELECT = `
 
 const PERIOD_PATTERN = /^\d{4}-\d{2}$/;
 
+const FIXED_EXPENSE_SELECT = `
+  id,
+  organization_id,
+  company_id,
+  expense_item,
+  period_month,
+  period_year,
+  amount,
+  due_date,
+  status,
+  notes,
+  is_recurring,
+  recurring_group_id,
+  created_by,
+  created_at,
+  updated_at
+`;
+
 const mapFinanceRecord = (row: any): OsgbFinanceRecord => ({
   id: row.id,
   organizationId: row.organization_id,
@@ -63,6 +133,30 @@ const mapFinanceRecord = (row: any): OsgbFinanceRecord => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
+
+const mapFixedExpenseRecord = (row: any): OsgbFixedExpenseRecord => {
+  const periodYear = Number(row.period_year || 0);
+  const periodMonth = Number(row.period_month || 0);
+
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    companyId: row.company_id || null,
+    expenseItem: row.expense_item,
+    periodMonth,
+    periodYear,
+    period: `${periodYear}-${String(periodMonth).padStart(2, "0")}`,
+    amount: Number(row.amount || 0),
+    dueDate: row.due_date || null,
+    status: (row.status || "pending") as OsgbFixedExpenseStatus,
+    notes: row.notes || null,
+    isRecurring: Boolean(row.is_recurring),
+    recurringGroupId: row.recurring_group_id || null,
+    createdBy: row.created_by || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+};
 
 const assertValidPeriod = (period: string) => {
   if (!PERIOD_PATTERN.test(period)) {
@@ -85,6 +179,20 @@ const buildFinancePayload = (organizationId: string, input: OsgbFinanceInput) =>
     notes: input.notes?.trim() || null,
   };
 };
+
+const buildFixedExpensePayload = (organizationId: string, input: OsgbFixedExpenseInput) => ({
+  organization_id: organizationId,
+  company_id: input.companyId || null,
+  expense_item: input.expenseItem.trim(),
+  period_month: Number(input.periodMonth),
+  period_year: Number(input.periodYear),
+  amount: Number(input.amount || 0),
+  due_date: input.dueDate || null,
+  status: input.status || "pending",
+  notes: input.notes?.trim() || null,
+  is_recurring: Boolean(input.isRecurring),
+  recurring_group_id: input.recurringGroupId || null,
+});
 
 const addOneMonthToPeriod = (period: string) => {
   assertValidPeriod(period);
@@ -245,4 +353,85 @@ export const duplicateFinanceNextMonth = async (
     status: "pending",
     notes: record.notes,
   });
+};
+
+export const listOsgbFixedExpenses = async (organizationId: string): Promise<OsgbFixedExpenseRecord[]> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_fixed_expenses")
+    .select(FIXED_EXPENSE_SELECT)
+    .eq("organization_id", organizationId)
+    .order("period_year", { ascending: false })
+    .order("period_month", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(mapFixedExpenseRecord);
+};
+
+export const createOsgbFixedExpense = async (
+  userId: string,
+  organizationId: string,
+  input: OsgbFixedExpenseInput,
+): Promise<OsgbFixedExpenseRecord> => {
+  const payload = {
+    ...buildFixedExpensePayload(organizationId, input),
+    created_by: userId,
+  };
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_fixed_expenses")
+    .insert(payload)
+    .select(FIXED_EXPENSE_SELECT)
+    .single();
+
+  if (error) throw error;
+  return mapFixedExpenseRecord(data);
+};
+
+export const createOsgbFixedExpenses = async (
+  userId: string,
+  organizationId: string,
+  inputs: OsgbFixedExpenseInput[],
+): Promise<OsgbFixedExpenseRecord[]> => {
+  if (inputs.length === 0) return [];
+
+  const payload = inputs.map((input) => ({
+    ...buildFixedExpensePayload(organizationId, input),
+    created_by: userId,
+  }));
+
+  const { data, error } = await (supabase as any)
+    .from("osgb_fixed_expenses")
+    .insert(payload)
+    .select(FIXED_EXPENSE_SELECT);
+
+  if (error) throw error;
+  return (data || []).map(mapFixedExpenseRecord);
+};
+
+export const updateOsgbFixedExpense = async (
+  id: string,
+  organizationId: string,
+  input: OsgbFixedExpenseInput,
+): Promise<OsgbFixedExpenseRecord> => {
+  const { data, error } = await (supabase as any)
+    .from("osgb_fixed_expenses")
+    .update(buildFixedExpensePayload(organizationId, input))
+    .eq("id", id)
+    .eq("organization_id", organizationId)
+    .select(FIXED_EXPENSE_SELECT)
+    .single();
+
+  if (error) throw error;
+  return mapFixedExpenseRecord(data);
+};
+
+export const deleteOsgbFixedExpense = async (id: string, organizationId: string): Promise<void> => {
+  const { error } = await (supabase as any)
+    .from("osgb_fixed_expenses")
+    .delete()
+    .eq("id", id)
+    .eq("organization_id", organizationId);
+
+  if (error) throw error;
 };

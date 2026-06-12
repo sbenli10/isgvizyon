@@ -324,18 +324,8 @@ export default function Auth() {
     if (!domain) return null;
 
     if (isLikelyCorporateDomain(domain)) {
-      return {
-        type: "info" as const,
-        title: "Kurumsal e-posta algılandı",
-        description:
-          "Şirket hesabınız varsa SSO kullanılabilir. Yöneticinizden SSO bağlantısı veya kurumsal giriş politikasını isteyin.",
-      };
+      
     }
-    return {
-      type: "warning" as const,
-      title: "Kişisel e-posta algılandı",
-      description: "Kurumsal kullanım için şirket e-postasıyla giriş yapmanız önerilir.",
-    };
   }, [formData.email]);
 
   const setFieldError = (field: keyof FieldErrors, message?: string) => {

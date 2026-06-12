@@ -41,17 +41,27 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   createOsgbFinanceRecord,
+  createOsgbFixedExpense,
+  createOsgbFixedExpenses,
   deleteOsgbFinanceRecord,
+  deleteOsgbFixedExpense,
   duplicateFinanceNextMonth,
+  listOsgbFixedExpenses,
   listOsgbFinanceRecords,
   markFinanceOverdue,
   markFinancePaid,
   markFinancePending,
+  OSGB_FIXED_EXPENSE_ITEMS,
+  updateOsgbFixedExpense,
   updateOsgbFinanceRecord,
+  type OsgbFixedExpenseInput,
+  type OsgbFixedExpenseRecord,
+  type OsgbFixedExpenseStatus,
   type OsgbFinanceInput,
   type OsgbFinanceRecord,
   type OsgbFinanceStatus,
@@ -64,6 +74,17 @@ type FinanceFormState = {
   dueDate: string;
   invoiceNo: string;
   status: OsgbFinanceStatus;
+  notes: string;
+};
+
+type FixedExpenseFormState = {
+  expenseItem: string;
+  period: string;
+  amount: string;
+  dueDate: string;
+  status: OsgbFixedExpenseStatus;
+  isRecurring: boolean;
+  recurringPeriods: string[];
   notes: string;
 };
 
@@ -91,7 +112,24 @@ const emptyForm = (): FinanceFormState => ({
   notes: "",
 });
 
+const emptyExpenseForm = (): FixedExpenseFormState => ({
+  expenseItem: "",
+  period: currentPeriod(),
+  amount: "",
+  dueDate: "",
+  status: "pending",
+  isRecurring: false,
+  recurringPeriods: [currentPeriod()],
+  notes: "",
+});
+
 const statusLabels: Record<OsgbFinanceStatus, string> = {
+  pending: "Beklemede",
+  paid: "Ödendi",
+  overdue: "Gecikti",
+};
+
+const expenseStatusLabels: Record<OsgbFixedExpenseStatus, string> = {
   pending: "Beklemede",
   paid: "Ödendi",
   overdue: "Gecikti",
@@ -157,6 +195,31 @@ const isDueNextSevenDays = (record: OsgbFinanceRecord) => {
 const financeSearchText = (record: OsgbFinanceRecord) =>
   normalizeText([record.companyName, record.period, record.invoiceNo, record.notes].join(" "));
 
+const expenseSearchText = (record: OsgbFixedExpenseRecord) =>
+  normalizeText([record.expenseItem, record.period, record.notes].join(" "));
+
+const parsePeriod = (period: string) => {
+  const [year, month] = period.split("-").map(Number);
+  return { year: year || new Date().getFullYear(), month: month || new Date().getMonth() + 1 };
+};
+
+const addMonthsToPeriod = (period: string, count: number) => {
+  const { year, month } = parsePeriod(period);
+  const date = new Date(year, month - 1, 1);
+  date.setMonth(date.getMonth() + count);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+};
+
+const alignDueDateToPeriod = (dueDate: string, period: string) => {
+  if (!dueDate) return "";
+  const due = new Date(`${dueDate}T00:00:00`);
+  if (Number.isNaN(due.getTime())) return "";
+  const { year, month } = parsePeriod(period);
+  const lastDay = new Date(year, month, 0).getDate();
+  const day = Math.min(due.getDate(), lastDay);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+};
+
 const makeInvoiceNo = (period: string, count: number) => {
   const year = period.slice(0, 4) || new Date().getFullYear().toString();
   return `IST-${year}-${String(count + 1).padStart(3, "0")}`;
@@ -174,6 +237,8 @@ const financeDebugLog = (event: string, payload?: Record<string, unknown>) => {
 };
 
 const sumAmounts = (rows: OsgbFinanceRecord[]) => rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+const sumExpenseAmounts = (rows: OsgbFixedExpenseRecord[]) =>
+  rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 
 const buildStats = (rows: OsgbFinanceRecord[]) => {
   const total = sumAmounts(rows);
@@ -253,37 +318,151 @@ const RadarCard = ({
   </div>
 );
 
-const FixedExpensesPanel = ({ onBack }: { onBack: () => void }) => (
-  <section className="rounded-xl border border-slate-800 bg-[#070d1f] p-5">
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Sabit Giderler</p>
-        <h2 className="mt-2 text-lg font-black text-white">Aylık gider takip alanı</h2>
-        <p className="mt-1 max-w-2xl text-sm text-slate-400">
-          Bu sekme açık. Sabit gider kayıtları için ayrı tablo ve kayıt formu eklendiğinde tahsilat ekranından
-          bağımsız yönetilecek.
-        </p>
-      </div>
-      <Button type="button" onClick={onBack} className="rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400">
-        <CreditCard className="mr-2 h-4 w-4" /> Tahsilatlara Dön
-      </Button>
+const FixedExpensesPanel = ({
+  records,
+  filteredRecords,
+  loading,
+  search,
+  statusFilter,
+  itemFilter,
+  periodFilter,
+  periods,
+  stats,
+  filteredTotal,
+  onSearchChange,
+  onStatusFilterChange,
+  onItemFilterChange,
+  onPeriodFilterChange,
+  onResetFilters,
+  onOpenCreate,
+  onEdit,
+  onDelete,
+}: {
+  records: OsgbFixedExpenseRecord[];
+  filteredRecords: OsgbFixedExpenseRecord[];
+  loading: boolean;
+  search: string;
+  statusFilter: OsgbFixedExpenseStatus | "all";
+  itemFilter: string;
+  periodFilter: string;
+  periods: string[];
+  stats: { total: number; paid: number; pending: number; overdue: number };
+  filteredTotal: number;
+  onSearchChange: (value: string) => void;
+  onStatusFilterChange: (value: OsgbFixedExpenseStatus | "all") => void;
+  onItemFilterChange: (value: string) => void;
+  onPeriodFilterChange: (value: string) => void;
+  onResetFilters: () => void;
+  onOpenCreate: () => void;
+  onEdit: (record: OsgbFixedExpenseRecord) => void;
+  onDelete: (record: OsgbFixedExpenseRecord) => void;
+}) => (
+  <>
+    <div className="grid gap-3 md:grid-cols-4">
+      <KpiCard title={`${periodFilter === "all" ? currentPeriod() : periodFilter} Gider`} value={formatCurrency(stats.total)} subtitle={`${records.length} kayıt`} icon={Wallet} />
+      <KpiCard title="Ödenen" value={formatCurrency(stats.paid)} subtitle="Kapanan giderler" icon={BadgeDollarSign} tone="emerald" />
+      <KpiCard title="Bekleyen" value={formatCurrency(stats.pending)} subtitle="Takipteki giderler" icon={Clock3} tone="amber" />
+      <KpiCard title="Geciken" value={formatCurrency(stats.overdue)} subtitle="Kritik giderler" icon={ShieldAlert} tone="rose" />
     </div>
-    <div className="mt-5 grid gap-3 md:grid-cols-3">
-      <KpiCard title="Aylık Gider" value={formatCurrency(0)} subtitle="Henüz gider kaydı yok" icon={Wallet} />
-      <KpiCard title="Ödenen Gider" value={formatCurrency(0)} subtitle="0 ödeme kapandı" icon={BadgeDollarSign} tone="emerald" />
-      <KpiCard title="Bekleyen Gider" value={formatCurrency(0)} subtitle="0 kayıt takipte" icon={Clock3} tone="amber" />
-    </div>
-    <div className="mt-5 flex min-h-[260px] flex-col items-center justify-center rounded-xl border border-slate-800 bg-[#050a18] px-4 text-center">
-      <div className="rounded-2xl bg-slate-800 p-4 text-slate-300">
-        <BarChart3 className="h-7 w-7" />
+
+    <section className="rounded-xl border border-slate-800 bg-[#070d1f] p-3 sm:p-4">
+      <div className="flex flex-col gap-3 xl:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Gider kalemi, dönem veya not ara"
+            className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] pl-10 text-slate-100 placeholder:text-slate-500"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={(value) => onStatusFilterChange(value as OsgbFixedExpenseStatus | "all")}>
+          <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
+            <SelectValue placeholder="Tüm durumlar" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tüm durumlar</SelectItem>
+            <SelectItem value="pending">Beklemede</SelectItem>
+            <SelectItem value="paid">Ödendi</SelectItem>
+            <SelectItem value="overdue">Gecikti</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={itemFilter} onValueChange={onItemFilterChange}>
+          <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-44">
+            <SelectValue placeholder="Tüm kalemler" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tüm kalemler</SelectItem>
+            {OSGB_FIXED_EXPENSE_ITEMS.map((item) => (
+              <SelectItem key={item} value={item}>{item}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={periodFilter} onValueChange={onPeriodFilterChange}>
+          <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-[#0f1a2f] font-bold text-slate-100 xl:w-40">
+            <SelectValue placeholder="Tüm dönemler" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tüm dönemler</SelectItem>
+            {periods.map((period) => (
+              <SelectItem key={period} value={period}>{period}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button type="button" variant="secondary" onClick={onResetFilters} className="h-11 rounded-xl bg-slate-800 text-slate-100 hover:bg-slate-700">
+          <SlidersHorizontal className="mr-2 h-4 w-4" /> Filtreleri Sıfırla
+        </Button>
+        <Button type="button" onClick={onOpenCreate} className="h-11 rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400">
+          <Plus className="mr-2 h-4 w-4" /> Yeni Gider
+        </Button>
       </div>
-      <h3 className="mt-4 text-base font-black text-white">Henüz sabit gider kaydı eklenmedi</h3>
-      <p className="mt-2 max-w-lg text-sm text-slate-400">
-        Bu alan artık erişilebilir. Gider kayıt formu hazırlandığında kira, maaş, abonelik ve operasyon giderleri
-        burada takip edilecek.
+      <p className="mt-3 text-xs font-semibold text-slate-400">
+        {filteredRecords.length} kayıt gösteriliyor • Filtrelenen gider {formatCurrency(filteredTotal)} • Tüm dönemler {formatCurrency(sumExpenseAmounts(records))}
       </p>
-    </div>
-  </section>
+    </section>
+
+    <section className="overflow-hidden rounded-xl border border-slate-800 bg-[#050a18]">
+      {loading ? (
+        <div className="flex min-h-[220px] items-center justify-center text-slate-300">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Sabit giderler yükleniyor...
+        </div>
+      ) : filteredRecords.length === 0 ? (
+        <div className="flex min-h-[220px] flex-col items-center justify-center px-4 text-center">
+          <div className="rounded-2xl bg-slate-800 p-4 text-slate-300">
+            <Search className="h-7 w-7" />
+          </div>
+          <h3 className="mt-4 text-base font-black text-white">Henüz gider kaydı eklenmedi</h3>
+          <p className="mt-2 max-w-lg text-sm text-slate-400">
+            İlk sabit gider kaydınızı ekleyin. Tekrarlayan giderler için birden fazla ay seçebilirsiniz.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-800">
+          {filteredRecords.map((record) => (
+            <div key={record.id} className="grid gap-3 p-4 text-sm text-slate-200 transition hover:bg-slate-900/60 lg:grid-cols-[1.2fr_.7fr_.7fr_.7fr_.8fr_1fr_auto] lg:items-center">
+              <div>
+                <p className="font-black text-white"><FileText className="mr-2 inline h-4 w-4 text-cyan-300" />{record.expenseItem}</p>
+                <p className="mt-1 text-xs text-slate-500">{record.isRecurring ? "Tekrarlayan gider" : "Tekil gider"}</p>
+              </div>
+              <div className="font-semibold">{formatMonthLabel(record.period)}</div>
+              <div className="font-black text-white">{formatCurrency(record.amount)}</div>
+              <div><Calendar className="mr-2 inline h-4 w-4 text-slate-400" />{formatDate(record.dueDate)}</div>
+              <div><Badge className={cn("rounded-full", statusClasses[record.status])}>{expenseStatusLabels[record.status]}</Badge></div>
+              <div className="min-w-0 truncate text-slate-400">{record.notes || "-"}</div>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" onClick={() => onEdit(record)} className="h-8 rounded-full bg-slate-800 px-3 text-xs text-slate-100 hover:bg-blue-700">
+                  <Edit3 className="mr-1 h-3 w-3" /> Düzenle
+                </Button>
+                <Button size="sm" onClick={() => onDelete(record)} className="h-8 rounded-full bg-rose-500/20 px-3 text-xs text-rose-100 hover:bg-rose-700">
+                  <Trash2 className="mr-1 h-3 w-3" /> Sil
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  </>
 );
 
 export default function OSGBFinance() {
@@ -292,21 +471,32 @@ export default function OSGBFinance() {
   const { companies = [] } = useOsgbManagedCompanies(organizationId);
 
   const [records, setRecords] = useState<OsgbFinanceRecord[]>([]);
+  const [expenseRecords, setExpenseRecords] = useState<OsgbFixedExpenseRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expensesLoading, setExpensesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [expenseSaving, setExpenseSaving] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<OsgbFinanceRecord | null>(null);
+  const [editingExpenseRecord, setEditingExpenseRecord] = useState<OsgbFixedExpenseRecord | null>(null);
   const [detailRecord, setDetailRecord] = useState<OsgbFinanceRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<OsgbFinanceRecord | null>(null);
+  const [expenseDeleteTarget, setExpenseDeleteTarget] = useState<OsgbFixedExpenseRecord | null>(null);
   const [form, setForm] = useState<FinanceFormState>(emptyForm);
+  const [expenseForm, setExpenseForm] = useState<FixedExpenseFormState>(emptyExpenseForm);
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OsgbFinanceStatus | "all">("all");
   const [companyFilter, setCompanyFilter] = useState("all");
   const [periodFilter, setPeriodFilter] = useState("all");
+  const [expenseSearch, setExpenseSearch] = useState("");
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState<OsgbFixedExpenseStatus | "all">("all");
+  const [expenseItemFilter, setExpenseItemFilter] = useState("all");
+  const [expensePeriodFilter, setExpensePeriodFilter] = useState("all");
   const [activeTab, setActiveTab] = useState<FinanceTab>("income");
 
   usePageDataTiming(loading);
@@ -332,20 +522,28 @@ export default function OSGBFinance() {
   const loadData = useCallback(async () => {
     if (!organizationId) {
       setRecords([]);
+      setExpenseRecords([]);
       setError(null);
       setLoading(false);
+      setExpensesLoading(false);
       return;
     }
 
     setLoading(true);
+    setExpensesLoading(true);
     try {
-      const rows = await listOsgbFinanceRecords(organizationId);
+      const [rows, fixedExpenseRows] = await Promise.all([
+        listOsgbFinanceRecords(organizationId),
+        listOsgbFixedExpenses(organizationId),
+      ]);
       setRecords((rows || []).map(hydrateRecord));
+      setExpenseRecords(fixedExpenseRows || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Finans kayıtları yüklenemedi.");
     } finally {
       setLoading(false);
+      setExpensesLoading(false);
     }
   }, [hydrateRecord, organizationId]);
 
@@ -374,6 +572,34 @@ export default function OSGBFinance() {
   const stats = useMemo(() => buildStats(records), [records]);
 
   const filteredTotal = useMemo(() => sumAmounts(filteredRecords), [filteredRecords]);
+
+  const expensePeriods = useMemo(() => {
+    const set = new Set(expenseRecords.map((record) => record.period).filter(Boolean));
+    set.add(currentPeriod());
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [expenseRecords]);
+
+  const filteredExpenseRecords = useMemo(() => {
+    const term = normalizeText(expenseSearch);
+
+    return expenseRecords.filter((record) => {
+      if (expenseStatusFilter !== "all" && record.status !== expenseStatusFilter) return false;
+      if (expenseItemFilter !== "all" && record.expenseItem !== expenseItemFilter) return false;
+      if (expensePeriodFilter !== "all" && record.period !== expensePeriodFilter) return false;
+      if (term && !expenseSearchText(record).includes(term)) return false;
+      return true;
+    });
+  }, [expenseItemFilter, expensePeriodFilter, expenseRecords, expenseSearch, expenseStatusFilter]);
+
+  const expenseStats = useMemo(() => {
+    const total = sumExpenseAmounts(filteredExpenseRecords);
+    const paid = sumExpenseAmounts(filteredExpenseRecords.filter((record) => record.status === "paid"));
+    const pending = sumExpenseAmounts(filteredExpenseRecords.filter((record) => record.status === "pending"));
+    const overdue = sumExpenseAmounts(filteredExpenseRecords.filter((record) => record.status === "overdue"));
+    return { total, paid, pending, overdue };
+  }, [filteredExpenseRecords]);
+
+  const filteredExpenseTotal = useMemo(() => sumExpenseAmounts(filteredExpenseRecords), [filteredExpenseRecords]);
 
   const radar = useMemo(() => {
     const todayRows = records.filter(isDueToday);
@@ -554,6 +780,118 @@ export default function OSGBFinance() {
     setPeriodFilter("all");
   };
 
+  const resetExpenseFilters = () => {
+    setExpenseSearch("");
+    setExpenseStatusFilter("all");
+    setExpenseItemFilter("all");
+    setExpensePeriodFilter("all");
+  };
+
+  const openCreateExpenseDialog = () => {
+    const period = expensePeriodFilter !== "all" ? expensePeriodFilter : currentPeriod();
+    setEditingExpenseRecord(null);
+    setExpenseForm({
+      ...emptyExpenseForm(),
+      period,
+      recurringPeriods: [period],
+    });
+    setExpenseDialogOpen(true);
+  };
+
+  const openEditExpenseDialog = (record: OsgbFixedExpenseRecord) => {
+    setEditingExpenseRecord(record);
+    setExpenseForm({
+      expenseItem: record.expenseItem,
+      period: record.period,
+      amount: String(record.amount || ""),
+      dueDate: record.dueDate || "",
+      status: record.status,
+      isRecurring: record.isRecurring,
+      recurringPeriods: [record.period],
+      notes: record.notes || "",
+    });
+    setExpenseDialogOpen(true);
+  };
+
+  const buildExpenseInputs = (): OsgbFixedExpenseInput[] => {
+    const amount = parseAmount(expenseForm.amount);
+    const selectedPeriods = expenseForm.isRecurring
+      ? Array.from(new Set(expenseForm.recurringPeriods.length > 0 ? expenseForm.recurringPeriods : [expenseForm.period])).sort()
+      : [expenseForm.period];
+
+    const recurringGroupId =
+      expenseForm.isRecurring && !editingExpenseRecord && typeof crypto !== "undefined"
+        ? crypto.randomUUID()
+        : editingExpenseRecord?.recurringGroupId || null;
+
+    return selectedPeriods.map((period) => {
+      const { year, month } = parsePeriod(period);
+      return {
+        expenseItem: expenseForm.expenseItem,
+        periodYear: year,
+        periodMonth: month,
+        amount,
+        dueDate: alignDueDateToPeriod(expenseForm.dueDate, period) || null,
+        status: expenseForm.status,
+        notes: expenseForm.notes.trim() || null,
+        isRecurring: expenseForm.isRecurring,
+        recurringGroupId,
+      };
+    });
+  };
+
+  const handleSaveExpense = async () => {
+    if (!organizationId || !user?.id) {
+      toast.error("Oturum veya organizasyon bilgisi bulunamadı.");
+      return;
+    }
+
+    const amount = parseAmount(expenseForm.amount);
+    if (!expenseForm.expenseItem || !expenseForm.period || amount <= 0) {
+      toast.error("Gider kalemi, dönem ve 0'dan büyük tutar zorunlu.");
+      return;
+    }
+
+    setExpenseSaving(true);
+    try {
+      const inputs = buildExpenseInputs();
+      if (editingExpenseRecord) {
+        await updateOsgbFixedExpense(editingExpenseRecord.id, organizationId, inputs[0]);
+        toast.success("Sabit gider kaydı güncellendi.");
+      } else if (inputs.length > 1) {
+        await createOsgbFixedExpenses(user.id, organizationId, inputs);
+        toast.success(`${inputs.length} dönem için sabit gider oluşturuldu.`);
+      } else {
+        await createOsgbFixedExpense(user.id, organizationId, inputs[0]);
+        toast.success("Sabit gider kaydı eklendi.");
+      }
+
+      setExpenseDialogOpen(false);
+      setEditingExpenseRecord(null);
+      await loadData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sabit gider kaydı kaydedilemedi.");
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
+
+  const handleDeleteExpense = async () => {
+    if (!organizationId || !expenseDeleteTarget) return;
+
+    setActionLoadingId(expenseDeleteTarget.id);
+    try {
+      await deleteOsgbFixedExpense(expenseDeleteTarget.id, organizationId);
+      setExpenseDeleteTarget(null);
+      await loadData();
+      toast.success("Sabit gider kaydı silindi.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Sabit gider kaydı silinemedi.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   if (!organizationId) {
     return (
       <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-amber-100">
@@ -605,7 +943,26 @@ export default function OSGBFinance() {
         </div>
 
         {activeTab === "expenses" ? (
-          <FixedExpensesPanel onBack={() => setActiveTab("income")} />
+          <FixedExpensesPanel
+            records={expenseRecords}
+            filteredRecords={filteredExpenseRecords}
+            loading={expensesLoading}
+            search={expenseSearch}
+            statusFilter={expenseStatusFilter}
+            itemFilter={expenseItemFilter}
+            periodFilter={expensePeriodFilter}
+            periods={expensePeriods}
+            stats={expenseStats}
+            filteredTotal={filteredExpenseTotal}
+            onSearchChange={setExpenseSearch}
+            onStatusFilterChange={setExpenseStatusFilter}
+            onItemFilterChange={setExpenseItemFilter}
+            onPeriodFilterChange={setExpensePeriodFilter}
+            onResetFilters={resetExpenseFilters}
+            onOpenCreate={openCreateExpenseDialog}
+            onEdit={openEditExpenseDialog}
+            onDelete={setExpenseDeleteTarget}
+          />
         ) : (
           <>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -972,6 +1329,201 @@ export default function OSGBFinance() {
         )}
       </div>
 
+      <Dialog open={expenseDialogOpen} onOpenChange={setExpenseDialogOpen}>
+        <DialogContent
+          container={dialogPortalContainer}
+          overlayClassName="z-[110] bg-slate-950/80 backdrop-blur-sm"
+          className="z-[120] max-h-[calc(100vh-2rem)] gap-0 overflow-hidden rounded-[22px] border-[#1b2942] bg-[#050a18] p-0 text-slate-100 shadow-2xl shadow-slate-950/60 sm:max-w-[330px] [&>button.absolute]:hidden"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{editingExpenseRecord ? "Sabit gider kaydını düzenle" : "Sabit gider kaydı ekle"}</DialogTitle>
+            <DialogDescription>Gider kalemi, dönem, tutar, vade, durum ve not bilgileriyle sabit gider formu.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-start justify-between border-b border-[#1b2942] px-4 py-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.32em] text-slate-500">Yeni Gider</p>
+              <h2 className="mt-2 text-base font-black text-white">
+                {editingExpenseRecord ? "Sabit gider kaydını düzenle" : "Sabit gider kaydı ekle"}
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpenseDialogOpen(false)}
+              className="rounded-full bg-[#111c2e] p-2 text-slate-300 transition hover:bg-slate-700 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="max-h-[calc(100vh-10rem)] space-y-4 overflow-y-auto px-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="osgb-fixed-expense-item" className="text-xs font-bold text-slate-200">
+                <FileText className="mr-2 inline h-3.5 w-3.5" />
+                Gider Kalemi
+              </Label>
+              <Select value={expenseForm.expenseItem || undefined} onValueChange={(value) => setExpenseForm((current) => ({ ...current, expenseItem: value }))}>
+                <SelectTrigger id="osgb-fixed-expense-item" className="h-9 rounded-xl border-cyan-400 bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
+                  <SelectValue placeholder="Gider kalemi seçin" />
+                </SelectTrigger>
+                <SelectContent className="z-[140] rounded-none border border-slate-300 bg-[#111a2d] p-0 text-white shadow-xl">
+                  {OSGB_FIXED_EXPENSE_ITEMS.map((item) => (
+                    <SelectItem
+                      key={item}
+                      value={item}
+                      className="rounded-none py-2 pl-3 pr-3 text-sm font-semibold text-white focus:bg-blue-600 focus:text-white data-[state=checked]:bg-blue-600 data-[state=checked]:text-white [&>span:first-child]:hidden"
+                    >
+                      {item}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="osgb-fixed-expense-period" className="text-xs font-bold text-slate-200">Dönem</Label>
+                <Input
+                  id="osgb-fixed-expense-period"
+                  name="osgb_fixed_expense_period"
+                  type="month"
+                  value={expenseForm.period}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      period: event.target.value,
+                      recurringPeriods: current.recurringPeriods.includes(event.target.value)
+                        ? current.recurringPeriods
+                        : [event.target.value],
+                    }))
+                  }
+                  className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="osgb-fixed-expense-amount" className="text-xs font-bold text-slate-200">Tutar (₺)</Label>
+                <Input
+                  id="osgb-fixed-expense-amount"
+                  name="osgb_fixed_expense_amount"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={expenseForm.amount}
+                  onChange={(event) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      amount: event.target.value.startsWith("-") ? "" : event.target.value,
+                    }))
+                  }
+                  className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="osgb-fixed-expense-due-date" className="text-xs font-bold text-slate-200">Vade Tarihi</Label>
+                <Input
+                  id="osgb-fixed-expense-due-date"
+                  name="osgb_fixed_expense_due_date"
+                  type="date"
+                  value={expenseForm.dueDate}
+                  onChange={(event) => setExpenseForm((current) => ({ ...current, dueDate: event.target.value }))}
+                  className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="osgb-fixed-expense-status" className="text-xs font-bold text-slate-200">Durum</Label>
+                <Select value={expenseForm.status} onValueChange={(value) => setExpenseForm((current) => ({ ...current, status: value as OsgbFixedExpenseStatus }))}>
+                  <SelectTrigger id="osgb-fixed-expense-status" className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[140] rounded-none border border-slate-300 bg-[#111a2d] p-0 text-white shadow-xl">
+                    <SelectItem value="pending">Beklemede</SelectItem>
+                    <SelectItem value="paid">Ödendi</SelectItem>
+                    <SelectItem value="overdue">Gecikti</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#30405d] bg-[#111a2d] p-3">
+              <div className="flex items-center gap-3">
+                <Switch
+                  id="osgb-fixed-expense-recurring"
+                  checked={expenseForm.isRecurring}
+                  disabled={Boolean(editingExpenseRecord)}
+                  onCheckedChange={(checked) =>
+                    setExpenseForm((current) => ({
+                      ...current,
+                      isRecurring: checked,
+                      recurringPeriods: checked
+                        ? Array.from(new Set([current.period, addMonthsToPeriod(current.period, 1), addMonthsToPeriod(current.period, 2)]))
+                        : [current.period],
+                    }))
+                  }
+                />
+                <Label htmlFor="osgb-fixed-expense-recurring" className="text-xs font-bold text-slate-200">
+                  <Copy className="mr-2 inline h-3.5 w-3.5" />
+                  Tekrarlayan Gider
+                </Label>
+              </div>
+              {expenseForm.isRecurring && !editingExpenseRecord ? (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {Array.from({ length: 6 }, (_, index) => addMonthsToPeriod(expenseForm.period, index)).map((period) => (
+                    <button
+                      key={period}
+                      type="button"
+                      onClick={() =>
+                        setExpenseForm((current) => ({
+                          ...current,
+                          recurringPeriods: current.recurringPeriods.includes(period)
+                            ? current.recurringPeriods.filter((item) => item !== period)
+                            : [...current.recurringPeriods, period],
+                        }))
+                      }
+                      className={cn(
+                        "rounded-lg border px-2 py-2 text-xs font-bold transition",
+                        expenseForm.recurringPeriods.includes(period)
+                          ? "border-cyan-400 bg-cyan-500/20 text-cyan-100"
+                          : "border-slate-700 bg-[#050a18] text-slate-400 hover:border-slate-500",
+                      )}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="osgb-fixed-expense-notes" className="text-xs font-bold text-slate-200">
+                <FileText className="mr-2 inline h-3.5 w-3.5" />
+                Notlar
+              </Label>
+              <Textarea
+                id="osgb-fixed-expense-notes"
+                name="osgb_fixed_expense_notes"
+                value={expenseForm.notes}
+                onChange={(event) => setExpenseForm((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="Ek notlar..."
+                className="min-h-20 resize-none rounded-xl border-[#30405d] bg-[#111a2d] text-sm font-semibold text-slate-100 placeholder:text-slate-500"
+              />
+            </div>
+          </div>
+          <DialogFooter className="grid grid-cols-2 gap-3 border-t border-[#1b2942] px-4 py-3">
+            <Button type="button" variant="secondary" onClick={() => setExpenseDialogOpen(false)} className="rounded-xl bg-[#111a2d] text-white hover:bg-slate-700">
+              Vazgeç
+            </Button>
+            <Button
+              type="button"
+              disabled={expenseSaving || !expenseForm.expenseItem || !expenseForm.period || parseAmount(expenseForm.amount) <= 0}
+              onClick={handleSaveExpense}
+              className="rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400 disabled:opacity-50"
+            >
+              {expenseSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+              Kaydet
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent
           container={dialogPortalContainer}
@@ -1240,6 +1792,29 @@ export default function OSGBFinance() {
               İptal
             </Button>
             <Button type="button" onClick={handleDelete} className="bg-rose-600 text-white hover:bg-rose-500">
+              Sil
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!expenseDeleteTarget} onOpenChange={(open) => !open && setExpenseDeleteTarget(null)}>
+        <DialogContent className="border-slate-700 bg-[#060b1d] text-slate-100 sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Sabit gider kaydı silinsin mi?</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {expenseDeleteTarget?.expenseItem || "Bu gider"} kaydı silinecek. Bu işlem geri alınamaz.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              onClick={() => setExpenseDeleteTarget(null)}
+              className="border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
+            >
+              İptal
+            </Button>
+            <Button type="button" onClick={handleDeleteExpense} className="bg-rose-600 text-white hover:bg-rose-500">
               Sil
             </Button>
           </DialogFooter>
