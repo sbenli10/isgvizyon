@@ -1,5 +1,6 @@
 import { saveAs } from "file-saver";
 import { ONBOARDING_TOPICS, ORIENTATION_TOPICS, type TopicStatus } from "@/components/assignment-letters/OrientationOnboardingTrainingModal";
+import { dateOrBlank, emptyLine, safeFilePart, valueOrBlank } from "@/lib/blankFormOutput";
 
 export interface OrientationOnboardingTrainingData {
   fullName: string;
@@ -18,10 +19,7 @@ export interface OrientationOnboardingTrainingData {
   employerSignatureName: string;
 }
 
-const safeText = (value?: string | null, fallback = "") => {
-  const normalized = value?.trim();
-  return normalized ? normalized : fallback;
-};
+const safeText = (value?: string | null, fallback = emptyLine) => valueOrBlank(value, fallback);
 
 const sanitizeFileName = (value: string) =>
   value
@@ -147,7 +145,7 @@ export async function generateOrientationOnboardingTrainingWord(data: Orientatio
       new TableRow({
         children: [
           textCell("İşe Giriş Tarihi", 27),
-          textCell(safeText(data.startDate), 69, { colSpan: 3 }),
+          textCell(dateOrBlank(data.startDate), 69, { colSpan: 3 }),
         ],
       }),
       new TableRow({
@@ -201,7 +199,7 @@ export async function generateOrientationOnboardingTrainingWord(data: Orientatio
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `${sanitizeFileName(`Oryantasyon-Isbasi-Egitimi-${data.fullName || "Form"}`)}.docx`;
+  const fileName = `${sanitizeFileName(`Oryantasyon-Isbasi-Egitimi-${safeFilePart(data.fullName)}`)}.docx`;
   saveAs(blob, fileName);
   return { blob, fileName };
 }

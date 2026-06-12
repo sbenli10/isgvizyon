@@ -1,4 +1,5 @@
 import { saveAs } from "file-saver";
+import { dateOrBlank, emptyLine, safeFilePart, valueOrBlank } from "@/lib/blankFormOutput";
 
 export interface EmployeeRepresentativeAppointmentData {
   workplaceTitle: string;
@@ -29,17 +30,9 @@ export interface EmployeeRepresentativeAppointmentData {
   additionalNotes: string;
 }
 
-const safeText = (value?: string | null, fallback = "-") => {
-  const normalized = value?.trim();
-  return normalized ? normalized : fallback;
-};
+const safeText = (value?: string | null, fallback = emptyLine) => valueOrBlank(value, fallback);
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("tr-TR");
-};
+const formatDate = (value?: string | null) => dateOrBlank(value);
 
 const sanitizeFileName = (value: string) =>
   value
@@ -562,7 +555,7 @@ export async function generateEmployeeRepresentativeAppointmentWord(data: Employ
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `${sanitizeFileName(`Calisan-Temsilcisi-Dosyasi-${data.representativeName || "Belge"}`)}.docx`;
+  const fileName = `${sanitizeFileName(`Calisan-Temsilcisi-Dosyasi-${safeFilePart(data.representativeName)}`)}.docx`;
   saveAs(blob, fileName);
   return { blob, fileName };
 }

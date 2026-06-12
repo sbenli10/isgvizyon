@@ -103,9 +103,9 @@ interface EmployeeRepresentativeBundleSettingsForm {
 const defaultForm: AssignmentFormValues = {
   company_id: "",
   employee_id: "",
-  start_date: new Date().toISOString().slice(0, 10),
-  duration: "12",
-  weekly_hours: "2",
+  start_date: "",
+  duration: "",
+  weekly_hours: "",
   hazard_class: "Az Tehlikeli",
 };
 
@@ -134,8 +134,8 @@ const defaultEmployeeRepresentativeBundleSettings: EmployeeRepresentativeBundleS
 const defaultWorkAccidentForm: WorkAccidentFormValues = {
   company_id: "",
   employee_id: "",
-  accident_date: new Date().toISOString().slice(0, 10),
-  accident_time: "09:00",
+  accident_date: "",
+  accident_time: "",
   injured_full_name: "",
   accident_place: "",
   injured_tc: "",
@@ -145,7 +145,7 @@ const defaultWorkAccidentForm: WorkAccidentFormValues = {
   witness_name: "",
   department_chief_name: "",
   safety_expert_name: "",
-  report_date: new Date().toISOString().slice(0, 10),
+  report_date: "",
   photos: [],
 };
 
@@ -164,7 +164,7 @@ const defaultReturnToWorkTrainingForm: ReturnToWorkTrainingFormValues = {
   address: "",
   sgk_registration_no: "",
   training_method: "",
-  training_date: new Date().toISOString().slice(0, 10),
+  training_date: "",
   training_duration: "",
   participant_name: "",
   participant_title: "",
@@ -182,8 +182,8 @@ const defaultRootCauseInvestigationForm: RootCauseInvestigationFormValues = {
   location: "",
   event_types: [],
   other_event_type: "",
-  event_date: new Date().toISOString().slice(0, 10),
-  event_time: "09:00",
+  event_date: "",
+  event_time: "",
   task_title: "",
   treatment_duration: "",
   unit_chief: "",
@@ -208,8 +208,8 @@ const defaultNearMissReportForm: NearMissReportFormValues = {
   manual_company_name: "",
   employee_mode: "system",
   employee_id: "",
-  report_date: new Date().toISOString().slice(0, 10),
-  report_time: "09:00",
+  report_date: "",
+  report_time: "",
   reporter_name: "",
   reporter_unit_role: "",
   is_experienced_by_reporter: false,
@@ -229,7 +229,7 @@ const defaultEmergencyDrillParticipants: EmergencyDrillAttendanceParticipantForm
 
 const defaultEmergencyDrillAttendanceForm: EmergencyDrillAttendanceFormValues = {
   drill_topic: "",
-  drill_date: new Date().toISOString().slice(0, 10),
+  drill_date: "",
   drill_duration: "",
   participants: defaultEmergencyDrillParticipants,
 };
@@ -237,13 +237,13 @@ const defaultEmergencyDrillAttendanceForm: EmergencyDrillAttendanceFormValues = 
 const defaultDrillForm: DrillFormValues = {
   workplace_name: "",
   drill_name: "",
-  drill_date: new Date().toISOString().slice(0, 10),
+  drill_date: "",
   drill_types: [],
   other_drill_type: "",
   participant_count: "",
   assembly_count_result: "",
-  start_time: "09:00",
-  end_time: "10:00",
+  start_time: "",
+  end_time: "",
   drill_subject: "",
   drill_purpose: "",
   post_drill_evaluation: "",
@@ -281,7 +281,7 @@ const defaultIncidentInvestigationReportForm: IncidentInvestigationReportFormVal
   witness_three_name: "",
   witness_three_title: "",
   witness_three_department: "",
-  report_date: new Date().toISOString().slice(0, 10),
+  report_date: "",
   prepared_by: "",
   approved_by: "",
 };
@@ -292,7 +292,7 @@ const buildTopicDefaults = (topics: readonly string[]) =>
 const defaultOrientationOnboardingTrainingForm: OrientationOnboardingTrainingFormValues = {
   full_name: "",
   birth_place_year: "",
-  start_date: new Date().toISOString().slice(0, 10),
+  start_date: "",
   education_level: "",
   position: "",
   orientation_duration: "",
@@ -319,9 +319,9 @@ const defaultEmployeeRepresentativeAppointmentForm: EmployeeRepresentativeAppoin
   representative_tc: "",
   representative_title: "",
   representative_department: "",
-  appointment_date: new Date().toISOString().slice(0, 10),
+  appointment_date: "",
   document_number: "",
-  representative_type: "Çalışan Temsilcisi",
+  representative_type: "",
   appointment_reason: "",
   legal_basis: "",
   duties_and_authorities: "",
@@ -729,6 +729,36 @@ export default function AssignmentLetters() {
     };
   }
 
+  function buildDraftAssignmentDocumentData(type: AssignmentType): AssignmentLetterDocumentData {
+    const company = companies.find((item) => item.id === form.company_id);
+    const employee = employees.find((item) => item.id === form.employee_id);
+    const employeeName = employee ? `${employee.first_name} ${employee.last_name}`.trim() : "";
+
+    return {
+      assignmentType: type,
+      assignmentTitle: assignmentLabels[type],
+      companyName: company?.company_name || "",
+      companyLogoUrl: company?.logo_url || undefined,
+      institutionTitle: letterSettings.institution_title,
+      institutionSubtitle: letterSettings.institution_subtitle || company?.company_name || "",
+      documentCode: letterSettings.document_code,
+      publishNumber: letterSettings.publish_number,
+      revisionDate: letterSettings.revision_date,
+      employeeName,
+      employeeJobTitle: employee?.job_title || "",
+      startDate: form.start_date,
+      duration: Number(form.duration || 0),
+      weeklyHours: Number(form.weekly_hours || 0),
+      hazardClass: form.hazard_class,
+      createdAt: "",
+      documentNumber: "",
+      leftSignatureName: letterSettings.left_signature_name,
+      leftSignatureTitle: letterSettings.left_signature_title,
+      rightSignatureName: letterSettings.right_signature_name || employeeName,
+      rightSignatureTitle: letterSettings.right_signature_title || employee?.job_title || "",
+    };
+  }
+
   function resolveArchiveCompany(companyId?: string | null, companyName?: string | null) {
     if (companyId) {
       const matched = companies.find((item) => item.id === companyId);
@@ -861,14 +891,23 @@ export default function AssignmentLetters() {
   async function handleCreateAssignment() {
     if (!activeType) return;
 
-    if (!form.company_id || !form.employee_id || !form.start_date || !form.duration || !form.weekly_hours) {
-      toast.error("Lütfen tüm zorunlu alanları doldurun.");
-      return;
-    }
-
     setSaving(true);
 
     try {
+      const canPersist =
+        Boolean(form.company_id) &&
+        Boolean(form.employee_id) &&
+        Boolean(form.start_date) &&
+        Number(form.duration || 0) > 0 &&
+        Number(form.weekly_hours || 0) > 0;
+
+      if (!canPersist) {
+        await generateAssignmentWord(buildDraftAssignmentDocumentData(activeType));
+        toast.success("Boş/kısmi atama yazısı Word çıktısı hazırlandı.");
+        resetModalState();
+        return;
+      }
+
       const payload = {
         company_id: form.company_id,
         employee_id: form.employee_id,
@@ -989,20 +1028,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateWorkAccidentReport() {
-    if (
-      !workAccidentForm.accident_date ||
-      !workAccidentForm.accident_time ||
-      !workAccidentForm.injured_full_name ||
-      !workAccidentForm.accident_place ||
-      !workAccidentForm.injured_tc ||
-      !workAccidentForm.injured_body_part ||
-      !workAccidentForm.victim_statement ||
-      !workAccidentForm.witness_statement
-    ) {
-      toast.error("Lütfen iş kazası tutanağı için zorunlu alanları doldurun.");
-      return;
-    }
-
     setWorkAccidentSaving(true);
 
     try {
@@ -1041,21 +1066,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateReturnTrainingForm() {
-    if (
-      !returnTrainingForm.organization_name.trim() ||
-      !returnTrainingForm.address.trim() ||
-      !returnTrainingForm.sgk_registration_no.trim() ||
-      !returnTrainingForm.training_method.trim() ||
-      !returnTrainingForm.training_date ||
-      !returnTrainingForm.training_duration.trim() ||
-      !returnTrainingForm.participant_name.trim() ||
-      !returnTrainingForm.participant_title.trim() ||
-      !returnTrainingForm.participant_tc.trim()
-    ) {
-      toast.error("Lütfen işe dönüş ilave eğitim formu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setReturnTrainingSaving(true);
 
     try {
@@ -1096,20 +1106,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateRootCauseForm() {
-    if (
-      !rootCauseForm.unit_name.trim() ||
-      !rootCauseForm.location.trim() ||
-      rootCauseForm.event_types.length === 0 ||
-      !rootCauseForm.event_date ||
-      !rootCauseForm.event_time ||
-      !rootCauseForm.injured_name.trim() ||
-      rootCauseForm.body_parts.length === 0 ||
-      !rootCauseForm.incident_description.trim()
-    ) {
-      toast.error("Lütfen kök neden araştırma formu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setRootCauseSaving(true);
 
     try {
@@ -1158,18 +1154,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateNearMissReport() {
-    if (
-      !nearMissForm.report_date ||
-      !nearMissForm.report_time ||
-      !nearMissForm.reporter_name.trim() ||
-      !nearMissForm.reporter_unit_role.trim() ||
-      !nearMissForm.incident_description.trim() ||
-      !nearMissForm.incident_location.trim()
-    ) {
-      toast.error("Lütfen olay bildirim formu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setNearMissSaving(true);
 
     try {
@@ -1208,15 +1192,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateEmergencyDrillAttendance() {
-    if (
-      !emergencyDrillForm.drill_topic.trim() ||
-      !emergencyDrillForm.drill_date ||
-      !emergencyDrillForm.drill_duration.trim()
-    ) {
-      toast.error("Lütfen tatbikat konusu, tarihi ve süresini doldurun.");
-      return;
-    }
-
     setEmergencyDrillSaving(true);
 
     try {
@@ -1242,16 +1217,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateDrillForm() {
-    if (
-      !drillForm.workplace_name.trim() ||
-      !drillForm.drill_name.trim() ||
-      !drillForm.drill_date ||
-      drillForm.drill_types.length === 0
-    ) {
-      toast.error("Lütfen işyeri, tatbikat adı, tarihi ve en az bir tatbikat türü girin.");
-      return;
-    }
-
     setDrillFormSaving(true);
 
     try {
@@ -1295,17 +1260,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateIncidentInvestigationReport() {
-    if (
-      !incidentInvestigationForm.cause_activity.trim() ||
-      !incidentInvestigationForm.where_when.trim() ||
-      !incidentInvestigationForm.incident_type.trim() ||
-      !incidentInvestigationForm.injured_full_name.trim() ||
-      !incidentInvestigationForm.incident_description.trim()
-    ) {
-      toast.error("Lütfen araştırma raporu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setIncidentInvestigationSaving(true);
 
     try {
@@ -1361,16 +1315,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateEmployeeRepresentativeAppointment() {
-    if (
-      !employeeRepresentativeAppointmentForm.workplace_title.trim() ||
-      !employeeRepresentativeAppointmentForm.representative_name.trim() ||
-      !employeeRepresentativeAppointmentForm.appointment_date ||
-      !employeeRepresentativeAppointmentForm.representative_type.trim()
-    ) {
-      toast.error("Lütfen çalışan temsilcisi formu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setEmployeeRepresentativeAppointmentSaving(true);
 
     try {
@@ -1425,11 +1369,6 @@ export default function AssignmentLetters() {
   }
 
   async function handleGenerateOrientationOnboardingTraining() {
-    if (!orientationOnboardingTrainingForm.full_name.trim() || !orientationOnboardingTrainingForm.position.trim()) {
-      toast.error("Lütfen oryantasyon ve işbaşı eğitimi formu için zorunlu alanları doldurun.");
-      return;
-    }
-
     setOrientationOnboardingTrainingSaving(true);
 
     try {

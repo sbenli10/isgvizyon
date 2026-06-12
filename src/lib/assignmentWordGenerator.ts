@@ -1,4 +1,5 @@
 import { saveAs } from "file-saver";
+import { dateOrBlank, emptyLine, safeFilePart, valueOrBlank } from "@/lib/blankFormOutput";
 
 export type AssignmentType =
   | "risk_assessment_team"
@@ -31,17 +32,9 @@ export interface AssignmentLetterDocumentData {
   rightSignatureTitle?: string;
 }
 
-const formatDate = (value?: string) => {
-  if (!value) return new Date().toLocaleDateString("tr-TR");
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("tr-TR");
-};
+const formatDate = (value?: string) => dateOrBlank(value);
 
-const safeText = (value?: string | null, fallback = "-") => {
-  const normalized = value?.trim();
-  return normalized ? normalized : fallback;
-};
+const safeText = (value?: string | number | null, fallback = emptyLine) => valueOrBlank(value, fallback);
 
 const sanitizeFileName = (value: string) =>
   value
@@ -91,7 +84,7 @@ const getBodyParagraphs = (data: AssignmentLetterDocumentData) => {
   if (data.assignmentType === "support_staff") {
     return [
       commonIntro,
-      `${data.employeeName}, ${safeText(data.employeeJobTitle)} unvanıyla destek elemanı olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${data.duration} ay, haftalık görev süresi ${data.weeklyHours} saat olarak planlanmıştır.`,
+      `${safeText(data.employeeName)}, ${safeText(data.employeeJobTitle)} unvanıyla destek elemanı olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${safeText(data.duration || null)} ay, haftalık görev süresi ${safeText(data.weeklyHours || null)} saat olarak planlanmıştır.`,
       "Görev kapsamında acil durumlara hazırlık, tahliye organizasyonu, yangınla mücadele desteği, çalışan yönlendirmesi ve ilgili eğitim/tatbikat süreçlerine katılım sağlanması beklenmektedir.",
       "Bilgi ve gereğini rica ederim.",
     ];
@@ -100,7 +93,7 @@ const getBodyParagraphs = (data: AssignmentLetterDocumentData) => {
   if (data.assignmentType === "employee_representative") {
     return [
       commonIntro,
-      `${data.employeeName}, ${safeText(data.employeeJobTitle)} unvanıyla çalışan temsilcisi olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${data.duration} ay, haftalık görev süresi ${data.weeklyHours} saat olarak planlanmıştır.`,
+      `${safeText(data.employeeName)}, ${safeText(data.employeeJobTitle)} unvanıyla çalışan temsilcisi olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${safeText(data.duration || null)} ay, haftalık görev süresi ${safeText(data.weeklyHours || null)} saat olarak planlanmıştır.`,
       "Görev kapsamında çalışanların iş sağlığı ve güvenliği konularındaki görüş, öneri ve taleplerinin iletilmesi; iyileştirme süreçlerine katılım sağlanması ve kurul/işveren ile iletişim süreçlerinde temsil görevinin yürütülmesi beklenmektedir.",
       "Bilgi ve gereğini rica ederim.",
     ];
@@ -108,7 +101,7 @@ const getBodyParagraphs = (data: AssignmentLetterDocumentData) => {
 
   return [
     commonIntro,
-    `${data.employeeName}, ${safeText(data.employeeJobTitle)} unvanıyla risk değerlendirme ekibi üyesi olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${data.duration} ay, haftalık görev süresi ${data.weeklyHours} saat olarak planlanmıştır.`,
+    `${safeText(data.employeeName)}, ${safeText(data.employeeJobTitle)} unvanıyla risk değerlendirme ekibi üyesi olarak görevlendirilmiştir. Görev başlangıç tarihi ${formatDate(data.startDate)} olup görevlendirme süresi ${safeText(data.duration || null)} ay, haftalık görev süresi ${safeText(data.weeklyHours || null)} saat olarak planlanmıştır.`,
     `Görev kapsamında ${data.hazardClass.toLocaleLowerCase("tr-TR")} sınıfta yer alan işyerimizde tehlikelerin belirlenmesi, risklerin analiz edilmesi, gerekli kontrol tedbirlerinin önerilmesi ve iyileştirme süreçlerine katılım sağlanması beklenmektedir.`,
     "Bilgi ve gereğini rica ederim.",
   ];
@@ -385,7 +378,7 @@ export async function generateAssignmentWord(data: AssignmentLetterDocumentData)
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `${sanitizeFileName(`Atama-Yazisi-${data.employeeName}`)}.docx`;
+  const fileName = `${sanitizeFileName(`Atama-Yazisi-${safeFilePart(data.employeeName)}`)}.docx`;
   saveAs(blob, fileName);
   return { blob, fileName };
 }

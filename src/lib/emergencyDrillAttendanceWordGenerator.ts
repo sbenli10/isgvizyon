@@ -1,4 +1,5 @@
 import { saveAs } from "file-saver";
+import { dateOrBlank, emptyLine, safeFilePart, valueOrBlank } from "@/lib/blankFormOutput";
 
 export interface EmergencyDrillAttendanceParticipant {
   fullName: string;
@@ -12,17 +13,9 @@ export interface EmergencyDrillAttendanceData {
   participants: EmergencyDrillAttendanceParticipant[];
 }
 
-const safeText = (value?: string | null, fallback = "") => {
-  const normalized = value?.trim();
-  return normalized ? normalized : fallback;
-};
+const safeText = (value?: string | null, fallback = emptyLine) => valueOrBlank(value, fallback);
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("tr-TR");
-};
+const formatDate = (value?: string | null) => dateOrBlank(value);
 
 const sanitizeFileName = (value: string) =>
   value
@@ -137,7 +130,7 @@ export async function generateEmergencyDrillAttendanceWord(data: EmergencyDrillA
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `${sanitizeFileName(`Acil-Durum-Tatbikati-Katilim-Kayit-Formu-${data.drillTopic || "Form"}`)}.docx`;
+  const fileName = `${sanitizeFileName(`Acil-Durum-Tatbikati-Katilim-Kayit-Formu-${safeFilePart(data.drillTopic)}`)}.docx`;
   saveAs(blob, fileName);
   return { blob, fileName };
 }

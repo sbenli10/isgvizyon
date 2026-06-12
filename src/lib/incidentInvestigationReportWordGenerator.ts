@@ -1,4 +1,5 @@
 import { saveAs } from "file-saver";
+import { dateOrBlank, emptyLine, safeFilePart, valueOrBlank } from "@/lib/blankFormOutput";
 
 export interface IncidentInvestigationReportData {
   causeActivity: string;
@@ -31,17 +32,9 @@ export interface IncidentInvestigationReportData {
   approvedBy: string;
 }
 
-const safeText = (value?: string | null, fallback = "") => {
-  const normalized = value?.trim();
-  return normalized ? normalized : fallback;
-};
+const safeText = (value?: string | null, fallback = emptyLine) => valueOrBlank(value, fallback);
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString("tr-TR");
-};
+const formatDate = (value?: string | null) => dateOrBlank(value);
 
 const sanitizeFileName = (value: string) =>
   value
@@ -289,7 +282,7 @@ export async function generateIncidentInvestigationReportWord(data: IncidentInve
   });
 
   const blob = await Packer.toBlob(doc);
-  const fileName = `${sanitizeFileName(`Kaza-Olay-Arastirma-Raporu-${data.injuredFullName || "Rapor"}`)}.docx`;
+  const fileName = `${sanitizeFileName(`Kaza-Olay-Arastirma-Raporu-${safeFilePart(data.injuredFullName)}`)}.docx`;
   saveAs(blob, fileName);
   return { blob, fileName };
 }
