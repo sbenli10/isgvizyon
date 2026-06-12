@@ -13,6 +13,19 @@ import { CertificatePreviewCard } from "@/components/certificates/CertificatePre
 import { generateCertificateJob, getCertificateDownload, getCertificateStatus } from "@/lib/certificateApi";
 import type { CertificateFormValues, CertificateJobItem, CertificateJobRecord, CertificateParticipantInput, CertificateRecord } from "@/types/certificates";
 
+async function resolveCertificateLogoUrl(rawValue?: string | null) {
+  const value = (rawValue || "").trim();
+  if (!value || /^https?:\/\//i.test(value) || value.startsWith("data:")) return value;
+
+  const companyLogoResult = await supabase.storage.from("company-logos").createSignedUrl(value, 3600);
+  if (!companyLogoResult.error && companyLogoResult.data?.signedUrl) {
+    return companyLogoResult.data.signedUrl;
+  }
+
+  const certificateLogoResult = await supabase.storage.from("certificate-files").createSignedUrl(value, 3600);
+  return certificateLogoResult.data?.signedUrl || "";
+}
+
 function getDetailStatusMeta(job: CertificateJobRecord | null) {
   if (!job || job.status === "draft") {
     return {
@@ -107,6 +120,7 @@ export default function CertificateJobDetail() {
     try {
       const { data: certificateData, error } = await (supabase as any).from("certificates").select("*").eq("id", certificateId).single();
       if (error) throw error;
+      const logoUrl = await resolveCertificateLogoUrl(certificateData.logo_url);
       setCertificate(certificateData);
       setForm({
         company_id: certificateData.company_id,
@@ -118,7 +132,7 @@ export default function CertificateJobDetail() {
         training_duration: certificateData.training_duration,
         certificate_type: certificateData.certificate_type,
         validity_date: certificateData.validity_date || "",
-        logo_url: certificateData.logo_url || "",
+        logo_url: logoUrl,
         template_type: certificateData.template_type,
         frame_style: certificateData.frame_style,
         trainer_names: certificateData.trainer_names || [],

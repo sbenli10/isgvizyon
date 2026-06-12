@@ -70,6 +70,7 @@ const CERT_LAYOUT = {
     subCompanyTopY: 530,
     unitTopY: 511,
     titleTopY: 480,
+    logo: { x: 52, y: 458, width: 84, height: 84 },
     seal: { x: 690, y: 456, size: 86 },
   },
   leftInfo: {
@@ -112,11 +113,11 @@ const CERT_LAYOUT = {
     signatureGap: 38,
   },
   qr: {
-    x: 688,
-    y: 94,
-    size: 76,
+    x: 700,
+    y: 54,
+    size: 64,
     labelGap: 13,
-    textWidth: 118,
+    textWidth: 108,
   },
 } as const;
 
@@ -382,7 +383,15 @@ async function drawImageAsset(pdfDoc: PDFDocument, page: any, assetUrl: string |
   if (!assetBytes) return;
   try {
     const asset = isPngBytes(assetBytes) ? await pdfDoc.embedPng(assetBytes) : await pdfDoc.embedJpg(assetBytes);
-    page.drawImage(asset, options);
+    const scale = Math.min(options.width / asset.width, options.height / asset.height);
+    const width = asset.width * scale;
+    const height = asset.height * scale;
+    page.drawImage(asset, {
+      x: options.x + (options.width - width) / 2,
+      y: options.y + (options.height - height) / 2,
+      width,
+      height,
+    });
   } catch (error) {
     console.error("certificate pdf asset embed failed", { assetUrl, error: error instanceof Error ? error.message : error });
   }
@@ -622,6 +631,26 @@ function drawCertificateSeal(page: any, fonts: { bodyFont: PdfFont; titleFont: P
 
 async function drawHeader(pdfDoc: PDFDocument, page: any, fonts: { bodyFont: PdfFont; titleFont: PdfFont }, data: CertificateRenderData) {
   const colors = colorTheme(data);
+  const logo = CERT_LAYOUT.header.logo;
+
+  if (data.logoUrl) {
+    await drawImageAsset(pdfDoc, page, data.logoUrl, {
+      x: logo.x,
+      y: logo.y,
+      width: logo.width,
+      height: logo.height,
+    });
+  } else {
+    page.drawRectangle({
+      x: logo.x,
+      y: logo.y,
+      width: logo.width,
+      height: logo.height,
+      borderColor: rgb(0.72, 0.82, 0.9),
+      borderWidth: 0.7,
+      opacity: 0.4,
+    });
+  }
 
   const companyLines = wrapTextLines(
     fonts.titleFont,
@@ -694,8 +723,8 @@ function infoRows(data: CertificateRenderData): InfoRow[] {
     { label: "Geçerlilik", value: data.validity, maxLines: 1 },
     { label: "Sertifika No", value: data.certificateNo, maxLines: 1 },
     { label: "Firma", value: data.companyName, maxLines: 2 },
-    { label: "Adres", value: data.address || "-", maxLines: 2 },
-    { label: "Eğitmenler", value: data.trainers.join(", "), maxLines: 1 },
+    { label: "Adres", value: data.address || "-", maxLines: 3 },
+    { label: "Eğitmenler", value: data.trainers.join(", "), maxLines: 2 },
   ];
 }
 

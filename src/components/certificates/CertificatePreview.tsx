@@ -92,8 +92,10 @@ function normalizePreviewData(raw: CertificatePreviewData) {
 }
 
 function InfoRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  const isLongValue = label === "Adres" || label === "Eğitmenler";
+
   return (
-    <div className="cert-info-row">
+    <div className="cert-info-row" data-long-value={isLongValue ? "true" : undefined}>
       <div className="cert-info-label">{label}</div>
       <div className="cert-info-colon">:</div>
       <div className={strong ? "cert-info-value cert-info-value-strong" : "cert-info-value"}>{value}</div>
@@ -177,6 +179,13 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
         <div className="cert-inner-frame" />
 
         <header className="cert-header">
+          <div className="cert-logo-slot">
+            {data.logoUrl ? (
+              <img src={data.logoUrl} alt="Firma logosu" />
+            ) : (
+              <span>LOGO</span>
+            )}
+          </div>
           <div className="cert-title-block">
             <div className="cert-company">{data.companyName}</div>
             <div className="cert-sub-company">{data.trainingTitle}</div>
@@ -287,7 +296,7 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
           position: relative;
           z-index: 3;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) 150px;
+          grid-template-columns: 128px minmax(0, 1fr) 150px;
           align-items: start;
           gap: 18px;
           padding: 42px 78px 0 78px;
@@ -298,6 +307,33 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
           min-width: 0;
           text-align: center;
           padding-top: 0;
+        }
+
+        .cert-logo-slot {
+          width: 112px;
+          height: 112px;
+          border-radius: 18px;
+          border: 1px solid rgba(8, 38, 90, 0.14);
+          background: rgba(255, 255, 255, 0.88);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 12px;
+          box-shadow: 0 8px 18px rgba(8, 38, 90, 0.08);
+        }
+
+        .cert-logo-slot img {
+          max-width: 100%;
+          max-height: 100%;
+          object-fit: contain;
+          display: block;
+        }
+
+        .cert-logo-slot span {
+          color: rgba(8, 38, 90, 0.36);
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: 0.08em;
         }
 
         .cert-company {
@@ -383,20 +419,20 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
 
         .cert-info-card {
           display: grid;
-          grid-auto-rows: minmax(20px, auto);
+          grid-auto-rows: minmax(22px, auto);
           align-content: start;
-          gap: 5px;
+          gap: 7px;
           min-width: 0;
         }
 
         .cert-info-row {
           display: grid;
-          grid-template-columns: 140px 18px minmax(0, 1fr);
+          grid-template-columns: 132px 18px minmax(0, 1fr);
           align-items: start;
           min-width: 0;
           color: #111827;
           font-size: 13px;
-          line-height: 1.22;
+          line-height: 1.28;
         }
 
         .cert-info-label,
@@ -413,6 +449,16 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
           -webkit-line-clamp: 3;
           -webkit-box-orient: vertical;
           overflow: hidden;
+        }
+
+        .cert-info-row[data-long-value="true"] {
+          font-size: 12px;
+          line-height: 1.32;
+        }
+
+        .cert-info-row[data-long-value="true"] .cert-info-value {
+          -webkit-line-clamp: 4;
+          white-space: normal;
         }
 
         .cert-info-value-strong {

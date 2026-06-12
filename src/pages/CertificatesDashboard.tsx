@@ -1363,12 +1363,12 @@ export default function CertificatesDashboard() {
 
                 <div className="space-y-2 md:col-span-2">
                   <Label>Eğitmenler</Label>
-                  <Input
+                  <Textarea
                     value={trainerNamesInput}
                     onChange={(e) => {
                       const nextValue = e.target.value;
                       const trainerNames = nextValue
-                        .split(",")
+                        .split(/\r?\n|,/)
                         .map((item) => item.trim())
                         .filter(Boolean);
 
@@ -1392,8 +1392,12 @@ export default function CertificatesDashboard() {
                         };
                       });
                     }}
-                    placeholder="Uzman adlarını virgül ile ayırın"
+                    className="min-h-24 resize-y"
+                    placeholder="Uzman adlarını virgül veya satır satır girin"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Birden fazla eğitmeni virgül ile ayırabilir veya her eğitmeni ayrı satıra yazabilirsiniz.
+                  </p>
                 </div>
 
                 <div className="space-y-3 md:col-span-2">
