@@ -63,7 +63,9 @@ type RiskTeamPerson = {
   fullName: string;
   tcNo: string;
   phone: string;
+  title?: string;
   certificateNo?: string;
+  certificateClass?: string;
 };
 
 type RiskTeamOsgb = {
@@ -71,6 +73,7 @@ type RiskTeamOsgb = {
   phone: string;
   email: string;
   authorizedPerson: string;
+  address?: string;
 };
 
 type RiskWizardCompanyInfo = {
@@ -154,16 +157,56 @@ type WizardCompanyOption = {
   id: string;
   name: string;
   email?: string | null;
+  phone?: string | null;
   address?: string | null;
   sgkNumber?: string | null;
   employeeCount?: number | null;
   hazardClass?: string | null;
   activityScope?: string | null;
   employerRepresentativeName?: string | null;
+  employerRepresentativeTcNo?: string | null;
+  employerRepresentativePhone?: string | null;
+  employerRepresentativeTitle?: string | null;
   occupationalSafetySpecialistName?: string | null;
+  occupationalSafetySpecialistTcNo?: string | null;
+  occupationalSafetySpecialistPhone?: string | null;
+  occupationalSafetySpecialistCertificateNo?: string | null;
+  occupationalSafetySpecialistCertificateClass?: string | null;
   workplaceDoctorName?: string | null;
+  workplaceDoctorTcNo?: string | null;
+  workplaceDoctorPhone?: string | null;
+  workplaceDoctorCertificateNo?: string | null;
   employeeRepresentativeName?: string | null;
+  employeeRepresentativeTcNo?: string | null;
+  employeeRepresentativePhone?: string | null;
+  employeeRepresentativeTitle?: string | null;
   osgbTitle?: string | null;
+  osgbAuthorizedPerson?: string | null;
+  osgbPhone?: string | null;
+  osgbEmail?: string | null;
+  osgbAddress?: string | null;
+};
+
+type CompanyAssignmentForRisk = {
+  company_id: string;
+  role_type: string;
+  person_name: string | null;
+  certificate_no: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  is_active: boolean | null;
+};
+
+type OrganizationForRisk = {
+  name?: string | null;
+  company_name?: string | null;
+  title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  authorized_person?: string | null;
+  representative_name?: string | null;
 };
 
 type WizardStep = {
@@ -205,56 +248,56 @@ const today = new Date().toISOString().split("T")[0];
 const WIZARD_STEPS: WizardStep[] = [
   {
     id: "company",
-    label: "Firma ve İşyeri Bilgileri",
-    title: "Firma ve İşyeri Bilgileri",
-    description: "Kapakta ve üst bilgi alanlarında yer alacak temel bilgileri girin.",
+    label: "Firma Bilgileri",
+    title: "Firma Bilgileri",
+    description: "Firma profilinden gelen bilgileri kontrol edin veya boş bırakın.",
     icon: <Building2 className="h-5 w-5" />,
   },
   {
     id: "team",
-    label: "Risk Değerlendirme Ekibi",
-    title: "İşyerine Ait Bilgiler ve Risk Değerlendirme Ekibi",
-    description: "Resmî ekip tablosunda yer alacak ekip üyelerini tanımlayın.",
+    label: "Ekip",
+    title: "Risk Değerlendirme Ekibi",
+    description: "İşveren, çalışan temsilcisi, İSG uzmanı, işyeri hekimi ve OSGB bilgileri.",
     icon: <Users className="h-5 w-5" />,
   },
   {
     id: "scope",
-    label: "Kapsam ve Yöntem",
-    title: "Değerlendirme Kapsamı ve Yöntem",
+    label: "Tehlikeler",
+    title: "Tehlikeler ve Kapsam",
     description: "Kapsamı, değerlendirilen faaliyetleri ve puanlama açıklamasını oluşturun.",
     icon: <ShieldCheck className="h-5 w-5" />,
   },
   {
     id: "risk-method",
-    label: "Risk Ekleme Yöntemi",
+    label: "Riskler",
     title: "Risk Ekleme Yöntemi",
     description: "Riskleri nasıl eklemek istediğinizi seçin.",
     icon: <Sparkles className="h-5 w-5" />,
   },
   {
     id: "risk-table",
-    label: "Risk Değerlendirme Tablosu",
+    label: "Önlemler",
     title: "Risk Değerlendirme Tablosu",
     description: "Seçtiğiniz yönteme göre oluşan risk maddelerini düzenleyin.",
     icon: <AlertTriangle className="h-5 w-5" />,
   },
   {
     id: "actions",
-    label: "Faaliyet Planı",
+    label: "Faaliyetler",
     title: "Öncelikli Düzeltici / Önleyici Faaliyet Planı",
     description: "Plan satırlarını yalnızca ihtiyaç duyduğunuz kadar oluşturun.",
     icon: <ListChecks className="h-5 w-5" />,
   },
   {
     id: "conclusion",
-    label: "Sonuç ve İmzalar",
+    label: "İmzalar",
     title: "Genel Sonuç, Onay ve İmzalar",
     description: "Onay metinlerini ve imza tablosunu tamamlayın.",
     icon: <PenSquare className="h-5 w-5" />,
   },
   {
     id: "preview",
-    label: "Önizleme ve Rapor",
+    label: "Rapor",
     title: "Önizleme ve Rapor Oluştur",
     description: "Özeti kontrol edin, taslağı saklayın ve rapor çıktısını alın.",
     icon: <Eye className="h-5 w-5" />,
@@ -264,14 +307,7 @@ const WIZARD_STEPS: WizardStep[] = [
 const RISK_METHOD_STEP_INDEX = WIZARD_STEPS.findIndex((step) => step.id === "risk-method");
 const RISK_TABLE_STEP_INDEX = WIZARD_STEPS.findIndex((step) => step.id === "risk-table");
 
-const REQUIRED_COMPANY_FIELDS: Array<keyof RiskWizardCompanyInfo> = [
-  "companyTitle",
-  "hazardClass",
-  "employeeCount",
-  "assessmentDate",
-  "activityScope",
-  "riskMethod",
-];
+const REQUIRED_COMPANY_FIELDS: Array<keyof RiskWizardCompanyInfo> = [];
 
 const emptyCompanyInfo = (): RiskWizardCompanyInfo => ({
   companyTitle: "",
@@ -298,6 +334,7 @@ const emptyOsgbInfo = (): RiskTeamOsgb => ({
   phone: "",
   email: "",
   authorizedPerson: "",
+  address: "",
 });
 
 const emptyTeamInfo = (): RiskWizardTeamInfo => ({
@@ -331,6 +368,36 @@ const emptyConclusionInfo = (): RiskWizardConclusionInfo => ({
 });
 
 const cleanText = (value?: string | null) => (value || "").replace(/\s+/g, " ").trim();
+const cleanUnknown = (value: unknown) => (typeof value === "string" || typeof value === "number" ? cleanText(String(value)) : "");
+const pickFirstText = (...values: unknown[]) => {
+  for (const value of values) {
+    const cleaned = cleanUnknown(value);
+    if (cleaned) return cleaned;
+  }
+  return "";
+};
+
+const parseOptionalNumber = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(cleanUnknown(value));
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const hasTeamPersonData = (person?: RiskTeamPerson | null) =>
+  Boolean(cleanText(person?.fullName) || cleanText(person?.tcNo) || cleanText(person?.phone) || cleanText(person?.certificateNo));
+
+const hasOsgbData = (osgb?: RiskTeamOsgb | null) =>
+  Boolean(cleanText(osgb?.title) || cleanText(osgb?.authorizedPerson) || cleanText(osgb?.phone) || cleanText(osgb?.email) || cleanText(osgb?.address));
+
+const hasTeamInfoData = (team?: RiskWizardTeamInfo | null) =>
+  Boolean(
+    hasTeamPersonData(team?.employer) ||
+      hasTeamPersonData(team?.employeeRepresentative) ||
+      hasTeamPersonData(team?.safetyExpert) ||
+      hasTeamPersonData(team?.workplaceDoctor) ||
+      hasOsgbData(team?.osgb),
+  );
+
 const splitTextToItems = (value?: string | null) =>
   String(value || "")
     .split(/\r?\n|•|-/)
@@ -369,7 +436,9 @@ const normalizeLegacyTeamPerson = (value: unknown): RiskTeamPerson => {
       fullName: cleanText(candidate.fullName),
       tcNo: cleanText(candidate.tcNo),
       phone: cleanText(candidate.phone),
+      title: cleanText(candidate.title),
       certificateNo: cleanText(candidate.certificateNo),
+      certificateClass: cleanText(candidate.certificateClass),
     };
   }
   return {
@@ -386,6 +455,7 @@ const normalizeLegacyOsgb = (value: unknown): RiskTeamOsgb => {
       phone: cleanText(candidate.phone),
       email: cleanText(candidate.email),
       authorizedPerson: cleanText(candidate.authorizedPerson),
+      address: cleanText(candidate.address),
     };
   }
   return {
@@ -400,6 +470,146 @@ const normalizeTeamInfo = (value?: Partial<RiskWizardTeamInfo> | null): RiskWiza
   safetyExpert: normalizeLegacyTeamPerson(value?.safetyExpert),
   workplaceDoctor: normalizeLegacyTeamPerson(value?.workplaceDoctor),
   osgb: normalizeLegacyOsgb(value?.osgb),
+});
+
+const assignmentMatchesRole = (assignment: CompanyAssignmentForRisk, needles: string[]) => {
+  const haystack = cleanText([assignment.role_type, assignment.notes].filter(Boolean).join(" ")).toLocaleLowerCase("tr-TR");
+  return needles.some((needle) => haystack.includes(needle));
+};
+
+const enrichCompaniesWithAssignments = (
+  companies: WizardCompanyOption[],
+  assignments: CompanyAssignmentForRisk[],
+) => {
+  if (assignments.length === 0) return companies;
+
+  const byCompany = new Map<string, CompanyAssignmentForRisk[]>();
+  assignments
+    .filter((assignment) => assignment.is_active !== false)
+    .forEach((assignment) => {
+      byCompany.set(assignment.company_id, [...(byCompany.get(assignment.company_id) || []), assignment]);
+    });
+
+  return companies.map((company) => {
+    const companyAssignments = byCompany.get(company.id) || [];
+    const employer = companyAssignments.find((assignment) =>
+      assignmentMatchesRole(assignment, ["işveren", "isveren", "vekil", "employer"]),
+    );
+    const employeeRepresentative = companyAssignments.find((assignment) =>
+      assignmentMatchesRole(assignment, ["çalışan temsilcisi", "calisan temsilcisi", "employee"]),
+    );
+    const safetyExpert = companyAssignments.find((assignment) =>
+      assignmentMatchesRole(assignment, ["iş güvenliği", "isg", "igu", "uzman", "safety"]),
+    );
+    const workplaceDoctor = companyAssignments.find((assignment) =>
+      assignmentMatchesRole(assignment, ["hekim", "doctor", "physician"]),
+    );
+
+    return {
+      ...company,
+      employerRepresentativeName: company.employerRepresentativeName || employer?.person_name || null,
+      employerRepresentativePhone: company.employerRepresentativePhone || employer?.phone || null,
+      employeeRepresentativeName: company.employeeRepresentativeName || employeeRepresentative?.person_name || null,
+      employeeRepresentativePhone: company.employeeRepresentativePhone || employeeRepresentative?.phone || null,
+      occupationalSafetySpecialistName: company.occupationalSafetySpecialistName || safetyExpert?.person_name || null,
+      occupationalSafetySpecialistPhone: company.occupationalSafetySpecialistPhone || safetyExpert?.phone || null,
+      occupationalSafetySpecialistCertificateNo:
+        company.occupationalSafetySpecialistCertificateNo || safetyExpert?.certificate_no || null,
+      workplaceDoctorName: company.workplaceDoctorName || workplaceDoctor?.person_name || null,
+      workplaceDoctorPhone: company.workplaceDoctorPhone || workplaceDoctor?.phone || null,
+      workplaceDoctorCertificateNo: company.workplaceDoctorCertificateNo || workplaceDoctor?.certificate_no || null,
+    };
+  });
+};
+
+const buildCompanyInfoFromProfile = (company: WizardCompanyOption): RiskWizardCompanyInfo => {
+  const hazardClass = ["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].includes(cleanText(company.hazardClass))
+    ? (cleanText(company.hazardClass) as HazardClass)
+    : "";
+
+  return {
+    ...emptyCompanyInfo(),
+    companyTitle: cleanText(company.name),
+    address: cleanText(company.address),
+    email: cleanText(company.email),
+    workplaceRegistryNo: cleanText(company.sgkNumber),
+    hazardClass,
+    employeeCount: company.employeeCount != null ? String(company.employeeCount) : "",
+    activityScope: cleanText(company.activityScope),
+  };
+};
+
+const buildTeamInfoFromProfile = (company: WizardCompanyOption): RiskWizardTeamInfo => ({
+  employer: {
+    fullName: cleanText(company.employerRepresentativeName),
+    tcNo: cleanText(company.employerRepresentativeTcNo),
+    phone: cleanText(company.employerRepresentativePhone),
+    title: cleanText(company.employerRepresentativeTitle) || "İşveren / İşveren Vekili",
+  },
+  employeeRepresentative: {
+    fullName: cleanText(company.employeeRepresentativeName),
+    tcNo: cleanText(company.employeeRepresentativeTcNo),
+    phone: cleanText(company.employeeRepresentativePhone),
+    title: cleanText(company.employeeRepresentativeTitle) || "Çalışan Temsilcisi",
+  },
+  safetyExpert: {
+    fullName: cleanText(company.occupationalSafetySpecialistName),
+    tcNo: cleanText(company.occupationalSafetySpecialistTcNo),
+    phone: cleanText(company.occupationalSafetySpecialistPhone),
+    certificateNo: cleanText(company.occupationalSafetySpecialistCertificateNo),
+    certificateClass: cleanText(company.occupationalSafetySpecialistCertificateClass),
+    title: "İş Güvenliği Uzmanı",
+  },
+  workplaceDoctor: {
+    fullName: cleanText(company.workplaceDoctorName),
+    tcNo: cleanText(company.workplaceDoctorTcNo),
+    phone: cleanText(company.workplaceDoctorPhone),
+    certificateNo: cleanText(company.workplaceDoctorCertificateNo),
+    title: "İşyeri Hekimi",
+  },
+  osgb: {
+    title: cleanText(company.osgbTitle),
+    authorizedPerson: cleanText(company.osgbAuthorizedPerson),
+    phone: cleanText(company.osgbPhone),
+    email: cleanText(company.osgbEmail),
+    address: cleanText(company.osgbAddress),
+  },
+});
+
+const mergeCompanyInfoFallback = (current: RiskWizardCompanyInfo, fallback: RiskWizardCompanyInfo): RiskWizardCompanyInfo => ({
+  companyTitle: current.companyTitle || fallback.companyTitle,
+  address: current.address || fallback.address,
+  email: current.email || fallback.email,
+  workplaceRegistryNo: current.workplaceRegistryNo || fallback.workplaceRegistryNo,
+  hazardClass: current.hazardClass || fallback.hazardClass,
+  employeeCount: current.employeeCount || fallback.employeeCount,
+  assessmentDate: current.assessmentDate || fallback.assessmentDate || today,
+  riskMethod: current.riskMethod || fallback.riskMethod,
+  activityScope: current.activityScope || fallback.activityScope,
+  note: current.note || fallback.note,
+});
+
+const mergePersonFallback = (current: RiskTeamPerson, fallback: RiskTeamPerson): RiskTeamPerson => ({
+  fullName: current.fullName || fallback.fullName,
+  tcNo: current.tcNo || fallback.tcNo,
+  phone: current.phone || fallback.phone,
+  title: current.title || fallback.title,
+  certificateNo: current.certificateNo || fallback.certificateNo,
+  certificateClass: current.certificateClass || fallback.certificateClass,
+});
+
+const mergeTeamInfoFallback = (current: RiskWizardTeamInfo, fallback: RiskWizardTeamInfo): RiskWizardTeamInfo => ({
+  employer: mergePersonFallback(current.employer, fallback.employer),
+  employeeRepresentative: mergePersonFallback(current.employeeRepresentative, fallback.employeeRepresentative),
+  safetyExpert: mergePersonFallback(current.safetyExpert, fallback.safetyExpert),
+  workplaceDoctor: mergePersonFallback(current.workplaceDoctor, fallback.workplaceDoctor),
+  osgb: {
+    title: current.osgb.title || fallback.osgb.title,
+    phone: current.osgb.phone || fallback.osgb.phone,
+    email: current.osgb.email || fallback.osgb.email,
+    authorizedPerson: current.osgb.authorizedPerson || fallback.osgb.authorizedPerson,
+    address: current.osgb.address || fallback.osgb.address,
+  },
 });
 
 const getRiskLevelFromScore = (score: number) => {
@@ -1344,27 +1554,98 @@ export default function RiskAssessmentWizard() {
         if (error) throw error;
         if (!active) return;
 
-        setCompanies(
-          ((data || []) as Array<Record<string, unknown>>).map((row) => ({
+        const companyRows = (data || []) as Array<Record<string, unknown>>;
+        const companyIds = companyRows.map((row) => String(row.id)).filter(Boolean);
+        let assignments: CompanyAssignmentForRisk[] = [];
+        let organizationInfo: OrganizationForRisk | null = null;
+
+        if (companyIds.length > 0) {
+          const { data: assignmentRows, error: assignmentError } = await supabase
+            .from("company_assignments")
+            .select("company_id, role_type, person_name, certificate_no, phone, email, notes, is_active")
+            .in("company_id", companyIds);
+
+          if (assignmentError) {
+            console.warn("Risk wizard company assignment fetch warning", assignmentError);
+          } else {
+            assignments = (assignmentRows || []) as CompanyAssignmentForRisk[];
+          }
+        }
+
+        if (profile?.organization_id) {
+          const { data: organizationRow, error: organizationError } = await supabase
+            .from("organizations")
+            .select("*")
+            .eq("id", profile.organization_id)
+            .maybeSingle();
+
+          if (organizationError) {
+            console.warn("Risk wizard organization fetch warning", organizationError);
+          } else {
+            organizationInfo = organizationRow as OrganizationForRisk | null;
+          }
+        }
+
+        const organizationOsgbTitle = pickFirstText(
+          organizationInfo?.company_name,
+          organizationInfo?.name,
+          organizationInfo?.title,
+        );
+        const organizationOsgbAuthorizedPerson = pickFirstText(
+          organizationInfo?.authorized_person,
+          organizationInfo?.representative_name,
+          profile?.full_name,
+        );
+
+        const mappedCompanies = companyRows.map((row) => ({
             id: String(row.id),
             name: cleanText(String(row.name || row.company_name || "İsimsiz firma")),
             email: row.email ? String(row.email) : null,
+            phone: row.phone ? String(row.phone) : null,
             address: row.address ? String(row.address) : null,
             sgkNumber: row.sgk_number || row.sgk_workplace_number || row.workplace_registration_number
               ? String(row.sgk_number || row.sgk_workplace_number || row.workplace_registration_number)
               : null,
-            employeeCount: typeof row.employee_count === "number" ? row.employee_count : null,
+            employeeCount: parseOptionalNumber(row.employee_count),
             hazardClass: row.hazard_class ? String(row.hazard_class) : null,
-            activityScope: row.activity_scope || row.sector ? String(row.activity_scope || row.sector) : null,
+            activityScope: row.activity_scope || row.sector || row.industry_sector || row.industry
+              ? String(row.activity_scope || row.sector || row.industry_sector || row.industry)
+              : null,
             employerRepresentativeName: row.employer_representative_name ? String(row.employer_representative_name) : null,
+            employerRepresentativeTcNo: row.employer_representative_tc_no ? String(row.employer_representative_tc_no) : null,
+            employerRepresentativePhone: row.employer_representative_phone ? String(row.employer_representative_phone) : null,
+            employerRepresentativeTitle: row.employer_representative_title ? String(row.employer_representative_title) : null,
             occupationalSafetySpecialistName: row.occupational_safety_specialist_name
               ? String(row.occupational_safety_specialist_name)
               : null,
+            occupationalSafetySpecialistTcNo: row.occupational_safety_specialist_tc_no
+              ? String(row.occupational_safety_specialist_tc_no)
+              : null,
+            occupationalSafetySpecialistPhone: row.occupational_safety_specialist_phone
+              ? String(row.occupational_safety_specialist_phone)
+              : null,
+            occupationalSafetySpecialistCertificateNo: row.occupational_safety_specialist_certificate_no
+              ? String(row.occupational_safety_specialist_certificate_no)
+              : null,
+            occupationalSafetySpecialistCertificateClass: row.occupational_safety_specialist_certificate_class
+              ? String(row.occupational_safety_specialist_certificate_class)
+              : null,
             workplaceDoctorName: row.workplace_doctor_name ? String(row.workplace_doctor_name) : null,
+            workplaceDoctorTcNo: row.workplace_doctor_tc_no ? String(row.workplace_doctor_tc_no) : null,
+            workplaceDoctorPhone: row.workplace_doctor_phone ? String(row.workplace_doctor_phone) : null,
+            workplaceDoctorCertificateNo: row.workplace_doctor_certificate_no ? String(row.workplace_doctor_certificate_no) : null,
             employeeRepresentativeName: row.employee_representative_name ? String(row.employee_representative_name) : null,
-            osgbTitle: row.osgb_title ? String(row.osgb_title) : null,
-          })),
-        );
+            employeeRepresentativeTcNo: row.employee_representative_tc_no ? String(row.employee_representative_tc_no) : null,
+            employeeRepresentativePhone: row.employee_representative_phone ? String(row.employee_representative_phone) : null,
+            employeeRepresentativeTitle: row.employee_representative_title ? String(row.employee_representative_title) : null,
+            osgbTitle: pickFirstText(row.osgb_title, row.osgb_name, organizationOsgbTitle) || null,
+            osgbAuthorizedPerson: pickFirstText(row.osgb_authorized_person, row.osgb_representative_name, organizationOsgbAuthorizedPerson) || null,
+            osgbPhone: pickFirstText(row.osgb_phone, organizationInfo?.phone, profile?.phone) || null,
+            osgbEmail: pickFirstText(row.osgb_email, organizationInfo?.email, profile?.email) || null,
+            osgbAddress: pickFirstText(row.osgb_address, organizationInfo?.address) || null,
+          }));
+
+        setCompanies(enrichCompaniesWithAssignments(mappedCompanies, assignments));
       } catch (error) {
         console.error("Risk wizard company fetch error", error);
         if (active) toast.error("Profildeki firmalar yüklenemedi.");
@@ -1438,12 +1719,6 @@ export default function RiskAssessmentWizard() {
   }, [companyInfo]);
 
   const isStepValid = (stepIndex: number) => {
-    if (stepIndex === 0 && !validationState.companyStepValid) {
-      return {
-        valid: false,
-        message: "Lütfen zorunlu firma ve işyeri bilgilerini doldurun.",
-      };
-    }
     return { valid: true };
   };
 
@@ -1476,44 +1751,14 @@ export default function RiskAssessmentWizard() {
     const company = companies.find((item) => item.id === companyId);
     if (!company) return;
 
-    const hazardClass = ["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].includes(cleanText(company.hazardClass))
-      ? (cleanText(company.hazardClass) as HazardClass)
-      : "";
-
     setCompanyInfo((prev) => ({
-      ...prev,
-      companyTitle: company.name || prev.companyTitle,
-      address: company.address || prev.address,
-      email: company.email || prev.email,
-      workplaceRegistryNo: company.sgkNumber || prev.workplaceRegistryNo,
-      hazardClass: hazardClass || prev.hazardClass,
-      employeeCount: company.employeeCount != null ? String(company.employeeCount) : prev.employeeCount,
-      activityScope: company.activityScope || prev.activityScope,
+      ...buildCompanyInfoFromProfile(company),
+      assessmentDate: prev.assessmentDate || today,
+      riskMethod: prev.riskMethod,
+      note: prev.note,
     }));
-
-    setTeamInfo((prev) => ({
-      ...prev,
-      employer: {
-        ...prev.employer,
-        fullName: company.employerRepresentativeName || prev.employer.fullName,
-      },
-      employeeRepresentative: {
-        ...prev.employeeRepresentative,
-        fullName: company.employeeRepresentativeName || prev.employeeRepresentative.fullName,
-      },
-      safetyExpert: {
-        ...prev.safetyExpert,
-        fullName: company.occupationalSafetySpecialistName || prev.safetyExpert.fullName,
-      },
-      workplaceDoctor: {
-        ...prev.workplaceDoctor,
-        fullName: company.workplaceDoctorName || prev.workplaceDoctor.fullName,
-      },
-      osgb: {
-        ...prev.osgb,
-        title: company.osgbTitle || prev.osgb.title,
-      },
-    }));
+    setTeamInfo(buildTeamInfoFromProfile(company));
+    setSignatureRows([]);
 
     const missingFields = [
       ["İşveren / İşveren Vekili", company.employerRepresentativeName],
@@ -1530,6 +1775,16 @@ export default function RiskAssessmentWizard() {
       toast.success("Firma ve risk değerlendirme ekibi bilgileri otomatik dolduruldu.");
     }
   };
+
+  useEffect(() => {
+    if (!selectedCompany) return;
+
+    const companyFallback = buildCompanyInfoFromProfile(selectedCompany);
+    const teamFallback = buildTeamInfoFromProfile(selectedCompany);
+
+    setCompanyInfo((current) => mergeCompanyInfoFallback(current, companyFallback));
+    setTeamInfo((current) => mergeTeamInfoFallback(current, teamFallback));
+  }, [selectedCompany]);
 
   const handleNext = () => {
     const validation = isStepValid(currentStep);
@@ -1827,12 +2082,6 @@ export default function RiskAssessmentWizard() {
   };
 
   const handleExportPdf = async () => {
-    if (!validationState.companyStepValid) {
-      REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
-      toast.error("PDF oluşturmadan önce zorunlu firma ve işyeri bilgilerini tamamlayın.");
-      setCurrentStep(0);
-      return;
-    }
     setExportingPdf(true);
     try {
       const doc = await buildWizardPdf({
@@ -1858,13 +2107,6 @@ export default function RiskAssessmentWizard() {
   };
 
   const handleWordDownload = async () => {
-    if (!validationState.companyStepValid) {
-      REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
-      toast.error("Word çıktısı oluşturmadan önce zorunlu firma ve işyeri bilgilerini tamamlayın.");
-      setCurrentStep(0);
-      return;
-    }
-
     setExportingWord(true);
     try {
       await generateRiskAssessmentOfficialDocx({
@@ -1938,7 +2180,7 @@ export default function RiskAssessmentWizard() {
     const isError = options?.required && touched[options?.errorKey || label] && !cleanText(value);
     return (
       <div className="space-y-2">
-        <Label className={cn("text-xs font-semibold uppercase tracking-wider text-slate-400", isError && "text-red-400")}>
+        <Label className={cn("text-xs font-semibold uppercase tracking-wider text-slate-500", isError && "text-red-500")}>
           {label}
         </Label>
         <Input
@@ -1947,11 +2189,11 @@ export default function RiskAssessmentWizard() {
           onChange={(event) => onChange(event.target.value)}
           placeholder={options?.placeholder}
           className={cn(
-            "h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600",
-            isError && "border-red-500/50 bg-red-950/10",
+            "h-10 rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm placeholder:text-slate-400",
+            isError && "border-red-300 bg-red-50",
           )}
         />
-        {isError ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
+        {isError ? <p className="text-xs text-red-500">Bu alanı boş bırakabilirsiniz; yalnızca çıktı bilgisini etkiler.</p> : null}
       </div>
     );
   };
@@ -1961,21 +2203,20 @@ export default function RiskAssessmentWizard() {
       case 0:
         return (
           <div className="space-y-6">
-            <div className="rounded-2xl border border-cyan-500/10 bg-cyan-500/5 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-cyan-400">Adım 1</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                Resmî kapak ve üst bilgi alanları için firma ve işyeri bilgilerini doldurun. Not alanı
-                opsiyoneldir; boş bırakılırsa çıktıda hiç görünmez.
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+              <p className="text-sm leading-relaxed text-cyan-900">
+                Firma bilgileri profil kayıtlarından otomatik getirilir. Bu ekranda yaptığınız değişiklikler yalnızca
+                risk değerlendirme taslağına kaydedilir.
               </p>
             </div>
 
-            <Card className="border-cyan-500/10 bg-slate-950/50">
+            <Card className="border-slate-200 bg-white shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base text-white">
-                  <Building2 className="h-4 w-4 text-cyan-300" />
+                <CardTitle className="flex items-center gap-2 text-base text-slate-900">
+                  <Building2 className="h-4 w-4 text-cyan-600" />
                   Profilimdeki Firmadan Doldur
                 </CardTitle>
-                <CardDescription className="text-slate-400">
+                <CardDescription className="text-slate-500">
                   Firma seçildiğinde kapak bilgileri ve Risk Değerlendirme Ekibi alanları Profilim &gt; Firmalar
                   kaydından otomatik aktarılır.
                 </CardDescription>
@@ -1983,10 +2224,10 @@ export default function RiskAssessmentWizard() {
               <CardContent className="space-y-4">
                 <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
                   <Select value={selectedCompanyId} onValueChange={applyCompanyToWizard} disabled={companiesLoading}>
-                    <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                    <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm">
                       <SelectValue placeholder={companiesLoading ? "Firmalar yükleniyor..." : "Firma seçin"} />
                     </SelectTrigger>
-                    <SelectContent className="max-h-80 border-slate-800 bg-slate-950 text-slate-100">
+                    <SelectContent className="max-h-80 border-slate-200 bg-white text-slate-900">
                       {companies.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.name}
@@ -1998,7 +2239,7 @@ export default function RiskAssessmentWizard() {
                     type="button"
                     variant="outline"
                     onClick={() => navigate("/profile?tab=companies")}
-                    className="rounded-xl border-cyan-500/20 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
+                    className="rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
                   >
                     Profilim / Firmalar
                     <ChevronRight className="ml-2 h-4 w-4" />
@@ -2017,9 +2258,8 @@ export default function RiskAssessmentWizard() {
             </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {renderInput("Firma Ünvanı *", companyInfo.companyTitle, (value) => updateCompanyInfo("companyTitle", value), {
+              {renderInput("Firma Ünvanı", companyInfo.companyTitle, (value) => updateCompanyInfo("companyTitle", value), {
                 placeholder: "Firma ünvanı",
-                required: true,
                 errorKey: "companyTitle",
               })}
               {renderInput("İşyeri Sicil No", companyInfo.workplaceRegistryNo, (value) => updateCompanyInfo("workplaceRegistryNo", value), {
@@ -2033,63 +2273,59 @@ export default function RiskAssessmentWizard() {
                 type: "email",
               })}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Tehlike Sınıfı *</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Tehlike Sınıfı</Label>
                 <Select value={companyInfo.hazardClass} onValueChange={(value) => updateCompanyInfo("hazardClass", value as HazardClass)}>
-                  <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                  <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm">
                     <SelectValue placeholder="Seçin" />
                   </SelectTrigger>
-                  <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
+                  <SelectContent className="border-slate-200 bg-white text-slate-900">
                     <SelectItem value="Az Tehlikeli">Az Tehlikeli</SelectItem>
                     <SelectItem value="Tehlikeli">Tehlikeli</SelectItem>
                     <SelectItem value="Çok Tehlikeli">Çok Tehlikeli</SelectItem>
                   </SelectContent>
                 </Select>
-                {touched.companyTitle && !cleanText(companyInfo.hazardClass) ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
               </div>
-              {renderInput("Çalışan Sayısı *", companyInfo.employeeCount, (value) => updateCompanyInfo("employeeCount", value), {
+              {renderInput("Çalışan Sayısı", companyInfo.employeeCount, (value) => updateCompanyInfo("employeeCount", value), {
                 placeholder: "Çalışan sayısı",
-                required: true,
                 errorKey: "employeeCount",
               })}
-              {renderInput("Değerlendirme Tarihi *", companyInfo.assessmentDate, (value) => updateCompanyInfo("assessmentDate", value), {
+              {renderInput("Değerlendirme Tarihi", companyInfo.assessmentDate, (value) => updateCompanyInfo("assessmentDate", value), {
                 type: "date",
-                required: true,
                 errorKey: "assessmentDate",
               })}
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Risk Değerlendirme Yöntemi *</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Risk Değerlendirme Yöntemi</Label>
                 <Select value={companyInfo.riskMethod} onValueChange={(value) => updateCompanyInfo("riskMethod", value as RiskMethod)}>
-                  <SelectTrigger className="h-11 rounded-xl border-slate-800 bg-slate-900/50 text-slate-100">
+                  <SelectTrigger className="h-10 rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm">
                     <SelectValue placeholder="Seçin" />
                   </SelectTrigger>
-                  <SelectContent className="border-slate-800 bg-slate-950 text-slate-100">
+                  <SelectContent className="border-slate-200 bg-white text-slate-900">
                     <SelectItem value="5x5 Matris">5x5 Matris</SelectItem>
                     <SelectItem value="Fine-Kinney">Fine-Kinney</SelectItem>
                     <SelectItem value="L Tipi Matris">L Tipi Matris</SelectItem>
                     <SelectItem value="Diğer">Diğer</SelectItem>
                   </SelectContent>
                 </Select>
-                {touched.riskMethod && !cleanText(companyInfo.riskMethod) ? <p className="text-xs text-red-400">Bu alan zorunludur.</p> : null}
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Faaliyet Kapsamı *</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Faaliyet Kapsamı</Label>
               <Textarea
                 value={companyInfo.activityScope}
                 onChange={(event) => updateCompanyInfo("activityScope", event.target.value)}
                 placeholder="Faaliyet kapsamını kısa ve net biçimde yazın"
-                className="min-h-[110px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+                className="min-h-[100px] rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm placeholder:text-slate-400"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">Not</Label>
+              <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Not</Label>
               <Textarea
                 value={companyInfo.note}
                 onChange={(event) => updateCompanyInfo("note", event.target.value)}
                 placeholder="Opsiyonel not"
-                className="min-h-[90px] rounded-2xl border-slate-800 bg-slate-900/50 text-slate-100 placeholder:text-slate-600"
+                className="min-h-[90px] rounded-xl border-slate-200 bg-white text-slate-900 shadow-sm placeholder:text-slate-400"
               />
               <p className="text-xs text-slate-500">Boş bırakılırsa çıktıda Not alanı hiç gösterilmez.</p>
             </div>
@@ -2138,18 +2374,23 @@ export default function RiskAssessmentWizard() {
 
       case 1:
         return (
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 2</p>
-              <p className="mt-2 text-sm leading-relaxed text-slate-300">
-                Bu bilgiler mevcut “İşyerine Ait Bilgiler ve Risk Değerlendirme Ekibi” bölümündeki ilgili
-                satırlara yazdırılır. Boş alanlar hücreyi boş bırakır.
-              </p>
+          <div className="space-y-5">
+            <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm leading-relaxed text-cyan-900">
+              {hasTeamInfoData(teamInfo)
+                ? "Bu bilgiler firma profilinden otomatik getirildi. Bu ekranda yaptığınız değişiklikler risk değerlendirme taslağına kaydedilir."
+                : "Firma profilinde kayıtlı ekip bilgisi bulunamadı. Alanları manuel doldurabilir veya boş bırakabilirsiniz."}
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
-                <p className="text-sm font-bold text-white">İşveren</p>
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-slate-900">Risk Değerlendirme Ekibi</CardTitle>
+                <CardDescription className="text-slate-500">
+                  Alanlar zorunlu değildir. Boş bırakılan bilgiler çıktıda boş alan olarak kalır.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-bold text-slate-900">İşveren</p>
                 {renderInput("Ad - Soyad", teamInfo.employer.fullName, (value) => updateTeamPerson("employer", "fullName", value), {
                   placeholder: "İşveren ad soyad",
                 })}
@@ -2161,8 +2402,8 @@ export default function RiskAssessmentWizard() {
                 })}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
-                <p className="text-sm font-bold text-white">Çalışan Temsilcisi</p>
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-bold text-slate-900">Çalışan Temsilcisi</p>
                 {renderInput("Ad - Soyad", teamInfo.employeeRepresentative.fullName, (value) => updateTeamPerson("employeeRepresentative", "fullName", value), {
                   placeholder: "Çalışan temsilcisi ad soyad",
                 })}
@@ -2174,8 +2415,8 @@ export default function RiskAssessmentWizard() {
                 })}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
-                <p className="text-sm font-bold text-white">İş Güvenliği Uzmanı</p>
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-bold text-slate-900">İş Güvenliği Uzmanı</p>
                 {renderInput("Ad - Soyad", teamInfo.safetyExpert.fullName, (value) => updateTeamPerson("safetyExpert", "fullName", value), {
                   placeholder: "İş güvenliği uzmanı ad soyad",
                 })}
@@ -2188,10 +2429,13 @@ export default function RiskAssessmentWizard() {
                 {renderInput("Sertifika No", teamInfo.safetyExpert.certificateNo || "", (value) => updateTeamPerson("safetyExpert", "certificateNo", value), {
                   placeholder: "Sertifika numarası",
                 })}
+                {renderInput("Sertifika Sınıfı", teamInfo.safetyExpert.certificateClass || "", (value) => updateTeamPerson("safetyExpert", "certificateClass", value), {
+                  placeholder: "A/B/C sınıfı veya ek bilgi",
+                })}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
-                <p className="text-sm font-bold text-white">İşyeri Hekimi</p>
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-sm font-bold text-slate-900">İşyeri Hekimi</p>
                 {renderInput("Ad - Soyad", teamInfo.workplaceDoctor.fullName, (value) => updateTeamPerson("workplaceDoctor", "fullName", value), {
                   placeholder: "İşyeri hekimi ad soyad",
                 })}
@@ -2206,8 +2450,8 @@ export default function RiskAssessmentWizard() {
                 })}
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-4 md:col-span-2">
-                <p className="text-sm font-bold text-white">OSGB</p>
+              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4 md:col-span-2">
+                <p className="text-sm font-bold text-slate-900">OSGB Bilgileri</p>
                 <div className="grid gap-4 md:grid-cols-2">
                   {renderInput("OSGB Unvanı", teamInfo.osgb.title, (value) => updateTeamOsgb("title", value), {
                     placeholder: "OSGB unvanı",
@@ -2222,9 +2466,13 @@ export default function RiskAssessmentWizard() {
                   {renderInput("Yetkili Kişi", teamInfo.osgb.authorizedPerson, (value) => updateTeamOsgb("authorizedPerson", value), {
                     placeholder: "Yetkili kişi",
                   })}
+                  {renderInput("Adres", teamInfo.osgb.address || "", (value) => updateTeamOsgb("address", value), {
+                    placeholder: "OSGB adresi",
+                  })}
                 </div>
               </div>
-            </div>
+              </CardContent>
+            </Card>
           </div>
         );
 
@@ -2900,45 +3148,86 @@ export default function RiskAssessmentWizard() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-base text-slate-900">Rapor Çıktıları</CardTitle>
+                <CardDescription className="text-slate-500">
+                  Boş, kısmen dolu veya tamamen dolu risk değerlendirme çıktısı oluşturabilirsiniz.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-3">
+                <Button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  variant="outline"
+                  className="rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Taslak Kaydet
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={exportingPdf}
+                  className="rounded-xl bg-cyan-600 text-white hover:bg-cyan-700"
+                >
+                  {exportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                  PDF İndir
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleWordDownload}
+                  disabled={!wordTemplateAvailable || checkingTemplate || exportingWord}
+                  variant="outline"
+                  className="rounded-xl border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-60"
+                >
+                  {exportingWord ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
+                  Word İndir
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         );
     }
   };
 
   return (
-    <div className="theme-page-readable space-y-8">
-      <section className="overflow-hidden rounded-[30px] border border-slate-800 bg-slate-950 p-6 md:p-8 shadow-[0_20px_48px_rgba(2,6,23,0.28)]">
-        <div className="grid gap-6 xl:grid-cols-[1.3fr_0.9fr] items-center">
+    <div className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900 sm:px-6">
+      <div className="mx-auto max-w-[1200px] space-y-6">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[1fr_260px] lg:items-center">
           <div className="space-y-4">
-            <Badge className="rounded-full border border-slate-800 bg-slate-900 text-slate-300 font-semibold px-3 py-1 text-xs">
-              Resmî Risk Analizi Sihirbazı
-            </Badge>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white leading-tight">
-              Resmî şablona uygun risk değerlendirme raporu oluşturun
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 md:text-3xl">
+              Risk Değerlendirme Oluştur
             </h1>
+            <p className="max-w-3xl text-sm leading-relaxed text-slate-500">
+              Firma bilgileri ve risk değerlendirme ekibi, firma profilinden otomatik getirilir. Gerekirse bu
+              ekranda düzenlenebilir.
+            </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs uppercase tracking-wider text-slate-500 font-bold">İlerleme</span>
-              <Badge className="rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-400 text-[10px] font-semibold">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">İlerleme</span>
+              <Badge className="rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700 text-[10px] font-semibold">
                 %{Math.round(progressRatio)}
               </Badge>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-slate-900">
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
               <div className="h-full rounded-full bg-cyan-500 transition-all duration-300" style={{ width: `${progressRatio}%` }} />
             </div>
-            <p className="text-xs text-slate-400">
-              Zorunlu alanlar tamamlandığında PDF veya Word çıktısı oluşturabilirsiniz.
+            <p className="mt-3 text-xs text-slate-500">
+              Alanları boş bırakarak da taslak ve çıktı oluşturabilirsiniz.
             </p>
           </div>
         </div>
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.35fr_0.95fr]">
-        <Card className="border-slate-850 bg-slate-950/80 shadow-2xl rounded-[28px] overflow-hidden">
+      <div className="grid gap-6">
+        <Card className="overflow-hidden rounded-xl border-slate-200 bg-white shadow-sm">
           <CardContent className="space-y-6 p-6">
-            <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {WIZARD_STEPS.map((step, index) => {
                 const isActive = index === currentStep;
                 const isCompleted = index < currentStep;
@@ -2951,54 +3240,48 @@ export default function RiskAssessmentWizard() {
                         setCurrentStep(index);
                         return;
                       }
-                      const validation = isStepValid(currentStep);
-                      if (!validation.valid) {
-                        REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
-                        toast.error(validation.message);
-                        return;
-                      }
                       setCurrentStep(index);
                     }}
                     className={cn(
-                      "rounded-xl border p-3 text-left transition-all",
-                      isActive && "border-cyan-500/30 bg-cyan-500/5",
-                      isCompleted && "border-slate-800 bg-slate-900/30",
-                      !isActive && !isCompleted && "border-slate-800 bg-slate-950 hover:bg-slate-900/40",
+                      "min-w-[138px] rounded-xl border p-3 text-left transition",
+                      isActive && "border-cyan-300 bg-cyan-50",
+                      isCompleted && "border-emerald-200 bg-emerald-50",
+                      !isActive && !isCompleted && "border-slate-200 bg-white hover:bg-slate-50",
                     )}
                   >
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
                           "flex h-7 w-7 items-center justify-center rounded-lg border text-xs",
-                          isActive && "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
-                          isCompleted && "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-                          !isActive && !isCompleted && "border-slate-800 bg-slate-900 text-slate-400",
+                          isActive && "border-cyan-200 bg-white text-cyan-700",
+                          isCompleted && "border-emerald-200 bg-white text-emerald-700",
+                          !isActive && !isCompleted && "border-slate-200 bg-slate-50 text-slate-500",
                         )}
                       >
                         {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.icon}
                       </div>
-                      <span className="text-[11px] font-bold text-slate-100 truncate">{step.label}</span>
+                      <span className="truncate text-[11px] font-bold text-slate-700">{step.label}</span>
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            <div className="rounded-2xl border border-slate-850 bg-slate-900/20 p-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5">
               <div className="mb-4">
-                <h3 className="text-lg font-bold text-white">{WIZARD_STEPS[currentStep].title}</h3>
-                <p className="text-xs text-slate-400 mt-1">{WIZARD_STEPS[currentStep].description}</p>
+                <h3 className="text-lg font-bold text-slate-950">{WIZARD_STEPS[currentStep].title}</h3>
+                <p className="mt-1 text-xs text-slate-500">{WIZARD_STEPS[currentStep].description}</p>
               </div>
               {renderStepContent()}
             </div>
 
-            <div className="flex flex-col gap-3 border-t border-slate-850 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
               <Button
                 type="button"
                 variant="outline"
                 onClick={handlePrev}
                 disabled={currentStep === 0}
-                className="rounded-xl border-slate-800 bg-slate-900/50 text-slate-100 hover:bg-slate-900"
+                className="rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Geri
@@ -3007,15 +3290,24 @@ export default function RiskAssessmentWizard() {
                 <Button
                   type="button"
                   variant="outline"
+                  onClick={handleSaveDraft}
+                  className="rounded-xl border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Taslak Kaydet
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={resetWizard}
-                  className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                  className="rounded-xl border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
                 >
                   <X className="mr-2 h-4 w-4" />
                   Taslağı Temizle
                 </Button>
                 {currentStep < WIZARD_STEPS.length - 1 ? (
-                  <Button type="button" onClick={handleNext} className="rounded-xl bg-violet-600 text-white hover:bg-violet-700">
-                    İleri
+                  <Button type="button" onClick={handleNext} className="rounded-xl bg-cyan-600 text-white hover:bg-cyan-700">
+                    Devam Et
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 ) : null}
@@ -3024,7 +3316,7 @@ export default function RiskAssessmentWizard() {
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="hidden space-y-4">
           <Card className="border-slate-850 bg-slate-950/80 rounded-[28px] shadow-2xl p-5">
             <p className="text-[11px] uppercase tracking-widest text-slate-500 font-bold">Özet</p>
             <div className="mt-4 space-y-3">
@@ -3114,6 +3406,7 @@ export default function RiskAssessmentWizard() {
             </div>
           </Card>
         </div>
+      </div>
       </div>
 
       <Dialog open={riskTemplateDialogOpen} onOpenChange={setRiskTemplateDialogOpen}>
