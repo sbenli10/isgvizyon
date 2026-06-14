@@ -132,7 +132,8 @@ function buildPrompt(sector: string, companyName?: string) {
 Gorev:
 - ${companyName ? `"${companyName}" icin` : "Bir firma icin"} "${sector}" sektorune ozel 15 adet en kritik risk maddesi uret.
 - Maddeler tekrarsiz, uygulanabilir ve sahaya ozgu olsun.
-- Her madde icin hazard, risk, category, probability, frequency, severity ve controls alanlarini doldur.
+- Her madde icin hazard, risk, category, probability, frequency, severity, responsible ve controls alanlarini doldur.
+- responsible alani her maddede kesinlikle "İşveren" olsun.
 - Controls alaninda tam olarak 3 somut, net ve uygulanabilir onlem olsun.
 - Yanitini baska hicbir aciklama metni eklemeden, doğrudan bir JSON ARRAY (dizi) dondur.
 
@@ -149,6 +150,7 @@ JSON ornegi:
     "probability": 3,
     "frequency": 6,
     "severity": 15,
+    "responsible": "İşveren",
     "controls": [
       "Panolarin kilitli tutulmasi ve sadece yetkili personelin erismesi",
       "Kacak akim rolelerinin aylik test edilmesi",

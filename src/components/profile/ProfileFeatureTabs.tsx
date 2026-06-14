@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   AlertTriangle,
   Archive,
@@ -68,6 +70,8 @@ type CompanyRow = {
   employee_representative_tc_no?: string | null;
   employee_representative_phone?: string | null;
   knowledgeable_employee_name?: string | null;
+  emergency_team_info?: unknown | null;
+  document_tracking_info?: unknown | null;
 };
 
 type EmployeeRow = {
@@ -146,6 +150,142 @@ const assignmentDetailRoles: Array<{
 ];
 
 const emptyText = "Henüz kayıt yok";
+
+type EmergencyTeamRoleKey = "all_units_contact" | "fire_chief" | "rescue_chief" | "protection_chief" | "first_aid_chief";
+
+type EmergencyTeamPerson = {
+  employee_id: string;
+  full_name: string;
+  tc_no: string;
+};
+
+type EmergencyTeamInfo = Record<EmergencyTeamRoleKey, EmergencyTeamPerson>;
+
+type CompanyDocumentTrackingItem = {
+  id: string;
+  document_name: string;
+  status: string;
+  expiry_date: string;
+  file: string;
+  notes: string;
+};
+
+type JsPdfWithAutoTable = jsPDF & {
+  lastAutoTable?: {
+    finalY: number;
+  };
+};
+
+const emergencyTeamRoles: Array<{ key: EmergencyTeamRoleKey; label: string }> = [
+  { key: "all_units_contact", label: "Tüm Birimlerden Bilgi Sahibi" },
+  { key: "fire_chief", label: "Söndürme Ekip Başkanı" },
+  { key: "rescue_chief", label: "Kurtarma Ekip Başkanı" },
+  { key: "protection_chief", label: "Koruma Ekip Başkanı" },
+  { key: "first_aid_chief", label: "İlk Yardım Ekip Başkanı" },
+];
+
+const defaultDocumentTrackingNames = [
+  "Risk Değerlendirmesi",
+  "Acil Durum Planı",
+  "Eğitim Belgeleri",
+  "Sağlık Raporları",
+  "İSG Kurul Evrakları",
+  "Yangın Tatbikatı",
+  "Çalışan Temsilcisi Atama Yazısı",
+  "Destek Elemanı Atama Yazısı",
+];
+
+const employeeSelectManualValue = "__manual__";
+
+function emptyEmergencyTeamPerson(): EmergencyTeamPerson {
+  return { employee_id: "", full_name: "", tc_no: "" };
+}
+
+function emptyEmergencyTeamInfo(): EmergencyTeamInfo {
+  return {
+    all_units_contact: emptyEmergencyTeamPerson(),
+    fire_chief: emptyEmergencyTeamPerson(),
+    rescue_chief: emptyEmergencyTeamPerson(),
+    protection_chief: emptyEmergencyTeamPerson(),
+    first_aid_chief: emptyEmergencyTeamPerson(),
+  };
+}
+
+function normalizeEmergencyTeamInfo(value: unknown): EmergencyTeamInfo {
+  const source = value && typeof value === "object" ? (value as Partial<Record<EmergencyTeamRoleKey, Partial<EmergencyTeamPerson>>>) : {};
+  return emergencyTeamRoles.reduce((acc, role) => {
+    const item = source[role.key] || {};
+    acc[role.key] = {
+      employee_id: typeof item.employee_id === "string" ? item.employee_id : "",
+      full_name: typeof item.full_name === "string" ? item.full_name : "",
+      tc_no: typeof item.tc_no === "string" ? item.tc_no : "",
+    };
+    return acc;
+  }, emptyEmergencyTeamInfo());
+}
+
+function sanitizeEmergencyTeamInfo(value: EmergencyTeamInfo) {
+  return emergencyTeamRoles.reduce<Record<string, { employee_id: string | null; full_name: string | null; tc_no: string | null }>>((acc, role) => {
+    const item = value[role.key] || emptyEmergencyTeamPerson();
+    acc[role.key] = {
+      employee_id: item.employee_id.trim() || null,
+      full_name: item.full_name.trim() || null,
+      tc_no: item.tc_no.trim() || null,
+    };
+    return acc;
+  }, {});
+}
+
+function defaultDocumentTrackingInfo(): CompanyDocumentTrackingItem[] {
+  return defaultDocumentTrackingNames.map((name, index) => ({
+    id: `default-${index + 1}`,
+    document_name: name,
+    status: "Beklemede",
+    expiry_date: "",
+    file: "",
+    notes: "",
+  }));
+}
+
+function normalizeDocumentTrackingInfo(value: unknown): CompanyDocumentTrackingItem[] {
+  if (!Array.isArray(value)) return defaultDocumentTrackingInfo();
+  const rows = value
+    .filter((item) => item && typeof item === "object")
+    .map((item, index) => {
+      const row = item as Partial<CompanyDocumentTrackingItem>;
+      return {
+        id: String(row.id || `doc-${index + 1}`),
+        document_name: String(row.document_name || ""),
+        status: String(row.status || "Beklemede"),
+        expiry_date: String(row.expiry_date || ""),
+        file: String(row.file || ""),
+        notes: String(row.notes || ""),
+      };
+    });
+  return rows.length > 0 ? rows : defaultDocumentTrackingInfo();
+}
+
+function sanitizeDocumentTrackingInfo(value: CompanyDocumentTrackingItem[]) {
+  return value
+    .filter((item) => item.document_name.trim())
+    .map((item) => ({
+      id: item.id,
+      document_name: item.document_name.trim(),
+      status: item.status || "Beklemede",
+      expiry_date: item.expiry_date || null,
+      file: item.file.trim() || null,
+      notes: item.notes.trim() || null,
+    }));
+}
+
+function safePdfText(value?: string | number | null) {
+  const text = value === undefined || value === null ? "" : String(value).trim();
+  return text || "-";
+}
+
+function getAutoTableFinalY(doc: jsPDF, fallback = 30) {
+  return (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ?? fallback;
+}
 
 function getFriendlyEmployeeError(error: unknown) {
   const source = error && typeof error === "object" ? error as { code?: string; message?: string; details?: string } : {};
@@ -362,6 +502,8 @@ async function loadCompanyById(companyId: string): Promise<CompanyRow | null> {
       employee_representative_tc_no: data.employee_representative_tc_no || null,
       employee_representative_phone: data.employee_representative_phone || null,
       knowledgeable_employee_name: data.knowledgeable_employee_name || null,
+      emergency_team_info: data.emergency_team_info || null,
+      document_tracking_info: data.document_tracking_info || null,
     };
   } catch (error) {
     console.warn("[Profile] çalışan firması alınamadı", error);
@@ -403,6 +545,8 @@ async function loadProfileCompanies(orgId?: string | null, userId?: string | nul
         employee_representative_tc_no: row.employee_representative_tc_no || null,
         employee_representative_phone: row.employee_representative_phone || null,
         knowledgeable_employee_name: row.knowledgeable_employee_name || null,
+        emergency_team_info: row.emergency_team_info || null,
+        document_tracking_info: row.document_tracking_info || null,
       }));
     } catch (error) {
       console.warn("[Profile] firma listesi alınamadı", error);
@@ -603,7 +747,7 @@ export function ProfileCompaniesTab() {
   const [query, setQuery] = useState("");
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogTab, setDialogTab] = useState<"edit" | "assignments" | "employees" | "reports" | "documents">("edit");
+  const [dialogTab, setDialogTab] = useState<"edit" | "assignments" | "employees" | "emergency" | "reports" | "documents">("edit");
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
   const [companyEmployees, setCompanyEmployees] = useState<EmployeeRow[]>([]);
   const [bulkCompanyOpen, setBulkCompanyOpen] = useState(false);
@@ -634,6 +778,8 @@ export function ProfileCompaniesTab() {
     employee_representative_tc_no: "",
     employee_representative_phone: "",
     knowledgeable_employee_name: "",
+    emergency_team_info: emptyEmergencyTeamInfo(),
+    document_tracking_info: defaultDocumentTrackingInfo(),
   });
 
   const loadCompanies = () => {
@@ -675,6 +821,8 @@ export function ProfileCompaniesTab() {
       employee_representative_tc_no: company?.employee_representative_tc_no || "",
       employee_representative_phone: company?.employee_representative_phone || "",
       knowledgeable_employee_name: company?.knowledgeable_employee_name || "",
+      emergency_team_info: normalizeEmergencyTeamInfo(company?.emergency_team_info),
+      document_tracking_info: normalizeDocumentTrackingInfo(company?.document_tracking_info),
     });
     setDialogOpen(true);
     if (company?.id) {
@@ -714,6 +862,8 @@ export function ProfileCompaniesTab() {
       employee_representative_tc_no: companyForm.employee_representative_tc_no.trim() || null,
       employee_representative_phone: companyForm.employee_representative_phone.trim() || null,
       knowledgeable_employee_name: companyForm.knowledgeable_employee_name.trim() || null,
+      emergency_team_info: sanitizeEmergencyTeamInfo(companyForm.emergency_team_info),
+      document_tracking_info: sanitizeDocumentTrackingInfo(companyForm.document_tracking_info),
       user_id: user?.id,
       organization_id: profile?.organization_id || null,
       is_active: true,
@@ -825,10 +975,135 @@ export function ProfileCompaniesTab() {
     }
   };
 
+  const updateEmergencyTeamPerson = (role: EmergencyTeamRoleKey, patch: Partial<EmergencyTeamPerson>) => {
+    setCompanyForm((current) => ({
+      ...current,
+      emergency_team_info: {
+        ...current.emergency_team_info,
+        [role]: {
+          ...current.emergency_team_info[role],
+          ...patch,
+        },
+      },
+    }));
+  };
+
+  const updateDocumentTrackingRow = (rowId: string, patch: Partial<CompanyDocumentTrackingItem>) => {
+    setCompanyForm((current) => ({
+      ...current,
+      document_tracking_info: current.document_tracking_info.map((item) => (item.id === rowId ? { ...item, ...patch } : item)),
+    }));
+  };
+
+  const addDocumentTrackingRow = () => {
+    setCompanyForm((current) => ({
+      ...current,
+      document_tracking_info: [
+        ...current.document_tracking_info,
+        {
+          id: `custom-${Date.now()}`,
+          document_name: "",
+          status: "Beklemede",
+          expiry_date: "",
+          file: "",
+          notes: "",
+        },
+      ],
+    }));
+  };
+
+  const downloadCompanyReport = (reportTitle: string) => {
+    if (!editingCompany) {
+      toast.error("Rapor için önce firmayı kaydedin.");
+      return;
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const fileBase = `${reportTitle.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9ğüşöçıİĞÜŞÖÇ]+/gi, "-")}-${companyForm.name || "firma"}`;
+    doc.setFontSize(15);
+    doc.text(reportTitle, 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Firma: ${safePdfText(companyForm.name)}`, 14, 23);
+
+    autoTable(doc, {
+      startY: 30,
+      head: [["Alan", "Bilgi"]],
+      body: [
+        ["Firma Ünvanı", safePdfText(companyForm.name)],
+        ["E-Posta", safePdfText(companyForm.email)],
+        ["Adres", safePdfText(companyForm.address)],
+        ["SGK Sicil No", safePdfText(companyForm.sgk_number)],
+        ["Çalışan Sayısı", safePdfText(companyForm.employee_count)],
+        ["Tehlike Sınıfı", safePdfText(companyForm.hazard_class)],
+      ],
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 23, 42] },
+    });
+
+    autoTable(doc, {
+      startY: getAutoTableFinalY(doc) + 8,
+      head: [["Acil Durum Görevi", "Ad Soyad", "T.C. Kimlik No"]],
+      body: emergencyTeamRoles.map((role) => {
+        const item = companyForm.emergency_team_info[role.key];
+        return [role.label, safePdfText(item.full_name), safePdfText(item.tc_no)];
+      }),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [180, 83, 9] },
+    });
+
+    if (reportTitle.includes("Çalışan")) {
+      autoTable(doc, {
+        startY: getAutoTableFinalY(doc) + 8,
+        head: [["Çalışan", "Görev", "Departman", "Telefon"]],
+        body: companyEmployees.map((employee) => [
+          safePdfText(fullEmployeeName(employee)),
+          safePdfText(employee.job_title),
+          safePdfText(employee.department),
+          safePdfText(employee.phone),
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [5, 150, 105] },
+      });
+    }
+
+    if (reportTitle.includes("Atama") || reportTitle.includes("Genel")) {
+      autoTable(doc, {
+        startY: getAutoTableFinalY(doc) + 8,
+        head: [["Rol", "Ad Soyad", "T.C.", "Telefon / Sertifika"]],
+        body: [
+          ["İşveren / Vekili", companyForm.employer_representative_name, companyForm.employer_representative_tc_no, companyForm.employer_representative_phone],
+          ["İş Güvenliği Uzmanı", companyForm.occupational_safety_specialist_name, companyForm.occupational_safety_specialist_tc_no, `${companyForm.occupational_safety_specialist_phone} ${companyForm.occupational_safety_specialist_certificate_no}`],
+          ["İşyeri Hekimi", companyForm.workplace_doctor_name, companyForm.workplace_doctor_tc_no, `${companyForm.workplace_doctor_phone} ${companyForm.workplace_doctor_certificate_no}`],
+          ["Çalışan Temsilcisi", companyForm.employee_representative_name, companyForm.employee_representative_tc_no, companyForm.employee_representative_phone],
+        ].map((row) => row.map((cell) => safePdfText(cell))),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [124, 58, 237] },
+      });
+    }
+
+    if (reportTitle.includes("Evrak") || reportTitle.includes("Genel")) {
+      autoTable(doc, {
+        startY: getAutoTableFinalY(doc) + 8,
+        head: [["Belge Adı", "Durum", "Son Geçerlilik", "Not"]],
+        body: companyForm.document_tracking_info.map((item) => [
+          safePdfText(item.document_name),
+          safePdfText(item.status),
+          safePdfText(item.expiry_date),
+          safePdfText(item.notes),
+        ]),
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [8, 145, 178] },
+      });
+    }
+
+    doc.save(`${fileBase}.pdf`);
+  };
+
   const dialogTabs = [
     { id: "edit" as const, label: "Düzenle", icon: Building2, tone: "data-[active=true]:bg-blue-600" },
     { id: "assignments" as const, label: "Atamalar", icon: Users, tone: "data-[active=true]:bg-fuchsia-600" },
     { id: "employees" as const, label: "Çalışanlar", icon: Users, tone: "data-[active=true]:bg-emerald-600" },
+    { id: "emergency" as const, label: "Acil Durum Ekipleri", icon: ShieldCheck, tone: "data-[active=true]:bg-amber-600" },
     { id: "reports" as const, label: "Raporlar", icon: FileText, tone: "data-[active=true]:bg-orange-500" },
     { id: "documents" as const, label: "Evrak Takip", icon: ClipboardList, tone: "data-[active=true]:bg-cyan-600" },
   ];
@@ -931,7 +1206,7 @@ export function ProfileCompaniesTab() {
           <DialogHeader className="sr-only">
             <DialogTitle>{editingCompany ? "Firma Düzenle" : "Firma Ekle"}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-5 gap-2 rounded-2xl border border-slate-700 bg-slate-950/60 p-1">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-700 bg-slate-950/60 p-1 sm:grid-cols-3 lg:grid-cols-6">
             {dialogTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -1069,6 +1344,154 @@ export function ProfileCompaniesTab() {
             ) : (
               <div className="rounded-2xl border border-slate-700 p-6 text-center text-sm font-semibold text-amber-300">
                 Çalışan listesini görmek için firma kaydedilmiş olmalıdır. Lütfen önce firmayı kaydedin.
+              </div>
+            )
+          ) : dialogTab === "emergency" ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
+                <p className="text-sm font-black text-white">Acil Durum Ekip Başkanları</p>
+                <p className="mt-1 text-xs leading-relaxed text-amber-100/80">
+                  Çalışan seçerseniz ad soyad ve T.C. bilgisi otomatik dolar. İsterseniz alanları manuel düzenleyebilirsiniz.
+                </p>
+              </div>
+              {!editingCompany ? (
+                <div className="rounded-2xl border border-slate-700 p-4 text-sm font-semibold text-amber-300">
+                  Çalışan seçimi firma kaydedildikten sonra aktif olur. Bu aşamada alanları manuel doldurabilirsiniz.
+                </div>
+              ) : null}
+              <div className="grid gap-4 lg:grid-cols-2">
+                {emergencyTeamRoles.map((role) => {
+                  const person = companyForm.emergency_team_info[role.key];
+                  return (
+                    <div key={role.key} className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
+                      <div className="mb-4 flex items-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-200">
+                          <ShieldCheck className="h-4 w-4" />
+                        </span>
+                        <p className="font-black text-white">{role.label}</p>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label>Çalışan Seç</Label>
+                          <Select
+                            value={person.employee_id || employeeSelectManualValue}
+                            onValueChange={(employeeId) => {
+                              if (employeeId === employeeSelectManualValue) {
+                                updateEmergencyTeamPerson(role.key, { employee_id: "" });
+                                return;
+                              }
+                              const employee = companyEmployees.find((item) => item.id === employeeId);
+                              updateEmergencyTeamPerson(role.key, {
+                                employee_id: employeeId,
+                                full_name: employee ? fullEmployeeName(employee) : person.full_name,
+                                tc_no: employee?.tc_number || person.tc_no,
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="rounded-xl border-slate-700 bg-slate-800">
+                              <SelectValue placeholder="Çalışan seç" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={employeeSelectManualValue}>Çalışan seç</SelectItem>
+                              {companyEmployees.map((employee) => (
+                                <SelectItem key={employee.id} value={employee.id}>
+                                  {fullEmployeeName(employee)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="space-y-1.5">
+                            <Label>Ad Soyad</Label>
+                            <Input value={person.full_name} onChange={(event) => updateEmergencyTeamPerson(role.key, { full_name: event.target.value })} placeholder="Ad soyad" className="rounded-xl border-slate-700 bg-slate-800" />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label>T.C. Kimlik No</Label>
+                            <Input maxLength={11} inputMode="numeric" value={person.tc_no} onChange={(event) => updateEmergencyTeamPerson(role.key, { tc_no: event.target.value.replace(/\D/g, "").slice(0, 11) })} placeholder="11 haneli" className="rounded-xl border-slate-700 bg-slate-800" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : dialogTab === "reports" ? (
+            editingCompany ? (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
+                  <p className="text-sm font-black text-white">Firma Raporları</p>
+                  <p className="mt-1 text-xs text-orange-100/80">Raporlarda firma bilgileri, acil durum ekipleri ve ilgili listeler otomatik yer alır.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {["Firma Bilgi Formu", "Acil Durum Ekipleri Listesi", "Çalışan Listesi", "Atama Özeti", "Evrak Durum Raporu", "Firma Genel Özeti"].map((report) => (
+                    <button key={report} type="button" onClick={() => downloadCompanyReport(report)} className="flex items-center justify-between rounded-2xl border border-slate-700 bg-slate-950/50 p-4 text-left transition hover:border-orange-400/60 hover:bg-slate-800">
+                      <span>
+                        <span className="block font-black text-white">{report}</span>
+                        <span className="mt-1 block text-xs text-slate-400">PDF olarak indir</span>
+                      </span>
+                      <Download className="h-4 w-4 text-orange-300" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-700 p-6 text-center text-sm font-semibold text-amber-300">
+                Raporları görmek için firma kaydedilmiş olmalıdır. Lütfen önce firmayı kaydedin.
+              </div>
+            )
+          ) : dialogTab === "documents" ? (
+            editingCompany ? (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-black text-white">Evrak Takip</p>
+                    <p className="mt-1 text-xs text-cyan-100/80">Durum, son geçerlilik tarihi, dosya bilgisi ve notları firma kaydıyla birlikte saklanır.</p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={addDocumentTrackingRow} className="rounded-xl border-cyan-500/40 bg-slate-900 text-cyan-100 hover:bg-cyan-500/10">
+                    <Plus className="mr-2 h-4 w-4" />Evrak Ekle
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {companyForm.document_tracking_info.map((item) => (
+                    <div key={item.id} className="grid gap-3 rounded-2xl border border-slate-700 bg-slate-950/50 p-4 md:grid-cols-[1.2fr_150px_170px_1fr]">
+                      <div className="space-y-1.5">
+                        <Label>Belge Adı</Label>
+                        <Input value={item.document_name} onChange={(event) => updateDocumentTrackingRow(item.id, { document_name: event.target.value })} className="rounded-xl border-slate-700 bg-slate-800" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Durum</Label>
+                        <Select value={item.status} onValueChange={(value) => updateDocumentTrackingRow(item.id, { status: value })}>
+                          <SelectTrigger className="rounded-xl border-slate-700 bg-slate-800"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Beklemede">Beklemede</SelectItem>
+                            <SelectItem value="Hazır">Hazır</SelectItem>
+                            <SelectItem value="Eksik">Eksik</SelectItem>
+                            <SelectItem value="Süresi Yaklaşıyor">Süresi Yaklaşıyor</SelectItem>
+                            <SelectItem value="Süresi Doldu">Süresi Doldu</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Son Geçerlilik Tarihi</Label>
+                        <Input type="date" value={item.expiry_date} onChange={(event) => updateDocumentTrackingRow(item.id, { expiry_date: event.target.value })} className="rounded-xl border-slate-700 bg-slate-800" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Dosya</Label>
+                        <Input value={item.file} onChange={(event) => updateDocumentTrackingRow(item.id, { file: event.target.value })} placeholder="Dosya adı veya bağlantı" className="rounded-xl border-slate-700 bg-slate-800" />
+                      </div>
+                      <div className="space-y-1.5 md:col-span-4">
+                        <Label>Not</Label>
+                        <Textarea value={item.notes} onChange={(event) => updateDocumentTrackingRow(item.id, { notes: event.target.value })} placeholder="Evrak notu..." className="min-h-20 rounded-xl border-slate-700 bg-slate-800" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-700 p-6 text-center text-sm font-semibold text-amber-300">
+                Önce firmayı kaydedin, evrak takibi için firma kimliği gereklidir.
               </div>
             )
           ) : (

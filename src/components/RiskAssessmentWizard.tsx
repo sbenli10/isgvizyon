@@ -14,12 +14,9 @@ import {
   FileText,
   FolderOpen,
   Info,
-  ListChecks,
   Loader2,
-  PenSquare,
   Plus,
   Search,
-  ShieldCheck,
   Sparkles,
   Trash2,
   Users,
@@ -36,7 +33,13 @@ import { MANUAL_RISK_LIBRARY, type ManualRiskLibraryItem } from "@/lib/risk/manu
 import { generateSectorRiskTemplates } from "@/lib/risk/sectorRiskTemplates";
 import { getSectorMinimumRiskItemCount, RISK_TEMPLATE_CONFIGS } from "@/lib/risk/riskTemplateConfig";
 import { listSavedRiskItems, type SavedRiskItem } from "@/lib/profileRisks";
-import { generateRiskAssessmentOfficialDocx } from "@/lib/riskAssessmentOfficialDocx";
+import {
+  calculateRiskValidityDate,
+  generateRiskAnalysisTemplateDocx,
+  generateRiskAnalysisTemplatePdf,
+  type RiskTemplateExportPayload,
+  type RiskTemplateEmergencyInfo,
+} from "@/lib/riskTemplateExport";
 import { generateRisksWithGemini, type GeminiRiskResult } from "@/services/geminiService";
 import type { RiskItem } from "@/types/risk-assessment";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
@@ -84,6 +87,7 @@ type RiskWizardCompanyInfo = {
   hazardClass: HazardClass;
   employeeCount: string;
   assessmentDate: string;
+  validUntil: string;
   riskMethod: RiskMethod | "";
   activityScope: string;
   note: string;
@@ -185,6 +189,7 @@ type WizardCompanyOption = {
   osgbPhone?: string | null;
   osgbEmail?: string | null;
   osgbAddress?: string | null;
+  emergencyTeamInfo?: RiskTemplateEmergencyInfo | null;
 };
 
 type CompanyAssignmentForRisk = {
@@ -261,13 +266,6 @@ const WIZARD_STEPS: WizardStep[] = [
     icon: <Users className="h-5 w-5" />,
   },
   {
-    id: "scope",
-    label: "Tehlikeler",
-    title: "Tehlikeler ve Kapsam",
-    description: "Kapsamı, degerlendirilen faaliyetleri ve puanlama açiklamasini oluşturun.",
-    icon: <ShieldCheck className="h-5 w-5" />,
-  },
-  {
     id: "risk-method",
     label: "Riskler",
     title: "Risk Ekleme Yöntemi",
@@ -280,20 +278,6 @@ const WIZARD_STEPS: WizardStep[] = [
     title: "Risk Değerlendirme Tablosu",
     description: "Seçtiginiz yönteme göre olusan risk maddelerini düzenleyin.",
     icon: <AlertTriangle className="h-5 w-5" />,
-  },
-  {
-    id: "actions",
-    label: "Faaliyetler",
-    title: "Öncelikli Düzeltici / Önleyici Faaliyet Plani",
-    description: "Plan satirlarini yalnizca ihtiyaç duydugunuz kadar oluşturun.",
-    icon: <ListChecks className="h-5 w-5" />,
-  },
-  {
-    id: "conclusion",
-    label: "İmzalar",
-    title: "Genel Sonuç, Onay ve İmzalar",
-    description: "Onay metinlerini ve imza tablosunu tamamlayin.",
-    icon: <PenSquare className="h-5 w-5" />,
   },
   {
     id: "preview",
@@ -317,6 +301,7 @@ const emptyCompanyInfo = (): RiskWizardCompanyInfo => ({
   hazardClass: "",
   employeeCount: "",
   assessmentDate: today,
+  validUntil: "",
   riskMethod: "",
   activityScope: "",
   note: "",
@@ -464,6 +449,26 @@ const normalizeLegacyOsgb = (value: unknown): RiskTeamOsgb => {
   };
 };
 
+const readEmergencyPerson = (value: unknown) => {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    fullName: cleanText(String(source.full_name || source.fullName || "")),
+    tcNo: cleanText(String(source.tc_no || source.tcNo || "")),
+  };
+};
+
+const normalizeEmergencyTeamInfo = (value: unknown): RiskTemplateEmergencyInfo | null => {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  return {
+    allUnitsContact: readEmergencyPerson(source.all_units_contact),
+    fireChief: readEmergencyPerson(source.fire_chief),
+    rescueChief: readEmergencyPerson(source.rescue_chief),
+    protectionChief: readEmergencyPerson(source.protection_chief),
+    firstAidChief: readEmergencyPerson(source.first_aid_chief),
+  };
+};
+
 const normalizeTeamInfo = (value?: Partial<RiskWizardTeamInfo> | null): RiskWizardTeamInfo => ({
   employer: normalizeLegacyTeamPerson(value?.employer),
   employeeRepresentative: normalizeLegacyTeamPerson(value?.employeeRepresentative),
@@ -535,6 +540,7 @@ const buildCompanyInfoFromProfile = (company: WizardCompanyOption): RiskWizardCo
     workplaceRegistryNo: cleanText(company.sgkNumber),
     hazardClass,
     employeeCount: company.employeeCount != null ? String(company.employeeCount) : "",
+    validUntil: calculateRiskValidityDate(today, hazardClass),
     activityScope: cleanText(company.activityScope),
   };
 };
@@ -584,6 +590,7 @@ const mergeCompanyInfoFallback = (current: RiskWizardCompanyInfo, fallback: Risk
   hazardClass: current.hazardClass || fallback.hazardClass,
   employeeCount: current.employeeCount || fallback.employeeCount,
   assessmentDate: current.assessmentDate || fallback.assessmentDate || today,
+  validUntil: current.validUntil || fallback.validUntil,
   riskMethod: current.riskMethod || fallback.riskMethod,
   activityScope: current.activityScope || fallback.activityScope,
   note: current.note || fallback.note,
@@ -666,7 +673,7 @@ const createRiskRowFromGeneratedRisk = (
     riskScore: String(riskScore),
     riskLevel: getRiskLevelFromScore(riskScore),
     additionalMeasures: cleanText(controls.slice(1).join("\n")),
-    responsible: "",
+    responsible: "İşveren",
     deadline: "",
   };
 };
@@ -1488,7 +1495,7 @@ export default function RiskAssessmentWizard() {
     let active = true;
     const checkTemplate = async () => {
       try {
-        const response = await fetch("/templates/Risk_Analizi.docx");
+        const response = await fetch("/templates/risk-analizi-sablonu.docx");
         if (!active) return;
         setWordTemplateAvailable(response.ok);
       } catch {
@@ -1643,6 +1650,7 @@ export default function RiskAssessmentWizard() {
             osgbPhone: pickFirstText(row.osgb_phone, organizationInfo?.phone, profile?.phone) || null,
             osgbEmail: pickFirstText(row.osgb_email, organizationInfo?.email, profile?.email) || null,
             osgbAddress: pickFirstText(row.osgb_address, organizationInfo?.address) || null,
+            emergencyTeamInfo: normalizeEmergencyTeamInfo(row.emergency_team_info),
           }));
 
         setCompanies(enrichCompaniesWithAssignments(mappedCompanies, assignments));
@@ -2081,58 +2089,118 @@ export default function RiskAssessmentWizard() {
     });
   };
 
+  const buildRiskTemplatePayload = (summaryItems: ReturnType<typeof buildRiskItemsSummary>): RiskTemplateExportPayload | null => {
+    if (!selectedCompany) return null;
+    return {
+      companyInfo: {
+        companyTitle: companyInfo.companyTitle || selectedCompany.name,
+        workplaceRegistryNo: companyInfo.workplaceRegistryNo || selectedCompany.sgkNumber || "",
+        hazardClass: companyInfo.hazardClass || selectedCompany.hazardClass || "",
+        assessmentDate: companyInfo.assessmentDate,
+        validUntil: companyInfo.validUntil,
+      },
+      teamInfo: {
+        employer: {
+          fullName: teamInfo.employer.fullName,
+          tcNo: teamInfo.employer.tcNo,
+        },
+        safetyExpert: {
+          fullName: teamInfo.safetyExpert.fullName,
+          certificateNo: teamInfo.safetyExpert.certificateNo,
+        },
+        workplaceDoctor: {
+          fullName: teamInfo.workplaceDoctor.fullName,
+          certificateNo: teamInfo.workplaceDoctor.certificateNo,
+        },
+        employeeRepresentative: {
+          fullName: teamInfo.employeeRepresentative.fullName,
+          tcNo: teamInfo.employeeRepresentative.tcNo,
+        },
+      },
+      emergencyInfo: selectedCompany.emergencyTeamInfo || undefined,
+      riskItems: summaryItems.map((item) => ({
+        no: item.no,
+        departmentActivity: item.departmentActivity,
+        hazardSource: item.hazardSource,
+        riskConsequence: item.riskConsequence,
+        affectedPeople: item.affectedPeople,
+        currentMeasure: item.currentMeasure,
+        probability: item.probability,
+        frequency: "1",
+        severity: item.severity,
+        riskScore: item.riskScore,
+        riskLevel: item.riskLevel,
+        additionalMeasures: item.additionalMeasures,
+        responsible: item.responsible,
+        deadline: item.deadline,
+      })),
+    };
+  };
+
   const handleExportPdf = async () => {
+    if (!selectedCompanyId || !selectedCompany) {
+      toast.error("Firma seçilmedi.");
+      return;
+    }
+    const summaryItems = buildRiskItemsSummary(riskItems);
+    if (summaryItems.length === 0) {
+      toast.error("Risk maddesi yok.");
+      return;
+    }
+    if (!wordTemplateAvailable) {
+      toast.error("Şablon bulunamadı.");
+      return;
+    }
+    const payload = buildRiskTemplatePayload(summaryItems);
+    if (!payload) {
+      toast.error("Firma seçilmedi.");
+      return;
+    }
+
     setExportingPdf(true);
     try {
-      const doc = await buildWizardPdf({
-        currentStep,
-        companyInfo,
-        teamInfo,
-        scopeInfo,
-        riskItems,
-        correctiveActions,
-        conclusionInfo,
-        signatureRows,
-        logo,
-      });
-      const fileName = `risk-analizi-${slugify(companyInfo.companyTitle || "firma")}-${today}.pdf`;
-      doc.save(fileName);
-      toast.success("Risk değerlendirme raporu PDF olarak hazirlandi.");
+      await generateRiskAnalysisTemplatePdf(payload);
+      toast.success("Risk analizi PDF olarak hazirlandi.");
     } catch (error) {
       console.error("Risk wizard PDF error", error);
-      toast.error("PDF raporu oluşturulamadi.");
+      const message = error instanceof Error ? error.message : "PDF raporu oluşturulamadi.";
+      toast.error(message.includes("Şablon") ? "Şablon bulunamadı." : "PDF raporu oluşturulamadi.");
     } finally {
       setExportingPdf(false);
     }
   };
 
-  const handleWordDownload = async () => {
+  const handleRiskTemplateDownload = async () => {
+    if (!selectedCompanyId || !selectedCompany) {
+      toast.error("Firma seçilmedi.");
+      return;
+    }
+    const summaryItems = buildRiskItemsSummary(riskItems);
+    if (summaryItems.length === 0) {
+      toast.error("Risk maddesi yok.");
+      return;
+    }
+    if (!wordTemplateAvailable) {
+      toast.error("Şablon bulunamadı.");
+      return;
+    }
+    const payload = buildRiskTemplatePayload(summaryItems);
+    if (!payload) {
+      toast.error("Firma seçilmedi.");
+      return;
+    }
+
     setExportingWord(true);
     try {
-      await generateRiskAssessmentOfficialDocx({
-        companyInfo,
-        teamInfo,
-        scopeInfo,
-        riskItems: buildRiskItemsSummary(riskItems),
-        correctiveActions: buildCorrectiveActionsSummary(correctiveActions),
-        conclusionInfo: {
-          conclusionItems: (conclusionInfo.conclusionItems || []).map((item) => cleanText(item)).filter(Boolean),
-          approvalNote: conclusionInfo.approvalNote,
-          preparedBy: conclusionInfo.preparedBy,
-          approvedBy: conclusionInfo.approvedBy,
-          signatureDate: conclusionInfo.signatureDate,
-        },
-        signatureRows: previewSignatureRows,
-      });
-      toast.success("Risk değerlendirme raporu Word sablonu ile hazirlandi.");
+      await generateRiskAnalysisTemplateDocx(payload);
+      toast.success("Rapor başarıyla oluşturuldu.");
     } catch (error) {
-      console.error("Risk wizard DOCX error", error);
-      toast.error("Word çıktısi oluşturulamadi.");
+      console.error("Risk analysis template DOCX error", error);
+      const message = error instanceof Error ? error.message : "Rapor oluşturulamadı.";
+      toast.error(message.includes("Şablon") ? "Şablon bulunamadı." : "Rapor oluşturulamadı.");
     } finally {
       setExportingWord(false);
     }
-    return;
-
   };
 
   const addScopeItem = () => {
@@ -2199,8 +2267,8 @@ export default function RiskAssessmentWizard() {
   };
 
   const renderStepContent = () => {
-    switch (currentStep) {
-      case 0:
+    switch (WIZARD_STEPS[currentStep]?.id) {
+      case "company":
         return (
           <div className="space-y-6">
             <div className="rounded-xl border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 p-4">
@@ -2293,6 +2361,9 @@ export default function RiskAssessmentWizard() {
                 type: "date",
                 errorKey: "assessmentDate",
               })}
+              {renderInput("Geçerlilik / Yenileme Tarihi", companyInfo.validUntil, (value) => updateCompanyInfo("validUntil", value), {
+                type: "date",
+              })}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Risk Değerlendirme Yöntemi</Label>
                 <Select value={companyInfo.riskMethod} onValueChange={(value) => updateCompanyInfo("riskMethod", value as RiskMethod)}>
@@ -2372,7 +2443,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 1:
+      case "team":
         return (
           <div className="space-y-5">
             <div className="rounded-xl border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 p-4 text-sm leading-relaxed text-cyan-800 dark:text-cyan-200">
@@ -2476,7 +2547,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 2:
+      case "scope":
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
@@ -2549,7 +2620,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 3:
+      case "risk-method":
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-violet-500/10 bg-violet-500/5 p-5">
@@ -2825,7 +2896,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 4:
+      case "risk-table":
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-rose-500/10 bg-rose-500/5 p-5">
@@ -2948,7 +3019,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 5:
+      case "actions":
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/5 p-5">
@@ -2999,7 +3070,7 @@ export default function RiskAssessmentWizard() {
           </div>
         );
 
-      case 6:
+      case "conclusion":
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
@@ -3156,7 +3227,7 @@ export default function RiskAssessmentWizard() {
                   Boş, kismen dolu veya tamamen dolu risk değerlendirme çıktısi oluşturabilirsiniz.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3 sm:grid-cols-3">
+              <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Button
                   type="button"
                   onClick={handleSaveDraft}
@@ -3174,16 +3245,15 @@ export default function RiskAssessmentWizard() {
                 >
                   {exportingPdf ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                   PDF Indir
-                </Button>
+                </Button>            
                 <Button
                   type="button"
-                  onClick={handleWordDownload}
+                  onClick={handleRiskTemplateDownload}
                   disabled={!wordTemplateAvailable || checkingTemplate || exportingWord}
-                  variant="outline"
-                  className="rounded-xl border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200 hover:bg-amber-100 disabled:opacity-60"
+                  className="rounded-xl bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60"
                 >
                   {exportingWord ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileDown className="mr-2 h-4 w-4" />}
-                  Word Indir
+                  Word Dosyası Indir
                 </Button>
               </CardContent>
             </Card>
@@ -3243,24 +3313,42 @@ export default function RiskAssessmentWizard() {
                       setCurrentStep(index);
                     }}
                     className={cn(
-                      "min-w-[138px] rounded-xl border p-3 text-left transition",
-                      isActive && "border-cyan-400 bg-cyan-50 dark:border-cyan-500 dark:bg-cyan-950/40",
-                      isCompleted && "border-emerald-200 bg-emerald-50",
-                      !isActive && !isCompleted && "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800",
+                      "min-w-[138px] rounded-xl border p-3 text-left transition focus:outline-none focus:ring-2 focus:ring-cyan-500/30 active:bg-slate-100 dark:active:bg-slate-800",
+                      isActive &&
+                        "border-cyan-400 bg-cyan-50 text-cyan-800 shadow-sm dark:border-cyan-500 dark:bg-slate-950 dark:text-slate-100",
+                      isCompleted &&
+                        !isActive &&
+                        "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-700/60 dark:bg-slate-900 dark:text-emerald-300",
+                      !isActive &&
+                        !isCompleted &&
+                        "border-slate-200 bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/70 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:border-cyan-700/70 dark:hover:bg-slate-800",
                     )}
                   >
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
                           "flex h-7 w-7 items-center justify-center rounded-lg border text-xs",
-                          isActive && "border-cyan-200 bg-white text-cyan-700",
-                          isCompleted && "border-emerald-200 bg-white text-emerald-700",
-                          !isActive && !isCompleted && "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900 text-slate-500 dark:text-slate-400",
+                          isActive && "border-cyan-300 bg-cyan-100 text-cyan-700 dark:border-cyan-500 dark:bg-cyan-950/60 dark:text-cyan-200",
+                          isCompleted &&
+                            !isActive &&
+                            "border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
+                          !isActive &&
+                            !isCompleted &&
+                            "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400",
                         )}
                       >
                         {isCompleted ? <CheckCircle2 className="h-3.5 w-3.5" /> : step.icon}
                       </div>
-                      <span className="truncate text-[11px] font-bold text-slate-700 dark:text-slate-300">{step.label}</span>
+                      <span
+                        className={cn(
+                          "truncate text-[11px] font-bold",
+                          isActive && "text-cyan-800 dark:text-slate-100",
+                          isCompleted && !isActive && "text-emerald-800 dark:text-emerald-300",
+                          !isActive && !isCompleted && "text-slate-600 dark:text-slate-400",
+                        )}
+                      >
+                        {step.label}
+                      </span>
                     </div>
                   </button>
                 );
@@ -3358,7 +3446,7 @@ export default function RiskAssessmentWizard() {
               </Button>
               <Button
                 type="button"
-                onClick={handleWordDownload}
+                onClick={handleRiskTemplateDownload}
                 disabled={!wordTemplateAvailable || checkingTemplate || exportingWord}
                 variant="outline"
                 className="w-full rounded-xl border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 disabled:opacity-60"
