@@ -134,7 +134,10 @@ Gorev:
 - Maddeler tekrarsiz, uygulanabilir ve sahaya ozgu olsun.
 - Her madde icin hazard, risk, category, probability, frequency, severity, responsible ve controls alanlarini doldur.
 - responsible alani her maddede kesinlikle "İşveren" olsun.
-- Controls alaninda tam olarak 3 somut, net ve uygulanabilir onlem olsun.
+- controls alaninda tam olarak 3 metin olsun:
+  1. metin olasi sonuc bilgisidir; yaralanma, meslek hastaligi, olum veya maddi hasar gibi sonucu yaz.
+  2. ve 3. metinler duzeltici / onleyici faaliyet bilgisidir; uygulanabilir onlemleri yaz.
+- Bu sayede risk tablosunda Mevcut Durum, Olasi Sonuc ve Duzeltici/Onleyici Faaliyet kolonlari bos kalmayacak.
 - Yanitini baska hicbir aciklama metni eklemeden, doğrudan bir JSON ARRAY (dizi) dondur.
 
 KRITIK KURALLAR (JSON BOZULMAMASI ICIN):
@@ -152,9 +155,9 @@ JSON ornegi:
     "severity": 15,
     "responsible": "İşveren",
     "controls": [
+      "Elektrik carpmasi, yanik, olum veya ekipman hasari olusabilir",
       "Panolarin kilitli tutulmasi ve sadece yetkili personelin erismesi",
-      "Kacak akim rolelerinin aylik test edilmesi",
-      "Pano onlerine yalitimkan paspas serilmesi"
+      "Kacak akim rolelerinin aylik test edilmesi ve pano onlerine yalitimkan paspas serilmesi"
     ]
   }
 ]`;

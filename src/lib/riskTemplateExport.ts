@@ -232,6 +232,8 @@ const riskColor = (value?: string) => {
   if (normalized.includes("kabul")) return "22C55E";
   if (normalized.includes("olası") || normalized.includes("olasi")) return "FACC15";
   if (normalized.includes("önemli") || normalized.includes("onemli")) return "EF4444";
+  if (normalized.includes("cok") || normalized.includes("çok")) return "7F1D1D";
+  if (normalized.includes("yuksek") || normalized.includes("yüksek")) return "F97316";
   return undefined;
 };
 
@@ -251,7 +253,7 @@ const riskLabelForTemplate = (level: string | undefined, score: string | undefin
   if (normalized.includes("olası") || normalized.includes("olasi")) return "Olası Risk";
   if (normalized.includes("önemli") || normalized.includes("onemli")) return "Önemli Risk";
   if (normalized.includes("çok") || normalized.includes("cok")) return "Çok Yüksek Risk";
-  if (normalized.includes("yüksek") || normalized.includes("yuksek")) return "Önemli Risk";
+  if (normalized.includes("yüksek") || normalized.includes("yuksek")) return "Yüksek Risk";
   if (normalized.includes("orta")) return "Olası Risk";
   if (normalized.includes("düşük") || normalized.includes("dusuk")) return "Kabul Edilebilir Risk";
   return riskLabelFromScore(score);
@@ -269,7 +271,24 @@ const riskColorRgb = (value?: string): [number, number, number] | undefined => {
   if (color === "22C55E") return [34, 197, 94];
   if (color === "FACC15") return [250, 204, 21];
   if (color === "EF4444") return [239, 68, 68];
+  if (color === "F97316") return [249, 115, 22];
+  if (color === "7F1D1D") return [127, 29, 29];
   return undefined;
+};
+
+const formatRiskNumber = (value: number) => (Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2))));
+
+const residualValues = (item: RiskTemplateRow, severity: string) => {
+  const postProbability = cleanText(item.postProbability) || "0.2";
+  const postFrequency = cleanText(item.postFrequency) || "1";
+  const postSeverity = cleanText(item.postSeverity) || (Number(severity) > 0 ? formatRiskNumber(Math.min(3, Number(severity))) : "1");
+  const postRiskScore =
+    cleanText(item.postRiskScore) ||
+    (Number(postProbability) && Number(postFrequency) && Number(postSeverity)
+      ? formatRiskNumber(Number(postProbability) * Number(postFrequency) * Number(postSeverity))
+      : "");
+  const postRiskLevel = riskLabelForTemplate(item.postRiskLevel, postRiskScore);
+  return { postProbability, postFrequency, postSeverity, postRiskScore, postRiskLevel };
 };
 
 const templateRiskRows = (riskItems: RiskTemplateRow[]) =>
@@ -283,15 +302,7 @@ const templateRiskRows = (riskItems: RiskTemplateRow[]) =>
         ? String(Number(probability) * Number(frequency) * Number(severity))
         : "");
     const riskLevel = riskLabelForTemplate(item.riskLevel, score);
-    const postProbability = cleanText(item.postProbability);
-    const postFrequency = cleanText(item.postFrequency);
-    const postSeverity = cleanText(item.postSeverity);
-    const postScore =
-      cleanText(item.postRiskScore) ||
-      (Number(postProbability) && Number(postFrequency) && Number(postSeverity)
-        ? String(Number(postProbability) * Number(postFrequency) * Number(postSeverity))
-        : "");
-    const postRiskLevel = riskLabelForTemplate(item.postRiskLevel, postScore);
+    const { postProbability, postFrequency, postSeverity, postRiskScore, postRiskLevel } = residualValues(item, severity);
 
     return [
       String(item.no || index + 1),
@@ -310,7 +321,7 @@ const templateRiskRows = (riskItems: RiskTemplateRow[]) =>
       postProbability,
       postFrequency,
       postSeverity,
-      postScore,
+      postRiskScore,
       postRiskLevel,
       formatDate(item.deadline),
       cleanText(item.responsible),
@@ -556,11 +567,7 @@ const fillRiskTable = (table: Element | undefined, riskItems: RiskTemplateRow[])
     const severity = cleanText(item.severity);
     const score = cleanText(item.riskScore) || (Number(probability) && Number(frequency) && Number(severity) ? String(Number(probability) * Number(frequency) * Number(severity)) : "");
     const riskLevel = riskLabelForTemplate(item.riskLevel, score);
-    const postProbability = cleanText(item.postProbability);
-    const postFrequency = cleanText(item.postFrequency);
-    const postSeverity = cleanText(item.postSeverity);
-    const postScore = cleanText(item.postRiskScore) || (Number(postProbability) && Number(postFrequency) && Number(postSeverity) ? String(Number(postProbability) * Number(postFrequency) * Number(postSeverity)) : "");
-    const postRiskLevel = riskLabelForTemplate(item.postRiskLevel, postScore);
+    const { postProbability, postFrequency, postSeverity, postRiskScore, postRiskLevel } = residualValues(item, severity);
 
     [
       String(item.no || index + 1),
@@ -579,7 +586,7 @@ const fillRiskTable = (table: Element | undefined, riskItems: RiskTemplateRow[])
       postProbability,
       postFrequency,
       postSeverity,
-      postScore,
+      postRiskScore,
       postRiskLevel,
       formatDate(item.deadline),
       cleanText(item.responsible),

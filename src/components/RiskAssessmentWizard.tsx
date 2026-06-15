@@ -40,6 +40,7 @@ import {
   type RiskTemplateExportPayload,
   type RiskTemplateEmergencyInfo,
 } from "@/lib/riskTemplateExport";
+import { generateRiskProcedureTemplateDoc, type RiskProcedureTemplatePayload } from "@/lib/riskProcedureTemplateExport";
 import { generateRisksWithGemini, type GeminiRiskResult } from "@/services/geminiService";
 import type { RiskItem } from "@/types/risk-assessment";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
@@ -115,10 +116,16 @@ type RiskWizardTableItem = {
   affectedPeople: string;
   currentMeasure: string;
   probability: string;
+  frequency: string;
   severity: string;
   riskScore: string;
   riskLevel: string;
   additionalMeasures: string;
+  postProbability: string;
+  postFrequency: string;
+  postSeverity: string;
+  postRiskScore: string;
+  postRiskLevel: string;
   responsible: string;
   deadline: string;
 };
@@ -636,18 +643,43 @@ const createEmptyRiskItem = (no: number): RiskWizardTableItem => ({
   affectedPeople: "",
   currentMeasure: "",
   probability: "",
+  frequency: "",
   severity: "",
   riskScore: "",
   riskLevel: "",
   additionalMeasures: "",
+  postProbability: "",
+  postFrequency: "",
+  postSeverity: "",
+  postRiskScore: "",
+  postRiskLevel: "",
   responsible: "",
   deadline: "",
 });
 
-const normalizeMatrixValue = (value: unknown, fallback = 3) => {
+const normalizeFineKinneyValue = (value: unknown, fallback = 3) => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue) || numericValue <= 0) return fallback;
-  return Math.min(5, Math.max(1, Math.round(numericValue)));
+  return numericValue;
+};
+
+const formatRiskNumber = (value: number) => (Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2))));
+
+const getFineKinneyRiskLevelFromScore = (score: number) => {
+  if (score > 400) return "Çok Yüksek";
+  if (score >= 200) return "Yüksek";
+  if (score >= 70) return "Önemli";
+  if (score >= 20) return "Olası";
+  if (score > 0) return "Kabul Edilebilir";
+  return "";
+};
+
+const inferFrequencyFromScore = (probability?: string | number | null, severity?: string | number | null, score?: string | number | null) => {
+  const probabilityValue = Number(probability || 0);
+  const severityValue = Number(severity || 0);
+  const scoreValue = Number(score || 0);
+  if (!probabilityValue || !severityValue || !scoreValue) return "";
+  return formatRiskNumber(scoreValue / (probabilityValue * severityValue));
 };
 
 const createRiskRowFromGeneratedRisk = (
@@ -655,10 +687,15 @@ const createRiskRowFromGeneratedRisk = (
   index: number,
   sourcePrefix: string,
 ): RiskWizardTableItem => {
-  const probability = normalizeMatrixValue("probability" in item ? item.probability : item.o);
-  const severity = normalizeMatrixValue("severity" in item ? item.severity : item.s);
-  const riskScore = probability * severity;
+  const probability = normalizeFineKinneyValue("probability" in item ? item.probability : item.o);
+  const frequency = normalizeFineKinneyValue("frequency" in item ? item.frequency : item.f, 1);
+  const severity = normalizeFineKinneyValue("severity" in item ? item.severity : item.s);
+  const riskScore = probability * frequency * severity;
   const controls = Array.isArray(item.controls) ? item.controls.filter(Boolean) : [];
+  const postProbability = 0.2;
+  const postFrequency = 1;
+  const postSeverity = Math.min(3, severity);
+  const postRiskScore = postProbability * postFrequency * postSeverity;
 
   return {
     id: createId(sourcePrefix),
@@ -666,13 +703,19 @@ const createRiskRowFromGeneratedRisk = (
     departmentActivity: cleanText(item.category),
     hazardSource: cleanText(item.hazard),
     riskConsequence: cleanText(item.risk),
-    affectedPeople: "Çalışanlar, ziyaretçiler ve ilgili üçüncü kisiler",
-    currentMeasure: cleanText(controls[0] || ""),
-    probability: String(probability),
-    severity: String(severity),
-    riskScore: String(riskScore),
-    riskLevel: getRiskLevelFromScore(riskScore),
+    affectedPeople: cleanText(controls[0] || "Yaralanma, meslek hastalığı veya maddi kayıp"),
+    currentMeasure: "Mevcut durum saha kontrolünde değerlendirilecektir.",
+    probability: formatRiskNumber(probability),
+    frequency: formatRiskNumber(frequency),
+    severity: formatRiskNumber(severity),
+    riskScore: formatRiskNumber(riskScore),
+    riskLevel: getFineKinneyRiskLevelFromScore(riskScore),
     additionalMeasures: cleanText(controls.slice(1).join("\n")),
+    postProbability: formatRiskNumber(postProbability),
+    postFrequency: formatRiskNumber(postFrequency),
+    postSeverity: formatRiskNumber(postSeverity),
+    postRiskScore: formatRiskNumber(postRiskScore),
+    postRiskLevel: getFineKinneyRiskLevelFromScore(postRiskScore),
     responsible: "İşveren",
     deadline: "",
   };
@@ -754,10 +797,16 @@ const mapEditorRiskItemToWizardRow = (item: RiskItem, index: number): RiskWizard
   affectedPeople: cleanText(item.affected_people),
   currentMeasure: cleanText(item.existing_controls),
   probability: item.probability_1 ? String(item.probability_1) : "",
+  frequency: item.frequency_1 ? String(item.frequency_1) : "",
   severity: item.severity_1 ? String(item.severity_1) : "",
   riskScore: item.score_1 ? String(item.score_1) : "",
   riskLevel: cleanText(item.risk_class_1),
   additionalMeasures: cleanText(item.proposed_controls),
+  postProbability: item.probability_2 ? String(item.probability_2) : "",
+  postFrequency: item.frequency_2 ? String(item.frequency_2) : "",
+  postSeverity: item.severity_2 ? String(item.severity_2) : "",
+  postRiskScore: item.score_2 ? String(item.score_2) : "",
+  postRiskLevel: cleanText(item.risk_class_2),
   responsible: cleanText(item.responsible_person),
   deadline: item.deadline || "",
 });
@@ -772,10 +821,16 @@ const mapSavedRiskItemToWizardRow = (item: SavedRiskItem, index: number): RiskWi
   affectedPeople: "Çalışanlar",
   currentMeasure: cleanText(item.currentStatus || item.riskDefinitionBefore),
   probability: item.probabilityBefore ? String(item.probabilityBefore) : "",
+  frequency: item.frequencyBefore ? String(item.frequencyBefore) : "1",
   severity: item.severityBefore ? String(item.severityBefore) : "",
   riskScore: item.riskScoreBefore ? String(item.riskScoreBefore) : "",
-  riskLevel: getRiskLevelFromScore(Number(item.riskScoreBefore || 0)),
+  riskLevel: getFineKinneyRiskLevelFromScore(Number(item.riskScoreBefore || 0)),
   additionalMeasures: cleanText(item.correctivePreventiveAction),
+  postProbability: item.probabilityAfter ? String(item.probabilityAfter) : "0.2",
+  postFrequency: item.frequencyAfter ? String(item.frequencyAfter) : "1",
+  postSeverity: item.severityAfter ? String(item.severityAfter) : "1",
+  postRiskScore: item.riskScoreAfter ? String(item.riskScoreAfter) : "",
+  postRiskLevel: getFineKinneyRiskLevelFromScore(Number(item.riskScoreAfter || 0)),
   responsible: cleanText(item.responsible),
   deadline: item.deadline || "",
 });
@@ -789,10 +844,16 @@ const mapTemplateRiskItemToWizardRow = (item: Record<string, unknown>, index: nu
   affectedPeople: cleanText(String(item.affectedPeople || item.affected_people || "")),
   currentMeasure: cleanText(String(item.existingControl || item.currentMeasure || item.existing_controls || "")),
   probability: item.probability ? String(item.probability) : item.probability_1 ? String(item.probability_1) : "",
+  frequency: item.frequency ? String(item.frequency) : item.frequency_1 ? String(item.frequency_1) : "1",
   severity: item.severity ? String(item.severity) : item.severity_1 ? String(item.severity_1) : "",
   riskScore: item.riskScore ? String(item.riskScore) : item.score_1 ? String(item.score_1) : "",
   riskLevel: cleanText(String(item.riskLevel || item.risk_class_1 || "")),
   additionalMeasures: cleanText(String(item.additionalMeasures || item.actions || item.proposed_controls || "")),
+  postProbability: cleanText(String(item.postProbability || item.probability_2 || "0.2")),
+  postFrequency: cleanText(String(item.postFrequency || item.frequency_2 || "1")),
+  postSeverity: cleanText(String(item.postSeverity || item.severity_2 || "1")),
+  postRiskScore: cleanText(String(item.postRiskScore || item.score_2 || "")),
+  postRiskLevel: cleanText(String(item.postRiskLevel || item.risk_class_2 || "")),
   responsible: cleanText(String(item.responsible || item.responsible_person || "")),
   deadline: cleanText(String(item.deadline || "")),
 });
@@ -806,23 +867,48 @@ const mapManualLibraryItemToWizardRow = (item: ManualRiskLibraryItem, index: num
   affectedPeople: cleanText(item.affectedPeople || "Çalışanlar"),
   currentMeasure: cleanText(item.currentMeasure),
   probability: cleanText(item.probability),
+  frequency: inferFrequencyFromScore(item.probability, item.severity, item.riskScore) || "1",
   severity: cleanText(item.severity),
   riskScore: cleanText(item.riskScore),
   riskLevel: cleanText(item.riskLevel),
   additionalMeasures: cleanText(item.additionalMeasures),
+  postProbability: cleanText(item.residualProbability || "0.2"),
+  postFrequency: inferFrequencyFromScore(item.residualProbability, item.residualSeverity, item.residualRiskScore) || "1",
+  postSeverity: cleanText(item.residualSeverity || "1"),
+  postRiskScore: cleanText(item.residualRiskScore || ""),
+  postRiskLevel: cleanText(item.residualRiskLevel || "Kabul Edilebilir"),
   responsible: cleanText(item.responsible),
   deadline: cleanText(item.deadline),
 });
 
 const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
-  items.map((item, index) => ({
-    ...item,
-    no: index + 1,
-    riskScore: item.riskScore || String(asInt(item.probability) * asInt(item.severity) || ""),
-    riskLevel:
-      cleanText(item.riskLevel) ||
-      getRiskLevelFromScore(asInt(item.riskScore) || asInt(item.probability) * asInt(item.severity)),
-  }));
+  items.map((item, index) => {
+    const frequency = cleanText(item.frequency) || "1";
+    const riskScore =
+      cleanText(item.riskScore) ||
+      formatRiskNumber(asInt(item.probability) * asInt(frequency) * asInt(item.severity) || 0);
+    const postProbability = cleanText(item.postProbability) || "0.2";
+    const postFrequency = cleanText(item.postFrequency) || "1";
+    const postSeverity = cleanText(item.postSeverity) || "1";
+    const postRiskScore =
+      cleanText(item.postRiskScore) ||
+      formatRiskNumber(asInt(postProbability) * asInt(postFrequency) * asInt(postSeverity) || 0);
+    return {
+      ...item,
+      no: index + 1,
+      frequency,
+      riskScore,
+      riskLevel: cleanText(item.riskLevel) || getFineKinneyRiskLevelFromScore(asInt(riskScore)),
+      additionalMeasures: cleanText(item.additionalMeasures) || "Planlanan düzeltici/önleyici faaliyet uygulanacaktır.",
+      postProbability,
+      postFrequency,
+      postSeverity,
+      postRiskScore,
+      postRiskLevel: cleanText(item.postRiskLevel) || getFineKinneyRiskLevelFromScore(asInt(postRiskScore)),
+      responsible: cleanText(item.responsible) || "İşveren",
+      deadline: cleanText(item.deadline),
+    };
+  });
 
 const buildCorrectiveActionsSummary = (actions: CorrectivePreventiveAction[]) =>
   actions.map((action, index) => ({ ...action, no: index + 1 }));
@@ -1415,6 +1501,7 @@ export default function RiskAssessmentWizard() {
   const [importingRiskItems, setImportingRiskItems] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
+  const [exportingProcedureWord, setExportingProcedureWord] = useState(false);
   const [riskTemplateDialogOpen, setRiskTemplateDialogOpen] = useState(false);
   const [riskTemplates, setRiskTemplates] = useState<RiskAssessmentTemplateRecord[]>([]);
   const [loadingRiskTemplates, setLoadingRiskTemplates] = useState(false);
@@ -1954,13 +2041,24 @@ export default function RiskAssessmentWizard() {
       prev.map((item) => {
         if (item.id !== id) return item;
         const nextItem = { ...item, [key]: value };
-        if (key === "probability" || key === "severity") {
-          const score = asInt(String(nextItem.probability)) * asInt(String(nextItem.severity));
+        if (key === "probability" || key === "frequency" || key === "severity") {
+          const score = asInt(String(nextItem.probability)) * asInt(String(nextItem.frequency || "1")) * asInt(String(nextItem.severity));
           nextItem.riskScore = score ? String(score) : "";
-          nextItem.riskLevel = score ? getRiskLevelFromScore(score) : "";
+          nextItem.riskLevel = score ? getFineKinneyRiskLevelFromScore(score) : "";
         }
         if (key === "riskScore") {
-          nextItem.riskLevel = getRiskLevelFromScore(asInt(String(value)));
+          nextItem.riskLevel = getFineKinneyRiskLevelFromScore(asInt(String(value)));
+        }
+        if (key === "postProbability" || key === "postFrequency" || key === "postSeverity") {
+          const postScore =
+            asInt(String(nextItem.postProbability || "0.2")) *
+            asInt(String(nextItem.postFrequency || "1")) *
+            asInt(String(nextItem.postSeverity || "1"));
+          nextItem.postRiskScore = postScore ? formatRiskNumber(postScore) : "";
+          nextItem.postRiskLevel = postScore ? getFineKinneyRiskLevelFromScore(postScore) : "";
+        }
+        if (key === "postRiskScore") {
+          nextItem.postRiskLevel = getFineKinneyRiskLevelFromScore(asInt(String(value)));
         }
         return nextItem;
       }),
@@ -2126,15 +2224,78 @@ export default function RiskAssessmentWizard() {
         affectedPeople: item.affectedPeople,
         currentMeasure: item.currentMeasure,
         probability: item.probability,
-        frequency: "1",
+        frequency: item.frequency,
         severity: item.severity,
         riskScore: item.riskScore,
         riskLevel: item.riskLevel,
         additionalMeasures: item.additionalMeasures,
         responsible: item.responsible,
         deadline: item.deadline,
+        postProbability: item.postProbability,
+        postFrequency: item.postFrequency,
+        postSeverity: item.postSeverity,
+        postRiskScore: item.postRiskScore,
+        postRiskLevel: item.postRiskLevel,
       })),
     };
+  };
+
+  const buildRiskProcedurePayload = (): RiskProcedureTemplatePayload | null => {
+    if (!selectedCompany) return null;
+    return {
+      companyInfo: {
+        companyTitle: companyInfo.companyTitle || selectedCompany.name,
+        workplaceRegistryNo: companyInfo.workplaceRegistryNo || selectedCompany.sgkNumber || "",
+        hazardClass: companyInfo.hazardClass || selectedCompany.hazardClass || "",
+        employeeCount: companyInfo.employeeCount || selectedCompany.employeeCount || "",
+        activityScope: companyInfo.activityScope || selectedCompany.activityScope || "",
+        address: companyInfo.address || selectedCompany.address || "",
+      },
+      teamInfo: {
+        employer: {
+          fullName: teamInfo.employer.fullName,
+          tcNo: teamInfo.employer.tcNo,
+        },
+        safetyExpert: {
+          fullName: teamInfo.safetyExpert.fullName,
+          certificateNo: teamInfo.safetyExpert.certificateNo,
+        },
+        workplaceDoctor: {
+          fullName: teamInfo.workplaceDoctor.fullName,
+          certificateNo: teamInfo.workplaceDoctor.certificateNo,
+        },
+        employeeRepresentative: {
+          fullName: teamInfo.employeeRepresentative.fullName,
+          tcNo: teamInfo.employeeRepresentative.tcNo,
+        },
+      },
+      emergencyInfo: selectedCompany.emergencyTeamInfo || undefined,
+      riskAnalysisPageCount: "1",
+    };
+  };
+
+  const handleRiskProcedureDownload = async () => {
+    if (!selectedCompanyId || !selectedCompany) {
+      toast.error("Önce firma seçmelisiniz.");
+      return;
+    }
+    const payload = buildRiskProcedurePayload();
+    if (!payload) {
+      toast.error("Önce firma seçmelisiniz.");
+      return;
+    }
+
+    setExportingProcedureWord(true);
+    try {
+      await generateRiskProcedureTemplateDoc(payload);
+      toast.success("Şablon dolduruldu, rapor indirildi.");
+    } catch (error) {
+      console.error("Risk procedure template export error", error);
+      const message = error instanceof Error ? error.message : "Rapor oluşturulamadı.";
+      toast.error(message.includes("Şablon") ? "Şablon bulunamadı." : "Rapor oluşturulamadı.");
+    } finally {
+      setExportingProcedureWord(false);
+    }
   };
 
   const handleExportPdf = async () => {
@@ -2321,7 +2482,30 @@ export default function RiskAssessmentWizard() {
                       sekmesindeki Atamalar bölümünden doldurabilirsiniz.
                     </p>
                   </div>
-                ) : null}
+                ) : null}                
+              </CardContent>
+            </Card>
+
+            <Card className="border-cyan-200 bg-cyan-50/80 shadow-sm dark:border-cyan-800 dark:bg-cyan-950/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base text-cyan-900 dark:text-cyan-100">
+                  <FileText className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
+                  Risk Değerlendirme Süreci
+                </CardTitle>
+                <CardDescription className="text-cyan-800/80 dark:text-cyan-200/80">
+                  Firma ve ekip bilgileri ile prosedür raporu oluşturun.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  type="button"
+                  onClick={handleRiskProcedureDownload}
+                  disabled={exportingProcedureWord}
+                  className="rounded-xl bg-cyan-600 text-white shadow-sm hover:bg-cyan-700 disabled:opacity-60"
+                >
+                  {exportingProcedureWord ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                  Risk Değerlendirme Süreci Raporu İndir
+                </Button>
               </CardContent>
             </Card>
 
@@ -3177,9 +3361,9 @@ export default function RiskAssessmentWizard() {
         return (
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adim 8</p>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Adım 8</p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Resmî sablondaki bölüm sirasina göre oluşturulacak rapor özetini kontrol edin.
+                Resmî şablondaki bölüm sırasına göre oluşturulacak rapor özetini kontrol edin.
               </p>
             </div>
 
@@ -3207,7 +3391,7 @@ export default function RiskAssessmentWizard() {
               <CardHeader>
                 <CardTitle className="text-base text-slate-900 dark:text-slate-100">Word Şablonu Durumu</CardTitle>
                 <CardDescription className="text-slate-400">
-                  Resmî sablon dosyasi erisimi kontrol edildi. Sablon bulundugunda resmi Word çıktısi ayni veri setiyle indirilebilir.
+                  Resmî sablon dosyasi erişimi kontrol edildi. Şablon bulunduğunda resmi Word çıktısı aynı veri setiyle indirilebilir.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
@@ -3224,7 +3408,7 @@ export default function RiskAssessmentWizard() {
               <CardHeader>
                 <CardTitle className="text-base text-slate-900 dark:text-slate-100">Rapor Çıktılari</CardTitle>
                 <CardDescription className="text-slate-500 dark:text-slate-400">
-                  Boş, kismen dolu veya tamamen dolu risk değerlendirme çıktısi oluşturabilirsiniz.
+                  Boş, kısmen dolu veya tamamen dolu risk değerlendirme çıktısı oluşturabilirsiniz.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
