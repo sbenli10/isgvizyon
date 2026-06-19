@@ -740,7 +740,7 @@ export default function Auth() {
   // ======= RENDER =======
   return (
     <div
-      className="relative isolate min-h-dvh overflow-hidden text-white"
+      className="auth-dark-surface relative isolate min-h-dvh overflow-hidden text-white"
       style={{
         background:
           "#050816 radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.35), transparent 65%)",
@@ -780,8 +780,8 @@ export default function Auth() {
           </div>
 
           {/* Card with gradient border */}
-          <div className="relative rounded-3xl p-[1px] bg-gradient-to-br from-white/10 via-white/5 to-white/10 shadow-[0_50px_130px_-70px_rgba(99,102,241,0.75)]">
-            <div className="rounded-3xl bg-slate-950/35 backdrop-blur-2xl border border-white/5 p-6">
+          <div className="relative rounded-3xl p-[1px] bg-gradient-to-br from-cyan-400/25 via-indigo-400/25 to-fuchsia-400/25 shadow-[0_50px_130px_-70px_rgba(99,102,241,0.75)]">
+            <div className="rounded-3xl bg-slate-950/90 backdrop-blur-2xl border border-white/10 p-6">
               {notice ? (
                 <div className="mb-5">
                   <Notice type={notice.type} title={notice.title} description={notice.description} />

@@ -1047,3 +1047,64 @@
 .light [class*="from-red-"] .text-muted-foreground {
   color: rgba(255, 255, 255, 0.78) !important;
 }
+
+/*
+  Auth ekranı landing/light tema düzenlemelerinden bağımsız kalmalı.
+  Global .light okunabilirlik kuralları text-white ve koyu inputları ezdiği için
+  bu scope auth sayfasının eski koyu görünümünü bilinçli olarak kilitler.
+*/
+.auth-dark-surface {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(99, 102, 241, 0.35), transparent 65%),
+    radial-gradient(900px 500px at 10% 20%, rgba(168, 85, 247, 0.25), transparent 60%),
+    radial-gradient(900px 500px at 90% 40%, rgba(34, 211, 238, 0.18), transparent 60%),
+    #050816 !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+.light .auth-dark-surface,
+.dark .auth-dark-surface {
+  background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(99, 102, 241, 0.35), transparent 65%),
+    radial-gradient(900px 500px at 10% 20%, rgba(168, 85, 247, 0.25), transparent 60%),
+    radial-gradient(900px 500px at 90% 40%, rgba(34, 211, 238, 0.18), transparent 60%),
+    #050816 !important;
+  color: #f8fafc !important;
+}
+
+.auth-dark-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a, button),
+.light .auth-dark-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a, button),
+.dark .auth-dark-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a, button) {
+  color: #f8fafc !important;
+}
+
+.auth-dark-surface :is(p, span),
+.light .auth-dark-surface :is(p, span),
+.dark .auth-dark-surface :is(p, span) {
+  color: inherit !important;
+}
+
+.auth-dark-surface :is(input, textarea, select),
+.light .auth-dark-surface :is(input, textarea, select),
+.dark .auth-dark-surface :is(input, textarea, select) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+}
+
+.auth-dark-surface :is(input, textarea, select)::placeholder,
+.light .auth-dark-surface :is(input, textarea, select)::placeholder,
+.dark .auth-dark-surface :is(input, textarea, select)::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1;
+}
+
+.auth-dark-surface input:-webkit-autofill,
+.auth-dark-surface input:-webkit-autofill:hover,
+.auth-dark-surface input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #f8fafc !important;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.95) inset !important;
+}
