@@ -332,6 +332,87 @@ export default function Auth() {
     };
   }, []);
 
+  useEffect(() => {
+    const logAuthStyles = (phase: string) => {
+      if (typeof window === "undefined") return;
+
+      const root = document.querySelector<HTMLElement>("[data-auth-root='true']");
+      const card = document.querySelector<HTMLElement>("[data-auth-card='true']");
+      const title = document.querySelector<HTMLElement>("[data-auth-title='true']");
+      const emailInput = document.querySelector<HTMLInputElement>("input[name='email']");
+      const html = document.documentElement;
+      const body = document.body;
+      const htmlStyle = window.getComputedStyle(html);
+      const bodyStyle = window.getComputedStyle(body);
+      const rootStyle = root ? window.getComputedStyle(root) : null;
+      const cardStyle = card ? window.getComputedStyle(card) : null;
+      const titleStyle = title ? window.getComputedStyle(title) : null;
+      const emailStyle = emailInput ? window.getComputedStyle(emailInput) : null;
+      const authRuleCount = Array.from(document.styleSheets).reduce((count, sheet) => {
+        try {
+          return count + Array.from(sheet.cssRules).filter((rule) => rule.cssText.includes("auth-dark-surface")).length;
+        } catch {
+          return count;
+        }
+      }, 0);
+
+      console.group(`[AuthDebug] ${phase}`);
+      console.log("location", window.location.href);
+      console.log("html", {
+        className: html.className,
+        inlineBackground: html.style.background,
+        computedBackground: htmlStyle.background,
+        computedColor: htmlStyle.color,
+      });
+      console.log("body", {
+        className: body.className,
+        inlineBackground: body.style.background,
+        computedBackground: bodyStyle.background,
+        computedColor: bodyStyle.color,
+      });
+      console.log("authRoot", {
+        exists: Boolean(root),
+        className: root?.className,
+        inlineBackground: root?.style.background,
+        computedBackground: rootStyle?.background,
+        computedBackgroundColor: rootStyle?.backgroundColor,
+        computedColor: rootStyle?.color,
+      });
+      console.log("authCard", {
+        exists: Boolean(card),
+        className: card?.className,
+        computedBackground: cardStyle?.background,
+        computedBackgroundColor: cardStyle?.backgroundColor,
+        computedColor: cardStyle?.color,
+      });
+      console.log("authTitle", {
+        exists: Boolean(title),
+        className: title?.className,
+        text: title?.textContent,
+        computedColor: titleStyle?.color,
+      });
+      console.log("emailInput", {
+        exists: Boolean(emailInput),
+        className: emailInput?.className,
+        value: emailInput?.value,
+        computedBackground: emailStyle?.background,
+        computedColor: emailStyle?.color,
+        webkitTextFillColor: emailStyle?.getPropertyValue("-webkit-text-fill-color"),
+      });
+      console.log("authDarkCssRules", authRuleCount);
+      console.groupEnd();
+    };
+
+    logAuthStyles("mount");
+    const frame = window.requestAnimationFrame(() => logAuthStyles("after-animation-frame"));
+    const timer = window.setTimeout(() => logAuthStyles("after-750ms"), 750);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, []);
+
   const domainHint = useMemo(() => {
     const domain = getDomain(formData.email);
     if (!domain) return null;
@@ -740,6 +821,7 @@ export default function Auth() {
   // ======= RENDER =======
   return (
     <div
+      data-auth-root="true"
       className="auth-dark-surface relative isolate min-h-dvh overflow-hidden text-white"
       style={{
         background:
@@ -772,7 +854,7 @@ export default function Auth() {
             </div>
 
             <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">
+              <h1 data-auth-title="true" className="text-3xl font-bold text-white tracking-tight">
                 İSGVİZYON{" "}
               </h1>
               <p className="text-sm text-slate-300/80 mt-1">AI Destekli İSG Yönetim Sistemi</p>
@@ -781,7 +863,7 @@ export default function Auth() {
 
           {/* Card with gradient border */}
           <div className="relative rounded-3xl p-[1px] bg-gradient-to-br from-cyan-400/25 via-indigo-400/25 to-fuchsia-400/25 shadow-[0_50px_130px_-70px_rgba(99,102,241,0.75)]">
-            <div className="rounded-3xl bg-slate-950/90 backdrop-blur-2xl border border-white/10 p-6">
+            <div data-auth-card="true" className="rounded-3xl bg-slate-950/90 backdrop-blur-2xl border border-white/10 p-6">
               {notice ? (
                 <div className="mb-5">
                   <Notice type={notice.type} title={notice.title} description={notice.description} />
