@@ -15,13 +15,13 @@ export function LandingSectionHeading({
 
   return (
     <div className={isCenter ? "mx-auto max-w-3xl text-center" : "max-w-3xl"}>
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200/80">
+      <p className="text-xs font-black uppercase tracking-[0.24em] text-sky-600">
         {eyebrow}
       </p>
-      <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+      <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950 sm:text-4xl">
         {title}
       </h2>
-      <p className="mt-4 text-base leading-8 text-slate-300 sm:text-lg">
+      <p className="mt-4 text-base leading-8 text-slate-600 sm:text-lg">
         {description}
       </p>
     </div>

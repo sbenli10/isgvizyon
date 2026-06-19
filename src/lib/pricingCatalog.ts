@@ -20,19 +20,18 @@ export type PricingComparisonRow = {
 };
 
 export const pricingPlans: PricingPlan[] = [
-    {
+  {
     title: "Ücretsiz",
     badge: "Başlangıç",
     price: "₺0",
     period: "/ sınırsız süre",
     audience: "Platformu tanımak isteyen bireysel kullanıcılar",
-    description:
-      "Temel İSG süreçlerini başlatmak, platformu keşfetmek ve ihtiyaçlarını risksiz şekilde denemek isteyen kullanıcılar için.",
+    description: "Temel İSG süreçlerini başlatmak, platformu keşfetmek ve ihtiyaçlarını risksiz şekilde denemek isteyen kullanıcılar için.",
     bullets: [
-      "1 firmaya kadar kullanım ve 50 çalışan kaydı desteği sunar",
-      "Risk değerlendirmesi, denetim, DÖF, acil durum planı ve kurul kayıtları sınırlı olarak kullanılabilir",
-      "Ayda 3 rapor çıktısı alma ve 100 MB dosya yükleme hakkı sağlar",
-      "Premium yapay zeka araçları, İSGBot, sertifika ve OSGB modülleri bu pakete dahil değildir",
+      "1 firmaya kadar kullanım ve 50 çalışan kaydı desteği",
+      "Risk değerlendirmesi, denetim, DÖF, acil durum planı ve kurul kayıtlarında temel kullanım",
+      "Ayda 3 rapor çıktısı alma ve 100 MB dosya yükleme hakkı",
+      "Premium yapay zeka araçları, İSGBot, sertifika ve OSGB modülleri dahil değildir",
     ],
     cta: "Ücretsiz Başla",
     recommended: false,
@@ -43,12 +42,11 @@ export const pricingPlans: PricingPlan[] = [
     price: "Fiyat yükleniyor",
     period: "/ ay",
     audience: "Aktif operasyon yürüten İSG profesyonelleri",
-    description:
-      "Yapay zeka destekli analizleri, gelişmiş raporlama araçlarını ve profesyonel doküman üretim özelliklerini aktif kullanan İSG profesyonelleri için.",
+    description: "Yapay zeka destekli analizleri, gelişmiş raporlama araçlarını ve profesyonel doküman üretim özelliklerini aktif kullanan İSG profesyonelleri için.",
     bullets: [
-      "Premium yapay zeka araçları, İSGBot, DÖF oluşturma ve kroki/plan analiz araçları dahildir",
-      "Sertifika oluşturma, özel form hazırlama ve gelişmiş çıktı alma araçları kullanılabilir",
-      "3 firmaya kadar kullanım, sınırsız çalışan kaydı ve 3 ekip üyesi desteği sunar",
+      "Premium yapay zeka araçları, İSGBot, DÖF oluşturma ve kroki/plan analiz araçları",
+      "Sertifika oluşturma, özel form hazırlama ve gelişmiş çıktı alma araçları",
+      "3 firmaya kadar kullanım, sınırsız çalışan kaydı ve 3 ekip üyesi desteği",
       "OSGB operasyon modülü bu pakete dahil değildir",
     ],
     cta: "Premium'a Başla",
@@ -60,8 +58,7 @@ export const pricingPlans: PricingPlan[] = [
     price: "Fiyat yükleniyor",
     period: "/ ay",
     audience: "Birden fazla firmayı yöneten OSGB yapıları",
-    description:
-      "Premium'un tüm özellikleriyle birlikte çoklu firma, ekip, İSG-KATİP ve OSGB operasyonlarını yöneten yapılar için.",
+    description: "Premium'un tüm özellikleriyle birlikte çoklu firma, ekip, İSG-KATİP ve OSGB operasyonlarını yöneten yapılar için.",
     bullets: [
       "Premium paketindeki tüm özellikler dahildir",
       "OSGB dashboard, personel, kapasite ve finans ekranları",
