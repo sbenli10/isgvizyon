@@ -56,22 +56,23 @@ export function LandingLayout({
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-white font-['Inter',sans-serif] text-slate-900">
-      <div className="bg-[#172337] text-white">
-        <div className="mx-auto flex h-auto min-h-10 max-w-[1440px] flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-2 text-xs font-semibold sm:justify-between lg:px-10">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-6 items-center gap-1 rounded-full bg-blue-600 px-3 text-[11px] font-black shadow-lg shadow-blue-900/30">
+      <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 text-white">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_50%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_78%_50%,rgba(59,130,246,0.22),transparent_34%)]" />
+        <div className="relative mx-auto flex h-auto min-h-11 max-w-[1440px] flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-2 text-xs font-semibold sm:justify-between lg:px-10">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 px-3.5 text-[11px] font-black text-white shadow-lg shadow-cyan-950/30">
               <Rocket className="h-3 w-3" />
               ISGVizyon ile tanış
             </span>
-            <span className="hidden text-slate-200 md:inline">İSG süreçlerini tek panelden yönetin</span>
+            <span className="hidden font-bold text-white md:inline">İSG süreçlerini tek panelden yönetin</span>
           </div>
-          <p className="hidden text-slate-300 lg:block">
+          <p className="hidden max-w-xl text-center font-semibold text-cyan-50 lg:block">
             İSG firmaları, OSGB'ler ve iş güvenliği uzmanları için dijital yönetim platformu
           </p>
           <button
             type="button"
             onClick={() => navigate("/auth")}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-black text-white shadow-sm transition hover:bg-emerald-400"
+            className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 px-4 py-1.5 text-xs font-black text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:from-emerald-300 hover:to-cyan-300"
           >
             <MessageCircle className="h-3.5 w-3.5" />
             Demo Talep Et
