@@ -34,6 +34,7 @@ import {
   type OrientationOnboardingTrainingFormValues,
   type TopicStatus,
 } from "@/components/assignment-letters/OrientationOnboardingTrainingModal";
+import { IsgTrainingAttendanceModal } from "@/components/assignment-letters/IsgTrainingAttendanceModal";
 import {
   EmployeeRepresentativeAppointmentModal,
   type EmployeeRepresentativeAppointmentFormValues,
@@ -433,6 +434,7 @@ export default function AssignmentLetters() {
   const [incidentInvestigationOpen, setIncidentInvestigationOpen] = useState(false);
   const [employeeRepresentativeAppointmentOpen, setEmployeeRepresentativeAppointmentOpen] = useState(false);
   const [orientationOnboardingTrainingOpen, setOrientationOnboardingTrainingOpen] = useState(false);
+  const [isgTrainingAttendanceOpen, setIsgTrainingAttendanceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AssignmentFormValues>(defaultForm);
   const [letterSettings, setLetterSettings] = useState<AssignmentLetterSettingsForm>(defaultLetterSettings);
@@ -655,6 +657,10 @@ export default function AssignmentLetters() {
   function openOrientationOnboardingTrainingModal() {
     setOrientationOnboardingTrainingForm(defaultOrientationOnboardingTrainingForm);
     setOrientationOnboardingTrainingOpen(true);
+  }
+
+  function openIsgTrainingAttendanceModal() {
+    setIsgTrainingAttendanceOpen(true);
   }
 
   const historyItems = useMemo<AssignmentHistoryItem[]>(() => {
@@ -1446,6 +1452,7 @@ export default function AssignmentLetters() {
       <AssignmentTypeCards
         onCreate={openCreateModal}
         onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
+        onOpenIsgTrainingAttendance={openIsgTrainingAttendanceModal}
         onOpenWorkAccidentReport={openWorkAccidentModal}
         onOpenReturnToWorkTraining={openReturnTrainingModal}
         onOpenRootCauseInvestigation={openRootCauseModal}
@@ -2138,6 +2145,13 @@ export default function AssignmentLetters() {
           }));
         }}
         onSubmit={handleGenerateOrientationOnboardingTraining}
+      />
+
+      <IsgTrainingAttendanceModal
+        open={isgTrainingAttendanceOpen}
+        companies={companies}
+        employees={employees}
+        onOpenChange={setIsgTrainingAttendanceOpen}
       />
 
       <IncidentInvestigationReportModal

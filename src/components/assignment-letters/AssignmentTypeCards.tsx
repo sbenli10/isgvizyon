@@ -16,6 +16,7 @@ import type { AssignmentType } from "@/lib/assignmentWordGenerator";
 interface AssignmentTypeCardsProps {
   onCreate: (type: AssignmentType) => void;
   onOpenEmployeeRepresentativeAppointment: () => void;
+  onOpenIsgTrainingAttendance: () => void;
   onOpenWorkAccidentReport: () => void;
   onOpenReturnToWorkTraining: () => void;
   onOpenRootCauseInvestigation: () => void;
@@ -56,6 +57,7 @@ const categoryLabels: Record<Exclude<Category, "all">, string> = {
 export function AssignmentTypeCards({
   onCreate,
   onOpenEmployeeRepresentativeAppointment,
+  onOpenIsgTrainingAttendance,
   onOpenWorkAccidentReport,
   onOpenReturnToWorkTraining,
   onOpenRootCauseInvestigation,
@@ -105,6 +107,15 @@ export function AssignmentTypeCards({
         icon: ClipboardCheck,
         colorClass: "bg-violet-500/10 text-violet-700 dark:text-violet-200",
         action: onOpenEmployeeRepresentativeAppointment,
+      },
+      {
+        id: "isg_training_attendance",
+        title: "İŞ SAĞLIĞI ve GÜVENLİĞİ EĞİTİM KATILIM LİSTESİ",
+        description: "Çalışanların temel İSG eğitimi katılım ve imza listesini oluşturun.",
+        category: "training",
+        icon: GraduationCap,
+        colorClass: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-200",
+        action: onOpenIsgTrainingAttendance,
       },
       {
         id: "orientation_onboarding",
@@ -184,6 +195,7 @@ export function AssignmentTypeCards({
       onOpenDrillForm,
       onOpenEmergencyDrillAttendance,
       onOpenEmployeeRepresentativeAppointment,
+      onOpenIsgTrainingAttendance,
       onOpenIncidentInvestigationReport,
       onOpenNearMissReport,
       onOpenOrientationOnboardingTraining,
