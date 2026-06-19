@@ -739,21 +739,27 @@ export default function Auth() {
 
   // ======= RENDER =======
   return (
-    <div className="relative isolate min-h-dvh overflow-hidden bg-[#050816] text-white">
+    <div
+      className="relative isolate min-h-dvh overflow-hidden text-white"
+      style={{
+        background:
+          "#050816 radial-gradient(1200px 600px at 50% -10%, rgba(99,102,241,0.35), transparent 65%)",
+      }}
+    >
       {/* Ultra background (aurora + grid + noise) */}
-      <div className="absolute inset-0 -z-10 bg-[#050816]" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.35),transparent_65%),radial-gradient(900px_500px_at_10%_20%,rgba(168,85,247,0.25),transparent_60%),radial-gradient(900px_500px_at_90%_40%,rgba(34,211,238,0.18),transparent_60%)]" />
-      <div className="absolute inset-0 -z-10 opacity-[0.25] bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:44px_44px]" />
+      <div className="absolute inset-0 z-0 bg-[#050816]" />
+      <div className="absolute inset-0 z-0 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.35),transparent_65%),radial-gradient(900px_500px_at_10%_20%,rgba(168,85,247,0.25),transparent_60%),radial-gradient(900px_500px_at_90%_40%,rgba(34,211,238,0.18),transparent_60%)]" />
+      <div className="absolute inset-0 z-0 opacity-[0.25] bg-[linear-gradient(to_right,rgba(148,163,184,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:44px_44px]" />
       <div
-        className="absolute inset-0 -z-10 opacity-[0.10] mix-blend-soft-light"
+        className="absolute inset-0 z-0 opacity-[0.10] mix-blend-soft-light"
         style={{
           backgroundImage:
             "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E\")",
         }}
       />
-      <div className="absolute -top-24 left-1/2 -translate-x-1/2 h-[420px] w-[900px] rounded-full bg-gradient-to-r from-indigo-500/25 via-fuchsia-500/20 to-cyan-500/20 blur-3xl -z-10" />
+      <div className="absolute -top-24 left-1/2 z-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-gradient-to-r from-indigo-500/25 via-fuchsia-500/20 to-cyan-500/20 blur-3xl" />
 
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="relative z-10 flex min-h-screen items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
           {/* Header */}
           <div className="text-center space-y-3">
