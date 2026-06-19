@@ -319,6 +319,19 @@ export default function Auth() {
   );
   const isBusy = loading || googleLoading;
 
+  useEffect(() => {
+    const previousBodyBackground = document.body.style.background;
+    const previousHtmlBackground = document.documentElement.style.background;
+
+    document.body.style.background = "#050816";
+    document.documentElement.style.background = "#050816";
+
+    return () => {
+      document.body.style.background = previousBodyBackground;
+      document.documentElement.style.background = previousHtmlBackground;
+    };
+  }, []);
+
   const domainHint = useMemo(() => {
     const domain = getDomain(formData.email);
     if (!domain) return null;
@@ -726,7 +739,7 @@ export default function Auth() {
 
   // ======= RENDER =======
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#050816] text-white">
+    <div className="relative isolate min-h-dvh overflow-hidden bg-[#050816] text-white">
       {/* Ultra background (aurora + grid + noise) */}
       <div className="absolute inset-0 -z-10 bg-[#050816]" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,0.35),transparent_65%),radial-gradient(900px_500px_at_10%_20%,rgba(168,85,247,0.25),transparent_60%),radial-gradient(900px_500px_at_90%_40%,rgba(34,211,238,0.18),transparent_60%)]" />
