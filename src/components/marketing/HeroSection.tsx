@@ -276,41 +276,41 @@ function DashboardMockup() {
               </div>
 
              <div className="overflow-hidden rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm">
-  <div className="flex items-center justify-between">
-    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25">
-      <Sparkles className="h-5 w-5" />
-    </div>
+              <div className="flex items-center justify-between">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-500/25">
+                  <Sparkles className="h-5 w-5" />
+                </div>
 
-    <Badge className="rounded-full border border-blue-100 bg-white px-3 py-1 !text-blue-700 shadow-sm hover:bg-white">
-      Akıllı analiz
-    </Badge>
-  </div>
+                <Badge className="rounded-full border border-blue-100 bg-white px-3 py-1 !text-blue-700 shadow-sm hover:bg-white">
+                  Akıllı analiz
+                </Badge>
+              </div>
 
-  <p className="mt-4 text-sm font-black !text-slate-950">
-    AI karar desteği
-  </p>
+              <p className="mt-4 text-sm font-black !text-slate-950">
+                AI karar desteği
+              </p>
 
-  <p className="mt-2 text-xs font-semibold leading-6 !text-slate-700">
-    Geciken aksiyonları, yüksek riskli firmaları ve eksik evrakları otomatik görünür kılar.
-  </p>
+              <p className="mt-2 text-xs font-semibold leading-6 !text-slate-700">
+                Geciken aksiyonları, yüksek riskli firmaları ve eksik evrakları otomatik görünür kılar.
+              </p>
 
-  <div className="mt-5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-    <p className="text-[11px] font-bold !text-slate-600">
-      Önerilen aksiyon
-    </p>
-    <p className="mt-1 text-sm font-black !text-slate-950">
-      7 kritik kayıt önceliklendirildi
-    </p>
-  </div>
+              <div className="mt-5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+                <p className="text-[11px] font-bold !text-slate-600">
+                  Önerilen aksiyon
+                </p>
+                <p className="mt-1 text-sm font-black !text-slate-950">
+                  7 kritik kayıt önceliklendirildi
+                </p>
+              </div>
 
-  <button
-    type="button"
-    className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-sm font-black !text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5"
-  >
-    AI önerilerini incele
-    <ArrowRight className="h-4 w-4" />
-  </button>
-</div>
+              <button
+                type="button"
+                className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-3 text-sm font-black !text-white shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5"
+              >
+                AI önerilerini incele
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
             </div>
           </div>
         </div>
