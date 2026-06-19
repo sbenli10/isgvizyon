@@ -295,11 +295,7 @@ export default function LandingPricing() {
                   <p className={`mt-3 min-h-[92px] text-sm font-medium leading-7 ${featured ? "text-slate-200" : "text-slate-950"}`}>
                     {plan.description}
                   </p>
-                </div>
-
-                <div className={`mt-5 inline-flex rounded-full px-4 py-2 text-xs font-black ${featured ? "bg-cyan-400/15 text-cyan-100" : "bg-emerald-50 text-emerald-700"}`}>
-                  Peşin fiyatına 3 taksit
-                </div>
+                </div>               
               </div>
 
               <div className="mt-7 flex-1">
