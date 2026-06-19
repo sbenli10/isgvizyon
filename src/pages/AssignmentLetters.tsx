@@ -34,6 +34,7 @@ import {
   type OrientationOnboardingTrainingFormValues,
   type TopicStatus,
 } from "@/components/assignment-letters/OrientationOnboardingTrainingModal";
+import { IsgEntranceExamModal } from "@/components/assignment-letters/IsgEntranceExamModal";
 import { IsgTrainingAttendanceModal } from "@/components/assignment-letters/IsgTrainingAttendanceModal";
 import {
   EmployeeRepresentativeAppointmentModal,
@@ -434,6 +435,7 @@ export default function AssignmentLetters() {
   const [incidentInvestigationOpen, setIncidentInvestigationOpen] = useState(false);
   const [employeeRepresentativeAppointmentOpen, setEmployeeRepresentativeAppointmentOpen] = useState(false);
   const [orientationOnboardingTrainingOpen, setOrientationOnboardingTrainingOpen] = useState(false);
+  const [isgEntranceExamOpen, setIsgEntranceExamOpen] = useState(false);
   const [isgTrainingAttendanceOpen, setIsgTrainingAttendanceOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<AssignmentFormValues>(defaultForm);
@@ -657,6 +659,10 @@ export default function AssignmentLetters() {
   function openOrientationOnboardingTrainingModal() {
     setOrientationOnboardingTrainingForm(defaultOrientationOnboardingTrainingForm);
     setOrientationOnboardingTrainingOpen(true);
+  }
+
+  function openIsgEntranceExamModal() {
+    setIsgEntranceExamOpen(true);
   }
 
   function openIsgTrainingAttendanceModal() {
@@ -1452,6 +1458,7 @@ export default function AssignmentLetters() {
       <AssignmentTypeCards
         onCreate={openCreateModal}
         onOpenEmployeeRepresentativeAppointment={openEmployeeRepresentativeAppointmentModal}
+        onOpenIsgEntranceExam={openIsgEntranceExamModal}
         onOpenIsgTrainingAttendance={openIsgTrainingAttendanceModal}
         onOpenWorkAccidentReport={openWorkAccidentModal}
         onOpenReturnToWorkTraining={openReturnTrainingModal}
@@ -2152,6 +2159,13 @@ export default function AssignmentLetters() {
         companies={companies}
         employees={employees}
         onOpenChange={setIsgTrainingAttendanceOpen}
+      />
+
+      <IsgEntranceExamModal
+        open={isgEntranceExamOpen}
+        companies={companies}
+        employees={employees}
+        onOpenChange={setIsgEntranceExamOpen}
       />
 
       <IncidentInvestigationReportModal

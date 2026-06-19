@@ -2,6 +2,7 @@
 import {
   ClipboardCheck,
   FileText,
+  FileQuestion,
   GraduationCap,
   Search,
   ShieldCheck,
@@ -16,6 +17,7 @@ import type { AssignmentType } from "@/lib/assignmentWordGenerator";
 interface AssignmentTypeCardsProps {
   onCreate: (type: AssignmentType) => void;
   onOpenEmployeeRepresentativeAppointment: () => void;
+  onOpenIsgEntranceExam: () => void;
   onOpenIsgTrainingAttendance: () => void;
   onOpenWorkAccidentReport: () => void;
   onOpenReturnToWorkTraining: () => void;
@@ -57,6 +59,7 @@ const categoryLabels: Record<Exclude<Category, "all">, string> = {
 export function AssignmentTypeCards({
   onCreate,
   onOpenEmployeeRepresentativeAppointment,
+  onOpenIsgEntranceExam,
   onOpenIsgTrainingAttendance,
   onOpenWorkAccidentReport,
   onOpenReturnToWorkTraining,
@@ -107,6 +110,15 @@ export function AssignmentTypeCards({
         icon: ClipboardCheck,
         colorClass: "bg-violet-500/10 text-violet-700 dark:text-violet-200",
         action: onOpenEmployeeRepresentativeAppointment,
+      },
+      {
+        id: "isg_entrance_exam",
+        title: "04 - İSG Giriş Sınavı",
+        description: "Çalışan için iş sağlığı ve güvenliği eğitimi değerlendirme sınavı oluşturun.",
+        category: "training",
+        icon: FileQuestion,
+        colorClass: "bg-blue-500/10 text-blue-700 dark:text-blue-200",
+        action: onOpenIsgEntranceExam,
       },
       {
         id: "isg_training_attendance",
@@ -195,6 +207,7 @@ export function AssignmentTypeCards({
       onOpenDrillForm,
       onOpenEmergencyDrillAttendance,
       onOpenEmployeeRepresentativeAppointment,
+      onOpenIsgEntranceExam,
       onOpenIsgTrainingAttendance,
       onOpenIncidentInvestigationReport,
       onOpenNearMissReport,
