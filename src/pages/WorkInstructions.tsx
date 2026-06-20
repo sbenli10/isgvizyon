@@ -2960,11 +2960,11 @@ export default function WorkInstructionsPage() {
               <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">
                 Çalışma Talimatları
                 <span className="block bg-gradient-to-r from-cyan-200 via-blue-200 to-violet-200 bg-clip-text text-transparent">
-                  renkli, h?zl? ve Çıktıya haz?r
+                  renkli, hızlı ve çıktıya hazır
                 </span>
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-                Hazır Şablonlardan veya yapay zeka ile saniyeler i?inde profesyonel ?SG talimat? olu?turun; PDF ve Word Çıktılar?n?z? ayn? ekrandan y?netin.
+                Hazır şablonlardan veya yapay zeka ile saniyeler içinde profesyonel İSG talimatı oluşturun; PDF ve Word çıktılarınızı aynı ekrandan yönetin.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -3044,7 +3044,7 @@ export default function WorkInstructionsPage() {
               value="saved"
               className="rounded-xl text-slate-300 transition data-[state=active]:bg-violet-400/15 data-[state=active]:text-violet-100 data-[state=active]:shadow-lg data-[state=active]:shadow-violet-950/20"
             >
-              Kayıtlı Talimatlar?m
+              Kayıtlı Talimatlarım
             </TabsTrigger>
           </TabsList>
 
