@@ -290,6 +290,12 @@ function base64ToUint8Array(base64: string) {
   return bytes;
 }
 
+function dataUrlToUint8Array(value: string) {
+  const match = value.match(/^data:[^;]+;base64,(.+)$/i);
+  if (!match?.[1]) return null;
+  return base64ToUint8Array(match[1]);
+}
+
 async function getFontBytes(cacheKey: string, base64: string) {
   if (assetCache.has(cacheKey)) return assetCache.get(cacheKey)!;
   const bytes = base64ToUint8Array(base64);
@@ -302,6 +308,18 @@ async function fetchLogoBytes(logoUrl?: string | null) {
   if (assetCache.has(logoUrl)) return assetCache.get(logoUrl)!;
 
   try {
+    if (/^data:image\//i.test(logoUrl)) {
+      const bytes = dataUrlToUint8Array(logoUrl);
+      if (!bytes) return null;
+      assetCache.set(logoUrl, bytes);
+      return bytes;
+    }
+
+    if (/^blob:/i.test(logoUrl)) {
+      console.error("certificate pdf asset cannot use browser blob url", { logoUrl });
+      return null;
+    }
+
     if (!/^https?:\/\//i.test(logoUrl)) {
       const supabase = createServiceClient();
       const companyLogoDownload = await supabase.storage.from("company-logos").download(logoUrl);

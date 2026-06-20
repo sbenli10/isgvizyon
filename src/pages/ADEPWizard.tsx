@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -52,8 +53,14 @@ import {
   loadSavedEvacuationProjects,
   type SavedEvacuationProject,
 } from "@/lib/evacuationProjectStorage";
+import {
+  generateEmergencyActionPlanDocx,
+  type EmergencyActionPlanPayload,
+  type EmergencyTeamMember,
+} from "@/lib/emergencyActionPlanTemplateExport";
 
 type WizardTab = "company" | "professionals" | "teams" | "inventory";
+type TemplateEmergencyKey = keyof EmergencyActionPlanPayload["selectedEmergencies"];
 
 interface CompanyOption {
   id: string;
@@ -79,6 +86,7 @@ interface CompanyOption {
   employee_representative_tc_no?: string | null;
   employee_representative_phone?: string | null;
   knowledgeable_employee_name?: string | null;
+  emergency_team_info?: unknown | null;
 }
 
 const inputClassName =
@@ -90,6 +98,88 @@ const mutedInputClassName =
 const createPerson = (): ADEPPerson => ({ ad_soyad: "", tc_no: "", telefon: "" });
 const createMaterial = (): ADEPMaterial => ({ equipment_name: "", quantity: "", location: "" });
 const emptyPersonForRender = createPerson();
+
+const defaultSelectedEmergencies: EmergencyActionPlanPayload["selectedEmergencies"] = {
+  fire: true,
+  poisoning: false,
+  epidemic: false,
+  naturalDisaster: true,
+  sabotage: false,
+  firstAid: true,
+  fallFromHeight: false,
+  electricShock: true,
+  explosion: false,
+  chemicalSpill: false,
+  biologicalSpread: false,
+  radioactiveSpread: false,
+  nuclearSpread: false,
+  other: false,
+};
+
+const emergencyOptionLabels: Array<{ key: TemplateEmergencyKey; label: string }> = [
+  { key: "fire", label: "Yangın İhtimali" },
+  { key: "poisoning", label: "Zehirlenme İhtimali" },
+  { key: "epidemic", label: "Salgın Hastalık İhtimali" },
+  { key: "naturalDisaster", label: "Doğal Afetlerin Meydana Gelme İhtimali (Deprem Sel Fırtına vb)" },
+  { key: "sabotage", label: "Sabotaj İhtimali" },
+  { key: "firstAid", label: "İlkyardım Gerektiren Durumlar (İş Kazası, Yaralanma Ölüm vb)" },
+  { key: "fallFromHeight", label: "Yüksekten Düşme Sonucu Askıda Kalma Durumu" },
+  { key: "electricShock", label: "Elektrik Çarpması" },
+  { key: "explosion", label: "Patlama (Basınçlı Kap, Boya Makinesi, Kazan vb Ekipmanlar)" },
+  { key: "chemicalSpill", label: "Tehlikeli Kimyasal Maddelerden Kaynaklanan Yayılım" },
+  { key: "biologicalSpread", label: "Biyolojik Maddelerden Kaynaklanan Yayılım" },
+  { key: "radioactiveSpread", label: "Radyoaktif Maddelerden Kaynaklanan Yayılım" },
+  { key: "nuclearSpread", label: "Nükleer Maddelerden Kaynaklanan Yayılım" },
+  { key: "other", label: "Diğer" },
+];
+
+const defaultContactNumbers: EmergencyActionPlanPayload["contactNumbers"] = {
+  police: "112",
+  ambulance: "112",
+  covidLine: "184",
+  naturalGas: "187",
+  electricity: "186",
+  governorship: "",
+  gendarmerie: "112",
+  afad: "112",
+  fireDepartment: "112",
+  forestFire: "112",
+};
+
+type CompanyEmergencyTeamRole = "all_units_contact" | "fire_chief" | "rescue_chief" | "protection_chief" | "first_aid_chief";
+
+type CompanyEmergencyTeamInfo = Record<CompanyEmergencyTeamRole, { full_name: string; tc_no: string }>;
+
+const normalizeCompanyEmergencyTeamInfo = (value: unknown): CompanyEmergencyTeamInfo => {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const readPerson = (role: CompanyEmergencyTeamRole) => {
+    const person = source[role] && typeof source[role] === "object" ? (source[role] as Record<string, unknown>) : {};
+    return {
+      full_name: typeof person.full_name === "string" ? person.full_name.trim() : "",
+      tc_no: typeof person.tc_no === "string" ? person.tc_no.trim() : "",
+    };
+  };
+
+  return {
+    all_units_contact: readPerson("all_units_contact"),
+    fire_chief: readPerson("fire_chief"),
+    rescue_chief: readPerson("rescue_chief"),
+    protection_chief: readPerson("protection_chief"),
+    first_aid_chief: readPerson("first_aid_chief"),
+  };
+};
+
+const emergencyPersonToAdep = (
+  person: { full_name: string; tc_no: string },
+  previous: ADEPPerson,
+): ADEPPerson => {
+  if (!person.full_name && !person.tc_no) return previous;
+  return {
+    ...previous,
+    ad_soyad: person.full_name || previous.ad_soyad,
+    tc_no: person.tc_no || previous.tc_no,
+  };
+};
 
 const teamMeta: Array<{ key: ADEPTeamKey; title: string; description: string }> = [
   {
@@ -125,7 +215,12 @@ export default function ADEPWizard() {
   const [savedSketches, setSavedSketches] = useState<SavedEvacuationProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [templateExporting, setTemplateExporting] = useState(false);
+  const [blankTemplateExporting, setBlankTemplateExporting] = useState(false);
   const [planData, setPlanData] = useState<ADEPPlanData>(DEFAULT_ADEP_PLAN_DATA);
+  const [selectedEmergencies, setSelectedEmergencies] =
+    useState<EmergencyActionPlanPayload["selectedEmergencies"]>(defaultSelectedEmergencies);
+  const [otherEmergencyText, setOtherEmergencyText] = useState("");
 
   const activeWorkspaceId = ((profile as any)?.active_workspace_id || profile?.organization_id || null) as string | null;
 
@@ -152,7 +247,7 @@ export default function ADEPWizard() {
         const [companiesRes, planRes] = await Promise.all([
           (supabase as any)
             .from("companies")
-            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone, employer_representative_name, employer_representative_tc_no, employer_representative_phone, occupational_safety_specialist_name, occupational_safety_specialist_tc_no, occupational_safety_specialist_phone, occupational_safety_specialist_certificate_no, workplace_doctor_name, workplace_doctor_tc_no, workplace_doctor_phone, workplace_doctor_certificate_no, employee_representative_name, employee_representative_tc_no, employee_representative_phone, knowledgeable_employee_name")
+            .select("id, name, address, employee_count, industry, hazard_class, tax_number, phone, employer_representative_name, employer_representative_tc_no, employer_representative_phone, occupational_safety_specialist_name, occupational_safety_specialist_tc_no, occupational_safety_specialist_phone, occupational_safety_specialist_certificate_no, workplace_doctor_name, workplace_doctor_tc_no, workplace_doctor_phone, workplace_doctor_certificate_no, employee_representative_name, employee_representative_tc_no, employee_representative_phone, knowledgeable_employee_name, emergency_team_info")
             .eq("is_active", true)
             .order("name"),
           planId
@@ -253,6 +348,7 @@ export default function ADEPWizard() {
 
   const applyCompany = (company: CompanyOption, showToast = true) => {
     const documentFields = getProfileCompanyDocumentFields(company as any);
+    const emergencyTeamInfo = normalizeCompanyEmergencyTeamInfo(company.emergency_team_info);
     setSelectedCompanyId(company.id);
     updatePlanData((previous) => ({
       ...previous,
@@ -333,7 +429,11 @@ export default function ADEPWizard() {
         },
         bilgi_sahibi_kisi: {
           ...previous.gorevli_bilgileri.bilgi_sahibi_kisi,
-          ad_soyad: documentFields.knowledgeableEmployeeName || previous.gorevli_bilgileri.bilgi_sahibi_kisi.ad_soyad,
+          ad_soyad:
+            emergencyTeamInfo.all_units_contact.full_name ||
+            documentFields.knowledgeableEmployeeName ||
+            previous.gorevli_bilgileri.bilgi_sahibi_kisi.ad_soyad,
+          tc_no: emergencyTeamInfo.all_units_contact.tc_no || previous.gorevli_bilgileri.bilgi_sahibi_kisi.tc_no,
         },
       },
       ekipler: {
@@ -341,22 +441,49 @@ export default function ADEPWizard() {
         sondurme: {
           ...previous.ekipler.sondurme,
           ekip_baskani: {
-            ...previous.ekipler.sondurme.ekip_baskani,
-            ad_soyad: documentFields.fireSupportPersonName || previous.ekipler.sondurme.ekip_baskani.ad_soyad,
+            ...emergencyPersonToAdep(
+              emergencyTeamInfo.fire_chief,
+              previous.ekipler.sondurme.ekip_baskani,
+            ),
+            ad_soyad:
+              emergencyTeamInfo.fire_chief.full_name ||
+              documentFields.fireSupportPersonName ||
+              previous.ekipler.sondurme.ekip_baskani.ad_soyad,
           },
         },
         ilkyardim: {
           ...previous.ekipler.ilkyardim,
           ekip_baskani: {
-            ...previous.ekipler.ilkyardim.ekip_baskani,
-            ad_soyad: documentFields.firstAidSupportPersonName || previous.ekipler.ilkyardim.ekip_baskani.ad_soyad,
+            ...emergencyPersonToAdep(
+              emergencyTeamInfo.first_aid_chief,
+              previous.ekipler.ilkyardim.ekip_baskani,
+            ),
+            ad_soyad:
+              emergencyTeamInfo.first_aid_chief.full_name ||
+              documentFields.firstAidSupportPersonName ||
+              previous.ekipler.ilkyardim.ekip_baskani.ad_soyad,
           },
         },
         kurtarma: {
           ...previous.ekipler.kurtarma,
           ekip_baskani: {
-            ...previous.ekipler.kurtarma.ekip_baskani,
-            ad_soyad: documentFields.evacuationSupportPersonName || previous.ekipler.kurtarma.ekip_baskani.ad_soyad,
+            ...emergencyPersonToAdep(
+              emergencyTeamInfo.rescue_chief,
+              previous.ekipler.kurtarma.ekip_baskani,
+            ),
+            ad_soyad:
+              emergencyTeamInfo.rescue_chief.full_name ||
+              documentFields.evacuationSupportPersonName ||
+              previous.ekipler.kurtarma.ekip_baskani.ad_soyad,
+          },
+        },
+        koruma: {
+          ...previous.ekipler.koruma,
+          ekip_baskani: {
+            ...emergencyPersonToAdep(
+              emergencyTeamInfo.protection_chief,
+              previous.ekipler.koruma.ekip_baskani,
+            ),
           },
         },
       },
@@ -606,6 +733,201 @@ export default function ADEPWizard() {
       toast.error("Word raporu oluşturulamadı", {
         description: error?.message || "Beklenmeyen hata",
       });
+    }
+  };
+
+  const toggleTemplateEmergency = (key: TemplateEmergencyKey, checked: boolean) => {
+    setSelectedEmergencies((previous) => ({
+      ...previous,
+      [key]: checked,
+    }));
+  };
+
+  const todayIso = () => new Date().toISOString().slice(0, 10);
+
+  const toTemplateMember = (
+    person: ADEPPerson,
+    role: "Ekip Başı" | "Ekip Personeli",
+  ): EmergencyTeamMember => ({
+    fullName: person.ad_soyad || "",
+    responsibilityArea: "İşyeri tamamı",
+    role,
+    phone: person.telefon || "",
+  });
+
+  const buildTemplateTeam = (teamKey: ADEPTeamKey): EmergencyTeamMember[] => {
+    const team = planData.ekipler[teamKey];
+    return [
+      toTemplateMember(team.ekip_baskani, "Ekip Başı"),
+      ...team.uyeler.map((member) => toTemplateMember(member, "Ekip Personeli")),
+    ].filter((member) => member.fullName.trim() || member.phone.trim());
+  };
+
+  const hasTemplateCapacityOverflow = () =>
+    buildTemplateTeam("sondurme").length > 4 ||
+    buildTemplateTeam("kurtarma").length > 4 ||
+    buildTemplateTeam("koruma").length > 3 ||
+    buildTemplateTeam("ilkyardim").length > 3;
+
+  const getMaterialLocations = (patterns: RegExp[]) =>
+    planData.malzeme_envanteri
+      .filter((item) => patterns.some((pattern) => pattern.test(`${item.equipment_name} ${item.location || ""}`)))
+      .map((item) => [item.equipment_name, item.location].filter(Boolean).join(" - "))
+      .filter(Boolean)
+      .join(", ");
+
+  const buildEmergencyActionPlanPayload = (): EmergencyActionPlanPayload => {
+    const preparedDate = planData.genel_bilgiler.hazirlanma_tarihi || planData.dokuman_bilgileri.dokuman_tarihi || todayIso();
+    const assemblyArea =
+      planData.toplanma_alani ||
+      planData.toplanma_yeri.aciklama ||
+      "İşyerinin önündeki açık alan";
+    const companyContact = [planData.isyeri_bilgileri.telefon, planData.osgb_bilgileri.telefon, planData.osgb_bilgileri.email]
+      .filter(Boolean)
+      .join(" / ");
+
+    return {
+      planDate: preparedDate,
+      companyTitle: planData.firma_bilgileri.unvan,
+      companyAddress: planData.firma_bilgileri.adres || planData.isyeri_bilgileri.adres,
+      companyContact,
+      employerName: planData.yetkililer.isveren_vekil.ad_soyad,
+      hazardClass: planData.firma_bilgileri.tehlike_sinifi || planData.isyeri_bilgileri.tehlike_sinifi,
+      sgkNumber: planData.firma_bilgileri.sgk_sicil_no || planData.isyeri_bilgileri.sgk_sicil_no,
+      preparedByTitle: "İş Güvenliği Uzmanı",
+      preparedByName:
+        planData.yetkililer.isg_uzmani.ad_soyad ||
+        planData.genel_bilgiler.hazirlayanlar?.[0]?.ad_soyad ||
+        "",
+      preparedDate,
+      validUntilDate: planData.genel_bilgiler.gecerlilik_tarihi,
+      revisionNo: planData.genel_bilgiler.revizyon_no || "0",
+      revisionDate: planData.genel_bilgiler.revizyon_tarihi,
+      assemblyArea,
+      selectedEmergencies,
+      otherEmergencyText,
+      externalRisk: {
+        companyTitle: "",
+        activity: "",
+        possibleEffect: "",
+      },
+      evacuation: {
+        evacuationPlanNote: planData.ekler.tahliye_plani_notu,
+        assemblyPointNote: assemblyArea,
+        fireEquipmentLocations: getMaterialLocations([/yangın/i, /yangin/i, /tüp/i, /tup/i, /söndür/i, /sondur/i]),
+        electricGasCutoffLocations: getMaterialLocations([/elektrik/i, /gaz/i, /vana/i, /şalter/i, /salter/i]),
+        firstAidMaterialLocations: getMaterialLocations([/ilk yardım/i, /ilk yardim/i, /ecza/i, /sağlık/i, /saglik/i]),
+        explosionRiskAreas: "",
+        chemicalSpreadAreas: "",
+      },
+      contactNumbers: defaultContactNumbers,
+      teams: {
+        fire: buildTemplateTeam("sondurme"),
+        rescue: buildTemplateTeam("kurtarma"),
+        protection: buildTemplateTeam("koruma"),
+        firstAid: buildTemplateTeam("ilkyardim"),
+      },
+      signatures: {
+        safetyExpertName: planData.yetkililer.isg_uzmani.ad_soyad,
+        employerName: planData.yetkililer.isveren_vekil.ad_soyad,
+      },
+    };
+  };
+
+  const buildBlankEmergencyActionPlanPayload = (): EmergencyActionPlanPayload => ({
+    planDate: "",
+    companyTitle: "",
+    companyAddress: "",
+    companyContact: "",
+    employerName: "",
+    hazardClass: "",
+    sgkNumber: "",
+    preparedByTitle: "",
+    preparedByName: "",
+    preparedDate: "",
+    validUntilDate: "",
+    revisionNo: "",
+    revisionDate: "",
+    assemblyArea: "",
+    selectedEmergencies: {
+      fire: false,
+      poisoning: false,
+      epidemic: false,
+      naturalDisaster: false,
+      sabotage: false,
+      firstAid: false,
+      fallFromHeight: false,
+      electricShock: false,
+      explosion: false,
+      chemicalSpill: false,
+      biologicalSpread: false,
+      radioactiveSpread: false,
+      nuclearSpread: false,
+      other: false,
+    },
+    otherEmergencyText: "",
+    externalRisk: {
+      companyTitle: "",
+      activity: "",
+      possibleEffect: "",
+    },
+    evacuation: {
+      evacuationPlanNote: "",
+      assemblyPointNote: "",
+      fireEquipmentLocations: "",
+      electricGasCutoffLocations: "",
+      firstAidMaterialLocations: "",
+      explosionRiskAreas: "",
+      chemicalSpreadAreas: "",
+    },
+    contactNumbers: defaultContactNumbers,
+    teams: {
+      fire: [],
+      rescue: [],
+      protection: [],
+      firstAid: [],
+    },
+    signatures: {
+      safetyExpertName: "",
+      employerName: "",
+    },
+    fileName: `acil-durum-eylem-plani-bos-form-${todayIso()}.docx`,
+  });
+
+  const downloadTemplateWordReport = async () => {
+    setTemplateExporting(true);
+    try {
+      if (hasTemplateCapacityOverflow()) {
+        toast.warning("Şablon kapasitesi nedeniyle ekiplerde yalnızca ilk kişiler çıktıya eklendi.");
+      }
+      await generateEmergencyActionPlanDocx(buildEmergencyActionPlanPayload());
+      toast.success("Acil durum eylem planı Word çıktısı oluşturuldu.");
+    } catch (error) {
+      console.error("Emergency action plan DOCX export failed:", error);
+      const message =
+        error instanceof Error && error.message === "TEMPLATE_NOT_FOUND"
+          ? "Acil durum eylem planı şablonu bulunamadı."
+          : "Acil durum eylem planı oluşturulamadı.";
+      toast.error(message);
+    } finally {
+      setTemplateExporting(false);
+    }
+  };
+
+  const downloadBlankTemplateWordReport = async () => {
+    setBlankTemplateExporting(true);
+    try {
+      await generateEmergencyActionPlanDocx(buildBlankEmergencyActionPlanPayload());
+      toast.success("Boş acil durum eylem planı şablonu indirildi.");
+    } catch (error) {
+      console.error("Blank emergency action plan DOCX export failed:", error);
+      const message =
+        error instanceof Error && error.message === "TEMPLATE_NOT_FOUND"
+          ? "Acil durum eylem planı şablonu bulunamadı."
+          : "Acil durum eylem planı oluşturulamadı.";
+      toast.error(message);
+    } finally {
+      setBlankTemplateExporting(false);
     }
   };
 
@@ -979,6 +1301,44 @@ export default function ADEPWizard() {
                   />
                 </Field>
 
+                <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5">
+                  <div className="mb-4">
+                    <div className="text-sm font-semibold text-white">Şablon Acil Durum İşaretleri</div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Bu seçimler yalnızca yeni şablonlu Word çıktısındaki acil durum işaretlerini doldurur.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {emergencyOptionLabels.map((option) => (
+                      <label
+                        key={option.key}
+                        htmlFor={`template-emergency-${option.key}`}
+                        className="flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                      >
+                        <Checkbox
+                          id={`template-emergency-${option.key}`}
+                          checked={selectedEmergencies[option.key]}
+                          onCheckedChange={(checked) => toggleTemplateEmergency(option.key, checked === true)}
+                          className="border-cyan-300/50 data-[state=checked]:border-cyan-400 data-[state=checked]:bg-cyan-500"
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </div>
+                  {selectedEmergencies.other && (
+                    <div className="mt-4">
+                      <Field label="Diğer Acil Durum Açıklaması">
+                        <Input
+                          className={inputClassName}
+                          value={otherEmergencyText}
+                          onChange={(event) => setOtherEmergencyText(event.target.value)}
+                          placeholder="Diğer acil durum açıklaması"
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+
                 <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-400/5 p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
@@ -994,6 +1354,25 @@ export default function ADEPWizard() {
                       <Button type="button" variant="outline" disabled={saving} onClick={savePlan} className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white">
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                         Kaydet
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={templateExporting}
+                        onClick={downloadTemplateWordReport}
+                        className="gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600"
+                      >
+                        {templateExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        Şablonlu Word İndir
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={blankTemplateExporting}
+                        onClick={downloadBlankTemplateWordReport}
+                        className="gap-2 border-cyan-400/30 bg-cyan-500/5 text-cyan-100 hover:bg-cyan-500/10 hover:text-cyan-50"
+                      >
+                        {blankTemplateExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        Boş Şablon İndir
                       </Button>
                       <Button type="button" disabled={saving} onClick={downloadWordReport} className="gap-2 bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700">
                         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}

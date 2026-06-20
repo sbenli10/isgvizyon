@@ -483,6 +483,48 @@ async function loadCompanyCertificatePeople(company: Company) {
   }
 }
 
+async function uploadInlineCertificateAssetIfNeeded(value: string | undefined | null, fileName: string) {
+  const source = (value || "").trim();
+  if (!source || (!source.startsWith("data:") && !source.startsWith("blob:"))) return source;
+
+  const response = await fetch(source);
+  if (!response.ok) {
+    throw new Error("Geçici logo dosyası okunamadı. Logoyu yeniden yükleyin.");
+  }
+
+  const blob = await response.blob();
+  const file = new File([blob], fileName, {
+    type: blob.type || "image/png",
+    lastModified: Date.now(),
+  });
+
+  return uploadCertificateAsset(file);
+}
+
+async function prepareCertificateAssetsForOutput(input: CertificateFormValues) {
+  const designConfig = normalizeDesignConfig(input.design_config, input.trainer_names, input.company_name);
+  const [logoUrl, osgbLogoUrl, signatures] = await Promise.all([
+    uploadInlineCertificateAssetIfNeeded(input.logo_url, "kurum-logo.png"),
+    uploadInlineCertificateAssetIfNeeded(designConfig.osgb_logo_url, "osgb-logo.png"),
+    Promise.all(
+      designConfig.signatures.map(async (signature, index) => ({
+        ...signature,
+        image_url: await uploadInlineCertificateAssetIfNeeded(signature.image_url, `imza-${index + 1}.png`),
+      })),
+    ),
+  ]);
+
+  return {
+    ...input,
+    logo_url: logoUrl || "",
+    design_config: {
+      ...designConfig,
+      osgb_logo_url: osgbLogoUrl || "",
+      signatures,
+    },
+  };
+}
+
 function buildDefaultDesignConfig(trainerNames: string[] = [], companyName = ""): CertificateDesignConfig {
   return {
     primaryColor: "#d4af37",
@@ -962,7 +1004,12 @@ export default function CertificatesDashboard() {
 
     setSubmitting(true);
     try {
-      const response = await createCertificate(form, participants);
+      const outputReadyForm = await prepareCertificateAssetsForOutput(form);
+      if (outputReadyForm.logo_url !== form.logo_url || outputReadyForm.design_config !== form.design_config) {
+        setForm(outputReadyForm);
+      }
+
+      const response = await createCertificate(outputReadyForm, participants);
       setActiveCertificate(response.certificate);
       setActiveJob(response.job);
       await loadRecentCertificates();

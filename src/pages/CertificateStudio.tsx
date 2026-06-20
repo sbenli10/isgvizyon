@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { CertificatePreviewCard } from "@/components/certificates/CertificatePreviewCard";
+import { uploadFileOptimized } from "@/lib/storageHelper";
 import type { CertificateDesignConfig, CertificateFormValues, CertificateSignatureConfig, CertificateTemplateType } from "@/types/certificates";
 
 const templateCards: Array<{ value: CertificateTemplateType; title: string; text: string }> = [
@@ -76,6 +77,41 @@ function normalizeDesignConfig(config?: CertificateDesignConfig): CertificateDes
   };
 }
 
+function normalizeFileNameForStorage(fileName: string) {
+  const extension = (fileName.split(".").pop() || "bin")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9]/g, "")
+    .slice(0, 12) || "bin";
+  const baseName = fileName.replace(/\.[^.]+$/, "");
+  const safeBase = baseName
+    .replace(/ı/g, "i")
+    .replace(/İ/g, "I")
+    .replace(/ğ/g, "g")
+    .replace(/Ğ/g, "G")
+    .replace(/ü/g, "u")
+    .replace(/Ü/g, "U")
+    .replace(/ş/g, "s")
+    .replace(/Ş/g, "S")
+    .replace(/ö/g, "o")
+    .replace(/Ö/g, "O")
+    .replace(/ç/g, "c")
+    .replace(/Ç/g, "C")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return `${safeBase || "logo"}.${extension}`;
+}
+
+async function uploadCertificateAsset(file: File) {
+  const fileName = `logos/${crypto.randomUUID()}-${normalizeFileNameForStorage(file.name)}`;
+  await uploadFileOptimized("certificate-files", fileName, file);
+  return fileName;
+}
+
 function readStoredPreset() {
   if (typeof window === "undefined") return buildDefaultForm();
   try {
@@ -95,6 +131,7 @@ function readStoredPreset() {
 
 export default function CertificateStudio() {
   const [form, setForm] = useState<CertificateFormValues>(() => readStoredPreset());
+  const [uploadingAsset, setUploadingAsset] = useState(false);
   const previewParticipant = useMemo(
     () => ({
       name: "Said Benli",
@@ -130,18 +167,35 @@ export default function CertificateStudio() {
     });
   }
 
-  function handleImageUpload(kind: "logo" | "osgb" | "signature", file: File, signatureIndex?: number) {
+  async function handleImageUpload(kind: "logo" | "osgb" | "signature", file: File, signatureIndex?: number) {
     const objectUrl = URL.createObjectURL(file);
+    setUploadingAsset(true);
+
     if (kind === "logo") {
       setForm((prev) => ({ ...prev, logo_url: objectUrl }));
-      return;
-    }
-    if (kind === "osgb") {
+    } else if (kind === "osgb") {
       updateDesignConfig({ osgb_logo_url: objectUrl });
-      return;
-    }
-    if (typeof signatureIndex === "number") {
+    } else if (typeof signatureIndex === "number") {
       updateSignature(signatureIndex, { image_url: objectUrl });
+    }
+
+    try {
+      const storagePath = await uploadCertificateAsset(file);
+
+      if (kind === "logo") {
+        setForm((prev) => ({ ...prev, logo_url: storagePath }));
+      } else if (kind === "osgb") {
+        updateDesignConfig({ osgb_logo_url: storagePath });
+      } else if (typeof signatureIndex === "number") {
+        updateSignature(signatureIndex, { image_url: storagePath });
+      }
+
+      toast.success("Görsel yüklendi ve çıktıya hazırlandı");
+    } catch (error) {
+      toast.error(`Görsel yüklenemedi: ${error instanceof Error ? error.message : "Bilinmeyen hata"}`);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+      setUploadingAsset(false);
     }
   }
 
@@ -263,12 +317,12 @@ export default function CertificateStudio() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="space-y-2">
                   <Label>Kurum Logosu</Label>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("logo", e.target.files[0])} />
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void handleImageUpload("logo", e.target.files[0])} />
                   <Button type="button" variant="outline" asChild className="w-full"><span>Logo Yükle</span></Button>
                 </label>
                 <label className="space-y-2">
                   <Label>OSGB Logosu</Label>
-                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("osgb", e.target.files[0])} />
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void handleImageUpload("osgb", e.target.files[0])} />
                   <Button type="button" variant="outline" asChild className="w-full"><span>OSGB Yükle</span></Button>
                 </label>
               </div>
@@ -293,7 +347,7 @@ export default function CertificateStudio() {
                       <Input value={signature.name} onChange={(e) => updateSignature(index, { name: e.target.value })} placeholder="İsim" />
                       <Input value={signature.title} onChange={(e) => updateSignature(index, { title: e.target.value })} placeholder="Unvan" />
                       <label>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("signature", e.target.files[0], index)} />
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void handleImageUpload("signature", e.target.files[0], index)} />
                         <Button type="button" variant="outline" asChild className="w-full"><span><Stamp className="mr-2 h-4 w-4" /> İmza PNG Yükle</span></Button>
                       </label>
                     </div>
