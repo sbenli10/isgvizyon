@@ -1108,3 +1108,728 @@
   caret-color: #f8fafc !important;
   box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.95) inset !important;
 }
+
+.auth-dark-surface [data-auth-card="true"],
+.light .auth-dark-surface [data-auth-card="true"],
+.dark .auth-dark-surface [data-auth-card="true"] {
+  background: rgba(2, 6, 23, 0.92) !important;
+  color: #f8fafc !important;
+}
+
+/* Absolute last auth override. Keep after all legacy auth theme helpers. */
+.auth-showcase-surface,
+.light .auth-showcase-surface,
+.dark .auth-showcase-surface {
+  background-color: #eaf0f8 !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+.auth-showcase-surface [data-auth-card="true"],
+.light .auth-showcase-surface [data-auth-card="true"],
+.dark .auth-showcase-surface [data-auth-card="true"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #f8fafc !important;
+}
+
+.auth-showcase-surface [data-auth-frame="true"] {
+  background: #020617 !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 35px 100px rgba(15, 23, 42, 0.28) !important;
+}
+
+.auth-showcase-surface [data-auth-url-pill="true"] {
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #a5f3fc !important;
+}
+
+.auth-showcase-surface [data-auth-left-panel="true"] {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(147, 197, 253, 0.22), transparent 25%),
+    radial-gradient(circle at 76% 74%, rgba(37, 99, 235, 0.26), transparent 38%),
+    linear-gradient(135deg, #05070d 0%, #0a1a38 48%, #0f3b98 100%) !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(37, 99, 235, 0.42), transparent 24%),
+    linear-gradient(180deg, #05070d 0%, #071b42 45%, #123c9c 100%) !important;
+  color: #ffffff !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button) {
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select) {
+  min-height: 3rem;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: transparent !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.light .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.dark .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"] {
+  color: #ffffff !important;
+}
+
+/* Final auth theme isolation: /auth is intentionally independent from ThemeToggle. */
+.auth-minimal-surface,
+.light .auth-minimal-surface,
+.dark .auth-minimal-surface,
+html.dark .auth-minimal-surface,
+body.dark .auth-minimal-surface {
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96.1%;
+  --secondary-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.auth-minimal-surface *,
+.light .auth-minimal-surface *,
+.dark .auth-minimal-surface *,
+html.dark .auth-minimal-surface *,
+body.dark .auth-minimal-surface * {
+  color-scheme: light !important;
+}
+
+.auth-minimal-surface :is(input, textarea, select),
+.light .auth-minimal-surface :is(input, textarea, select),
+.dark .auth-minimal-surface :is(input, textarea, select),
+html.dark .auth-minimal-surface :is(input, textarea, select),
+body.dark .auth-minimal-surface :is(input, textarea, select) {
+  background-color: transparent !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #2563eb !important;
+}
+
+.auth-minimal-surface :is(input, textarea, select)::placeholder,
+.light .auth-minimal-surface :is(input, textarea, select)::placeholder,
+.dark .auth-minimal-surface :is(input, textarea, select)::placeholder,
+html.dark .auth-minimal-surface :is(input, textarea, select)::placeholder,
+body.dark .auth-minimal-surface :is(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.auth-minimal-surface .auth-minimal-primary,
+.auth-minimal-surface .auth-minimal-primary *,
+.light .auth-minimal-surface .auth-minimal-primary,
+.light .auth-minimal-surface .auth-minimal-primary *,
+.dark .auth-minimal-surface .auth-minimal-primary,
+.dark .auth-minimal-surface .auth-minimal-primary *,
+html.dark .auth-minimal-surface .auth-minimal-primary,
+html.dark .auth-minimal-surface .auth-minimal-primary *,
+body.dark .auth-minimal-surface .auth-minimal-primary,
+body.dark .auth-minimal-surface .auth-minimal-primary * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+/* Minimal white auth screen. Isolated from the older dark auth overrides above. */
+.auth-minimal-surface,
+.light .auth-minimal-surface,
+.dark .auth-minimal-surface {
+  background: #ffffff !important;
+  color: #111827 !important;
+  color-scheme: light;
+}
+
+.auth-minimal-surface input,
+.auth-minimal-surface textarea,
+.auth-minimal-surface select,
+.light .auth-minimal-surface input,
+.light .auth-minimal-surface textarea,
+.light .auth-minimal-surface select,
+.dark .auth-minimal-surface input,
+.dark .auth-minimal-surface textarea,
+.dark .auth-minimal-surface select {
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  caret-color: #111827 !important;
+}
+
+.auth-minimal-surface input::placeholder,
+.auth-minimal-surface textarea::placeholder,
+.light .auth-minimal-surface input::placeholder,
+.light .auth-minimal-surface textarea::placeholder,
+.dark .auth-minimal-surface input::placeholder,
+.dark .auth-minimal-surface textarea::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1;
+}
+
+.auth-minimal-surface input:-webkit-autofill,
+.auth-minimal-surface input:-webkit-autofill:hover,
+.auth-minimal-surface input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #111827 !important;
+}
+
+.auth-minimal-surface .auth-minimal-primary,
+.auth-minimal-surface .auth-minimal-primary *,
+.light .auth-minimal-surface .auth-minimal-primary,
+.light .auth-minimal-surface .auth-minimal-primary *,
+.dark .auth-minimal-surface .auth-minimal-primary,
+.dark .auth-minimal-surface .auth-minimal-primary * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.auth-showcase-surface [data-auth-frame="true"] {
+  background: #020617 !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 35px 100px rgba(15, 23, 42, 0.28) !important;
+}
+
+.auth-showcase-surface [data-auth-url-pill="true"] {
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #a5f3fc !important;
+}
+
+.auth-showcase-surface [data-auth-left-panel="true"] {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(147, 197, 253, 0.22), transparent 25%),
+    radial-gradient(circle at 76% 74%, rgba(37, 99, 235, 0.26), transparent 38%),
+    linear-gradient(135deg, #05070d 0%, #0a1a38 48%, #0f3b98 100%) !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(37, 99, 235, 0.42), transparent 24%),
+    linear-gradient(180deg, #05070d 0%, #071b42 45%, #123c9c 100%) !important;
+  color: #ffffff !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button) {
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select) {
+  min-height: 3rem;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: transparent !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.light .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.dark .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"] {
+  color: #ffffff !important;
+}
+
+/* Absolute last auth override. Keep after all legacy auth theme helpers. */
+.auth-showcase-surface,
+.light .auth-showcase-surface,
+.dark .auth-showcase-surface {
+  background-color: #eaf0f8 !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+.auth-showcase-surface [data-auth-card="true"],
+.light .auth-showcase-surface [data-auth-card="true"],
+.dark .auth-showcase-surface [data-auth-card="true"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #f8fafc !important;
+}
+
+/* Premium Auth Showcase
+   Bu katman sadece auth ekranını global light/dark tema override'larından korur.
+   Gradient butonları ve özel Tailwind renklerini ezmez.
+*/
+
+.auth-showcase-surface,
+.light .auth-showcase-surface,
+.dark .auth-showcase-surface {
+  min-height: 100dvh;
+  background:
+    radial-gradient(780px 520px at 8% 92%, rgba(56, 189, 248, 0.22), transparent 68%),
+    radial-gradient(760px 520px at 94% 8%, rgba(37, 99, 235, 0.24), transparent 64%),
+    #eaf0f8 !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+/* Ana premium frame global kart stillerinden etkilenmesin */
+.auth-showcase-surface [data-auth-frame="true"],
+.light .auth-showcase-surface [data-auth-frame="true"],
+.dark .auth-showcase-surface [data-auth-frame="true"] {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.65) !important;
+  box-shadow: 0 35px 100px rgba(15, 23, 42, 0.32) !important;
+}
+
+/* Üst browser bar */
+.auth-showcase-surface [data-auth-frame="true"] > div:first-child {
+  background-color: #05070d !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* URL pill açık ve okunaklı kalsın */
+.auth-showcase-surface [data-auth-url-pill="true"],
+.light .auth-showcase-surface [data-auth-url-pill="true"],
+.dark .auth-showcase-surface [data-auth-url-pill="true"] {
+  background: rgba(15, 23, 42, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #a5f3fc !important;
+}
+
+/* Sol panel koyu/premium görünüm */
+.auth-showcase-surface [data-auth-left-panel="true"],
+.light .auth-showcase-surface [data-auth-left-panel="true"],
+.dark .auth-showcase-surface [data-auth-left-panel="true"] {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(147, 197, 253, 0.2), transparent 26%),
+    radial-gradient(circle at 78% 72%, rgba(37, 99, 235, 0.32), transparent 40%),
+    linear-gradient(135deg, #020617 0%, #07152f 48%, #0b2f86 100%) !important;
+  color: #f8fafc !important;
+}
+
+/* Sağ panel gerçek koyu mavi/lacivert olsun */
+.auth-showcase-surface [data-auth-right-panel="true"],
+.light .auth-showcase-surface [data-auth-right-panel="true"],
+.dark .auth-showcase-surface [data-auth-right-panel="true"] {
+  background:
+    radial-gradient(circle at 48% 58%, rgba(37, 99, 235, 0.58), transparent 34%),
+    linear-gradient(180deg, #020617 0%, #061536 42%, #123ea0 100%) !important;
+  color: #f8fafc !important;
+}
+
+/* Auth card şeffaf kalsın, global card stilleri gelmesin */
+.auth-showcase-surface [data-auth-card="true"],
+.light .auth-showcase-surface [data-auth-card="true"],
+.dark .auth-showcase-surface [data-auth-card="true"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #f8fafc !important;
+}
+
+/* Başlık ve label kontrastı */
+.auth-showcase-surface [data-auth-card="true"] h1,
+.auth-showcase-surface [data-auth-card="true"] h2,
+.auth-showcase-surface [data-auth-card="true"] h3,
+.auth-showcase-surface [data-auth-card="true"] label,
+.auth-showcase-surface [data-auth-card="true"] strong {
+  color: #f8fafc !important;
+}
+
+/* Açıklama metinleri okunaklı ama başlık kadar parlak değil */
+.auth-showcase-surface [data-auth-card="true"] p,
+.auth-showcase-surface [data-auth-card="true"] small {
+  color: rgba(203, 213, 225, 0.94) !important;
+}
+
+/* Linkler ve yardımcı aksiyonlar */
+.auth-showcase-surface [data-auth-card="true"] a,
+.auth-showcase-surface [data-auth-card="true"] button[type="button"]:not([class*="bg-gradient"]):not([class*="bg-black"]) {
+  color: inherit;
+}
+
+/* Input alanları koyu cam efektli kalsın */
+.auth-showcase-surface [data-auth-card="true"] input,
+.auth-showcase-surface [data-auth-card="true"] textarea,
+.auth-showcase-surface [data-auth-card="true"] select,
+.light .auth-showcase-surface [data-auth-card="true"] input,
+.light .auth-showcase-surface [data-auth-card="true"] textarea,
+.light .auth-showcase-surface [data-auth-card="true"] select,
+.dark .auth-showcase-surface [data-auth-card="true"] input,
+.dark .auth-showcase-surface [data-auth-card="true"] textarea,
+.dark .auth-showcase-surface [data-auth-card="true"] select {
+  background: transparent !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #60a5fa !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Placeholder */
+.auth-showcase-surface [data-auth-card="true"] input::placeholder,
+.auth-showcase-surface [data-auth-card="true"] textarea::placeholder,
+.light .auth-showcase-surface [data-auth-card="true"] input::placeholder,
+.light .auth-showcase-surface [data-auth-card="true"] textarea::placeholder,
+.dark .auth-showcase-surface [data-auth-card="true"] input::placeholder,
+.dark .auth-showcase-surface [data-auth-card="true"] textarea::placeholder {
+  color: rgba(148, 163, 184, 0.88) !important;
+  -webkit-text-fill-color: rgba(148, 163, 184, 0.88) !important;
+  opacity: 1 !important;
+}
+
+/* Autofill beyaz/sarı görünmesin */
+.auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill,
+.auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:hover,
+.auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:focus,
+.light .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill,
+.light .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:hover,
+.light .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:focus,
+.dark .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill,
+.dark .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:hover,
+.dark .auth-showcase-surface [data-auth-card="true"] input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #60a5fa !important;
+  box-shadow: 0 0 0 1000px rgba(2, 6, 23, 0.9) inset !important;
+  border-color: transparent !important;
+}
+
+/* Checkbox renkleri */
+.auth-showcase-surface [data-auth-card="true"] [role="checkbox"],
+.auth-showcase-surface [data-auth-card="true"] input[type="checkbox"] {
+  border-color: rgba(103, 232, 249, 0.45) !important;
+}
+
+/* Dialoglar auth ekranında koyu tema kalsın */
+.auth-showcase-surface [role="dialog"] {
+  color: #e2e8f0 !important;
+}
+
+/* Seçili metin rengi */
+.auth-showcase-surface ::selection {
+  background: rgba(56, 189, 248, 0.35);
+  color: #ffffff;
+}
+/*
+  Landing çizgisindeki auth tasarımı: beyaz/açık zemin, koyu metin,
+  mavi-cyan-mor aksiyonlar. Mevcut auth componentindeki eski koyu tema
+  sınıflarını tek tek sökmeden okunabilir hale getirir.
+*/
+.auth-landing-surface {
+  color: #0f172a !important;
+  color-scheme: light;
+}
+
+.auth-landing-surface [data-auth-card="true"],
+.light .auth-landing-surface [data-auth-card="true"],
+.dark .auth-landing-surface [data-auth-card="true"] {
+  background: rgba(255, 255, 255, 0.92) !important;
+  color: #0f172a !important;
+}
+
+.auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
+.light .auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
+.dark .auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a) {
+  color: #0f172a !important;
+}
+
+.auth-landing-surface :is(p, div, span)[class*="text-white"],
+.auth-landing-surface :is(p, div, span)[class*="text-slate-200"],
+.auth-landing-surface :is(p, div, span)[class*="text-slate-300"],
+.light .auth-landing-surface :is(p, div, span)[class*="text-white"],
+.light .auth-landing-surface :is(p, div, span)[class*="text-slate-200"],
+.light .auth-landing-surface :is(p, div, span)[class*="text-slate-300"],
+.dark .auth-landing-surface :is(p, div, span)[class*="text-white"],
+.dark .auth-landing-surface :is(p, div, span)[class*="text-slate-200"],
+.dark .auth-landing-surface :is(p, div, span)[class*="text-slate-300"] {
+  color: #334155 !important;
+}
+
+.auth-landing-surface button:not([class*="bg-gradient"]),
+.light .auth-landing-surface button:not([class*="bg-gradient"]),
+.dark .auth-landing-surface button:not([class*="bg-gradient"]) {
+  color: #0f172a !important;
+}
+
+.auth-landing-surface button[class*="bg-gradient"],
+.auth-landing-surface button[class*="from-purple"],
+.auth-landing-surface button[class*="from-sky"],
+.auth-landing-surface button[class*="from-blue"],
+.light .auth-landing-surface button[class*="bg-gradient"],
+.light .auth-landing-surface button[class*="from-purple"],
+.light .auth-landing-surface button[class*="from-sky"],
+.light .auth-landing-surface button[class*="from-blue"],
+.dark .auth-landing-surface button[class*="bg-gradient"],
+.dark .auth-landing-surface button[class*="from-purple"],
+.dark .auth-landing-surface button[class*="from-sky"],
+.dark .auth-landing-surface button[class*="from-blue"] {
+  color: #ffffff !important;
+}
+
+.auth-landing-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.light .auth-landing-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.dark .auth-landing-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+) {
+  background-color: rgba(248, 250, 252, 0.88) !important;
+  border-color: rgba(186, 230, 253, 0.9) !important;
+}
+
+.auth-landing-surface [data-auth-card="true"] :is(input, textarea, select),
+.light .auth-landing-surface [data-auth-card="true"] :is(input, textarea, select),
+.dark .auth-landing-surface [data-auth-card="true"] :is(input, textarea, select) {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0ea5e9 !important;
+}
+
+.auth-landing-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder,
+.light .auth-landing-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder,
+.dark .auth-landing-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1;
+}
+
+/*
+  Referans login tasarımına yakın iki panelli auth ekranı.
+  Light tema global override'ları bu karanlık mavi form alanını bozmamalı.
+*/
+.auth-showcase-surface {
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+.auth-showcase-surface [data-auth-card="true"],
+.light .auth-showcase-surface [data-auth-card="true"],
+.dark .auth-showcase-surface [data-auth-card="true"] {
+  background: rgba(15, 23, 42, 0.38) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+.auth-showcase-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
+.light .auth-showcase-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
+.dark .auth-showcase-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a) {
+  color: #f8fafc !important;
+}
+
+.auth-showcase-surface :is(p, span, div)[class*="text-slate-"],
+.light .auth-showcase-surface :is(p, span, div)[class*="text-slate-"],
+.dark .auth-showcase-surface :is(p, span, div)[class*="text-slate-"] {
+  color: rgba(203, 213, 225, 0.88) !important;
+}
+
+.auth-showcase-surface button[class*="bg-gradient"],
+.auth-showcase-surface button[class*="from-purple"],
+.auth-showcase-surface button[class*="from-sky"],
+.auth-showcase-surface button[class*="from-blue"],
+.light .auth-showcase-surface button[class*="bg-gradient"],
+.light .auth-showcase-surface button[class*="from-purple"],
+.light .auth-showcase-surface button[class*="from-sky"],
+.light .auth-showcase-surface button[class*="from-blue"],
+.dark .auth-showcase-surface button[class*="bg-gradient"],
+.dark .auth-showcase-surface button[class*="from-purple"],
+.dark .auth-showcase-surface button[class*="from-sky"],
+.dark .auth-showcase-surface button[class*="from-blue"] {
+  color: #ffffff !important;
+}
+
+.auth-showcase-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.light .auth-showcase-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.dark .auth-showcase-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+) {
+  background-color: rgba(15, 23, 42, 0.62) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select),
+.light .auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select),
+.dark .auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #38bdf8 !important;
+}
+
+.auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder,
+.light .auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder,
+.dark .auth-showcase-surface [data-auth-card="true"] :is(input, textarea, select)::placeholder {
+  color: rgba(148, 163, 184, 0.95) !important;
+  -webkit-text-fill-color: rgba(148, 163, 184, 0.95) !important;
+  opacity: 1;
+}
+
+.auth-dark-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.light .auth-dark-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+),
+.dark .auth-dark-surface :is(
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="bg-white/5"],
+  [class*="bg-white/["]
+) {
+  background-color: rgba(15, 23, 42, 0.82) !important;
+}
+
+.auth-dark-surface :is([class*="bg-gradient-to-r"], [class*="bg-gradient-to-br"]),
+.light .auth-dark-surface :is([class*="bg-gradient-to-r"], [class*="bg-gradient-to-br"]),
+.dark .auth-dark-surface :is([class*="bg-gradient-to-r"], [class*="bg-gradient-to-br"]) {
+  background-color: transparent !important;
+}
+
+.auth-dark-surface [data-auth-card="true"],
+.light .auth-dark-surface [data-auth-card="true"],
+.dark .auth-dark-surface [data-auth-card="true"] {
+  background: rgba(2, 6, 23, 0.92) !important;
+  color: #f8fafc !important;
+}
+
+/* Absolute last auth override. Keep after all legacy auth theme helpers. */
+.auth-showcase-surface,
+.light .auth-showcase-surface,
+.dark .auth-showcase-surface {
+  background-color: #eaf0f8 !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
+}
+
+.auth-showcase-surface [data-auth-card="true"],
+.light .auth-showcase-surface [data-auth-card="true"],
+.dark .auth-showcase-surface [data-auth-card="true"] {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #f8fafc !important;
+}
+/* Auth showcase final contrast lock. */
+.auth-showcase-surface [data-auth-frame="true"] {
+  background: #020617 !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 35px 100px rgba(15, 23, 42, 0.28) !important;
+}
+
+.auth-showcase-surface [data-auth-url-pill="true"] {
+  background: #0f172a !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #a5f3fc !important;
+}
+
+.auth-showcase-surface [data-auth-left-panel="true"] {
+  background:
+    radial-gradient(circle at 28% 18%, rgba(147, 197, 253, 0.22), transparent 25%),
+    radial-gradient(circle at 76% 74%, rgba(37, 99, 235, 0.26), transparent 38%),
+    linear-gradient(135deg, #05070d 0%, #0a1a38 48%, #0f3b98 100%) !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(37, 99, 235, 0.42), transparent 24%),
+    linear-gradient(180deg, #05070d 0%, #071b42 45%, #123c9c 100%) !important;
+  color: #ffffff !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(h1, h2, h3, label, p, span, div, button) {
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select),
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select) {
+  min-height: 3rem;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  background: transparent !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.light .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder,
+.dark .auth-showcase-surface [data-auth-right-panel="true"] :is(input, textarea, select)::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.light .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
+.dark .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"] {
+  color: #ffffff !important;
+}
