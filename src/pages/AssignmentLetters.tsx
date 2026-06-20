@@ -1414,43 +1414,62 @@ export default function AssignmentLetters() {
 
   return (
     <div className="theme-page-readable mx-auto max-w-[1500px] space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
-      <section className="overflow-hidden rounded-[24px] border border-border/60 bg-gradient-to-br from-cyan-50 via-background to-emerald-50/70 p-4 shadow-sm dark:from-cyan-950/20 dark:via-background dark:to-emerald-950/20 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <section className="relative overflow-hidden rounded-[32px] border border-slate-200/80 bg-white p-5 shadow-2xl shadow-slate-950/[0.05] dark:border-slate-800 dark:bg-slate-950 sm:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px] xl:items-end">
           <div className="min-w-0">
             <Badge className="border-cyan-500/20 bg-cyan-500/10 text-cyan-700 hover:bg-cyan-500/10 dark:text-cyan-200">
               <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
               İSG Belge Merkezi
             </Badge>
 
-            <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              <FileText className="h-6 w-6 shrink-0 text-cyan-600 dark:text-cyan-300" />
-              İSG Formları ve Atama Yazıları
+            <h1 className="mt-4 max-w-4xl text-3xl font-black tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+              İSG Formları ve Atama Yazılarını Tek Panelden Oluşturun
             </h1>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Atama, eğitim, olay bildirimi ve tatbikat belgelerini sade bir akışla oluşturun ve Word çıktısı alın.
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400 sm:text-base">
+              Atama, eğitim, olay bildirimi, tatbikat ve çalışan temsilcisi belgelerini profesyonel Word şablonlarıyla hazırlayın. Boş form, kısmen dolu form veya firma/personel verileriyle hazır çıktı alın.
             </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+                <p className="text-2xl font-black text-slate-950 dark:text-white">14+</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Hazır belge</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                <p className="text-2xl font-black text-emerald-700 dark:text-emerald-200">DOCX</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-emerald-700/70 dark:text-emerald-300/70">Şablon çıktı</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/20">
+                <p className="text-2xl font-black text-cyan-700 dark:text-cyan-200">Arşiv</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-cyan-700/70 dark:text-cyan-300/70">Kayıt geçmişi</p>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Badge
-              variant="outline"
-              className="rounded-full border-cyan-500/20 bg-background/70 px-3 py-1 text-cyan-700 dark:text-cyan-200"
-            >
-              10+ Belge
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full border-emerald-500/20 bg-background/70 px-3 py-1 text-emerald-700 dark:text-emerald-200"
-            >
-              DOCX Çıktı
-            </Badge>
-            <Badge
-              variant="outline"
-              className="rounded-full border-amber-500/20 bg-background/70 px-3 py-1 text-amber-700 dark:text-amber-200"
-            >
-              Arşiv Uyumlu
-            </Badge>
+          <div className="rounded-[28px] border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 p-5 text-white shadow-xl shadow-blue-950/20 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-cyan-400/15 text-cyan-200">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-black">Hızlı çıktı akışı</p>
+                <p className="mt-1 text-xs text-slate-300">Form seç, bilgileri doldur, Word indir.</p>
+              </div>
+            </div>
+            <div className="mt-5 space-y-3 text-sm">
+              {[
+                "Firma ve çalışan verileriyle otomatik doldurma",
+                "Boş form oluşturma desteği",
+                "Geçmişten tekrar indirme ve düzenleme",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2">
+                  <span className="h-2 w-2 rounded-full bg-cyan-300" />
+                  <span className="text-slate-200">{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -1470,8 +1489,8 @@ export default function AssignmentLetters() {
         onOpenOrientationOnboardingTraining={openOrientationOnboardingTrainingModal}
       />
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+      {/* <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <Card className="rounded-[28px] border border-slate-200/80 bg-white shadow-xl shadow-slate-950/[0.04] dark:border-slate-800 dark:bg-slate-950">
           <CardHeader className="pb-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700 dark:text-cyan-200">
@@ -1540,7 +1559,7 @@ export default function AssignmentLetters() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/25 p-4">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Sol imza alanı</h3>
                   <p className="mt-1 text-xs text-muted-foreground">İşveren veya yetkili kişi bilgisi.</p>
@@ -1571,7 +1590,7 @@ export default function AssignmentLetters() {
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-2xl border border-border/60 bg-muted/25 p-4">
+              <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/60">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Sağ imza alanı</h3>
                   <p className="mt-1 text-xs text-muted-foreground">Boş bırakılırsa personel bilgisi kullanılır.</p>
@@ -1603,7 +1622,7 @@ export default function AssignmentLetters() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-border/60 pt-4">
+            <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-slate-800">
               <Button className="rounded-xl px-5 shadow-sm" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
                 {settingsSaving ? "Kaydediliyor..." : "Belge Ayarlarını Kaydet"}
               </Button>
@@ -1611,7 +1630,7 @@ export default function AssignmentLetters() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[24px] border border-border/60 bg-card shadow-sm">
+        <Card className="rounded-[28px] border border-slate-200/80 bg-white shadow-xl shadow-slate-950/[0.04] dark:border-slate-800 dark:bg-slate-950">
           <CardHeader className="pb-4">
             <div className="flex items-start gap-3">
               <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-700 dark:text-emerald-200">
@@ -1706,14 +1725,14 @@ export default function AssignmentLetters() {
               </div>
             </div>
 
-            <div className="flex justify-end border-t border-border/60 pt-4">
+            <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-slate-800">
               <Button className="w-full rounded-xl shadow-sm sm:w-auto" onClick={handleSaveLetterSettings} disabled={settingsSaving}>
                 {settingsSaving ? "Kaydediliyor..." : "Kaydet"}
               </Button>
             </div>
           </CardContent>
         </Card>
-      </section>
+      </section> */}
 
       <section className="space-y-3">
         <div>

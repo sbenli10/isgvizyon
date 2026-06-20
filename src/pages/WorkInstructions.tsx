@@ -2424,54 +2424,75 @@ function InstructionCard({
   const Icon = meta.icon;
 
   return (
-    <Card className="group overflow-hidden border-slate-700/60 bg-slate-900/70 text-slate-100 shadow-xl shadow-black/20 transition hover:-translate-y-0.5 hover:border-cyan-400/45 hover:bg-slate-900">
-      <div className={cn("h-1 bg-gradient-to-r", meta.accent)} />
-      <CardHeader className="space-y-4 p-5">
+    <Card className="group relative overflow-hidden rounded-[28px] border border-white/10 bg-slate-950/[0.72] text-slate-100 shadow-[0_22px_70px_rgba(2,6,23,0.36)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:border-cyan-300/55 hover:shadow-cyan-950/30">
+      <div className={cn("absolute inset-x-0 top-0 h-32 bg-gradient-to-br opacity-80", meta.accent)} />
+      <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl transition group-hover:bg-cyan-300/20" />
+      <div className="relative h-1.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-violet-500" />
+      <CardHeader className="relative space-y-5 p-5">
         <div className="flex items-start justify-between gap-3">
-          <Badge className={cn("rounded-full border px-2.5 py-1 text-[10px] font-semibold", meta.badge)}>
+          <Badge className={cn("rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em]", meta.badge)}>
             {instruction.category}
           </Badge>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04]">
-            <Icon className="h-5 w-5 text-slate-100" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/12 bg-white/10 shadow-lg shadow-black/20 ring-1 ring-white/10 transition group-hover:scale-105">
+            <Icon className="h-5 w-5 text-cyan-100" />
           </div>
         </div>
         <div>
-          <CardTitle className="line-clamp-2 text-lg font-bold text-white">{instruction.title}</CardTitle>
-          <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-400">{instruction.description}</p>
+          <CardTitle className="line-clamp-2 text-xl font-black leading-tight text-white">{instruction.title}</CardTitle>
+          <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-300">{instruction.description}</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 p-5 pt-0">
+      <CardContent className="relative space-y-5 p-5 pt-0">
         <div className="flex flex-wrap gap-1.5">
           {[...instruction.requiredPpe.slice(0, 3), ...instruction.tags.slice(0, 2)].map((tag) => (
-            <span key={tag} className="rounded-full border border-slate-700/80 bg-slate-950/70 px-2 py-1 text-[10px] text-slate-300">
+            <span
+              key={tag}
+              className="rounded-full border border-cyan-300/15 bg-cyan-300/[0.08] px-2.5 py-1 text-[10px] font-semibold text-cyan-100"
+            >
               {tag}
             </span>
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-2 text-[11px] text-slate-400">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-2">
-            <span className="block text-slate-500">KKD</span>
-            <strong className="text-slate-200">{instruction.requiredPpe.length}</strong>
+        <div className="grid grid-cols-3 gap-2 text-[11px]">
+          <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-3">
+            <span className="block text-emerald-200/80">KKD</span>
+            <strong className="text-lg text-white">{instruction.requiredPpe.length}</strong>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-2">
-            <span className="block text-slate-500">Risk</span>
-            <strong className="text-slate-200">{instruction.risks.length}</strong>
+          <div className="rounded-2xl border border-rose-300/15 bg-rose-400/10 p-3">
+            <span className="block text-rose-200/80">Risk</span>
+            <strong className="text-lg text-white">{instruction.risks.length}</strong>
           </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-2">
-            <span className="block text-slate-500">Adım</span>
-            <strong className="text-slate-200">{instruction.steps.length}</strong>
+          <div className="rounded-2xl border border-blue-300/15 bg-blue-400/10 p-3">
+            <span className="block text-blue-200/80">Adım</span>
+            <strong className="text-lg text-white">{instruction.steps.length}</strong>
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onPreview} className="border-slate-700 bg-slate-950/60 text-slate-100 hover:bg-slate-800">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onPreview}
+            className="rounded-xl border-white/10 bg-white/[0.08] text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-400/10 hover:text-white"
+          >
             <Eye className="mr-1.5 h-3.5 w-3.5" />
             İncele
           </Button>
-          <Button type="button" size="sm" onClick={onPdf} className="bg-blue-600 text-white hover:bg-blue-500">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onPdf}
+            className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-950/25 hover:from-blue-500 hover:to-cyan-400"
+          >
             <Download className="mr-1.5 h-3.5 w-3.5" />
             PDF
           </Button>
-          <Button type="button" size="sm" onClick={onWord} className="bg-violet-600 text-white hover:bg-violet-500">
+          <Button
+            type="button"
+            size="sm"
+            onClick={onWord}
+            className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-500 text-white shadow-lg shadow-violet-950/25 hover:from-violet-500 hover:to-fuchsia-400"
+          >
             <FileText className="mr-1.5 h-3.5 w-3.5" />
             Word
           </Button>
@@ -2897,7 +2918,7 @@ export default function WorkInstructionsPage() {
         return prev;
       }
       toast.success("Talimat kayıtlı talimatlarınıza eklendi.");
-      return [{ ...instruction, id: instruction.id.startsWith("template-") ? `saved-${Date.now()}` : instruction.id }, ...prev];
+      return [{ ...instruction, id: instruction.id.startsWith("template-") ? "saved-" + Date.now() : instruction.id }, ...prev];
     });
   }, []);
 
@@ -2912,61 +2933,118 @@ export default function WorkInstructionsPage() {
     setDetailsOpen(true);
   };
 
+  const heroStats = [
+    { label: "Hazır Şablon", value: templates.length, helper: "Sektörel talimat", className: "from-cyan-400/18 to-blue-500/10", icon: ClipboardList },
+    { label: "Kayıtlı", value: savedInstructions.length, helper: "Kişisel arşiv", className: "from-violet-400/18 to-fuchsia-500/10", icon: Save },
+    { label: "Kategori", value: categories.length, helper: "Risk alanı", className: "from-emerald-400/18 to-teal-500/10", icon: Filter },
+    { label: "Çıktı", value: "PDF + Word", helper: "Tek tıkla indir", className: "from-amber-400/18 to-orange-500/10", icon: Download },
+  ];
+
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(168,85,247,0.16),transparent_28%),#020617] p-4 text-slate-100 md:p-6">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <section className="overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950/70 p-5 shadow-2xl shadow-black/30 backdrop-blur md:p-7">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_12%_8%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_86%_16%,rgba(124,58,237,0.24),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(59,130,246,0.18),transparent_34%),linear-gradient(180deg,#06111f_0%,#081225_48%,#020617_100%)] p-4 text-slate-100 md:p-6">
+      <div className="pointer-events-none fixed left-8 top-24 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none fixed bottom-10 right-8 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl" />
+
+      <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-6">
+        <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_30px_100px_rgba(2,6,23,0.42)] backdrop-blur-xl md:p-7">
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(14,165,233,0.12),transparent_38%,rgba(168,85,247,0.12))]" />
+          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/12 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-32 w-full bg-gradient-to-t from-blue-950/30 to-transparent" />
+
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <Badge className="mb-4 border border-cyan-400/25 bg-cyan-500/10 text-cyan-100">
-                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                İSG talimat merkezi
+              <Badge className="mb-4 border border-cyan-300/30 bg-cyan-400/12 px-3 py-1.5 text-cyan-100 shadow-lg shadow-cyan-950/20">
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                ISGVizyon Talimat Merkezi
               </Badge>
-              <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">Çalışma Talimatları</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400 md:text-base">
-                Hazır şablonlardan veya yapay zeka ile saniyeler içinde profesyonel İSG talimatı oluşturun.
+              <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">
+                Çalışma Talimatları
+                <span className="block bg-gradient-to-r from-cyan-200 via-blue-200 to-violet-200 bg-clip-text text-transparent">
+                  renkli, h?zl? ve Çıktıya haz?r
+                </span>
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
+                Hazır Şablonlardan veya yapay zeka ile saniyeler i?inde profesyonel ?SG talimat? olu?turun; PDF ve Word Çıktılar?n?z? ayn? ekrandan y?netin.
               </p>
             </div>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button
                 type="button"
                 onClick={() => setAiDialogOpen(true)}
-                className="h-11 rounded-xl bg-gradient-to-r from-purple-600 to-fuchsia-600 px-5 text-white shadow-lg shadow-purple-950/30 hover:from-purple-500 hover:to-fuchsia-500"
+                className="h-12 rounded-2xl bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 px-5 font-black text-white shadow-[0_18px_44px_rgba(168,85,247,0.28)] hover:from-violet-500 hover:to-pink-400"
               >
                 <Bot className="mr-2 h-4 w-4" />
                 AI ile Üret
               </Button>
-              <Button type="button" onClick={() => setNewDialogOpen(true)} className="h-11 rounded-xl bg-blue-600 px-5 text-white hover:bg-blue-500">
+              <Button
+                type="button"
+                onClick={() => setNewDialogOpen(true)}
+                className="h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 font-black text-white shadow-[0_18px_44px_rgba(37,99,235,0.28)] hover:from-blue-500 hover:to-cyan-400"
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Yeni Talimat
               </Button>
             </div>
           </div>
 
-          <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative w-full lg:max-w-xl">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <div className="relative mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {heroStats.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className={cn("rounded-3xl border border-white/10 bg-gradient-to-br p-4 shadow-lg shadow-black/15", item.className)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
+                      <p className="mt-2 text-2xl font-black text-white">{item.value}</p>
+                      <p className="mt-1 text-xs text-slate-400">{item.helper}</p>
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+                      <Icon className="h-5 w-5 text-cyan-100" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="rounded-[30px] border border-white/10 bg-slate-950/[0.62] p-4 shadow-2xl shadow-black/20 backdrop-blur-xl md:p-5">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div className="relative w-full xl:max-w-2xl">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200/70" />
               <Input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Başlık, kategori, KKD, risk veya etikete göre ara..."
-                className="h-11 rounded-2xl border-slate-700 bg-slate-900/80 pl-10 text-slate-100 placeholder:text-slate-500"
+                className="h-12 rounded-2xl border-white/10 bg-white/[0.08] pl-11 text-slate-100 placeholder:text-slate-500 focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-400/20"
               />
             </div>
-            <div className="flex items-center gap-3 text-xs text-slate-400">
-              <ShieldCheck className="h-4 w-4 text-emerald-300" />
-              {templates.length} hazır şablon · {savedInstructions.length} kayıtlı talimat
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-2 text-emerald-100">
+                <ShieldCheck className="h-4 w-4" />
+                {filteredInstructions.length} kayıt görüntüleniyor
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-400/10 px-3 py-2 text-blue-100">
+                <ClipboardList className="h-4 w-4" />
+                {activeTab === "templates" ? "Şablon kütüphanesi" : "Kayıtlı talimatlar"}
+              </span>
             </div>
           </div>
         </section>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "templates" | "saved")} className="space-y-5">
-          <TabsList className="grid w-full max-w-xl grid-cols-2 rounded-2xl border border-slate-800 bg-slate-950/80 p-1">
-            <TabsTrigger value="templates" className="rounded-xl data-[state=active]:bg-cyan-500/15 data-[state=active]:text-cyan-100">
+          <TabsList className="grid w-full max-w-xl grid-cols-2 rounded-2xl border border-white/10 bg-slate-950/70 p-1 shadow-lg shadow-black/15">
+            <TabsTrigger
+              value="templates"
+              className="rounded-xl text-slate-300 transition data-[state=active]:bg-cyan-400/15 data-[state=active]:text-cyan-100 data-[state=active]:shadow-lg data-[state=active]:shadow-cyan-950/20"
+            >
               Şablon Kütüphanesi
             </TabsTrigger>
-            <TabsTrigger value="saved" className="rounded-xl data-[state=active]:bg-violet-500/15 data-[state=active]:text-violet-100">
-              Kayıtlı Talimatlarım
+            <TabsTrigger
+              value="saved"
+              className="rounded-xl text-slate-300 transition data-[state=active]:bg-violet-400/15 data-[state=active]:text-violet-100 data-[state=active]:shadow-lg data-[state=active]:shadow-violet-950/20"
+            >
+              Kayıtlı Talimatlar?m
             </TabsTrigger>
           </TabsList>
 
@@ -3012,15 +3090,19 @@ function InstructionGrid({
 }) {
   if (!items.length) {
     return (
-      <div className="rounded-[2rem] border border-dashed border-slate-700 bg-slate-950/60 p-10 text-center text-slate-400">
-        <BadgeCheck className="mx-auto mb-3 h-8 w-8 text-slate-500" />
-        {emptyLabel}
+      <div className="relative overflow-hidden rounded-[32px] border border-dashed border-cyan-300/25 bg-slate-950/65 p-12 text-center text-slate-300 shadow-2xl shadow-black/20 backdrop-blur-xl">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_42%)]" />
+        <div className="relative mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-3xl border border-cyan-300/20 bg-cyan-400/10">
+          <BadgeCheck className="h-7 w-7 text-cyan-100" />
+        </div>
+        <p className="relative text-base font-bold text-white">{emptyLabel}</p>
+        <p className="relative mt-2 text-sm text-slate-400">Arama veya kategori filtresini değiştirerek tekrar deneyebilirsiniz.</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
       {items.map((instruction) => (
         <InstructionCard
           key={instruction.id}
