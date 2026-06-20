@@ -1,4 +1,4 @@
-﻿import {
+import {
   type ChangeEvent,
   type ReactNode,
   useEffect,
@@ -87,8 +87,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-type HazardClass = "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli" | "";
-type RiskMethod = "5x5 Matris" | "Fine-Kinney" | "L Tipi Matris" | "Diğer";
+type HazardClass = "Az Tehlikeli" | "Tehlikeli" | "�ok Tehlikeli" | "";
+type RiskMethod = "5x5 Matris" | "Fine-Kinney" | "L Tipi Matris" | "Diger";
 
 type RiskTeamPerson = {
   fullName: string;
@@ -290,31 +290,31 @@ const WIZARD_STEPS: WizardStep[] = [
     label: "Firma",
     title: "Firma ve Rapor Bilgileri",
     description:
-      "Firma profilini seçin; kapak, yöntem, tarih ve faaliyet bilgilerini kontrol edin.",
+      "Firma profilini se�in; kapak, y�ntem, tarih ve faaliyet bilgilerini kontrol edin.",
     icon: <Building2 className="h-5 w-5" />,
   },
   {
     id: "risk-method",
-    label: "Risk Kaynağı",
-    title: "Risk Ekleme Yöntemi",
+    label: "Risk Kaynagi",
+    title: "Risk Ekleme Y�ntemi",
     description:
-      "Riskleri AI, kütüphane, şablon veya kayıtlı değerlendirmeler üzerinden ekleyin.",
+      "Riskleri AI, k�t�phane, sablon veya kayitli degerlendirmeler �zerinden ekleyin.",
     icon: <Sparkles className="h-5 w-5" />,
   },
   {
     id: "risk-table",
     label: "Risk Tablosu",
-    title: "Risk Değerlendirme Tablosu",
+    title: "Risk Degerlendirme Tablosu",
     description:
-      "Eklenen riskleri, puanları, önlemleri, sorumluları ve terminleri düzenleyin.",
+      "Eklenen riskleri, puanlari, �nlemleri, sorumlulari ve terminleri d�zenleyin.",
     icon: <AlertTriangle className="h-5 w-5" />,
   },
   {
     id: "preview",
     label: "Rapor",
-    title: "Kontrol ve Rapor Oluşturma",
+    title: "Kontrol ve Rapor Olusturma",
     description:
-      "Özeti kontrol edin; taslağı saklayın ve Word/PDF çıktısını oluşturun.",
+      "�zeti kontrol edin; taslagi saklayin ve Word/PDF �iktisini olusturun.",
     icon: <Eye className="h-5 w-5" />,
   },
 ];
@@ -363,7 +363,7 @@ const emptyTeamInfo = (): RiskWizardTeamInfo => ({
 });
 
 const FIXED_METHOD_DESCRIPTION =
-  "Risk puanı = Olasılık x Şiddet. Risk düzeyleri: 1-4 Düşük, 5-9 Orta, 10-15 Yüksek, 16-25 Çok Yüksek olarak kabul edilmiştir. Kontrol tedbirlerinde öncelik sırası; tehlikeyi ortadan kaldırma, ikame, mühendislik kontrolü, idari kontrol ve kişisel koruyucu donanım şeklindedir.";
+  "Risk puani = Olasilik x Siddet. Risk d�zeyleri: 1-4 D�s�k, 5-9 Orta, 10-15 Y�ksek, 16-25 �ok Y�ksek olarak kabul edilmistir. Kontrol tedbirlerinde �ncelik sirasi; tehlikeyi ortadan kaldirma, ikame, m�hendislik kontrol�, idari kontrol ve kisisel koruyucu donanim seklindedir.";
 
 const emptyScopeInfo = (): RiskWizardScopeInfo => ({
   evaluatedSections: "",
@@ -372,11 +372,11 @@ const emptyScopeInfo = (): RiskWizardScopeInfo => ({
 
 const emptyConclusionInfo = (): RiskWizardConclusionInfo => ({
   generalConclusion:
-    "Bu risk değerlendirmesi, işyerinde beyan edilen faaliyet kapsamı ve mevcut çalışma koşulları dikkate alinarak hazırlanmıştır. Belirlenen ilave tedbirlerin uygulanması ve tamamlanan faaliyetler sonrası risk seviyelerinin yeniden değerlendirilmesi önerilir.",
+    "Bu risk degerlendirmesi, isyerinde beyan edilen faaliyet kapsami ve mevcut �alisma kosullari dikkate alinarak hazirlanmistir. Belirlenen ilave tedbirlerin uygulanmasi ve tamamlanan faaliyetler sonrasi risk seviyelerinin yeniden degerlendirilmesi �nerilir.",
   conclusionItems: [
-    "Bu risk değerlendirmesi, işyerinde beyan edilen faaliyet kapsamı ve mevcut çalışma koşulları dikkate alinarak hazırlanmıştır.",
-    "Belirlenen ilave tedbirlerin uygulanması ve tamamlanan faaliyetler sonrası risk seviyelerinin yeniden değerlendirilmesi önerilir.",
-    "Risk değerlendirmesi, işyerinde önemli değişiklik olmasi veya mevzuat gereği yenilenmesi gereken durumlarda güncellenmelidir.",
+    "Bu risk degerlendirmesi, isyerinde beyan edilen faaliyet kapsami ve mevcut �alisma kosullari dikkate alinarak hazirlanmistir.",
+    "Belirlenen ilave tedbirlerin uygulanmasi ve tamamlanan faaliyetler sonrasi risk seviyelerinin yeniden degerlendirilmesi �nerilir.",
+    "Risk degerlendirmesi, isyerinde �nemli degisiklik olmasi veya mevzuat geregi yenilenmesi gereken durumlarda g�ncellenmelidir.",
   ],
   approvalNote: "",
   preparedBy: "",
@@ -432,7 +432,7 @@ const hasTeamInfoData = (team?: RiskWizardTeamInfo | null) =>
 
 const splitTextToItems = (value?: string | null) =>
   String(value || "")
-    .split(/\r?\n|•|-/)
+    .split(/\r?\n|�|-/)
     .map((item) => cleanText(item))
     .filter(Boolean);
 const asInt = (value?: string) => {
@@ -562,14 +562,14 @@ const enrichCompaniesWithAssignments = (
     );
     const employeeRepresentative = companyAssignments.find((assignment) =>
       assignmentMatchesRole(assignment, [
-        "çalışan temsilcisi",
-        "çalışan temsilcisi",
+        "�alisan temsilcisi",
+        "�alisan temsilcisi",
         "employee",
       ]),
     );
     const safetyExpert = companyAssignments.find((assignment) =>
       assignmentMatchesRole(assignment, [
-        "iş güvenliği",
+        "is g�venligi",
         "isg",
         "igu",
         "uzman",
@@ -621,7 +621,7 @@ const enrichCompaniesWithAssignments = (
 const buildCompanyInfoFromProfile = (
   company: WizardCompanyOption,
 ): RiskWizardCompanyInfo => {
-  const hazardClass = ["Az Tehlikeli", "Tehlikeli", "Çok Tehlikeli"].includes(
+  const hazardClass = ["Az Tehlikeli", "Tehlikeli", "�ok Tehlikeli"].includes(
     cleanText(company.hazardClass),
   )
     ? (cleanText(company.hazardClass) as HazardClass)
@@ -650,14 +650,14 @@ const buildTeamInfoFromProfile = (
     phone: cleanText(company.employerRepresentativePhone),
     title:
       cleanText(company.employerRepresentativeTitle) ||
-      "İşveren / İşveren Vekili",
+      "Isveren / Isveren Vekili",
   },
   employeeRepresentative: {
     fullName: cleanText(company.employeeRepresentativeName),
     tcNo: cleanText(company.employeeRepresentativeTcNo),
     phone: cleanText(company.employeeRepresentativePhone),
     title:
-      cleanText(company.employeeRepresentativeTitle) || "Çalışan Temsilcisi",
+      cleanText(company.employeeRepresentativeTitle) || "�alisan Temsilcisi",
   },
   safetyExpert: {
     fullName: cleanText(company.occupationalSafetySpecialistName),
@@ -667,14 +667,14 @@ const buildTeamInfoFromProfile = (
     certificateClass: cleanText(
       company.occupationalSafetySpecialistCertificateClass,
     ),
-    title: "İş Güvenliği Uzmanı",
+    title: "Is G�venligi Uzmani",
   },
   workplaceDoctor: {
     fullName: cleanText(company.workplaceDoctorName),
     tcNo: cleanText(company.workplaceDoctorTcNo),
     phone: cleanText(company.workplaceDoctorPhone),
     certificateNo: cleanText(company.workplaceDoctorCertificateNo),
-    title: "İşyeri Hekimi",
+    title: "Isyeri Hekimi",
   },
   osgb: {
     title: cleanText(company.osgbTitle),
@@ -775,10 +775,10 @@ const formatRiskNumber = (value: number) =>
   Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
 
 const getFineKinneyRiskLevelFromScore = (score: number) => {
-  if (score > 400) return "Çok Yüksek";
-  if (score >= 200) return "Yüksek";
-  if (score >= 70) return "Önemli";
-  if (score >= 20) return "Olası";
+  if (score > 400) return "�ok Y�ksek";
+  if (score >= 200) return "Y�ksek";
+  if (score >= 70) return "�nemli";
+  if (score >= 20) return "Olasi";
   if (score > 0) return "Kabul Edilebilir";
   return "";
 };
@@ -827,8 +827,8 @@ const createRiskRowFromGeneratedRisk = (
     departmentActivity: cleanText(item.category),
     hazardSource: cleanText(item.hazard),
     riskConsequence: cleanText(item.risk),
-    affectedPeople: "Çalışanlar, ziyaretçiler ve ilgili üçüncü kişiler",
-    currentMeasure: "Mevcut durum saha kontrolünde değerlendirilecektir.",
+    affectedPeople: "�alisanlar, ziyaret�iler ve ilgili ���nc� kisiler",
+    currentMeasure: "Mevcut durum saha kontrol�nde degerlendirilecektir.",
     probability: formatRiskNumber(probability),
     frequency: formatRiskNumber(frequency),
     severity: formatRiskNumber(severity),
@@ -840,7 +840,7 @@ const createRiskRowFromGeneratedRisk = (
     postSeverity: formatRiskNumber(postSeverity),
     postRiskScore: formatRiskNumber(postRiskScore),
     postRiskLevel: getFineKinneyRiskLevelFromScore(postRiskScore),
-    responsible: "İşveren",
+    responsible: "Isveren",
     deadline: "",
   };
 };
@@ -869,7 +869,7 @@ const buildSignatureRowsFromTeam = (
     {
       id: createId("signature"),
       fullName: cleanText(teamInfo.employer.fullName),
-      role: "İşveren",
+      role: "Isveren",
       documentOrContact: cleanText(
         teamInfo.employer.phone || teamInfo.employer.tcNo,
       ),
@@ -877,13 +877,13 @@ const buildSignatureRowsFromTeam = (
     {
       id: createId("signature"),
       fullName: cleanText(teamInfo.employeeRepresentative.fullName),
-      role: "Çalışan Temsilcisi",
+      role: "�alisan Temsilcisi",
       documentOrContact: cleanText(teamInfo.employeeRepresentative.phone),
     },
     {
       id: createId("signature"),
       fullName: cleanText(teamInfo.safetyExpert.fullName),
-      role: "İş Güvenliği Uzmanı",
+      role: "Is G�venligi Uzmani",
       documentOrContact: cleanText(
         [
           teamInfo.safetyExpert.certificateNo
@@ -900,7 +900,7 @@ const buildSignatureRowsFromTeam = (
     {
       id: createId("signature"),
       fullName: cleanText(teamInfo.workplaceDoctor.fullName),
-      role: "İşyeri Hekimi",
+      role: "Isyeri Hekimi",
       documentOrContact: cleanText(
         [
           teamInfo.workplaceDoctor.certificateNo
@@ -963,7 +963,7 @@ const mapSavedRiskItemToWizardRow = (
   departmentActivity: cleanText(item.activity),
   hazardSource: cleanText(item.hazard),
   riskConsequence: cleanText(item.risk),
-  affectedPeople: "Çalışanlar",
+  affectedPeople: "�alisanlar",
   currentMeasure: cleanText(item.currentStatus || item.riskDefinitionBefore),
   probability: item.probabilityBefore ? String(item.probabilityBefore) : "",
   frequency: item.frequencyBefore ? String(item.frequencyBefore) : "1",
@@ -1058,7 +1058,7 @@ const mapManualLibraryItemToWizardRow = (
   departmentActivity: cleanText(item.departmentActivity || item.category),
   hazardSource: cleanText(item.hazardSource),
   riskConsequence: cleanText(item.riskConsequence),
-  affectedPeople: cleanText(item.affectedPeople || "Çalışanlar"),
+  affectedPeople: cleanText(item.affectedPeople || "�alisanlar"),
   currentMeasure: cleanText(item.currentMeasure),
   probability: cleanText(item.probability),
   frequency:
@@ -1124,7 +1124,7 @@ const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
         getFineKinneyRiskLevelFromScore(asInt(riskScore)),
       additionalMeasures:
         cleanText(item.additionalMeasures) ||
-        "Planlanan düzeltici/önleyici faaliyet uygulanacaktır.",
+        "Planlanan d�zeltici/�nleyici faaliyet uygulanacaktir.",
       postProbability,
       postFrequency,
       postSeverity,
@@ -1132,7 +1132,7 @@ const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
       postRiskLevel:
         cleanText(item.postRiskLevel) ||
         getFineKinneyRiskLevelFromScore(asInt(postRiskScore)),
-      responsible: cleanText(item.responsible) || "İşveren",
+      responsible: cleanText(item.responsible) || "Isveren",
       deadline: cleanText(item.deadline),
     };
   });
@@ -1294,12 +1294,12 @@ export default function RiskAssessmentWizard() {
     const checkTemplate = async () => {
       try {
         const headResponse = await fetch(
-          "/templates/risk-analizi-şablonu.docx",
+          "/templates/risk-analizi-sablonu.docx",
           { method: "HEAD" },
         );
         const response = headResponse.ok
           ? headResponse
-          : await fetch("/templates/risk-analizi-şablonu.docx", {
+          : await fetch(encodeURI("/templates/risk-analizi-sablonu.docx"), {
               method: "GET",
             });
         if (!active) return;
@@ -1338,7 +1338,7 @@ export default function RiskAssessmentWizard() {
       setRiskTemplates((data || []) as RiskAssessmentTemplateRecord[]);
     } catch (error) {
       console.error("Risk wizard template fetch error", error);
-      toast.error("Risk şablonları yüklenemedi.");
+      toast.error("Risk sablonlari y�klenemedi.");
     } finally {
       setLoadingRiskTemplates(false);
     }
@@ -1549,7 +1549,7 @@ export default function RiskAssessmentWizard() {
         );
       } catch (error) {
         console.error("Risk wizard company fetch error", error);
-        if (active) toast.error("Profildeki firmalar yüklenemedi.");
+        if (active) toast.error("Profildeki firmalar y�klenemedi.");
       } finally {
         if (active) setCompaniesLoading(false);
       }
@@ -1583,10 +1583,10 @@ export default function RiskAssessmentWizard() {
   const selectedCompanyMissingTeamFields = useMemo(() => {
     if (!selectedCompany) return [];
     return [
-      ["İşveren / İşveren Vekili", selectedCompany.employerRepresentativeName],
-      ["İş Güvenliği Uzmanı", selectedCompany.occupationalSafetySpecialistName],
-      ["İşyeri Hekimi", selectedCompany.workplaceDoctorName],
-      ["Çalışan Temsilcisi", selectedCompany.employeeRepresentativeName],
+      ["Isveren / Isveren Vekili", selectedCompany.employerRepresentativeName],
+      ["Is G�venligi Uzmani", selectedCompany.occupationalSafetySpecialistName],
+      ["Isyeri Hekimi", selectedCompany.workplaceDoctorName],
+      ["�alisan Temsilcisi", selectedCompany.employeeRepresentativeName],
     ]
       .filter(([, value]) => !cleanText(String(value || "")))
       .map(([label]) => label);
@@ -1647,7 +1647,7 @@ export default function RiskAssessmentWizard() {
     setManualRiskSearch("");
     setExpandedManualCategories({});
     setTouched({});
-    toast.success("Risk değerlendirme taslağı temizlendi.");
+    toast.success("Risk degerlendirme taslagi temizlendi.");
   };
 
   const touchField = (key: string) =>
@@ -1676,22 +1676,22 @@ export default function RiskAssessmentWizard() {
     setSignatureRows([]);
 
     const missingFields = [
-      ["İşveren / İşveren Vekili", company.employerRepresentativeName],
-      ["İş Güvenliği Uzmanı", company.occupationalSafetySpecialistName],
-      ["İşyeri Hekimi", company.workplaceDoctorName],
-      ["Çalışan Temsilcisi", company.employeeRepresentativeName],
+      ["Isveren / Isveren Vekili", company.employerRepresentativeName],
+      ["Is G�venligi Uzmani", company.occupationalSafetySpecialistName],
+      ["Isyeri Hekimi", company.workplaceDoctorName],
+      ["�alisan Temsilcisi", company.employeeRepresentativeName],
     ].filter(([, value]) => !cleanText(String(value || "")));
 
     if (missingFields.length > 0) {
       toast.warning(
-        "Firma bilgileri aktarıldı; risk değerlendirme ekibinde eksık alanlar var.",
+        "Firma bilgileri aktarildi; risk degerlendirme ekibinde eksik alanlar var.",
         {
           description: missingFields.map(([label]) => label).join(", "),
         },
       );
     } else {
       toast.success(
-        "Firma ve risk değerlendirme ekibi bilgileri otomatik dolduruldu.",
+        "Firma ve risk degerlendirme ekibi bilgileri otomatik dolduruldu.",
       );
     }
   };
@@ -1714,7 +1714,7 @@ export default function RiskAssessmentWizard() {
       REQUIRED_COMPANY_FIELDS.forEach((field) => touchField(String(field)));
       toast.error(
         validation.message ||
-          "Bu adımda kontrol edilmesi gereken alanlar bulunuyor.",
+          "Bu adimda kontrol edilmesi gereken alanlar bulunuyor.",
       );
       return;
     }
@@ -1826,7 +1826,7 @@ export default function RiskAssessmentWizard() {
     );
     if (!sector) {
       toast.error(
-        "AI ile risk üretmek için sektör, faaliyet kapsamı veya kısa bir işyeri açıklaması girin.",
+        "AI ile risk �retmek i�in sekt�r, faaliyet kapsami veya kisa bir isyeri a�iklamasi girin.",
       );
       return;
     }
@@ -1864,7 +1864,7 @@ export default function RiskAssessmentWizard() {
       setRiskAdditionMethod("ai");
       setCurrentStep(RISK_TABLE_STEP_INDEX);
       toast.success(
-        `${completedRows.length} risk maddesi Risk Değerlendirme Tablosu’na eklendi.`,
+        `${completedRows.length} risk maddesi Risk Degerlendirme Tablosu�na eklendi.`,
       );
     } catch (error) {
       console.error("Risk wizard AI generation error", error);
@@ -1873,7 +1873,7 @@ export default function RiskAssessmentWizard() {
       setRiskAdditionMethod("ai");
       setCurrentStep(RISK_TABLE_STEP_INDEX);
       toast.info(
-        "AI servisi yanıt veremedi; sektör bazlı hazır risk paketi tabloya eklendi.",
+        "AI servisi yanit veremedi; sekt�r bazli hazir risk paketi tabloya eklendi.",
       );
     } finally {
       setAiGenerating(false);
@@ -1889,7 +1889,7 @@ export default function RiskAssessmentWizard() {
     appendRiskItems(mappedItems);
     setRiskAdditionMethod("manual");
     toast.success(
-      `${mappedItems.length} risk maddesi Risk Değerlendirme Tablosu’na eklendi.`,
+      `${mappedItems.length} risk maddesi Risk Degerlendirme Tablosu�na eklendi.`,
     );
   };
 
@@ -2009,7 +2009,7 @@ export default function RiskAssessmentWizard() {
 
   const regenerateSignaturesFromTeam = () => {
     setSignatureRows(buildSignatureRowsFromTeam(teamInfo));
-    toast.success("İmza satırları ekip bilgilerinden yeniden oluşturuldu.");
+    toast.success("Imza satirlari ekip bilgilerinden yeniden olusturuldu.");
   };
 
   const addSignatureRow = () => {
@@ -2041,12 +2041,12 @@ export default function RiskAssessmentWizard() {
     if (!file) return;
     const validTypes = ["image/png", "image/jpeg", "image/jpg"];
     if (!validTypes.includes(file.type)) {
-      toast.error("Sadece PNG veya JPG formatinda logo yükleyebilirsiniz.");
+      toast.error("Sadece PNG veya JPG formatinda logo y�kleyebilirsiniz.");
       event.target.value = "";
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast.error("Logo dosyası en fazla 2 MB olabilir.");
+      toast.error("Logo dosyasi en fazla 2 MB olabilir.");
       event.target.value = "";
       return;
     }
@@ -2057,7 +2057,7 @@ export default function RiskAssessmentWizard() {
         type: file.type,
         dataUrl: String(loadEvent.target?.result || ""),
       });
-      toast.success("Logo önizlemesi hazırlandı.");
+      toast.success("Logo �nizlemesi hazirlandi.");
     };
     reader.readAsDataURL(file);
     event.target.value = "";
@@ -2065,7 +2065,7 @@ export default function RiskAssessmentWizard() {
 
   const importRiskItemsFromAssessment = async () => {
     if (!user?.id) {
-      toast.error("Kayıtlı riskleri aktarmak için oturum bulunamadı.");
+      toast.error("Kayitli riskleri aktarmak i�in oturum bulunamadi.");
       return;
     }
     setImportingRiskItems(true);
@@ -2084,19 +2084,19 @@ export default function RiskAssessmentWizard() {
         );
         setRiskItems(mappedItems);
         toast.success(
-          `${mappedItems.length} risk maddesi editörden aktarıldı.`,
+          `${mappedItems.length} risk maddesi edit�rden aktarildi.`,
         );
       } else {
         const savedRisks = await listSavedRiskItems(user.id);
         const mappedItems = savedRisks.map(mapSavedRiskItemToWizardRow);
         setRiskItems(mappedItems);
-        toast.success(`${mappedItems.length} kayıtlı risk maddesi aktarıldı.`);
+        toast.success(`${mappedItems.length} kayitli risk maddesi aktarildi.`);
       }
       setRiskAdditionMethod("saved");
       setCurrentStep(RISK_TABLE_STEP_INDEX);
     } catch (error) {
       console.error("Risk wizard import error", error);
-      toast.error("Risk maddeleri aktarılamadı.");
+      toast.error("Risk maddeleri aktarilamadi.");
     } finally {
       setImportingRiskItems(false);
     }
@@ -2109,7 +2109,7 @@ export default function RiskAssessmentWizard() {
       ? template.payload.items
       : [];
     if (templateItems.length === 0) {
-      toast.error("Seçilen şablonda aktarılacak risk maddesi bulunamadı.");
+      toast.error("Se�ilen sablonda aktarilacak risk maddesi bulunamadi.");
       return;
     }
 
@@ -2121,14 +2121,14 @@ export default function RiskAssessmentWizard() {
     setCurrentStep(RISK_TABLE_STEP_INDEX);
     setRiskTemplateDialogOpen(false);
     toast.success(
-      `"${template.name}" şablonundan ${mappedItems.length} risk maddesi tabloya aktarıldı.`,
+      `"${template.name}" sablonundan ${mappedItems.length} risk maddesi tabloya aktarildi.`,
     );
   };
 
   const handleSaveDraft = () => {
     toast.success("Taslak kaydedildi.", {
       description:
-        "Girilen bilgiler adımlar arasında ve tekrar girişte korunacaktır.",
+        "Girilen bilgiler adimlar arasinda ve tekrar giriste korunacaktir.",
     });
   };
 
@@ -2230,15 +2230,15 @@ export default function RiskAssessmentWizard() {
     setExportingProcedureWord(true);
     try {
       await generateRiskProcedureTemplateDoc(payload);
-      toast.success("Şablon dolduruldu, rapor indirildi.");
+      toast.success("Sablon dolduruldu, rapor indirildi.");
     } catch (error) {
       console.error("Risk procedure template export error", error);
       const message =
-        error instanceof Error ? error.message : "Rapor oluşturulamadı.";
+        error instanceof Error ? error.message : "Rapor olusturulamadi.";
       toast.error(
-        message.includes("Şablon")
-          ? "Şablon bulunamadı."
-          : "Rapor oluşturulamadı.",
+        message.includes("Sablon")
+          ? "Sablon bulunamadi."
+          : "Rapor olusturulamadi.",
       );
     } finally {
       setExportingProcedureWord(false);
@@ -2252,7 +2252,7 @@ export default function RiskAssessmentWizard() {
       return;
     }
     if (!wordTemplateAvailable) {
-      toast.error("Şablon bulunamadı.");
+      toast.error("Sablon bulunamadi.");
       return;
     }
     const payload = buildRiskTemplatePayload(summaryItems);
@@ -2260,15 +2260,15 @@ export default function RiskAssessmentWizard() {
     setExportingPdf(true);
     try {
       await generateRiskAnalysisTemplatePdf(payload);
-      toast.success("Risk analizi PDF olarak hazırlandı.");
+      toast.success("Risk analizi PDF olarak hazirlandi.");
     } catch (error) {
       console.error("Risk wizard PDF error", error);
       const message =
-        error instanceof Error ? error.message : "PDF raporu oluşturulamadı.";
+        error instanceof Error ? error.message : "PDF raporu olusturulamadi.";
       toast.error(
-        message.includes("Şablon")
-          ? "Şablon bulunamadı."
-          : "PDF raporu oluşturulamadı.",
+        message.includes("Sablon")
+          ? "Sablon bulunamadi."
+          : "PDF raporu olusturulamadi.",
       );
     } finally {
       setExportingPdf(false);
@@ -2282,7 +2282,7 @@ export default function RiskAssessmentWizard() {
       return;
     }
     if (!wordTemplateAvailable) {
-      toast.error("Şablon bulunamadı.");
+      toast.error("Sablon bulunamadi.");
       return;
     }
     const payload = buildRiskTemplatePayload(summaryItems);
@@ -2290,15 +2290,15 @@ export default function RiskAssessmentWizard() {
     setExportingWord(true);
     try {
       await generateRiskAnalysisTemplateDocx(payload);
-      toast.success("Rapor başarıyla oluşturuldu.");
+      toast.success("Rapor basariyla olusturuldu.");
     } catch (error) {
       console.error("Risk analysis template DOCX error", error);
       const message =
-        error instanceof Error ? error.message : "Rapor oluşturulamadı.";
+        error instanceof Error ? error.message : "Rapor olusturulamadi.";
       toast.error(
-        message.includes("Şablon")
-          ? "Şablon bulunamadı."
-          : "Rapor oluşturulamadı.",
+        message.includes("Sablon")
+          ? "Sablon bulunamadi."
+          : "Rapor olusturulamadi.",
       );
     } finally {
       setExportingWord(false);
@@ -2393,7 +2393,7 @@ export default function RiskAssessmentWizard() {
         />
         {isError ? (
           <p className="text-xs text-red-500">
-            Bu alanı boş bırakabilirsiniz; yalnızca çıktı bilgisini etkiler.
+            Bu alani bos birakabilirsiniz; yalnizca �ikti bilgisini etkiler.
           </p>
         ) : null}
       </div>
@@ -2407,9 +2407,9 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-xl border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 p-4">
               <p className="text-sm leading-relaxed text-cyan-800 dark:text-cyan-200">
-                Firma bilgileri profil kayıtlarından otomatik getirilir. Bu
-                ekranda yaptığınız değişiklikler yalnızca risk değerlendirme
-                taslağına kaydedilir.
+                Firma bilgileri profil kayitlarindan otomatik getirilir. Bu
+                ekranda yaptiginiz degisiklikler yalnizca risk degerlendirme
+                taslagina kaydedilir.
               </p>
             </div>
 
@@ -2420,8 +2420,8 @@ export default function RiskAssessmentWizard() {
                   Profilimdeki Firmadan Doldur
                 </CardTitle>
                 <CardDescription className="text-slate-500 dark:text-slate-400">
-                  Firma seçildiginde kapak bilgileri ve Risk Değerlendirme Ekibi
-                  alanları Profilim &gt; Firmalar kaydından otomatik aktarılır.
+                  Firma se�ildiginde kapak bilgileri ve Risk Degerlendirme Ekibi
+                  alanlari Profilim &gt; Firmalar kaydindan otomatik aktarilir.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -2435,8 +2435,8 @@ export default function RiskAssessmentWizard() {
                       <SelectValue
                         placeholder={
                           companiesLoading
-                            ? "Firmalar yükleniyor..."
-                            : "Firma seçin"
+                            ? "Firmalar y�kleniyor..."
+                            : "Firma se�in"
                         }
                       />
                     </SelectTrigger>
@@ -2462,12 +2462,12 @@ export default function RiskAssessmentWizard() {
                 selectedCompanyMissingTeamFields.length > 0 ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
                     <p className="font-bold">
-                      Risk Değerlendirme Ekibi bilgileri eksık.
+                      Risk Degerlendirme Ekibi bilgileri eksik.
                     </p>
                     <p className="mt-1 text-amber-700 dark:text-amber-200/90">
-                      Eksık alanlar:{" "}
-                      {selectedCompanyMissingTeamFields.join(", ")}. Bu alanları
-                      Profilim &gt; Firmalar sekmesindeki Atamalar bölümünden
+                      Eksik alanlar:{" "}
+                      {selectedCompanyMissingTeamFields.join(", ")}. Bu alanlari
+                      Profilim &gt; Firmalar sekmesindeki Atamalar b�l�m�nden
                       doldurabilirsiniz.
                     </p>
                   </div>
@@ -2479,10 +2479,10 @@ export default function RiskAssessmentWizard() {
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-cyan-900 dark:text-cyan-100">
                   <FileText className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-                  Risk Değerlendirme Süreci
+                  Risk Degerlendirme S�reci
                 </CardTitle>
                 <CardDescription className="text-cyan-800/80 dark:text-cyan-200/80">
-                  Firma ve ekip bilgileri ile prosedür raporu oluşturun.
+                  Firma ve ekip bilgileri ile prosed�r raporu olusturun.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -2497,27 +2497,27 @@ export default function RiskAssessmentWizard() {
                   ) : (
                     <FileText className="mr-2 h-4 w-4" />
                   )}
-                  Risk Değerlendirme Süreci Raporu İndir
+                  Risk Degerlendirme S�reci Raporu Indir
                 </Button>
               </CardContent>
             </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               {renderInput(
-                "Firma Unvanı",
+                "Firma Unvani",
                 companyInfo.companyTitle,
                 (value) => updateCompanyInfo("companyTitle", value),
                 {
-                  placeholder: "Firma unvanı",
+                  placeholder: "Firma unvani",
                   errorKey: "companyTitle",
                 },
               )}
               {renderInput(
-                "İşyeri Sicil No",
+                "Isyeri Sicil No",
                 companyInfo.workplaceRegistryNo,
                 (value) => updateCompanyInfo("workplaceRegistryNo", value),
                 {
-                  placeholder: "İşyeri sicil numarası",
+                  placeholder: "Isyeri sicil numarasi",
                 },
               )}
               {renderInput(
@@ -2525,7 +2525,7 @@ export default function RiskAssessmentWizard() {
                 companyInfo.address,
                 (value) => updateCompanyInfo("address", value),
                 {
-                  placeholder: "Açık adres",
+                  placeholder: "A�ik adres",
                 },
               )}
               {renderInput(
@@ -2539,7 +2539,7 @@ export default function RiskAssessmentWizard() {
               )}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Tehlike Sınıfı
+                  Tehlike Sinifi
                 </Label>
                 <Select
                   value={companyInfo.hazardClass}
@@ -2548,26 +2548,26 @@ export default function RiskAssessmentWizard() {
                   }
                 >
                   <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                    <SelectValue placeholder="Seçin" />
+                    <SelectValue placeholder="Se�in" />
                   </SelectTrigger>
                   <SelectContent className="border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
                     <SelectItem value="Az Tehlikeli">Az Tehlikeli</SelectItem>
                     <SelectItem value="Tehlikeli">Tehlikeli</SelectItem>
-                    <SelectItem value="Çok Tehlikeli">Çok Tehlikeli</SelectItem>
+                    <SelectItem value="�ok Tehlikeli">�ok Tehlikeli</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               {renderInput(
-                "Çalışan Sayısı",
+                "�alisan Sayisi",
                 companyInfo.employeeCount,
                 (value) => updateCompanyInfo("employeeCount", value),
                 {
-                  placeholder: "Çalışan sayısı",
+                  placeholder: "�alisan sayisi",
                   errorKey: "employeeCount",
                 },
               )}
               {renderInput(
-                "Değerlendirme Tarihi",
+                "Degerlendirme Tarihi",
                 companyInfo.assessmentDate,
                 (value) => updateCompanyInfo("assessmentDate", value),
                 {
@@ -2576,7 +2576,7 @@ export default function RiskAssessmentWizard() {
                 },
               )}
               {renderInput(
-                "Geçerlilik / Yenileme Tarihi",
+                "Ge�erlilik / Yenileme Tarihi",
                 companyInfo.validUntil,
                 (value) => updateCompanyInfo("validUntil", value),
                 {
@@ -2585,7 +2585,7 @@ export default function RiskAssessmentWizard() {
               )}
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                  Risk Değerlendirme Yöntemi
+                  Risk Degerlendirme Y�ntemi
                 </Label>
                 <Select
                   value={companyInfo.riskMethod}
@@ -2594,13 +2594,13 @@ export default function RiskAssessmentWizard() {
                   }
                 >
                   <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
-                    <SelectValue placeholder="Seçin" />
+                    <SelectValue placeholder="Se�in" />
                   </SelectTrigger>
                   <SelectContent className="border-slate-200 bg-white text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100">
                     <SelectItem value="5x5 Matris">5x5 Matris</SelectItem>
                     <SelectItem value="Fine-Kinney">Fine-Kinney</SelectItem>
                     <SelectItem value="L Tipi Matris">L Tipi Matris</SelectItem>
-                    <SelectItem value="Diğer">Diğer</SelectItem>
+                    <SelectItem value="Diger">Diger</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2608,14 +2608,14 @@ export default function RiskAssessmentWizard() {
 
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Faaliyet Kapsamı
+                Faaliyet Kapsami
               </Label>
               <Textarea
                 value={companyInfo.activityScope}
                 onChange={(event) =>
                   updateCompanyInfo("activityScope", event.target.value)
                 }
-                placeholder="Faaliyet kapsamını kısa ve net biçimde yazın"
+                placeholder="Faaliyet kapsamini kisa ve net bi�imde yazin"
                 className="min-h-[100px] rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
@@ -2633,7 +2633,7 @@ export default function RiskAssessmentWizard() {
                 className="min-h-[90px] rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Boş bırakılırsa çıktıda Not alanı hiç gösterilmez.
+                Bos birakilirsa �iktida Not alani hi� g�sterilmez.
               </p>
             </div>
 
@@ -2643,7 +2643,7 @@ export default function RiskAssessmentWizard() {
                   Risk Analizi Logosu
                 </Label>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Logo eklerseniz PDF çıktısınin üst bölümünde gösterilir.
+                  Logo eklerseniz PDF �iktisinin �st b�l�m�nde g�sterilir.
                 </p>
               </div>
               {logo ? (
@@ -2661,7 +2661,7 @@ export default function RiskAssessmentWizard() {
                       onClick={() => setLogo(null)}
                     >
                       <X className="mr-2 h-4 w-4" />
-                      Logoyu Kaldır
+                      Logoyu Kaldir
                     </Button>
                   </div>
                 </div>
@@ -2673,7 +2673,7 @@ export default function RiskAssessmentWizard() {
                 >
                   <FileText className="mx-auto h-7 w-7 text-cyan-400" />
                   <p className="mt-3 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    PNG veya JPG logo seçin
+                    PNG veya JPG logo se�in
                   </p>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Maksimum 2 MB
@@ -2696,31 +2696,31 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-5">
             <div className="rounded-xl border border-cyan-200 bg-cyan-50 dark:border-cyan-800 dark:bg-cyan-950/30 p-4 text-sm leading-relaxed text-cyan-800 dark:text-cyan-200">
               {hasTeamInfoData(teamInfo)
-                ? "Bu bilgiler firma profilinden otomatik getirildi. Bu ekranda yaptığınız değişiklikler risk değerlendirme taslağına kaydedilir."
-                : "Firma profilinde kayıtlı ekip bilgisi bulunamadı. Alanları manuel doldurabilir veya boş bırakabilirsiniz."}
+                ? "Bu bilgiler firma profilinden otomatik getirildi. Bu ekranda yaptiginiz degisiklikler risk degerlendirme taslagina kaydedilir."
+                : "Firma profilinde kayitli ekip bilgisi bulunamadi. Alanlari manuel doldurabilir veya bos birakabilirsiniz."}
             </div>
 
             <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base text-slate-900 dark:text-slate-100">
-                  Risk Değerlendirme Ekibi
+                  Risk Degerlendirme Ekibi
                 </CardTitle>
                 <CardDescription className="text-slate-500 dark:text-slate-400">
-                  Alanlar zorunlu değildir. Boş bırakılan bilgiler çıktıda boş
-                  alan olarak kalır.
+                  Alanlar zorunlu degildir. Bos birakilan bilgiler �iktida bos
+                  alan olarak kalir.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 p-4">
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    İşveren
+                    Isveren
                   </p>
                   {renderInput(
                     "Ad - Soyad",
                     teamInfo.employer.fullName,
                     (value) => updateTeamPerson("employer", "fullName", value),
                     {
-                      placeholder: "İşveren ad soyad",
+                      placeholder: "Isveren ad soyad",
                     },
                   )}
                   {renderInput(
@@ -2728,7 +2728,7 @@ export default function RiskAssessmentWizard() {
                     teamInfo.employer.tcNo,
                     (value) => updateTeamPerson("employer", "tcNo", value),
                     {
-                      placeholder: "T.C. kimlik numarası",
+                      placeholder: "T.C. kimlik numarasi",
                     },
                   )}
                   {renderInput(
@@ -2736,14 +2736,14 @@ export default function RiskAssessmentWizard() {
                     teamInfo.employer.phone,
                     (value) => updateTeamPerson("employer", "phone", value),
                     {
-                      placeholder: "Telefon numarası",
+                      placeholder: "Telefon numarasi",
                     },
                   )}
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 p-4">
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Çalışan Temsilcisi
+                    �alisan Temsilcisi
                   </p>
                   {renderInput(
                     "Ad - Soyad",
@@ -2755,7 +2755,7 @@ export default function RiskAssessmentWizard() {
                         value,
                       ),
                     {
-                      placeholder: "Çalışan temsilcisi ad soyad",
+                      placeholder: "�alisan temsilcisi ad soyad",
                     },
                   )}
                   {renderInput(
@@ -2764,7 +2764,7 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("employeeRepresentative", "tcNo", value),
                     {
-                      placeholder: "T.C. kimlik numarası",
+                      placeholder: "T.C. kimlik numarasi",
                     },
                   )}
                   {renderInput(
@@ -2777,14 +2777,14 @@ export default function RiskAssessmentWizard() {
                         value,
                       ),
                     {
-                      placeholder: "Telefon numarası",
+                      placeholder: "Telefon numarasi",
                     },
                   )}
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 p-4">
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    İş Güvenliği Uzmanı
+                    Is G�venligi Uzmani
                   </p>
                   {renderInput(
                     "Ad - Soyad",
@@ -2792,7 +2792,7 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("safetyExpert", "fullName", value),
                     {
-                      placeholder: "İş güvenliği uzmanı ad soyad",
+                      placeholder: "Is g�venligi uzmani ad soyad",
                     },
                   )}
                   {renderInput(
@@ -2800,7 +2800,7 @@ export default function RiskAssessmentWizard() {
                     teamInfo.safetyExpert.tcNo,
                     (value) => updateTeamPerson("safetyExpert", "tcNo", value),
                     {
-                      placeholder: "T.C. kimlik numarası",
+                      placeholder: "T.C. kimlik numarasi",
                     },
                   )}
                   {renderInput(
@@ -2808,7 +2808,7 @@ export default function RiskAssessmentWizard() {
                     teamInfo.safetyExpert.phone,
                     (value) => updateTeamPerson("safetyExpert", "phone", value),
                     {
-                      placeholder: "Telefon numarası",
+                      placeholder: "Telefon numarasi",
                     },
                   )}
                   {renderInput(
@@ -2817,11 +2817,11 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("safetyExpert", "certificateNo", value),
                     {
-                      placeholder: "Sertifika numarası",
+                      placeholder: "Sertifika numarasi",
                     },
                   )}
                   {renderInput(
-                    "Sertifika Sınıfı",
+                    "Sertifika Sinifi",
                     teamInfo.safetyExpert.certificateClass || "",
                     (value) =>
                       updateTeamPerson(
@@ -2830,14 +2830,14 @@ export default function RiskAssessmentWizard() {
                         value,
                       ),
                     {
-                      placeholder: "A/B/C sınıfı veya ek bilgi",
+                      placeholder: "A/B/C sinifi veya ek bilgi",
                     },
                   )}
                 </div>
 
                 <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70 p-4">
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    İşyeri Hekimi
+                    Isyeri Hekimi
                   </p>
                   {renderInput(
                     "Ad - Soyad",
@@ -2845,7 +2845,7 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("workplaceDoctor", "fullName", value),
                     {
-                      placeholder: "İşyeri hekimi ad soyad",
+                      placeholder: "Isyeri hekimi ad soyad",
                     },
                   )}
                   {renderInput(
@@ -2854,7 +2854,7 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("workplaceDoctor", "tcNo", value),
                     {
-                      placeholder: "T.C. kimlik numarası",
+                      placeholder: "T.C. kimlik numarasi",
                     },
                   )}
                   {renderInput(
@@ -2863,7 +2863,7 @@ export default function RiskAssessmentWizard() {
                     (value) =>
                       updateTeamPerson("workplaceDoctor", "phone", value),
                     {
-                      placeholder: "Telefon numarası",
+                      placeholder: "Telefon numarasi",
                     },
                   )}
                   {renderInput(
@@ -2876,7 +2876,7 @@ export default function RiskAssessmentWizard() {
                         value,
                       ),
                     {
-                      placeholder: "Sertifika numarası",
+                      placeholder: "Sertifika numarasi",
                     },
                   )}
                 </div>
@@ -2887,11 +2887,11 @@ export default function RiskAssessmentWizard() {
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     {renderInput(
-                      "OSGB Unvanı",
+                      "OSGB Unvani",
                       teamInfo.osgb.title,
                       (value) => updateTeamOsgb("title", value),
                       {
-                        placeholder: "OSGB unvanı",
+                        placeholder: "OSGB unvani",
                       },
                     )}
                     {renderInput(
@@ -2899,7 +2899,7 @@ export default function RiskAssessmentWizard() {
                       teamInfo.osgb.phone,
                       (value) => updateTeamOsgb("phone", value),
                       {
-                        placeholder: "Telefon numarası",
+                        placeholder: "Telefon numarasi",
                       },
                     )}
                     {renderInput(
@@ -2912,11 +2912,11 @@ export default function RiskAssessmentWizard() {
                       },
                     )}
                     {renderInput(
-                      "Yetkili Kişi",
+                      "Yetkili Kisi",
                       teamInfo.osgb.authorizedPerson,
                       (value) => updateTeamOsgb("authorizedPerson", value),
                       {
-                        placeholder: "Yetkili kişi",
+                        placeholder: "Yetkili kisi",
                       },
                     )}
                     {renderInput(
@@ -2939,11 +2939,11 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                Adım 3
+                Adim 3
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Değerlendirme kapsamını madde madde girin. Risk puanlama yöntemi
-                bölümünde PDF’te her zaman sabit 5x5 tablo basılır.
+                Degerlendirme kapsamini madde madde girin. Risk puanlama y�ntemi
+                b�l�m�nde PDF�te her zaman sabit 5x5 tablo basilir.
               </p>
             </div>
 
@@ -2961,7 +2961,7 @@ export default function RiskAssessmentWizard() {
             <div className="space-y-4">
               {scopeInfo.assessmentScopeItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                  Henüz kapsam maddesi eklenmedi.
+                  Hen�z kapsam maddesi eklenmedi.
                 </div>
               ) : (
                 scopeInfo.assessmentScopeItems.map((item, index) => (
@@ -2988,7 +2988,7 @@ export default function RiskAssessmentWizard() {
                       onChange={(event) =>
                         updateScopeItem(index, event.target.value)
                       }
-                      placeholder="Değerlendirme kapsamı maddesi"
+                      placeholder="Degerlendirme kapsami maddesi"
                       className="min-h-[90px] rounded-2xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
@@ -2998,25 +2998,25 @@ export default function RiskAssessmentWizard() {
 
             <div className="space-y-2">
               <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Değerlendirilen Bölümler / Faaliyetler
+                Degerlendirilen B�l�mler / Faaliyetler
               </Label>
               <Textarea
                 value={scopeInfo.evaluatedSections}
                 onChange={(event) =>
                   updateScopeInfo("evaluatedSections", event.target.value)
                 }
-                placeholder="Örn: Üretim hatti, depo, sevkiyat alanı"
+                placeholder="�rn: �retim hatti, depo, sevkiyat alani"
                 className="min-h-[100px] rounded-2xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
             <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/40">
               <CardHeader>
                 <CardTitle className="text-sm text-slate-900 dark:text-slate-100">
-                  PDF’te Sabit Görünecek Risk Puanlama Metodu
+                  PDF�te Sabit G�r�necek Risk Puanlama Metodu
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  Kapakta seçtiğiniz yöntem yazmaya devam eder; ancak resmi
-                  şablon gereği bu raporda sabit 5x5 puanlama açıklaması ve
+                  Kapakta se�tiginiz y�ntem yazmaya devam eder; ancak resmi
+                  sablon geregi bu raporda sabit 5x5 puanlama a�iklamasi ve
                   tablosu kullanilir.
                 </CardDescription>
               </CardHeader>
@@ -3032,11 +3032,11 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-violet-500/10 bg-violet-500/5 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-violet-700 dark:text-violet-300">
-                Adım 4
+                Adim 4
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Riskleri tek merkezden ekleyin: AI ile üretin, manuel satır
-                açin, şablonlardan aktarın veya kayıtlı risklerinizi tabloya
+                Riskleri tek merkezden ekleyin: AI ile �retin, manuel satir
+                a�in, sablonlardan aktarin veya kayitli risklerinizi tabloya
                 tasiyin.
               </p>
             </div>
@@ -3045,54 +3045,54 @@ export default function RiskAssessmentWizard() {
               {[
                 {
                   id: "ai" as const,
-                  title: "Yapay Zeka Sohbeti ile Risk Üret",
+                  title: "Yapay Zeka Sohbeti ile Risk �ret",
                   description:
-                    "AI önce işyeriniz hakkında bağlam alır, sonra sektör odaklı riskleri tabloya ekler.",
+                    "AI �nce isyeriniz hakkinda baglam alir, sonra sekt�r odakli riskleri tabloya ekler.",
                   icon: <Sparkles className="h-6 w-6" />,
                   accent: "from-fuchsia-500 to-violet-600",
-                  badge: "ÖNERILEN",
+                  badge: "�NERILEN",
                   items: [
-                    "Sektör ve faaliyet odaklı üretim",
-                    "Hazir risk paketiyle güvenli yedek",
-                    "Tabloya tek tıkla aktarım",
+                    "Sekt�r ve faaliyet odakli �retim",
+                    "Hazir risk paketiyle g�venli yedek",
+                    "Tabloya tek tikla aktarim",
                   ],
                 },
                 {
                   id: "manual" as const,
-                  title: "Manuel Seçim",
+                  title: "Manuel Se�im",
                   description:
-                    "Risk kütüphanesinden veya kendi saha notlarinizdan satırları kendiniz girin.",
+                    "Risk k�t�phanesinden veya kendi saha notlarinizdan satirlari kendiniz girin.",
                   icon: <BookOpen className="h-6 w-6" />,
                   accent: "from-emerald-500 to-teal-600",
                   items: [
-                    "Boş risk satırı oluşturma",
+                    "Bos risk satiri olusturma",
                     "Tam kontrol",
-                    "Aninda düzenleme",
+                    "Aninda d�zenleme",
                   ],
                 },
                 {
                   id: "templates" as const,
-                  title: "Şablonlar & Paylasilanlar",
+                  title: "Sablonlar & Paylasilanlar",
                   description:
-                    "Kayıtlı şablonlarınizi veya paylasilan risk paketlerini hizlica kullanin.",
+                    "Kayitli sablonlarinizi veya paylasilan risk paketlerini hizlica kullanin.",
                   icon: <Archive className="h-6 w-6" />,
                   accent: "from-amber-500 to-orange-600",
                   items: [
-                    "Şablon kütüphanesi",
-                    "Tek tıkla aktarma",
-                    "Sektör paketleri",
+                    "Sablon k�t�phanesi",
+                    "Tek tikla aktarma",
+                    "Sekt�r paketleri",
                   ],
                 },
                 {
                   id: "saved" as const,
-                  title: "Kayıtlı Risklerim",
+                  title: "Kayitli Risklerim",
                   description:
-                    "Daha önce oluşturduğunuz risk maddelerini mevcut rapora aktarın.",
+                    "Daha �nce olusturdugunuz risk maddelerini mevcut rapora aktarin.",
                   icon: <FolderOpen className="h-6 w-6" />,
                   accent: "from-blue-500 to-cyan-600",
                   items: [
-                    "Mevcut değerlendirmeden aktarım",
-                    "Arama ve filtreleme için hazır yapi",
+                    "Mevcut degerlendirmeden aktarim",
+                    "Arama ve filtreleme i�in hazir yapi",
                     "Toplu ekleme",
                   ],
                 },
@@ -3149,11 +3149,11 @@ export default function RiskAssessmentWizard() {
                       </div>
                       <div>
                         <CardTitle className="text-lg text-slate-900 dark:text-slate-100">
-                          Manuel Risk Seçimi
+                          Manuel Risk Se�imi
                         </CardTitle>
                         <CardDescription className="mt-1 text-slate-400">
-                          Şablondaki {MANUAL_RISK_LIBRARY.length} risk maddesini
-                          kategorilere göre seçip tabloya ekleyin.
+                          Sablondaki {MANUAL_RISK_LIBRARY.length} risk maddesini
+                          kategorilere g�re se�ip tabloya ekleyin.
                         </CardDescription>
                       </div>
                     </div>
@@ -3166,7 +3166,7 @@ export default function RiskAssessmentWizard() {
                   <div className="grid gap-3 lg:grid-cols-[170px_1fr] lg:items-center">
                     <div className="flex items-center gap-2 text-sm font-black text-slate-900 dark:text-slate-100">
                       <BookOpen className="h-4 w-4 text-emerald-400" />
-                      Risk Kütüphanesi
+                      Risk K�t�phanesi
                     </div>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
@@ -3175,7 +3175,7 @@ export default function RiskAssessmentWizard() {
                         onChange={(event) =>
                           setManualRiskSearch(event.target.value)
                         }
-                        placeholder="Kategori, tehlike, risk veya önlem ara..."
+                        placeholder="Kategori, tehlike, risk veya �nlem ara..."
                         className="h-11 rounded-xl border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/70 pl-10 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                       />
                     </div>
@@ -3184,7 +3184,7 @@ export default function RiskAssessmentWizard() {
                   <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
                     {manualRiskCategories.length === 0 ? (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-center text-sm text-slate-400">
-                        Aramanıza uygun risk maddesi bulunamadı.
+                        Aramaniza uygun risk maddesi bulunamadi.
                       </div>
                     ) : (
                       manualRiskCategories.map(({ category, items }) => {
@@ -3220,7 +3220,7 @@ export default function RiskAssessmentWizard() {
                                 variant="ghost"
                                 onClick={() => addManualLibraryCategory(items)}
                                 className="h-9 w-9 shrink-0 rounded-xl text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
-                                title="Bu kategorideki tüm riskleri ekle"
+                                title="Bu kategorideki t�m riskleri ekle"
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
@@ -3247,11 +3247,11 @@ export default function RiskAssessmentWizard() {
                                         </div>
                                         <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
                                           {item.hazardSource ||
-                                            "Tehlike kaynağı belirtilmedi"}
+                                            "Tehlike kaynagi belirtilmedi"}
                                         </p>
                                         <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                                           {item.riskConsequence ||
-                                            "Risk açıklaması yok"}
+                                            "Risk a�iklamasi yok"}
                                         </p>
                                         {item.additionalMeasures ? (
                                           <p className="line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
@@ -3282,7 +3282,7 @@ export default function RiskAssessmentWizard() {
 
                   <div className="flex flex-col gap-3 border-t border-slate-800/80 pt-4 text-xs text-slate-500 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <span>
-                      Eklenen maddeler bir sonraki adımda düzenlenebilir veya
+                      Eklenen maddeler bir sonraki adimda d�zenlenebilir veya
                       silinebilir.
                     </span>
                     <Button
@@ -3291,7 +3291,7 @@ export default function RiskAssessmentWizard() {
                       onClick={() => setCurrentStep(RISK_TABLE_STEP_INDEX)}
                       className="rounded-xl border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
                     >
-                      Risk Tablosuna Geç
+                      Risk Tablosuna Ge�
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   </div>
@@ -3303,11 +3303,11 @@ export default function RiskAssessmentWizard() {
               <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <CardHeader>
                   <CardTitle className="text-base text-slate-900 dark:text-slate-100">
-                    AI ile Risk Üretim Alanı
+                    AI ile Risk �retim Alani
                   </CardTitle>
                   <CardDescription className="text-slate-400">
-                    İsterseniz kısa bir sektör/saha açıklaması girin. AI yanıt
-                    veremezse sistem sektör bazlı hazır risk paketini güvenli
+                    Isterseniz kisa bir sekt�r/saha a�iklamasi girin. AI yanit
+                    veremezse sistem sekt�r bazli hazir risk paketini g�venli
                     yedek olarak tabloya ekler.
                   </CardDescription>
                 </CardHeader>
@@ -3315,7 +3315,7 @@ export default function RiskAssessmentWizard() {
                   <div className="grid gap-4 lg:grid-cols-[1fr_160px]">
                     <div className="space-y-2">
                       <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                        İşyeri Türü / Sektör
+                        Isyeri T�r� / Sekt�r
                       </Label>
                       <Select
                         value={aiSector}
@@ -3327,19 +3327,19 @@ export default function RiskAssessmentWizard() {
                         }}
                       >
                         <SelectTrigger className="h-11 rounded-xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-                          <SelectValue placeholder="Sektör seçin veya aşağıya açıklama yazın" />
+                          <SelectValue placeholder="Sekt�r se�in veya asagiya a�iklama yazin" />
                         </SelectTrigger>
                         <SelectContent className="max-h-80 border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
                           {RISK_TEMPLATE_CONFIGS.map((sector) => (
                             <SelectItem key={sector.code} value={sector.name}>
-                              {sector.name} · min. {sector.itemCount}
+                              {sector.name} � min. {sector.itemCount}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     {renderInput(
-                      "Risk Madde Sayısı",
+                      "Risk Madde Sayisi",
                       aiRiskCount,
                       setAiRiskCount,
                       {
@@ -3350,19 +3350,19 @@ export default function RiskAssessmentWizard() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                      AI için Saha Notu
+                      AI i�in Saha Notu
                     </Label>
                     <Textarea
                       value={aiContext}
                       onChange={(event) => setAiContext(event.target.value)}
-                      placeholder="Örn: 3 katlı şantiye, iskele ve geçici elektrik var; taşeron ekipler çalışıyor."
+                      placeholder="�rn: 3 katli santiye, iskele ve ge�ici elektrik var; taseron ekipler �alisiyor."
                       className="min-h-[100px] rounded-2xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                      Sonraki adımda oluşturulan tüm risk maddelerini
-                      düzenleyebilir, silebilir veya yeni satır
+                      Sonraki adimda olusturulan t�m risk maddelerini
+                      d�zenleyebilir, silebilir veya yeni satir
                       ekleyebilirsiniz.
                     </p>
                     <Button
@@ -3377,8 +3377,8 @@ export default function RiskAssessmentWizard() {
                         <Sparkles className="mr-2 h-4 w-4" />
                       )}
                       {aiGenerating
-                        ? "Riskler üretiliyor..."
-                        : "AI ile Riskleri Oluştur"}
+                        ? "Riskler �retiliyor..."
+                        : "AI ile Riskleri Olustur"}
                     </Button>
                   </div>
                 </CardContent>
@@ -3392,11 +3392,11 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-rose-500/10 bg-rose-500/5 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-rose-400">
-                Adım 5
+                Adim 5
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Risk tablosu yalnızca eklediğiniz veya aktardığınız satırlar
-                kadar oluşturulur. Boş şablon satırı basılmaz.
+                Risk tablosu yalnizca eklediginiz veya aktardiginiz satirlar
+                kadar olusturulur. Bos sablon satiri basilmaz.
               </p>
             </div>
 
@@ -3420,7 +3420,7 @@ export default function RiskAssessmentWizard() {
                 ) : (
                   <FileDown className="mr-2 h-4 w-4" />
                 )}
-                Risk Şablonundan Ekle
+                Risk Sablonundan Ekle
               </Button>
               <Button
                 type="button"
@@ -3434,22 +3434,22 @@ export default function RiskAssessmentWizard() {
                 ) : (
                   <Download className="mr-2 h-4 w-4" />
                 )}
-                Kayıtlı Riskleri Aktar
+                Kayitli Riskleri Aktar
               </Button>
             </div>
             {!importAssessmentId ? (
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Kayıtlı riskler Profilim &gt; Risklerim kütüphanenizden
-                aktarılır; mevcut değerlendirme üzerinden açıldıysa editör
-                satırları da desteklenir.
+                Kayitli riskler Profilim &gt; Risklerim k�t�phanenizden
+                aktarilir; mevcut degerlendirme �zerinden a�ildiysa edit�r
+                satirlari da desteklenir.
               </p>
             ) : null}
 
             <div className="space-y-4">
               {riskItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                  Henüz risk maddesi eklenmedi. İsterseniz manuel satır ekleyin,
-                  AI ile üretin veya kayıtlı riskleri aktarın.
+                  Hen�z risk maddesi eklenmedi. Isterseniz manuel satir ekleyin,
+                  AI ile �retin veya kayitli riskleri aktarin.
                 </div>
               ) : (
                 riskItems.map((item) => (
@@ -3473,13 +3473,13 @@ export default function RiskAssessmentWizard() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       {renderInput(
-                        "Bölüm / Faaliyet",
+                        "B�l�m / Faaliyet",
                         item.departmentActivity,
                         (value) =>
                           updateRiskItem(item.id, "departmentActivity", value),
                       )}
                       {renderInput(
-                        "Tehlike Kaynağı",
+                        "Tehlike Kaynagi",
                         item.hazardSource,
                         (value) =>
                           updateRiskItem(item.id, "hazardSource", value),
@@ -3488,7 +3488,7 @@ export default function RiskAssessmentWizard() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Risk / Olası Sonuç
+                          Risk / Olasi Sonu�
                         </Label>
                         <Textarea
                           value={item.riskConsequence}
@@ -3522,7 +3522,7 @@ export default function RiskAssessmentWizard() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Mevcut Önlem
+                          Mevcut �nlem
                         </Label>
                         <Textarea
                           value={item.currentMeasure}
@@ -3538,7 +3538,7 @@ export default function RiskAssessmentWizard() {
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Alınacak İlave Önlemler
+                          Alinacak Ilave �nlemler
                         </Label>
                         <Textarea
                           value={item.additionalMeasures}
@@ -3556,15 +3556,15 @@ export default function RiskAssessmentWizard() {
                     <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/60 dark:bg-amber-950/20">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-amber-800 dark:text-amber-300">
-                          Mevcut Risk Puanı
+                          Mevcut Risk Puani
                         </p>
                         <Badge className="rounded-full border border-amber-200 bg-white text-amber-700 dark:border-amber-900 dark:bg-slate-900 dark:text-amber-300">
-                          O × F × Ş = R
+                          O � F � S = R
                         </Badge>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
                         {renderInput(
-                          "Olasılık (O)",
+                          "Olasilik (O)",
                           item.probability,
                           (value) =>
                             updateRiskItem(item.id, "probability", value),
@@ -3578,19 +3578,19 @@ export default function RiskAssessmentWizard() {
                           { type: "number" },
                         )}
                         {renderInput(
-                          "Şiddet (Ş)",
+                          "Siddet (S)",
                           item.severity,
                           (value) => updateRiskItem(item.id, "severity", value),
                           { type: "number" },
                         )}
                         {renderInput(
-                          "Risk Puanı (R)",
+                          "Risk Puani (R)",
                           item.riskScore,
                           (value) =>
                             updateRiskItem(item.id, "riskScore", value),
                           { type: "number" },
                         )}
-                        {renderInput("Risk Düzeyi", item.riskLevel, (value) =>
+                        {renderInput("Risk D�zeyi", item.riskLevel, (value) =>
                           updateRiskItem(item.id, "riskLevel", value),
                         )}
                         {renderInput(
@@ -3598,7 +3598,7 @@ export default function RiskAssessmentWizard() {
                           item.deadline,
                           (value) => updateRiskItem(item.id, "deadline", value),
                           {
-                            placeholder: "Süreklilik esastır / gg.aa.yyyy",
+                            placeholder: "S�reklilik esastir / gg.aa.yyyy",
                           },
                         )}
                       </div>
@@ -3613,15 +3613,15 @@ export default function RiskAssessmentWizard() {
                     <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-xs font-black uppercase tracking-[0.14em] text-emerald-800 dark:text-emerald-300">
-                          Tedbir Sonrası Risk
+                          Tedbir Sonrasi Risk
                         </p>
                         <Badge className="rounded-full border border-emerald-200 bg-white text-emerald-700 dark:border-emerald-900 dark:bg-slate-900 dark:text-emerald-300">
-                          Artık risk seviyesi
+                          Artik risk seviyesi
                         </Badge>
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                         {renderInput(
-                          "Olasılık (O)",
+                          "Olasilik (O)",
                           item.postProbability,
                           (value) =>
                             updateRiskItem(item.id, "postProbability", value),
@@ -3635,21 +3635,21 @@ export default function RiskAssessmentWizard() {
                           { type: "number" },
                         )}
                         {renderInput(
-                          "Şiddet (Ş)",
+                          "Siddet (S)",
                           item.postSeverity,
                           (value) =>
                             updateRiskItem(item.id, "postSeverity", value),
                           { type: "number" },
                         )}
                         {renderInput(
-                          "Risk Puanı (R)",
+                          "Risk Puani (R)",
                           item.postRiskScore,
                           (value) =>
                             updateRiskItem(item.id, "postRiskScore", value),
                           { type: "number" },
                         )}
                         {renderInput(
-                          "Risk Düzeyi",
+                          "Risk D�zeyi",
                           item.postRiskLevel,
                           (value) =>
                             updateRiskItem(item.id, "postRiskLevel", value),
@@ -3668,11 +3668,11 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-emerald-500/10 bg-emerald-500/5 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-emerald-400">
-                Adım 6
+                Adim 6
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Faaliyet planı tablosu yalnızca eklediğiniz satırlardan olusur.
-                Boş satırlar çıktıdan tamamen çıkarılır.
+                Faaliyet plani tablosu yalnizca eklediginiz satirlardan olusur.
+                Bos satirlar �iktidan tamamen �ikarilir.
               </p>
             </div>
 
@@ -3689,8 +3689,8 @@ export default function RiskAssessmentWizard() {
 
             {correctiveActions.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                Henüz faaliyet eklenmedi. İsterseniz bu adımi boş
-                bırakabilirsiniz.
+                Hen�z faaliyet eklenmedi. Isterseniz bu adimi bos
+                birakabilirsiniz.
               </div>
             ) : (
               <div className="space-y-4">
@@ -3717,7 +3717,7 @@ export default function RiskAssessmentWizard() {
                       {renderInput("Tespit / Risk", item.finding, (value) =>
                         updateCorrectiveAction(item.id, "finding", value),
                       )}
-                      {renderInput("Yapılacak Faaliyet", item.action, (value) =>
+                      {renderInput("Yapilacak Faaliyet", item.action, (value) =>
                         updateCorrectiveAction(item.id, "action", value),
                       )}
                       {renderInput("Sorumlu", item.responsible, (value) =>
@@ -3746,11 +3746,11 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                Adım 7
+                Adim 7
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Genel sonuç maddelerini ekleyin ve imza satırlarıni ekip
-                üyelerinden otomatik oluşturun veya elle yönetin.
+                Genel sonu� maddelerini ekleyin ve imza satirlarini ekip
+                �yelerinden otomatik olusturun veya elle y�netin.
               </p>
             </div>
 
@@ -3761,14 +3761,14 @@ export default function RiskAssessmentWizard() {
                 className="rounded-xl bg-violet-600 text-white hover:bg-violet-700"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Sonuç Maddesi Ekle
+                Sonu� Maddesi Ekle
               </Button>
             </div>
 
             <div className="space-y-4">
               {conclusionInfo.conclusionItems.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                  Henüz sonuç maddesi eklenmedi.
+                  Hen�z sonu� maddesi eklenmedi.
                 </div>
               ) : (
                 conclusionInfo.conclusionItems.map((item, index) => (
@@ -3778,7 +3778,7 @@ export default function RiskAssessmentWizard() {
                   >
                     <div className="flex items-center justify-between">
                       <Badge className="rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 text-slate-600 dark:text-slate-300">
-                        Sonuç Maddesi #{index + 1}
+                        Sonu� Maddesi #{index + 1}
                       </Badge>
                       <Button
                         type="button"
@@ -3795,7 +3795,7 @@ export default function RiskAssessmentWizard() {
                       onChange={(event) =>
                         updateConclusionItem(index, event.target.value)
                       }
-                      placeholder="Genel sonuç / onay maddesi"
+                      placeholder="Genel sonu� / onay maddesi"
                       className="min-h-[90px] rounded-2xl border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
                     />
                   </div>
@@ -3817,14 +3817,14 @@ export default function RiskAssessmentWizard() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              {renderInput("Hazırlayan", conclusionInfo.preparedBy, (value) =>
+              {renderInput("Hazirlayan", conclusionInfo.preparedBy, (value) =>
                 updateConclusionInfo("preparedBy", value),
               )}
               {renderInput("Onaylayan", conclusionInfo.approvedBy, (value) =>
                 updateConclusionInfo("approvedBy", value),
               )}
               {renderInput(
-                "İmza Tarihi",
+                "Imza Tarihi",
                 conclusionInfo.signatureDate,
                 (value) => updateConclusionInfo("signatureDate", value),
                 { type: "date" },
@@ -3847,13 +3847,13 @@ export default function RiskAssessmentWizard() {
                 className="rounded-xl bg-violet-600 text-white hover:bg-violet-700"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                İmza Satırı Ekle
+                Imza Satiri Ekle
               </Button>
             </div>
 
             {previewSignatureRows.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                Henüz imza satırı eklenmedi.
+                Hen�z imza satiri eklenmedi.
               </div>
             ) : (
               <div className="space-y-4">
@@ -3862,14 +3862,14 @@ export default function RiskAssessmentWizard() {
                     key={row.id}
                     className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 p-5 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto]"
                   >
-                    {renderInput("Adı Soyadı", row.fullName, (value) =>
+                    {renderInput("Adi Soyadi", row.fullName, (value) =>
                       updateSignatureRow(row.id, "fullName", value),
                     )}
-                    {renderInput("Görevi", row.role, (value) =>
+                    {renderInput("G�revi", row.role, (value) =>
                       updateSignatureRow(row.id, "role", value),
                     )}
                     {renderInput(
-                      "Belge / İletişim Bilgisi",
+                      "Belge / Iletisim Bilgisi",
                       row.documentOrContact,
                       (value) =>
                         updateSignatureRow(row.id, "documentOrContact", value),
@@ -3897,34 +3897,34 @@ export default function RiskAssessmentWizard() {
           <div className="space-y-6">
             <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-5">
               <p className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                Adım 8
+                Adim 8
               </p>
               <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                Resmî şablondaki bölüm sırasına göre oluşturulacak rapor özetini
+                Resm� sablondaki b�l�m sirasina g�re olusturulacak rapor �zetini
                 kontrol edin.
               </p>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {[
-                ["Firma Unvanı", companyInfo.companyTitle || "Belirtilmedi"],
-                ["Tehlike Sınıfı", companyInfo.hazardClass || "Belirtilmedi"],
-                ["Çalışan Sayısı", companyInfo.employeeCount || "Belirtilmedi"],
+                ["Firma Unvani", companyInfo.companyTitle || "Belirtilmedi"],
+                ["Tehlike Sinifi", companyInfo.hazardClass || "Belirtilmedi"],
+                ["�alisan Sayisi", companyInfo.employeeCount || "Belirtilmedi"],
                 [
-                  "Faaliyet Kapsamı",
+                  "Faaliyet Kapsami",
                   companyInfo.activityScope || "Belirtilmedi",
                 ],
                 [
-                  "Değerlendirme Tarihi",
+                  "Degerlendirme Tarihi",
                   formatDisplayDate(companyInfo.assessmentDate),
                 ],
                 [
-                  "Risk Değerlendirme Yöntemi",
+                  "Risk Degerlendirme Y�ntemi",
                   companyInfo.riskMethod || "Belirtilmedi",
                 ],
-                ["Risk Madde Sayısı", String(previewRiskItems.length)],
-                ["DÖF / Faaliyet Planı Sayısı", String(previewActions.length)],
-                ["İmza Satırı Sayısı", String(previewSignatureRows.length)],
+                ["Risk Madde Sayisi", String(previewRiskItems.length)],
+                ["D�F / Faaliyet Plani Sayisi", String(previewActions.length)],
+                ["Imza Satiri Sayisi", String(previewSignatureRows.length)],
                 ["Not", cleanText(companyInfo.note) ? "Var" : "Yok"],
               ].map(([label, value]) => (
                 <div
@@ -3944,11 +3944,11 @@ export default function RiskAssessmentWizard() {
             <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
               <CardHeader>
                 <CardTitle className="text-base text-slate-900 dark:text-slate-100">
-                  Word Şablonu Durumu
+                  Word Sablonu Durumu
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  Resmî şablon dosyası erişimi kontrol edildi. Şablon
-                  bulunduğunda resmi Word çıktısı aynı veri setiyle
+                  Resm� sablon dosyasi erisimi kontrol edildi. Sablon
+                  bulundugunda resmi Word �iktisi ayni veri setiyle
                   indirilebilir.
                 </CardDescription>
               </CardHeader>
@@ -3965,13 +3965,13 @@ export default function RiskAssessmentWizard() {
                     {checkingTemplate
                       ? "Kontrol ediliyor"
                       : wordTemplateAvailable
-                        ? "Şablon bulundu"
-                        : "Şablona erişilemedi"}
+                        ? "Sablon bulundu"
+                        : "Sablona erisilemedi"}
                   </Badge>
                   <span>
                     {wordTemplateAvailable
-                      ? "Word şablonu indirilmeye hazır."
-                      : "Word şablon dosyasına erişilemiyor."}
+                      ? "Word sablonu indirilmeye hazir."
+                      : "Word sablon dosyasina erisilemiyor."}
                   </span>
                 </div>
               </CardContent>
@@ -3980,11 +3980,11 @@ export default function RiskAssessmentWizard() {
             <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-base text-slate-900 dark:text-slate-100">
-                  Rapor Çıktılari
+                  Rapor �iktilari
                 </CardTitle>
                 <CardDescription className="text-slate-500 dark:text-slate-400">
-                  Boş, kısmen dolu veya tamamen dolu risk değerlendirme çıktısı
-                  oluşturabilirsiniz.
+                  Bos, kismen dolu veya tamamen dolu risk degerlendirme �iktisi
+                  olusturabilirsiniz.
                 </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -4008,7 +4008,7 @@ export default function RiskAssessmentWizard() {
                   ) : (
                     <Download className="mr-2 h-4 w-4" />
                   )}
-                  PDF İndir
+                  PDF Indir
                 </Button>
                 <Button
                   type="button"
@@ -4023,7 +4023,7 @@ export default function RiskAssessmentWizard() {
                   ) : (
                     <FileDown className="mr-2 h-4 w-4" />
                   )}
-                  Word Dosyası İndir
+                  Word Dosyasi Indir
                 </Button>
               </CardContent>
             </Card>
@@ -4043,19 +4043,19 @@ export default function RiskAssessmentWizard() {
             <div>
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <Badge className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1 text-[11px] font-bold tracking-wide text-cyan-100">
-                  İSGVizyon · Risk Yönetimi
+                  ISGVizyon � Risk Y�netimi
                 </Badge>
                 <Badge className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-slate-300">
-                  8 adımlı profesyonel oluşturucu
+                  8 adimli profesyonel olusturucu
                 </Badge>
               </div>
               <h1 className="max-w-4xl text-2xl font-black tracking-tight sm:text-3xl lg:text-4xl">
-                Risk Değerlendirmesini Düzenli, Kontrollü ve Eksıksiz Hazırlayın
+                Risk Degerlendirmesini D�zenli, Kontroll� ve Eksiksiz Hazirlayin
               </h1>
               <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300 sm:text-base">
-                Firma ve ekip bilgilerini aktarın, kapsamı belirleyin, risk
-                maddelerini yönetin ve resmî rapor çıktısını tek ekrandan
-                oluşturun.
+                Firma ve ekip bilgilerini aktarin, kapsami belirleyin, risk
+                maddelerini y�netin ve resm� rapor �iktisini tek ekrandan
+                olusturun.
               </p>
             </div>
 
@@ -4066,7 +4066,7 @@ export default function RiskAssessmentWizard() {
                     Genel ilerleme
                   </p>
                   <p className="mt-1 text-lg font-black text-white">
-                    Adım {currentStep + 1} / {WIZARD_STEPS.length}
+                    Adim {currentStep + 1} / {WIZARD_STEPS.length}
                   </p>
                 </div>
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-300/20 bg-cyan-400/10 text-lg font-black text-cyan-100">
@@ -4080,7 +4080,7 @@ export default function RiskAssessmentWizard() {
                 />
               </div>
               <p className="mt-3 text-xs leading-5 text-slate-400">
-                Taslak otomatik korunur. Zorunlu alan bulunmadığından bilgileri
+                Taslak otomatik korunur. Zorunlu alan bulunmadigindan bilgileri
                 daha sonra tamamlayabilirsiniz.
               </p>
             </div>
@@ -4090,9 +4090,9 @@ export default function RiskAssessmentWizard() {
         <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
             {
-              label: "Seçili Firma",
-              value: companyInfo.companyTitle || "Firma seçilmedi",
-              detail: companyInfo.hazardClass || "Tehlike sınıfı belirtilmedi",
+              label: "Se�ili Firma",
+              value: companyInfo.companyTitle || "Firma se�ilmedi",
+              detail: companyInfo.hazardClass || "Tehlike sinifi belirtilmedi",
               icon: <Building2 className="h-5 w-5" />,
               iconClass:
                 "bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300",
@@ -4101,30 +4101,30 @@ export default function RiskAssessmentWizard() {
               label: "Risk Maddeleri",
               value: String(previewRiskItems.length),
               detail: riskAdditionMethod
-                ? "Risk kaynağı seçildi"
-                : "Henüz risk kaynağı seçilmedi",
+                ? "Risk kaynagi se�ildi"
+                : "Hen�z risk kaynagi se�ilmedi",
               icon: <AlertTriangle className="h-5 w-5" />,
               iconClass:
                 "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300",
             },
             {
-              label: "Faaliyet Planı",
+              label: "Faaliyet Plani",
               value: String(previewActions.length),
-              detail: `${previewSignatureRows.length} imza satırı`,
+              detail: `${previewSignatureRows.length} imza satiri`,
               icon: <CheckCircle2 className="h-5 w-5" />,
               iconClass:
                 "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300",
             },
             {
-              label: "Rapor Şablonu",
+              label: "Rapor Sablonu",
               value: checkingTemplate
                 ? "Kontrol ediliyor"
                 : wordTemplateAvailable
-                  ? "Hazır"
-                  : "Erişilemiyor",
+                  ? "Hazir"
+                  : "Erisilemiyor",
               detail: wordTemplateAvailable
-                ? "Word ve PDF çıktısı alınabilir"
-                : "Şablon dosyasını kontrol edin",
+                ? "Word ve PDF �iktisi alinabilir"
+                : "Sablon dosyasini kontrol edin",
               icon: <FileText className="h-5 w-5" />,
               iconClass: wordTemplateAvailable
                 ? "bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
@@ -4165,11 +4165,11 @@ export default function RiskAssessmentWizard() {
             <Card className="overflow-hidden rounded-[24px] border-slate-200/80 bg-white shadow-lg shadow-slate-950/[0.04] dark:border-slate-800 dark:bg-slate-900">
               <CardHeader className="border-b border-slate-200/80 bg-slate-50/80 pb-4 dark:border-slate-800 dark:bg-slate-900/80">
                 <CardTitle className="text-base text-slate-950 dark:text-white">
-                  Oluşturma Adımları
+                  Olusturma Adimlari
                 </CardTitle>
                 <CardDescription className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  İstediğiniz adıma doğrudan geçebilir, bilgileri dilediğiniz
-                  sırada tamamlayabilirsiniz.
+                  Istediginiz adima dogrudan ge�ebilir, bilgileri dilediginiz
+                  sirada tamamlayabilirsiniz.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2 p-3">
@@ -4210,7 +4210,7 @@ export default function RiskAssessmentWizard() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Adım {index + 1}
+                          Adim {index + 1}
                         </p>
                         <p
                           className={cn(
@@ -4311,7 +4311,7 @@ export default function RiskAssessmentWizard() {
                     </div>
                     <div>
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-600 dark:text-cyan-400">
-                        Adım {currentStep + 1} / {WIZARD_STEPS.length}
+                        Adim {currentStep + 1} / {WIZARD_STEPS.length}
                       </p>
                       <CardTitle className="mt-1 text-xl text-slate-950 sm:text-2xl dark:text-white">
                         {WIZARD_STEPS[currentStep].title}
@@ -4322,7 +4322,7 @@ export default function RiskAssessmentWizard() {
                     </div>
                   </div>
                   <Badge className="w-fit rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[10px] font-bold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    Otomatik taslak açık
+                    Otomatik taslak a�ik
                   </Badge>
                 </div>
               </CardHeader>
@@ -4341,7 +4341,7 @@ export default function RiskAssessmentWizard() {
                     className="h-11 rounded-xl border-slate-300 bg-white px-5 text-slate-700 shadow-sm hover:bg-slate-100 disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <ChevronLeft className="mr-2 h-4 w-4" />
-                    Önceki Adım
+                    �nceki Adim
                   </Button>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
@@ -4352,7 +4352,7 @@ export default function RiskAssessmentWizard() {
                       className="h-11 rounded-xl border-slate-300 bg-white px-5 text-slate-700 shadow-sm hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" />
-                      Taslağı Kaydet
+                      Taslagi Kaydet
                     </Button>
                     <Button
                       type="button"
@@ -4361,7 +4361,7 @@ export default function RiskAssessmentWizard() {
                       className="h-11 rounded-xl border-rose-200 bg-rose-50 px-5 text-rose-700 hover:bg-rose-100 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
                     >
                       <X className="mr-2 h-4 w-4" />
-                      Taslağı Temizle
+                      Taslagi Temizle
                     </Button>
                     {currentStep < WIZARD_STEPS.length - 1 ? (
                       <Button
@@ -4369,7 +4369,7 @@ export default function RiskAssessmentWizard() {
                         onClick={handleNext}
                         className="h-11 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 px-6 text-white shadow-lg shadow-cyan-600/15 hover:from-cyan-500 hover:to-blue-500"
                       >
-                        Sonraki Adım
+                        Sonraki Adim
                         <ChevronRight className="ml-2 h-4 w-4" />
                       </Button>
                     ) : (
@@ -4389,7 +4389,7 @@ export default function RiskAssessmentWizard() {
                         ) : (
                           <FileDown className="mr-2 h-4 w-4" />
                         )}
-                        Word Raporunu Oluştur
+                        Word Raporunu Olustur
                       </Button>
                     )}
                   </div>
@@ -4405,29 +4405,29 @@ export default function RiskAssessmentWizard() {
       >
         <DialogContent className="max-w-3xl border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
           <DialogHeader>
-            <DialogTitle>Risk Şablonları</DialogTitle>
+            <DialogTitle>Risk Sablonlari</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Kayıtlı risk şablonlarından birini tek tıkla Risk Değerlendirme
-              Tablosu’na aktarın.
+              Kayitli risk sablonlarindan birini tek tikla Risk Degerlendirme
+              Tablosu�na aktarin.
             </DialogDescription>
           </DialogHeader>
 
           <div className="max-h-[70vh] space-y-3 overflow-y-auto pr-1">
             {!profile?.organization_id ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                Risk şablonlarıni kullanmak için organizasyon bilgisi
-                bulunmalıdır.
+                Risk sablonlarini kullanmak i�in organizasyon bilgisi
+                bulunmalidir.
               </div>
             ) : loadingRiskTemplates ? (
               <div className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-600 dark:text-slate-300">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Şablonlar yükleniyor...
+                  Sablonlar y�kleniyor...
                 </div>
               </div>
             ) : riskTemplates.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40 p-6 text-sm text-slate-400">
-                Kayıtlı risk şablonu bulunamadı.
+                Kayitli risk sablonu bulunamadi.
               </div>
             ) : (
               riskTemplates.map((template) => {
@@ -4451,7 +4451,7 @@ export default function RiskAssessmentWizard() {
                             </Badge>
                           ) : null}
                           <Badge className="rounded-full border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 text-slate-600 dark:text-slate-300">
-                            {template.method || "Yöntem belirtilmedi"}
+                            {template.method || "Y�ntem belirtilmedi"}
                           </Badge>
                           <Badge className="rounded-full border border-cyan-500/20 bg-cyan-500/10 text-cyan-300">
                             {itemCount} risk maddesi
