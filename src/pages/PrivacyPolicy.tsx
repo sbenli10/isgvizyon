@@ -207,7 +207,7 @@ export default function PrivacyPolicy() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-8">
+      <div className="w-full min-w-0 px-4 py-8">
         <div className="mb-8">
           <Button
             variant="ghost"

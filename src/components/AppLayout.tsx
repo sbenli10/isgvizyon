@@ -221,17 +221,14 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
           </header>
 
           <main
-            className="relative z-0 min-h-screen bg-transparent"
+            className="relative z-0 min-h-screen min-w-0 w-full flex-1 overflow-y-auto bg-transparent"
             style={{
               paddingTop: NAVBAR_HEIGHT,
             }}
           >
-            <div className="relative z-0 container max-w-screen-2xl px-4 pt-4 lg:px-6 lg:pt-6">
-              <div className="relative z-0 rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.24)] backdrop-blur-2xl lg:p-4">
-                <SubscriptionBanner />
-              </div>
-            </div>
-            <div className="relative z-0 container max-w-screen-2xl p-4 pt-3 lg:p-6 lg:pt-4">
+            <SubscriptionBanner />
+
+            <div className="relative z-0 w-full min-w-0 p-4 pt-3 lg:p-6 lg:pt-4">
               <div className="relative z-0 rounded-[30px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.22)] backdrop-blur-xl lg:px-2 lg:py-2">
                 {children}
               </div>
@@ -273,13 +270,10 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
             </div>
           </header>
 
-          <main className="relative z-0 min-h-screen bg-transparent">
-            <div className="relative z-0 container max-w-screen-2xl px-4 pt-4">
-              <div className="relative z-0 rounded-[30px] border border-border/60 bg-background/58 p-3 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.24)] backdrop-blur-2xl">
-                <SubscriptionBanner />
-              </div>
-            </div>
-            <div className="relative z-0 container max-w-screen-2xl p-4 pt-3">
+          <main className="relative z-0 min-h-screen min-w-0 w-full flex-1 overflow-y-auto bg-transparent">
+            <SubscriptionBanner />
+
+            <div className="relative z-0 w-full min-w-0 p-4 pt-3">
               <div className="relative z-0 rounded-[30px] border border-border/50 bg-background/38 px-1 py-1 shadow-[0_26px_90px_-48px_rgba(15,23,42,0.22)] backdrop-blur-xl">
                 {children}
               </div>
@@ -305,3 +299,4 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+

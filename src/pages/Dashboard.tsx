@@ -503,7 +503,7 @@ export default function Dashboard() {
   const latestCompanies = companies.slice(0, 3);
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-5 px-3 pb-8 text-slate-100 sm:px-4 lg:px-6">
+    <div className="w-full min-w-0 space-y-5 px-3 pb-8 text-slate-100 sm:px-4 lg:px-6">
       <section className="overflow-hidden rounded-2xl border border-violet-400/20 bg-[linear-gradient(110deg,#4f46e5,#8b1cf6_48%,#b000f5)] p-4 shadow-[0_20px_80px_-52px_rgba(168,85,247,0.9)] sm:p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-h-[74px]">

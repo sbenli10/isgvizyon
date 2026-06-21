@@ -97,7 +97,7 @@ export default function BlueprintAnalyzerGuide() {
   const navigate = useNavigate();
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 lg:px-6">
+    <div className="w-full min-w-0 space-y-6 px-4 py-6 lg:px-6">
       <section className="relative overflow-hidden rounded-3xl border border-slate-700/70 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_24%),radial-gradient(circle_at_top_right,rgba(234,179,8,0.14),transparent_20%),linear-gradient(135deg,#020617_0%,#0b1220_42%,#102347_100%)] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.55)]">
         <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="absolute -left-16 bottom-0 h-56 w-56 rounded-full bg-blue-500/10 blur-3xl" />

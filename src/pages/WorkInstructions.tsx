@@ -2945,7 +2945,7 @@ export default function WorkInstructionsPage() {
       <div className="pointer-events-none fixed left-8 top-24 h-44 w-44 rounded-full bg-cyan-400/10 blur-3xl" />
       <div className="pointer-events-none fixed bottom-10 right-8 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl" />
 
-      <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-col gap-6">
+      <div className="relative z-10 flex w-full min-w-0 flex-col gap-6">
         <section className="relative overflow-hidden rounded-[34px] border border-white/10 bg-slate-950/70 p-5 shadow-[0_30px_100px_rgba(2,6,23,0.42)] backdrop-blur-xl md:p-7">
           <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(14,165,233,0.12),transparent_38%,rgba(168,85,247,0.12))]" />
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/12 blur-3xl" />

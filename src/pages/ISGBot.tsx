@@ -5580,7 +5580,7 @@ export default function ISGBot() {
 
   return (
     <div className="min-h-screen bg-[#0B1220] px-4 py-6 text-slate-50 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <section className="overflow-hidden rounded-[28px] border border-slate-500/20 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.22),transparent_35%),linear-gradient(135deg,#0F172A,#0B1220_55%,#111827)] p-5 shadow-2xl shadow-black/30 sm:p-7">
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">

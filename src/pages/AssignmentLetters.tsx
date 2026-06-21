@@ -1413,7 +1413,7 @@ export default function AssignmentLetters() {
   }
 
   return (
-    <div className="theme-page-readable mx-auto max-w-[1500px] space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
+    <div className="theme-page-readable w-full min-w-0 space-y-6 px-4 pb-8 sm:px-6 lg:px-8">
       <section className="relative overflow-hidden rounded-[32px] border border-slate-200/80 bg-white p-5 shadow-2xl shadow-slate-950/[0.05] dark:border-slate-800 dark:bg-slate-950 sm:p-6">
         <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-28 left-1/3 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />

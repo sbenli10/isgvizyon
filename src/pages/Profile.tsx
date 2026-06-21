@@ -146,48 +146,90 @@ export default function Profile() {
     }
   };
 
+  const activeTabConfig = PROFILE_TABS.find((tab) => tab.id === activeTab) ?? PROFILE_TABS[0];
+  const profileName = profile?.full_name || user?.email?.split("@")[0] || "ISGVizyon kullanıcısı";
+  const planLabel = isPaidSubscriptionActive ? "Aktif paket" : demoState.isActive ? "Demo aktif" : "Standart erişim";
+  const workspaceLabel = profile?.organization_id ? "Organizasyon bağlı" : "Kişisel çalışma alanı";
+  const quickStats = [
+    { label: "Aktif Sekme", value: activeTabConfig.label, icon: activeTabConfig.icon, tone: "from-cyan-400/20 to-blue-500/10" },
+    { label: "Modül", value: PROFILE_TABS.length, icon: LayoutGrid, tone: "from-violet-400/20 to-fuchsia-500/10" },
+    { label: "Çalışma Alanı", value: workspaceLabel, icon: Building2, tone: "from-emerald-400/20 to-teal-500/10" },
+    { label: "Üyelik", value: planLabel, icon: CreditCard, tone: "from-amber-400/20 to-orange-500/10" },
+  ];
+
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5 px-4 pb-8 sm:px-6 lg:px-8">
-      <section className="overflow-hidden rounded-[28px] border border-slate-800 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.20),transparent_34%),linear-gradient(135deg,#020617,#0f172a_56%,#111827)] p-5 text-white shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <Badge className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-cyan-100">
-              İSGVizyon Yönetim Merkezi
+    <div className="relative flex h-[calc(100dvh-136px)] min-h-[680px] w-full min-w-0 flex-col overflow-hidden rounded-[34px] border border-white/10 bg-[radial-gradient(circle_at_12%_0%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_82%_12%,rgba(124,58,237,0.20),transparent_28%),linear-gradient(180deg,#08111f_0%,#0b1324_45%,#050816_100%)] p-3 text-slate-100 shadow-[0_30px_100px_rgba(2,6,23,0.36)] sm:p-4 lg:p-5">
+      <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-cyan-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-20 bottom-16 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
+
+      <section className="relative shrink-0 overflow-hidden rounded-[30px] border border-white/10 bg-slate-950/55 p-5 shadow-2xl shadow-black/20 backdrop-blur-xl sm:p-6">
+        <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(14,165,233,0.12),transparent_42%,rgba(168,85,247,0.12))]" />
+        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <Badge className="rounded-full border border-cyan-300/30 bg-cyan-400/12 px-3 py-1 text-cyan-100 shadow-lg shadow-cyan-950/20">
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+              ISGVizyon Yönetim Merkezi
             </Badge>
-            <h1 className="mt-4 text-2xl font-black tracking-tight sm:text-3xl">Profilim</h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-              Firmalar, çalışanlar, eğitimler, evrak takibi, riskler, raporlar, ziyaretler, abonelik ve ayarlar tek
-              sekmeli merkezde yönetilir.
-            </p>
-          </div>
-          <div className="flex flex-wrap justify-start gap-2 text-center text-xs font-bold lg:max-w-[430px] lg:justify-end">
-            {["Tek Merkez", "Canlı Veri", "Koyu Tema"].map((item) => (
-              <div key={item} className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-slate-100">
-                {item}
+            <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-center">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-3xl border border-white/10 bg-gradient-to-br from-blue-600 to-cyan-400 shadow-xl shadow-blue-950/25">
+                <ShieldCheck className="h-8 w-8 text-white" />
               </div>
-            ))}
-            {showDemoControl ? (
-              <Button
-                type="button"
-                disabled={!showDemoStartButton || startingDemo || !user}
-                onClick={() => setConfirmDemoOpen(true)}
-                className={`min-h-11 rounded-2xl px-4 text-xs font-black shadow-lg transition ${
-                  showDemoStatusBadge
-                    ? "border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/10 disabled:opacity-80"
-                    : "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:from-amber-300 hover:to-yellow-400"
-                }`}
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                {demoButtonLabel}
-              </Button>
-            ) : null}
+              <div className="min-w-0">
+                <h1 className="text-2xl font-black tracking-tight text-white sm:text-4xl">Profilim</h1>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                  {profileName} için firma, çalışan, eğitim, evrak, rapor, ziyaret ve abonelik yönetimini tek profesyonel panelde toplayın.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs font-bold sm:grid-cols-4 xl:min-w-[620px]">
+            {quickStats.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className={"rounded-3xl border border-white/10 bg-gradient-to-br p-3 shadow-lg shadow-black/10 " + item.tone}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-[0.18em] text-slate-400">{item.label}</p>
+                      <p className="mt-2 truncate text-sm font-black text-white">{item.value}</p>
+                    </div>
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+                      <Icon className="h-4 w-4 text-cyan-100" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
+
+        {showDemoControl ? (
+          <div className="relative mt-4 flex justify-start xl:justify-end">
+            <Button
+              type="button"
+              disabled={!showDemoStartButton || startingDemo || !user}
+              onClick={() => setConfirmDemoOpen(true)}
+              className={
+                "min-h-11 rounded-2xl px-5 text-xs font-black shadow-lg transition " +
+                (showDemoStatusBadge
+                  ? "border border-amber-300/25 bg-amber-400/10 text-amber-100 hover:bg-amber-400/10 disabled:opacity-80"
+                  : "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-amber-500/20 hover:from-amber-300 hover:to-yellow-400")
+              }
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              {demoButtonLabel}
+            </Button>
+          </div>
+        ) : null}
       </section>
 
-      <ProfileTabs tabs={PROFILE_TABS} activeTab={activeTab} onChange={handleTabChange} />
+      <div className="relative z-10 mt-4 shrink-0">
+        <ProfileTabs tabs={PROFILE_TABS} activeTab={activeTab} onChange={handleTabChange} />
+      </div>
 
-      <section className="min-h-[520px]">{renderActiveTab()}</section>
+      <section className="relative z-10 mt-4 min-h-0 flex-1 overflow-y-auto rounded-[30px] border border-white/10 bg-slate-950/35 p-3 shadow-2xl shadow-black/15 backdrop-blur-xl [scrollbar-width:none] sm:p-4 [&::-webkit-scrollbar]:hidden">
+        {renderActiveTab()}
+      </section>
 
       <Dialog open={confirmDemoOpen} onOpenChange={setConfirmDemoOpen}>
         <DialogContent className="border-slate-800 bg-slate-950 text-white sm:max-w-[520px]">

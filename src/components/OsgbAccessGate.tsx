@@ -61,7 +61,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
 
   if (authLoading || roleLoading || planLoading) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full min-w-0 py-6">
         <div className="h-64 animate-pulse rounded-3xl border border-slate-800 bg-slate-900/70" />
       </div>
     );
@@ -69,7 +69,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
 
   if (!hasOsgbAccess) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full min-w-0 py-6">
         <Card className="overflow-hidden border-amber-500/25 bg-[linear-gradient(135deg,rgba(245,158,11,0.14),rgba(15,23,42,0.92))] text-white shadow-[0_24px_70px_rgba(245,158,11,0.12)]">
           <CardHeader className="space-y-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-200 ring-1 ring-amber-300/20">
@@ -96,7 +96,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
 
   if (!profile?.organization_id) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full min-w-0 py-6">
         <Card className="overflow-hidden border-cyan-500/20 bg-[linear-gradient(135deg,rgba(8,145,178,0.16),rgba(15,23,42,0.92))] text-cyan-50 shadow-[0_24px_70px_rgba(8,145,178,0.12)]">
           <CardHeader className="space-y-3">
             <div className="flex items-center gap-3 text-xl font-semibold">
@@ -125,7 +125,7 @@ export function OsgbAccessGate({ children }: { children: React.ReactNode }) {
 
   if (!["admin", "inspector", "viewer", "staff"].includes(role)) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full min-w-0 py-6">
         <div className="rounded-3xl border border-red-500/20 bg-red-500/10 p-8 text-red-100">
           <div className="mb-3 flex items-center gap-3 text-xl font-semibold">
             <ShieldAlert className="h-5 w-5" />

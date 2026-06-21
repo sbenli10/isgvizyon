@@ -49,7 +49,7 @@ export default function BulkCAPAHowTo() {
   const navigate = useNavigate();
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 lg:px-6">
+    <div className="w-full min-w-0 space-y-6 px-4 py-6 lg:px-6">
       <section className="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-gradient-to-br from-slate-950 via-slate-900 to-[#0b1f4d] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.45)]">
         <div className="absolute -right-24 -top-24 h-56 w-56 rounded-full bg-cyan-500/20 blur-3xl" />
         <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-emerald-500/15 blur-3xl" />

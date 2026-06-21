@@ -32,7 +32,7 @@ const nextSteps = [
 
 export default function ISGBotSetup() {
   return (
-    <div className="container mx-auto max-w-6xl space-y-8 py-8">
+    <div className="w-full min-w-0 space-y-8 py-8">
       <div className="space-y-4 text-center">
         <div className="flex justify-center">
           <div className="rounded-full bg-primary/10 p-4">

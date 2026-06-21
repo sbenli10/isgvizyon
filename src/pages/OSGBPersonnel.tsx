@@ -41,10 +41,10 @@ export default function OSGBPersonnel() {
     overloaded: capacity.filter((item) => item.overloaded).length,
   }), [capacity, personnel]);
 
-  if (!organizationId) return <div className="container mx-auto py-6"><Alert><AlertTitle>Organizasyon gerekli</AlertTitle><AlertDescription>Personel havuzu organizasyon bazlı çalışır.</AlertDescription></Alert></div>;
+  if (!organizationId) return <div className="w-full min-w-0 py-6"><Alert><AlertTitle>Organizasyon gerekli</AlertTitle><AlertDescription>Personel havuzu organizasyon bazlı çalışır.</AlertDescription></Alert></div>;
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       <div className="space-y-2">
         <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary"><Users className="h-5 w-5" /></div><div><h1 className="text-3xl font-bold tracking-tight text-foreground">Personel Havuzu</h1><p className="text-sm text-muted-foreground">Eski kullanıcı bazlı personel akışı yerine organizasyon ve kapasite görünümü burada toplanır.</p></div></div>
       </div>

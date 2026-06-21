@@ -54,7 +54,7 @@ export default function ClientCompanyPortalHowTo() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 text-slate-100">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-3">

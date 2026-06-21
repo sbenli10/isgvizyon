@@ -103,7 +103,7 @@ export default function OSGBModule() {
   };
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="w-full min-w-0 space-y-6 px-4 py-6 sm:px-6 lg:px-8">
       <section className="overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-700/40 via-purple-700/35 to-fuchsia-700/30 p-6 shadow-2xl shadow-slate-950/40 lg:p-8">
         <div className="grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
           <div className="space-y-6">

@@ -64,7 +64,7 @@ export default function OsgbHowTo() {
   const { profile } = useAuth();
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       <section className="rounded-3xl border border-slate-800 bg-[radial-gradient(circle_at_top_left,_rgba(34,197,94,0.14),_transparent_35%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.86))] p-6 shadow-2xl shadow-slate-950/40">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">

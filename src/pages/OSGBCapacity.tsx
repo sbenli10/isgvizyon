@@ -107,7 +107,7 @@ export default function OSGBCapacity() {
 
   if (loading && !data) {
     return (
-      <div className="container mx-auto space-y-6 py-6">
+      <div className="w-full min-w-0 space-y-6 py-6">
         <div className="h-9 w-72 animate-pulse rounded-lg bg-slate-800" />
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
@@ -120,7 +120,7 @@ export default function OSGBCapacity() {
 
   if (!organizationId) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="w-full min-w-0 py-6">
         <Alert>
           <AlertTitle>Organizasyon bağlantısı gerekli</AlertTitle>
           <AlertDescription>Süre ve kapasite ekranı organization scope ile çalışır. Önce profilinizden organizasyon bağlayın.</AlertDescription>
@@ -130,7 +130,7 @@ export default function OSGBCapacity() {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-3">

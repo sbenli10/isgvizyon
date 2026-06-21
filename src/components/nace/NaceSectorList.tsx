@@ -1,4 +1,4 @@
-﻿// ====================================================
+// ====================================================
 // NACE SECTOR LIST COMPONENT
 // ====================================================
 
@@ -209,7 +209,7 @@ export default function NaceSectorList() {
 
   if (loading) {
     return (
-      <div className="container mx-auto space-y-6 py-6">
+      <div className="w-full min-w-0 space-y-6 py-6">
         <div className="space-y-2">
           <div className="h-8 w-64 animate-pulse rounded bg-slate-800" />
           <div className="h-4 w-80 animate-pulse rounded bg-slate-900" />
@@ -247,7 +247,7 @@ export default function NaceSectorList() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold flex items-center gap-3">

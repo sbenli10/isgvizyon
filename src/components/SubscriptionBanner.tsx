@@ -235,7 +235,7 @@ export function SubscriptionBanner() {
     <>
       <div
         className={cn(
-          "relative overflow-hidden rounded-[26px] border px-4 py-4 backdrop-blur-2xl lg:px-5 lg:py-5",
+          "relative mx-4 mt-4 overflow-hidden rounded-[26px] border px-4 py-4 backdrop-blur-2xl lg:mx-6 lg:mt-6 lg:px-5 lg:py-5",
           copy.surfaceClassName,
         )}
       >
@@ -308,3 +308,4 @@ export function SubscriptionBanner() {
     </>
   );
 }
+

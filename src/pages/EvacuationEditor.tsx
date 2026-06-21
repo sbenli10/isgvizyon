@@ -1840,7 +1840,7 @@ export default function EvacuationEditor() {
   return (
     <>
       <div className="-mx-4 -my-4 min-h-[calc(100vh-3.8rem)] bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_24%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.14),transparent_22%),linear-gradient(180deg,#020617_0%,#06132b_46%,#081a39_100%)] px-4 py-6 lg:-mx-6 lg:-my-6 lg:px-6">
-        <div className="mx-auto flex max-w-7xl flex-col gap-6">
+        <div className="flex w-full min-w-0 flex-col gap-6">
           <div className="overflow-hidden rounded-[30px] border border-cyan-500/20 bg-slate-950/70 shadow-[0_36px_100px_rgba(2,12,27,0.55)] backdrop-blur-xl">
             <div className="grid gap-0 xl:grid-cols-[1.15fr_0.85fr]">
               <div className="border-b border-slate-800/80 p-6 xl:border-b-0 xl:border-r">

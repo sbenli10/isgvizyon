@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { BadgeCheck, Loader2, ShieldCheck, ShieldX } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +31,7 @@ export default function CertificateVerifyPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[radial-gradient(circle_at_top,#0f172a,#020617_65%)] px-4 py-10">
-        <div className="mx-auto max-w-4xl space-y-6">
+        <div className="w-full min-w-0 space-y-6">
           <div className="space-y-3 text-center">
             <div className="mx-auto h-4 w-40 animate-pulse rounded bg-slate-800" />
             <div className="mx-auto h-10 w-72 animate-pulse rounded bg-slate-900" />
@@ -45,7 +45,7 @@ export default function CertificateVerifyPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,#0f172a,#020617_65%)] px-4 py-10 text-white">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <div className="text-center">
           <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">Sertifika Doğrulama</p>
           <h1 className="mt-3 text-4xl font-black">{error ? "Doğrulama Başarısız" : "Sertifika Geçerli"}</h1>

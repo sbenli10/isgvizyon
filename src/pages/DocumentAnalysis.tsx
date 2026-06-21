@@ -646,7 +646,7 @@ const { clearDraft } = usePersistentDraft({
   };
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-3">

@@ -1,4 +1,4 @@
-﻿import {
+import {
   type ChangeEvent,
   type ReactNode,
   useEffect,
@@ -4034,7 +4034,7 @@ export default function RiskAssessmentWizard() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.10),_transparent_32%),radial-gradient(circle_at_top_right,_rgba(139,92,246,0.08),_transparent_28%)] bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <div className="mx-auto w-full max-w-[1600px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
+      <div className="w-full min-w-0 px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         <section className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-slate-950 px-5 py-6 text-white shadow-xl shadow-slate-950/10 sm:px-7 lg:px-9 lg:py-8 dark:border-slate-800">
           <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-violet-500/20 blur-3xl" />

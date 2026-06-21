@@ -161,7 +161,7 @@ export default function NaceHazardQuery() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="w-full min-w-0 space-y-6 py-6">
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold flex items-center gap-3">

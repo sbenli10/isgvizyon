@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { lazy, Suspense } from "react";
@@ -4379,7 +4379,7 @@ const exportToPDFAndShare = async () => {
       {/* MAIN CONTENT */}
       {!assessment ? (
         <div className="flex-1 overflow-auto p-6">
-          <div className="mx-auto grid max-w-6xl gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="grid w-full min-w-0 gap-6 xl:grid-cols-[1.15fr_0.85fr]">
             <Card className="border border-white/10 bg-white/[0.04] shadow-[0_30px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
               <CardContent className="p-8">
                 <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">

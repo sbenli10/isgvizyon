@@ -204,7 +204,7 @@ export default function EmailHistory() {
   }, [currentPage, filteredLogs]);
 
   return (
-    <div className="theme-page-readable container mx-auto space-y-6 py-6">
+    <div className="theme-page-readable w-full min-w-0 space-y-6 py-6">
       <section className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_24px_80px_rgba(2,6,23,0.12)] dark:shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
         <div className="flex flex-col gap-6 px-6 py-7 lg:flex-row lg:items-start lg:justify-between lg:px-8">
           <div className="max-w-3xl space-y-3">

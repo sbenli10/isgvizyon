@@ -29,7 +29,7 @@ type ProfileTabsProps = {
 
 export function ProfileTabs({ tabs, activeTab, onChange }: ProfileTabsProps) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-slate-700/60 bg-slate-900/70 p-2 shadow-sm">
+    <div className="overflow-x-auto rounded-[26px] border border-white/10 bg-slate-950/55 p-2 shadow-2xl shadow-black/15 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="flex min-w-max gap-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -40,10 +40,10 @@ export function ProfileTabs({ tabs, activeTab, onChange }: ProfileTabsProps) {
               type="button"
               onClick={() => onChange(tab.id)}
               className={cn(
-                "inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm font-semibold transition-all",
+                "inline-flex h-11 items-center gap-2 rounded-2xl border px-3.5 text-sm font-black transition-all",
                 active
-                  ? "bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-950/20"
-                  : "text-slate-300 hover:bg-slate-800 hover:text-white",
+                  ? "border-cyan-300/35 bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-950/25"
+                  : "border-white/5 bg-white/[0.04] text-slate-300 hover:border-cyan-300/25 hover:bg-cyan-400/10 hover:text-white",
               )}
             >
               <Icon className="h-4 w-4" />

@@ -947,7 +947,7 @@ export default function ADEPWizard() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(8,145,178,0.22),transparent_34%),linear-gradient(135deg,#020617,#0f172a_52%,#111827)] px-4 py-6 text-white md:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <Card className="overflow-hidden border-cyan-400/20 bg-slate-950/80 shadow-[0_24px_80px_rgba(8,47,73,0.35)]">
           <CardContent className="p-6 md:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">

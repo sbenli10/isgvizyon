@@ -145,7 +145,7 @@ export default function ClientCompanyPortal() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 p-6">
-        <div className="mx-auto max-w-6xl space-y-6">
+        <div className="w-full min-w-0 space-y-6">
           <div className="h-40 animate-pulse rounded-3xl border border-slate-800 bg-slate-900/70" />
           <div className="grid gap-4 md:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
@@ -160,7 +160,7 @@ export default function ClientCompanyPortal() {
   if (!data) {
     return (
       <div className="min-h-screen bg-slate-950 p-6">
-        <div className="mx-auto max-w-4xl">
+        <div className="w-full min-w-0">
           <Alert variant="destructive" className="border-red-500/20 bg-red-500/10 text-red-100">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Portal acilamadi</AlertTitle>
@@ -173,7 +173,7 @@ export default function ClientCompanyPortal() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_28%),linear-gradient(180deg,#020617,#0f172a)] p-6 text-slate-100">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <section className="rounded-3xl border border-slate-800 bg-slate-900/75 p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
             <div className="space-y-3">

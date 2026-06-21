@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Building2, Download, FileSpreadsheet, FileText, Plus, Save, Trash2 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -1182,7 +1182,7 @@ export default function AnnualPlans() {
   if (loading) {
     return (
       <div className="theme-page-readable min-h-screen bg-background px-4 py-6 md:px-8">
-        <div className="mx-auto flex min-h-[50vh] max-w-7xl items-center justify-center">
+        <div className="flex min-h-[50vh] w-full min-w-0 items-center justify-center">
           <Card className="border-border bg-card shadow-sm">
             <CardContent className="px-6 py-5 text-sm text-muted-foreground">
               Yıllık çalışma planı hazırlanıyor...
@@ -1195,7 +1195,7 @@ export default function AnnualPlans() {
 
   return (
     <div className="theme-page-readable min-h-screen bg-background px-4 py-6 text-foreground md:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="w-full min-w-0 space-y-6">
         <Card className="border-border bg-card shadow-sm">
           <CardHeader className="gap-5 lg:flex-row lg:items-start lg:justify-between">
             <div className="space-y-3">

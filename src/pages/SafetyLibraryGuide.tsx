@@ -95,7 +95,7 @@ export default function SafetyLibraryGuide() {
   const navigate = useNavigate();
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 lg:px-6">
+    <div className="w-full min-w-0 space-y-6 px-4 py-6 lg:px-6">
       <section className="relative overflow-hidden rounded-3xl border border-slate-700/70 bg-[radial-gradient(circle_at_top_left,rgba(16,185,129,0.16),transparent_22%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_24%),linear-gradient(135deg,#020617_0%,#0b1220_40%,#111827_100%)] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.55)]">
         <div className="relative z-10 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-3">
