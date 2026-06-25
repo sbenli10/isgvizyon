@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import {
   AlertCircle,
@@ -1726,7 +1726,7 @@ function MultiAssignmentPanel({
     }
 
     downloadCsv(
-      `isgvizyon-coklu-atama-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
+      `isgvizyon-coklu-atama-plani-${new Date().toISOString().slice(0, 10)}.csv`,
       plan.planRows.map((row) => ({
         Rapor: "İSGVİZYON Çoklu Atama İşlem Planı",
         "Firma Adı": row.companyName,
@@ -1752,7 +1752,28 @@ function MultiAssignmentPanel({
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          { title: "1. Personel", text: personnel.length ? `${personnel.length} personel hazır` : "Personeli girin veya yapıştırın", tone: personnel.length ? "emerald" : "slate" },
+          { title: "2. Firma", text: validSgkNumbers.length ? `${validSgkNumbers.length} SGK no hazır` : "SGK sicil numarası girin", tone: validSgkNumbers.length ? "emerald" : "slate" },
+          { title: "3. İşlem", text: plan ? `${selectablePlanRows.length} kayıt seçilebilir` : "Planı hazırlayın", tone: selectablePlanRows.length ? "violet" : "slate" },
+        ].map((item) => (
+          <div
+            key={item.title}
+            className={cn(
+              "rounded-2xl border p-4",
+              item.tone === "emerald" && "border-emerald-400/25 bg-emerald-500/10",
+              item.tone === "violet" && "border-violet-400/25 bg-violet-500/10",
+              item.tone === "slate" && "border-slate-700/70 bg-slate-900/80",
+            )}
+          >
+            <p className="text-sm font-black text-white">{item.title}</p>
+            <p className="mt-1 text-xs text-slate-300">{item.text}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[0.95fr_1.15fr_1fr]">
         <div className="space-y-4">
           <div className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 transition hover:border-violet-500/40">
             <div className="mb-3 flex items-center justify-between">
@@ -1857,7 +1878,9 @@ function MultiAssignmentPanel({
         <div className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 transition hover:border-violet-500/40">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="font-black text-white">Atama Planı ({plan?.planRows.length ?? 0})</h4>
-            <Badge className="rounded-full bg-violet-500/15 text-violet-200 hover:bg-violet-500/15">Dry-Run</Badge>
+            <Badge className="rounded-full bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/15">
+              Canlıya hazır: {selectedPlanRows.length}
+            </Badge>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1896,7 +1919,16 @@ function MultiAssignmentPanel({
                       <p className="text-sm font-black text-white">{row.companyName}</p>
                       <p className="mt-1 text-xs text-slate-400">{row.personnelName} · {row.personnelRole}</p>
                     </div>
-                    <Badge variant="outline" className="rounded-full border-violet-400/30 bg-violet-500/10 text-violet-200">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "rounded-full",
+                        row.status === "Planlanabilir" && "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+                        row.status === "Uyarılı" && "border-amber-400/30 bg-amber-500/10 text-amber-200",
+                        row.status === "Kapasite Yetersiz" && "border-rose-400/30 bg-rose-500/10 text-rose-200",
+                        row.status === "Veri Eksik" && "border-slate-500/30 bg-slate-500/10 text-slate-200",
+                      )}
+                    >
                       {row.status}
                     </Badge>
                   </div>
@@ -2363,7 +2395,7 @@ function ExcessDurationUpdatePanel({
     }
 
     downloadCsv(
-      `isgvizyon-fazla-sure-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
+      `isgvizyon-fazla-sure-analizi-${new Date().toISOString().slice(0, 10)}.csv`,
       preview.rows.map((row) => ({
         Rapor: "İSGVİZYON Fazla Süre Güncelleme Raporu",
         "Firma Adı": row.companyName,
@@ -3359,9 +3391,30 @@ function MultiAssignmentPanelV2({
       }),
     [acceptedRealChange, extensionStatus, plan?.planRows, planHash, reviewedPlan, selectedPlanRows, typedConfirmation],
   );
+  const selectablePlanRows = useMemo(
+    () => plan?.planRows.filter((row) => row.status === "Planlanabilir" || row.status === "Uyarılı") ?? [],
+    [plan],
+  );
+  const blockedPlanRows = useMemo(
+    () => plan?.planRows.filter((row) => row.status === "Kapasite Yetersiz" || row.status === "Veri Eksik") ?? [],
+    [plan],
+  );
+  const firstBlockingReason = useMemo(() => {
+    if (!plan) return null;
+    if (selectablePlanRows.length > 0 && selectedPlanRows.length === 0) {
+      return "Gerçek işlem için listeden bir kayıt seçin.";
+    }
+    if (selectablePlanRows.length === 0 && blockedPlanRows.length > 0) {
+      return "Bu planda işlem yapılabilir kayıt yok. Gerekli dakika, personel kapasitesi veya firma verilerini tamamlayın.";
+    }
+    return null;
+  }, [blockedPlanRows.length, plan, selectablePlanRows.length, selectedPlanRows.length]);
 
   const resetApplyState = () => {
-    setSelectedPlanRowIds([]);
+    const initialSelectableRows = result.planRows.filter(
+      (row) => row.status === "Planlanabilir" || row.status === "Uyarılı",
+    );
+    setSelectedPlanRowIds(initialSelectableRows.slice(0, ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION).map((row) => row.id));
     setApplyDialogOpen(false);
     setReviewedPlan(false);
     setAcceptedRealChange(false);
@@ -3536,12 +3589,12 @@ function MultiAssignmentPanelV2({
 
   const handleExportPlan = () => {
     if (!plan?.planRows.length) {
-      toast.error("CSV için önce dry-run planı oluşturun.");
+      toast.error("CSV için önce işlem planı oluşturun.");
       return;
     }
 
     downloadCsv(
-      `isgvizyon-coklu-atama-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
+      `isgvizyon-coklu-atama-plani-${new Date().toISOString().slice(0, 10)}.csv`,
       plan.planRows.map((row) => ({
         "Rapor": "İSGVİZYON Çoklu Atama İşlem Planı",
         "Firma Adı": row.companyName,
@@ -3753,7 +3806,7 @@ function MultiAssignmentPanelV2({
         <AlertDescription className="text-amber-100/80">
           {ISGBOT_APPLY_ENABLED
             ? `Canlı işlem modu aktiftir. Seçili kayıtlar eklenti üzerinden gerçek İSG-KATİP işlemine gönderilir. Güvenli işlem limiti ${ISGBOT_PILOT_LIMIT} kayıttır.`
-            : "Bu işlem İSG-KATİP üzerinde gerçek atama yapmaz. Sadece personel/firma eşleştirmesi, uyarı kontrolü ve dry-run planı oluşturur."}
+            : "Bu işlem yapılandırma tarafından canlı işleme kapalıdır. Personel/firma eşleştirmesi ve işlem planı yine hazırlanabilir."}
         </AlertDescription>
       </Alert>
 
@@ -3843,7 +3896,9 @@ function MultiAssignmentPanelV2({
         <div className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 transition hover:border-violet-500/40">
           <div className="mb-3 flex items-center justify-between">
             <h4 className="font-black text-white">Atama Planı ({plan?.planRows.length ?? 0})</h4>
-            <Badge className="rounded-full bg-violet-500/15 text-violet-200 hover:bg-violet-500/15">Dry-Run</Badge>
+            <Badge className="rounded-full bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/15">
+              Seçili: {selectedPlanRows.length}
+            </Badge>
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -3859,7 +3914,7 @@ function MultiAssignmentPanelV2({
             <Button className="rounded-xl bg-violet-500 text-white hover:bg-violet-400" onClick={handleBuildPlan}>
               Atama Planı Hazırla
             </Button>
-            <Button className="rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-500 disabled:bg-slate-700 disabled:text-slate-300" onClick={() => void openApplyDialog()} disabled={!ISGBOT_APPLY_ENABLED || !plan || selectedPlanRows.length === 0 || isApplying}>
+            <Button className="rounded-xl bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-lg shadow-violet-950/30 hover:from-violet-400 hover:to-cyan-400 disabled:bg-slate-700 disabled:text-slate-300" onClick={() => void openApplyDialog()} disabled={!ISGBOT_APPLY_ENABLED || !plan || selectedPlanRows.length === 0 || isApplying}>
               Gerçek İşlem İçin Onayla
             </Button>
             <Button variant="outline" className="rounded-xl border-slate-600 bg-slate-950/60 text-slate-100 hover:bg-slate-800" onClick={handleExportPlan}>
@@ -3872,6 +3927,12 @@ function MultiAssignmentPanelV2({
               Planı Temizle
             </Button>
           </div>
+
+          {firstBlockingReason ? (
+            <div className="mt-3 rounded-2xl border border-amber-400/25 bg-amber-500/10 p-3 text-xs font-semibold text-amber-100">
+              {firstBlockingReason}
+            </div>
+          ) : null}
 
           {!plan ? (
             <EmptyState title="Henüz atama planı yok" description="Personel ve SGK listesini hazırlayıp işlem planı oluşturun." icon={Layers} />
@@ -3897,7 +3958,11 @@ function MultiAssignmentPanelV2({
                     <span>Çalışan: {row.employeeCount}</span>
                     <span>Tehlike: {row.hazardClass}</span>
                   </div>
-                  {row.warnings.length > 0 && <p className="mt-2 text-xs text-amber-200">{row.warnings.join(" | ")}</p>}
+                  {row.warnings.length > 0 && (
+                    <div className="mt-2 rounded-xl border border-amber-400/20 bg-amber-500/10 p-2 text-xs text-amber-100">
+                      {row.warnings.join(" | ")}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -4239,7 +4304,7 @@ function ExcessDurationUpdatePanelV2({
     }
 
     downloadCsv(
-      `isgvizyon-fazla-sure-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
+      `isgvizyon-fazla-sure-analizi-${new Date().toISOString().slice(0, 10)}.csv`,
       preview.rows.map((row) => ({
         "Rapor": "İSGVİZYON Fazla Süre Güncelleme Raporu",
         "Firma Adı": row.companyName,
@@ -5862,5 +5927,6 @@ export default function ISGBot() {
     </div>
   );
 }
+
 
 

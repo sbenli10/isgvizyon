@@ -1,4 +1,4 @@
-export type IsgbotCompanyLike = {
+﻿export type IsgbotCompanyLike = {
   id: string;
   company_name: string | null;
   sgk_no: string | null;
@@ -192,9 +192,11 @@ export function buildMultiAssignmentPlan(
       if (selectedPersonnel && requiredMinutes > selectedPersonnel.remainingCapacityMinutes) warnings.push("Personelin kalan kapasitesi yetersiz.");
       if (match.warning) warnings.push(match.warning);
 
+      const hasCapacityBlocker = warnings.some((warning) => warning.includes("kapasitesi"));
+      const hasBlockingDataGap = !selectedPersonnel || !requiredMinutes;
       const status: MultiAssignmentPlanRow["status"] =
-        warnings.some((warning) => warning.includes("kapasitesi")) ? "Kapasite Yetersiz" :
-        warnings.some((warning) => warning.includes("hesaplanamadı") || warning.includes("bulunamadı") || warning.includes("eksik")) ? "Veri Eksik" :
+        hasCapacityBlocker ? "Kapasite Yetersiz" :
+        hasBlockingDataGap ? "Veri Eksik" :
         warnings.length ? "Uyarılı" : "Planlanabilir";
 
       return {
@@ -231,3 +233,4 @@ export function buildMultiAssignmentPlan(
     },
   };
 }
+
