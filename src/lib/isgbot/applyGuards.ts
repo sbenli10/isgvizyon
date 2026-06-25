@@ -1,7 +1,7 @@
 import type { MultiAssignmentPlanRow } from "./assignmentDryRun";
 import type { ExcessDurationPreviewRow } from "./excessDurationDryRun";
 
-export const ISGBOT_APPLY_ENABLED = String(import.meta.env.VITE_ISGBOT_APPLY_ENABLED || "").toLowerCase() === "true";
+export const ISGBOT_APPLY_ENABLED = String(import.meta.env.VITE_ISGBOT_APPLY_ENABLED ?? "true").toLowerCase() !== "false";
 export const ISGBOT_PILOT_LIMIT = Math.max(1, Number.parseInt(String(import.meta.env.VITE_ISGBOT_APPLY_LIMIT || "3"), 10) || 3);
 
 type ExtensionLike = {
@@ -79,7 +79,7 @@ export function createPlanHash(payload: unknown) {
 function validateConfirmation(confirmation?: ConfirmationLike) {
   const reasons: string[] = [];
   if (!confirmation?.reviewedPlan) {
-    reasons.push("Önizleme planını kontrol ettiğinizi onaylamalısınız.");
+    reasons.push("İşlem planını kontrol ettiğinizi onaylamalısınız.");
   }
   if (!confirmation?.acceptedRealChange) {
     reasons.push("Gerçek değişiklik onay kutusunu işaretlemelisiniz.");
@@ -97,10 +97,10 @@ export function validateApplyPayload(
   pilotLimit = ISGBOT_PILOT_LIMIT,
 ): ApplyGuardResult {
   const reasons: string[] = [];
-  if (!planHash) reasons.push("Plan doğrulaması başarısız oldu. Lütfen önizlemeyi yeniden oluşturun.");
+  if (!planHash) reasons.push("Plan doğrulaması başarısız oldu. Lütfen işlem planını yeniden oluşturun.");
   if (!Array.isArray(records) || records.length === 0) reasons.push("İşlem yapılacak kayıt seçilmedi.");
   if (Array.isArray(records) && records.length > pilotLimit) {
-    reasons.push(`Pilot modda en fazla ${pilotLimit} kayıt işlenebilir.`);
+    reasons.push(`Canlı işlem modunda en fazla ${pilotLimit} kayıt işlenebilir.`);
   }
 
   if (type === "multi_assignment") {
@@ -137,12 +137,12 @@ export function canApplyMultiAssignment(input: MultiAssignmentApplyInput): Apply
   const reasons: string[] = [];
   const pilotLimit = input.pilotLimit ?? ISGBOT_PILOT_LIMIT;
 
-  if (!input.applyEnabled) reasons.push("Gerçek işlem modu şu anda kapalıdır. Önizleme oluşturabilirsiniz.");
+  if (!input.applyEnabled) reasons.push("Gerçek işlem modu yapılandırma tarafından kapatılmıştır.");
   if (!input.extensionStatus.installed) reasons.push("Eklenti bağlantısı doğrulanamadı.");
   if (!input.extensionStatus.isgKatipReady || input.extensionStatus.state !== "sync_ready") {
     reasons.push("İSG-KATİP oturumu bulunamadı veya hazır değil.");
   }
-  if (!input.planRows.length) reasons.push("Önce dry-run planı oluşturun.");
+  if (!input.planRows.length) reasons.push("Önce işlem planı oluşturun.");
   if (!input.selectedRows.length) reasons.push("İşlem yapılacak kayıt seçilmedi.");
 
   const invalidSelectedRows = input.selectedRows.filter(
@@ -172,12 +172,12 @@ export function canApplyExcessDuration(input: ExcessDurationApplyInput): ApplyGu
   const reasons: string[] = [];
   const pilotLimit = input.pilotLimit ?? ISGBOT_PILOT_LIMIT;
 
-  if (!input.applyEnabled) reasons.push("Gerçek işlem modu şu anda kapalıdır. Önizleme oluşturabilirsiniz.");
+  if (!input.applyEnabled) reasons.push("Gerçek işlem modu yapılandırma tarafından kapatılmıştır.");
   if (!input.extensionStatus.installed) reasons.push("Eklenti bağlantısı doğrulanamadı.");
   if (!input.extensionStatus.isgKatipReady || input.extensionStatus.state !== "sync_ready") {
     reasons.push("İSG-KATİP oturumu bulunamadı veya hazır değil.");
   }
-  if (!input.previewRows.length) reasons.push("Önce fazla süre önizlemesi oluşturun.");
+  if (!input.previewRows.length) reasons.push("Önce fazla süre analizini oluşturun.");
   if (!input.selectedRows.length) reasons.push("İşlem yapılacak kayıt seçilmedi.");
 
   const invalidRows = input.selectedRows.filter((row) => row.status === "Hesaplanamadı" || row.excessMinutes <= 0);

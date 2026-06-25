@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import {
   AlertCircle,
@@ -103,7 +103,7 @@ type BotFeature = {
   title: string;
   description: string;
   badge: string;
-  status: "Aktif" | "Kısıtlı" | "Hazırlanıyor" | "Önizleme" | "Rapor" | "Analiz" | "PDF";
+  status: "Aktif" | "Kısıtlı" | "Hazırlanıyor" | "Rapor" | "Analiz" | "PDF";
   cta: string;
   tone: FeatureTone;
   icon: typeof UserPlus;
@@ -245,6 +245,7 @@ type ExtensionInstallState =
   | "installed_no_auth"
   | "isgkatip_login_required"
   | "sync_ready"
+  | "server_sync_ready"
   | "error";
 
 type ExtensionStatus = {
@@ -689,10 +690,10 @@ const botFeatures: BotFeature[] = [
   {
     id: "multi-assignment",
     title: "Çoklu Atama Yap",
-    description: "Personel ve firma eşleştirme ekranını güvenli ön hazırlık modunda planlayın.",
+    description: "Personel ve firma eşleştirmesini hazırlayıp eklenti bağlıyken gerçek İSG-KATİP atamasını çalıştırın.",
     badge: "OSGB",
-    status: "Kısıtlı",
-    cta: "Önizlemeyi aç",
+    status: "Aktif",
+    cta: "İşlemi aç",
     tone: "violet",
     icon: UserPlus,
   },
@@ -718,11 +719,11 @@ const botFeatures: BotFeature[] = [
   },
   {
     id: "excess-duration-update",
-    title: "Fazla Süre Önizleme ve Pilot Uygulama",
-    description: "Fazla süre adaylarını güvenli analiz modunda değerlendirin.",
-    badge: "Önizleme",
-    status: "Önizleme",
-    cta: "Önizlemeyi aç",
+    title: "Fazla Süre Güncelleme",
+    description: "Fazla süre adaylarını analiz edin ve eklenti bağlıyken gerçek süre güncellemesini çalıştırın.",
+    badge: "Canlı",
+    status: "Aktif",
+    cta: "İşlemi aç",
     tone: "emerald",
     icon: Layers,
   },
@@ -731,8 +732,8 @@ const botFeatures: BotFeature[] = [
     title: "Hizmet Alan İşyerleri İSG Sözleşme Durumu",
     description: "İSG profesyoneli sözleşme durumunu renk skalasıyla raporlayın.",
     badge: "Rapor",
-    status: "Önizleme",
-    cta: "Önizlemeyi aç",
+    status: "Aktif",
+    cta: "İşlemi aç",
     tone: "amber",
     icon: ShieldCheck,
   },
@@ -741,8 +742,8 @@ const botFeatures: BotFeature[] = [
     title: "Süre Analizi",
     description: "Personellerin kalan çalışma dakikalarını ve doluluk oranlarını analiz edin.",
     badge: "Analiz",
-    status: "Önizleme",
-    cta: "Veriyi gör",
+    status: "Aktif",
+    cta: "Analizi aç",
     tone: "rose",
     icon: TimerReset,
   },
@@ -1713,21 +1714,21 @@ function MultiAssignmentPanel({
     onRecordDryRun(result);
 
     const hasWarnings = result.summary.warning_count > 0 || result.summary.unmatched_sgk_count > 0;
-    toast(hasWarnings ? "Atama önizlemesi uyarılı oluşturuldu" : "Atama önizlemesi oluşturuldu", {
+    toast(hasWarnings ? "Atama planı uyarılı oluşturuldu" : "Atama planı oluşturuldu", {
       description: `${result.summary.planned_assignment_count} plan satırı hazırlandı. Gerçek İSG-KATİP ataması yapılmadı.`,
     });
   };
 
   const handleExportPlan = () => {
     if (!plan?.planRows.length) {
-      toast.error("CSV için önce önizleme planı oluşturun.");
+      toast.error("CSV için önce işlem planı oluşturun.");
       return;
     }
 
     downloadCsv(
       `isgvizyon-coklu-atama-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
       plan.planRows.map((row) => ({
-        Rapor: "İSGVİZYON Çoklu Atama Önizleme Raporu",
+        Rapor: "İSGVİZYON Çoklu Atama İşlem Planı",
         "Firma Adı": row.companyName,
         "SGK No": row.sgkNo,
         "Personel": row.personnelName,
@@ -1745,9 +1746,9 @@ function MultiAssignmentPanel({
     <div className="space-y-4">
       <Alert className="border-amber-400/25 bg-amber-500/10 text-amber-50">
         <AlertCircle className="h-4 w-4 text-amber-300" />
-        <AlertTitle>Önizleme Modu · Gerçek işlem yapılmaz</AlertTitle>
+        <AlertTitle>Canlı İşlem Modu</AlertTitle>
         <AlertDescription className="text-amber-100/80">
-          Bu işlem İSG-KATİP üzerinde gerçek atama yapmaz. Sadece personel/firma eşleştirmesi, uyarı kontrolü ve önizleme planı oluşturur.
+          Bu alan personel/firma eşleştirmesini hazırlar; eklenti ve İSG-KATİP oturumu hazır olduğunda gerçek atama işlemi başlatılabilir.
         </AlertDescription>
       </Alert>
 
@@ -1870,7 +1871,7 @@ function MultiAssignmentPanel({
 
           <div className="mt-4 grid gap-2">
             <Button className="rounded-xl bg-violet-500 text-white hover:bg-violet-400" onClick={handleBuildPlan}>
-              Önizleme Planı Hazırla
+              Atama Planı Hazırla
             </Button>
             <Button variant="outline" className="rounded-xl border-slate-600 bg-slate-950/60 text-slate-100 hover:bg-slate-800" onClick={handleExportPlan}>
               CSV Olarak İndir
@@ -1883,7 +1884,7 @@ function MultiAssignmentPanel({
           {!plan ? (
             <EmptyState
               title="Henüz atama planı yok"
-              description="Personel ve SGK listesini hazırlayıp önizleme oluşturun."
+              description="Personel ve SGK listesini hazırlayıp işlem planı oluşturun."
               icon={Layers}
             />
           ) : (
@@ -2286,7 +2287,7 @@ function ContractsNeedUpdatePanel({
       <div className="flex flex-wrap gap-2">
         <Button className="rounded-xl bg-amber-500 text-white hover:bg-amber-400" onClick={onRun}>
           <RefreshCw className="mr-2 h-4 w-4" />
-          Önizlemeyi Güncelle
+          Planı Güncelle
         </Button>
         <Button
           variant="outline"
@@ -2357,14 +2358,14 @@ function ExcessDurationUpdatePanel({
 
   const handleExport = () => {
     if (preview.rows.length === 0) {
-      toast.error("CSV için indirilebilir fazla süre önizlemesi bulunamadı.");
+      toast.error("CSV için indirilebilir fazla süre analizi bulunamadı.");
       return;
     }
 
     downloadCsv(
       `isgvizyon-fazla-sure-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
       preview.rows.map((row) => ({
-        Rapor: "İSGVİZYON Fazla Süre Önizleme Raporu",
+        Rapor: "İSGVİZYON Fazla Süre Güncelleme Raporu",
         "Firma Adı": row.companyName,
         "SGK No": row.sgkNo,
         "Çalışan Sayısı": row.employeeCount,
@@ -2383,9 +2384,9 @@ function ExcessDurationUpdatePanel({
     <div className="space-y-4">
       <Alert className="border-emerald-400/25 bg-emerald-500/10 text-emerald-50">
         <Layers className="h-4 w-4 text-emerald-300" />
-        <AlertTitle>Önizleme Modu · Gerçek işlem yapılmaz</AlertTitle>
+        <AlertTitle>Canlı İşlem Modu</AlertTitle>
         <AlertDescription className="text-emerald-100/80">
-          Bu işlem yalnızca fazla atama önizlemesi oluşturur. İSG-KATİP üzerinde otomatik güncelleme yapılmaz.
+          Bu alan fazla atama adaylarını analiz eder; eklenti ve İSG-KATİP oturumu hazır olduğunda gerçek güncelleme başlatılabilir.
         </AlertDescription>
       </Alert>
 
@@ -2399,7 +2400,7 @@ function ExcessDurationUpdatePanel({
 
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 sm:flex-row">
         <Button className="rounded-xl bg-emerald-500 text-white hover:bg-emerald-400" onClick={handleGeneratePreview}>
-          Önizleme Oluştur
+          Analizi Oluştur
         </Button>
         <Button variant="outline" className="rounded-xl border-slate-600 bg-slate-950/60 text-slate-100 hover:bg-slate-800" onClick={handleExport}>
           CSV Olarak İndir
@@ -3170,7 +3171,7 @@ function LegacyCompanyImportPanel({ runtime, onRun }: { runtime: FeatureRuntimeS
         <Chrome className="h-4 w-4 text-blue-300" />
         <AlertTitle>Firmalarımı Aktar</AlertTitle>
         <AlertDescription className="text-blue-100/80">
-          İSG-KATİP sayfasında eklenti panelinden “Firmalarımı Oku” işlemini başlatın, önizlemeyi kontrol edin ve ikinci onayla İSGVİZYON’a aktarın.
+          İSG-KATİP sayfasında eklenti panelinden “Firmalarımı Oku” işlemini başlatın, listeyi kontrol edin ve ikinci onayla İSGVİZYON’a aktarın.
         </AlertDescription>
       </Alert>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -3218,7 +3219,7 @@ function OperationHistoryPanel({
   const summaryText = (operation: IsgbotOperationRow) => {
     const summary = operation.result_summary || {};
     if (summary.guidance_only) {
-      return "Yönlendirme yapıldı; gerçek senkron İSG-KATİP eklenti panelinden başlatılır.";
+      return "Yönlendirme yapıldı; senkron İSG-KATİP eklenti panelinden başlatılır.";
     }
 
     const parts = [
@@ -3523,12 +3524,12 @@ function MultiAssignmentPanelV2({
     );
     setApplyError(null);
     setApplyInfo(
-      `Canlı pilot mod aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.`,
+      `Canlı işlem modu aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.`,
     );
     onRecordDryRun(result);
 
     const hasWarnings = result.summary.warning_count > 0 || result.summary.unmatched_sgk_count > 0;
-    toast(hasWarnings ? "Atama önizlemesi uyarılı oluşturuldu" : "Atama önizlemesi oluşturuldu", {
+    toast(hasWarnings ? "Atama planı uyarılı oluşturuldu" : "Atama planı oluşturuldu", {
       description: `${result.summary.planned_assignment_count} plan satırı hazırlandı. Gerçek İSG-KATİP ataması yapılmadı.`,
     });
   };
@@ -3542,7 +3543,7 @@ function MultiAssignmentPanelV2({
     downloadCsv(
       `isgvizyon-coklu-atama-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
       plan.planRows.map((row) => ({
-        "Rapor": "İSGVİZYON Çoklu Atama Önizleme Raporu",
+        "Rapor": "İSGVİZYON Çoklu Atama İşlem Planı",
         "Firma Adı": row.companyName,
         "SGK No": row.sgkNo,
         "Personel": row.personnelName,
@@ -3557,7 +3558,7 @@ function MultiAssignmentPanelV2({
   const handleExportApplyResults = () => {
     const rows = applyResults.filter((row) => row.status !== "pending");
     if (rows.length === 0) {
-      toast.error("Sonuç raporu için önce pilot işlemi çalıştırın.");
+      toast.error("Sonuç raporu için önce gerçek işlemi çalıştırın.");
       return;
     }
     exportApplyResultsCsv("İSGVİZYON Gerçek İşlem Sonuç Raporu", rows, downloadCsv);
@@ -3575,7 +3576,7 @@ function MultiAssignmentPanelV2({
         return current.filter((value) => value !== rowId);
       }
       if (current.length >= ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION) {
-        toast.error(`Canlı pilot modda ilk aşamada en fazla ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçebilirsiniz.`);
+        toast.error(`Canlı işlem moduda ilk aşamada en fazla ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçebilirsiniz.`);
         return current;
       }
       return [...current, rowId];
@@ -3601,7 +3602,7 @@ function MultiAssignmentPanelV2({
 
     const operation = await startClientOperation(userId, organizationId, {
       operationType: "multi_assignment_apply",
-      operationTitle: "Çoklu Atama Pilot Apply",
+      operationTitle: "Çoklu Atama Canlı İşlem",
       source: "web_app",
       inputSummary: {
         feature_id: "multi-assignment",
@@ -3643,7 +3644,7 @@ function MultiAssignmentPanelV2({
       });
 
       if (!response?.success && !response?.results?.length) {
-        throw new Error(response?.error || "Pilot işlem başarısız oldu.");
+        throw new Error(response?.error || "Gerçek işlem başarısız oldu.");
       }
 
       setApplyStage(`Kayıt ${selectedPlanRows.length}/${selectedPlanRows.length} işlendi`);
@@ -3676,7 +3677,7 @@ function MultiAssignmentPanelV2({
           sgkNo: row.sgkNo,
           operationType: "Çoklu Atama",
           status: selectedPlanRowIds.includes(row.id) ? "skipped" : "pending",
-          reason: selectedPlanRowIds.includes(row.id) ? "Pilot işlem sonucu dönmedi." : null,
+          reason: selectedPlanRowIds.includes(row.id) ? "Gerçek işlem sonucu dönmedi." : null,
           processedAt: selectedPlanRowIds.includes(row.id) ? new Date().toISOString() : null,
         });
       });
@@ -3709,9 +3710,9 @@ function MultiAssignmentPanelV2({
           ? "İşlem gönderildi ancak İSG-KATİP ekranında sonuç doğrulanamadı. Lütfen kaydı manuel kontrol edin."
           : summary.failed_count > 0
             ? "Bazı kayıtlar işlenemedi. Sonuç raporunu kontrol edin."
-            : `${summary.success_count} kayıt pilot modda işlendi.`,
+            : `${summary.success_count} kayıt canlı işlem modunda işlendi.`,
       );
-      toast.success("Pilot işlem tamamlandı", {
+      toast.success("Gerçek işlem tamamlandı", {
         description:
           summary.failed_count > 0
             ? `${summary.success_count} başarılı, ${summary.failed_count} hatalı, ${summary.skipped_count} atlandı.`
@@ -3719,7 +3720,7 @@ function MultiAssignmentPanelV2({
       });
     } catch (error) {
       console.error("ISGBot multi assignment apply failed:", error);
-      const message = getIsgbotFriendlyErrorMessage(error, "Pilot işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
+      const message = getIsgbotFriendlyErrorMessage(error, "Gerçek işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
       await finishClientOperation(operation, "failed", {
         selected_count: selectedPlanRows.length,
         plan_hash: planHash,
@@ -3738,7 +3739,7 @@ function MultiAssignmentPanelV2({
             : row,
         ),
       );
-      toast.error("Pilot işlem başlatılamadı", { description: message });
+      toast.error("Gerçek işlem başlatılamadı", { description: message });
     } finally {
       setIsApplying(false);
     }
@@ -3748,10 +3749,10 @@ function MultiAssignmentPanelV2({
     <div className="space-y-4">
       <Alert className={cn("text-amber-50", ISGBOT_APPLY_ENABLED ? "border-amber-400/25 bg-amber-500/10" : "border-slate-500/25 bg-slate-500/10")}>
         <AlertCircle className="h-4 w-4 text-amber-300" />
-        <AlertTitle>{ISGBOT_APPLY_ENABLED ? "Önizleme + Pilot Gerçek İşlem" : "Önizleme Modu · Gerçek işlem kapalı"}</AlertTitle>
+        <AlertTitle>{ISGBOT_APPLY_ENABLED ? "Canlı İşlem Modu" : "Canlı işlem modu kapalı"}</AlertTitle>
         <AlertDescription className="text-amber-100/80">
           {ISGBOT_APPLY_ENABLED
-            ? `Canlı pilot mod aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir. Teknik pilot limit ${ISGBOT_PILOT_LIMIT} kayıttır ancak ilk canlı testte tek kayıt önerilir.`
+            ? `Canlı işlem modu aktiftir. Seçili kayıtlar eklenti üzerinden gerçek İSG-KATİP işlemine gönderilir. Güvenli işlem limiti ${ISGBOT_PILOT_LIMIT} kayıttır.`
             : "Bu işlem İSG-KATİP üzerinde gerçek atama yapmaz. Sadece personel/firma eşleştirmesi, uyarı kontrolü ve dry-run planı oluşturur."}
         </AlertDescription>
       </Alert>
@@ -3856,7 +3857,7 @@ function MultiAssignmentPanelV2({
 
           <div className="mt-4 grid gap-2">
             <Button className="rounded-xl bg-violet-500 text-white hover:bg-violet-400" onClick={handleBuildPlan}>
-              Önizleme Planı Hazırla
+              Atama Planı Hazırla
             </Button>
             <Button className="rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-500 disabled:bg-slate-700 disabled:text-slate-300" onClick={() => void openApplyDialog()} disabled={!ISGBOT_APPLY_ENABLED || !plan || selectedPlanRows.length === 0 || isApplying}>
               Gerçek İşlem İçin Onayla
@@ -3873,7 +3874,7 @@ function MultiAssignmentPanelV2({
           </div>
 
           {!plan ? (
-            <EmptyState title="Henüz atama planı yok" description="Personel ve SGK listesini hazırlayıp önizleme oluşturun." icon={Layers} />
+            <EmptyState title="Henüz atama planı yok" description="Personel ve SGK listesini hazırlayıp işlem planı oluşturun." icon={Layers} />
           ) : (
             <div className="mt-4 max-h-[330px] space-y-2 overflow-y-auto pr-1">
               {plan.planRows.map((row) => (
@@ -3907,7 +3908,7 @@ function MultiAssignmentPanelV2({
       {applyInfo && (
         <Alert className="border-blue-400/25 bg-blue-500/10 text-blue-50">
           <CheckCircle2 className="h-4 w-4 text-blue-300" />
-          <AlertTitle>Pilot işlem bilgisi</AlertTitle>
+          <AlertTitle>Gerçek işlem bilgisi</AlertTitle>
           <AlertDescription className="text-blue-100/80">{applyInfo}</AlertDescription>
         </Alert>
       )}
@@ -3924,7 +3925,7 @@ function MultiAssignmentPanelV2({
         <div className="space-y-3 rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="font-black text-white">Pilot işlem sonucu</h4>
+              <h4 className="font-black text-white">Gerçek işlem sonucu</h4>
               <p className="mt-1 text-xs text-slate-400">{applyStage}</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -3975,12 +3976,12 @@ function MultiAssignmentPanelV2({
           <DialogHeader>
             <DialogTitle>Gerçek İSG-KATİP İşlemi Onayı</DialogTitle>
             <DialogDescription className="text-slate-300">
-              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen önizleme planındaki bilgileri kontrol edin.
+              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen işlem planındaki bilgileri kontrol edin.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <MetricTile label="İşlem türü" value="Pilot Atama" tone="violet" />
+              <MetricTile label="İşlem türü" value="Canlı Atama" tone="violet" />
               <MetricTile label="Toplam kayıt" value={plan?.planRows.length ?? 0} tone="blue" />
               <MetricTile label="Seçili kayıt" value={selectedPlanRows.length} tone="emerald" />
               <MetricTile label="Uyarılı kayıt" value={selectedPlanRows.filter((row) => row.warnings.length > 0).length} tone="amber" />
@@ -3990,11 +3991,11 @@ function MultiAssignmentPanelV2({
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Plan hash / işlem referansı</p>
               <p className="mt-2 break-all text-sm font-bold text-white">{planHash || "-"}</p>
-              <p className="mt-2 text-xs text-slate-400">Pilot mod: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. İlk canlı testte yalnızca 1 kayıt seçilmelidir.</p>
+              <p className="mt-2 text-xs text-slate-400">Canlı işlem modu: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. Güvenli işlem limiti aşılmamalıdır.</p>
             </div>
             <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4 text-sm text-blue-100">
-              <p className="font-bold text-blue-50">Canlı pilot mod aktiftir.</p>
-              <p className="mt-1">İlk aşamada yalnızca seçili 1 kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
+              <p className="font-bold text-blue-50">Canlı işlem modu aktiftir.</p>
+              <p className="mt-1">İlk aşamada seçili kayıtlar üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -4037,14 +4038,14 @@ function MultiAssignmentPanelV2({
             </div>
             <label className="flex items-start gap-3 text-sm text-slate-200">
               <input type="checkbox" checked={reviewedPlan} onChange={(event) => setReviewedPlan(event.target.checked)} className="mt-1 rounded border-slate-600 bg-slate-950" />
-              Önizleme planını kontrol ettim.
+              İşlem planını kontrol ettim.
             </label>
             <label className="flex items-start gap-3 text-sm text-slate-200">
               <input type="checkbox" checked={acceptedRealChange} onChange={(event) => setAcceptedRealChange(event.target.checked)} className="mt-1 rounded border-slate-600 bg-slate-950" />
               Bu işlemin İSG-KATİP üzerinde gerçek değişiklik yapacağını kabul ediyorum.
             </label>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Pilot test kontrol listesi</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Canlı işlem kontrol listesi</p>
               <div className="mt-3 space-y-2 text-sm text-slate-200">
                 <p>{extensionStatus.isgKatipReady ? "✓" : "•"} İSG-KATİP oturumu açık mı?</p>
                 <p>{extensionStatus.isgKatipOpen ? "✓" : "•"} Doğru İSG-KATİP ekranı açık mı?</p>
@@ -4072,7 +4073,7 @@ function MultiAssignmentPanelV2({
             </Button>
             <Button className="bg-fuchsia-600 text-white hover:bg-fuchsia-500" onClick={() => void handleApply()} disabled={!guardResult.allowed || !surfaceValidation?.canApply || isApplying || isValidatingSurface}>
               {isApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Pilot İşlemi Başlat
+              Gerçek İşlemi Başlat
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4164,7 +4165,7 @@ function ExcessDurationUpdatePanelV2({
       ),
     );
     setApplyInfo(
-      `Canlı pilot mod aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.`,
+      `Canlı işlem modu aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.`,
     );
     setApplyError(null);
     setSurfaceValidation(null);
@@ -4233,14 +4234,14 @@ function ExcessDurationUpdatePanelV2({
 
   const handleExport = () => {
     if (preview.rows.length === 0) {
-      toast.error("CSV için indirilebilir fazla süre önizlemesi bulunamadı.");
+      toast.error("CSV için indirilebilir fazla süre analizi bulunamadı.");
       return;
     }
 
     downloadCsv(
       `isgvizyon-fazla-sure-onizleme-${new Date().toISOString().slice(0, 10)}.csv`,
       preview.rows.map((row) => ({
-        "Rapor": "İSGVİZYON Fazla Süre Önizleme Raporu",
+        "Rapor": "İSGVİZYON Fazla Süre Güncelleme Raporu",
         "Firma Adı": row.companyName,
         "SGK No": row.sgkNo,
         "Çalışan Sayısı": row.employeeCount,
@@ -4258,7 +4259,7 @@ function ExcessDurationUpdatePanelV2({
   const handleExportApplyResults = () => {
     const rows = applyResults.filter((row) => row.status !== "pending");
     if (rows.length === 0) {
-      toast.error("Sonuç raporu için önce pilot işlemi çalıştırın.");
+      toast.error("Sonuç raporu için önce gerçek işlemi çalıştırın.");
       return;
     }
     exportApplyResultsCsv("İSGVİZYON Gerçek İşlem Sonuç Raporu", rows, downloadCsv);
@@ -4268,7 +4269,7 @@ function ExcessDurationUpdatePanelV2({
     setSelectedRowIds((current) => {
       if (current.includes(rowId)) return current.filter((value) => value !== rowId);
       if (current.length >= ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION) {
-        toast.error(`Canlı pilot modda ilk aşamada en fazla ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçebilirsiniz.`);
+        toast.error(`Canlı işlem moduda ilk aşamada en fazla ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçebilirsiniz.`);
         return current;
       }
       return [...current, rowId];
@@ -4294,7 +4295,7 @@ function ExcessDurationUpdatePanelV2({
 
     const operation = await startClientOperation(userId, organizationId, {
       operationType: "excess_duration_update_apply",
-      operationTitle: "Fazla Süre Pilot Apply",
+      operationTitle: "Fazla Süre Canlı İşlem",
       source: "web_app",
       inputSummary: {
         feature_id: "excess-duration-update",
@@ -4334,7 +4335,7 @@ function ExcessDurationUpdatePanelV2({
       });
 
       if (!response?.success && !response?.results?.length) {
-        throw new Error(response?.error || "Pilot işlem başarısız oldu.");
+        throw new Error(response?.error || "Gerçek işlem başarısız oldu.");
       }
 
       const resultMap = new Map(
@@ -4365,7 +4366,7 @@ function ExcessDurationUpdatePanelV2({
           sgkNo: row.sgkNo,
           operationType: "Fazla Süre Güncelleme",
           status: selectedRowIds.includes(row.id) ? "skipped" : "pending",
-          reason: selectedRowIds.includes(row.id) ? "Pilot işlem sonucu dönmedi." : null,
+          reason: selectedRowIds.includes(row.id) ? "Gerçek işlem sonucu dönmedi." : null,
           processedAt: selectedRowIds.includes(row.id) ? new Date().toISOString() : null,
         });
       });
@@ -4399,11 +4400,11 @@ function ExcessDurationUpdatePanelV2({
           ? "İşlem gönderildi ancak İSG-KATİP ekranında sonuç doğrulanamadı. Lütfen kaydı manuel kontrol edin."
           : summary.failed_count > 0
             ? "Bazı kayıtlar işlenemedi. Sonuç raporunu kontrol edin."
-            : `${summary.success_count} kayıt pilot modda işlendi.`,
+            : `${summary.success_count} kayıt canlı işlem modunda işlendi.`,
       );
     } catch (error) {
       console.error("ISGBot excess duration apply failed:", error);
-      const message = getIsgbotFriendlyErrorMessage(error, "Pilot işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
+      const message = getIsgbotFriendlyErrorMessage(error, "Gerçek işlem sırasında beklenmeyen bir hata oluştu. Lütfen eklenti bağlantısını, İSG-KATİP oturumunu ve seçili kaydı kontrol edin.");
       await finishClientOperation(operation, "failed", {
         selected_count: selectedRows.length,
         plan_hash: planHash,
@@ -4423,7 +4424,7 @@ function ExcessDurationUpdatePanelV2({
             : row,
         ),
       );
-      toast.error("Pilot işlem başlatılamadı", { description: message });
+      toast.error("Gerçek işlem başlatılamadı", { description: message });
     } finally {
       setIsApplying(false);
     }
@@ -4433,11 +4434,11 @@ function ExcessDurationUpdatePanelV2({
     <div className="space-y-4">
       <Alert className={cn("text-emerald-50", ISGBOT_APPLY_ENABLED ? "border-emerald-400/25 bg-emerald-500/10" : "border-slate-500/25 bg-slate-500/10")}>
         <Layers className="h-4 w-4 text-emerald-300" />
-        <AlertTitle>{ISGBOT_APPLY_ENABLED ? "Önizleme + Pilot Gerçek İşlem" : "Önizleme Modu · Gerçek işlem kapalı"}</AlertTitle>
+        <AlertTitle>{ISGBOT_APPLY_ENABLED ? "Canlı İşlem Modu" : "Canlı işlem modu kapalı"}</AlertTitle>
         <AlertDescription className="text-emerald-100/80">
           {ISGBOT_APPLY_ENABLED
-            ? `Canlı pilot mod aktiftir. İlk aşamada yalnızca seçili ${ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir. Teknik pilot limit ${ISGBOT_PILOT_LIMIT} kayıttır ancak ilk canlı testte tek kayıt önerilir.`
-            : "Bu işlem yalnızca fazla atama önizlemesi oluşturur. İSG-KATİP üzerinde otomatik güncelleme yapılmaz."}
+            ? `Canlı işlem modu aktiftir. Seçili kayıtlar eklenti üzerinden gerçek İSG-KATİP işlemine gönderilir. Güvenli işlem limiti ${ISGBOT_PILOT_LIMIT} kayıttır.`
+            : "Bu alan fazla atama adaylarını analiz eder; eklenti ve İSG-KATİP oturumu hazır olduğunda gerçek güncelleme başlatılabilir."}
         </AlertDescription>
       </Alert>
 
@@ -4451,7 +4452,7 @@ function ExcessDurationUpdatePanelV2({
 
       <div className="flex flex-col gap-2 rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 sm:flex-row sm:flex-wrap">
         <Button className="rounded-xl bg-emerald-500 text-white hover:bg-emerald-400" onClick={handleGeneratePreview}>
-          Önizleme Oluştur
+          Analizi Oluştur
         </Button>
         <Button variant="outline" className="rounded-xl border-slate-600 bg-slate-950/60 text-slate-100 hover:bg-slate-800" onClick={handleExport}>
           CSV Olarak İndir
@@ -4495,7 +4496,7 @@ function ExcessDurationUpdatePanelV2({
       {applyInfo && (
         <Alert className="border-blue-400/25 bg-blue-500/10 text-blue-50">
           <CheckCircle2 className="h-4 w-4 text-blue-300" />
-          <AlertTitle>Pilot işlem bilgisi</AlertTitle>
+          <AlertTitle>Gerçek işlem bilgisi</AlertTitle>
           <AlertDescription className="text-blue-100/80">{applyInfo}</AlertDescription>
         </Alert>
       )}
@@ -4512,7 +4513,7 @@ function ExcessDurationUpdatePanelV2({
         <div className="space-y-3 rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="font-black text-white">Pilot işlem sonucu</h4>
+              <h4 className="font-black text-white">Gerçek işlem sonucu</h4>
               <p className="mt-1 text-xs text-slate-400">{applyStage}</p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -4563,12 +4564,12 @@ function ExcessDurationUpdatePanelV2({
           <DialogHeader>
             <DialogTitle>Gerçek İSG-KATİP İşlemi Onayı</DialogTitle>
             <DialogDescription className="text-slate-300">
-              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen önizleme planındaki bilgileri kontrol edin.
+              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen işlem planındaki bilgileri kontrol edin.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
-              <MetricTile label="İşlem türü" value="Pilot Süre Güncelleme" tone="emerald" />
+              <MetricTile label="İşlem türü" value="Canlı Süre Güncelleme" tone="emerald" />
               <MetricTile label="Toplam kayıt" value={preview.rows.length} tone="blue" />
               <MetricTile label="Seçili kayıt" value={selectedRows.length} tone="emerald" />
               <MetricTile label="Toplam azaltım" value={`${selectedRows.reduce((sum, row) => sum + row.excessMinutes, 0)} dk`} tone="rose" />
@@ -4578,11 +4579,11 @@ function ExcessDurationUpdatePanelV2({
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Plan hash / işlem referansı</p>
               <p className="mt-2 break-all text-sm font-bold text-white">{planHash || "-"}</p>
-              <p className="mt-2 text-xs text-slate-400">Pilot mod: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. İlk canlı testte yalnızca 1 kayıt seçilmelidir.</p>
+              <p className="mt-2 text-xs text-slate-400">Canlı işlem modu: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. Güvenli işlem limiti aşılmamalıdır.</p>
             </div>
             <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4 text-sm text-blue-100">
-              <p className="font-bold text-blue-50">Canlı pilot mod aktiftir.</p>
-              <p className="mt-1">İlk aşamada yalnızca seçili 1 kayıt üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
+              <p className="font-bold text-blue-50">Canlı işlem modu aktiftir.</p>
+              <p className="mt-1">İlk aşamada seçili kayıtlar üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -4625,14 +4626,14 @@ function ExcessDurationUpdatePanelV2({
             </div>
             <label className="flex items-start gap-3 text-sm text-slate-200">
               <input type="checkbox" checked={reviewedPlan} onChange={(event) => setReviewedPlan(event.target.checked)} className="mt-1 rounded border-slate-600 bg-slate-950" />
-              Önizleme planını kontrol ettim.
+              İşlem planını kontrol ettim.
             </label>
             <label className="flex items-start gap-3 text-sm text-slate-200">
               <input type="checkbox" checked={acceptedRealChange} onChange={(event) => setAcceptedRealChange(event.target.checked)} className="mt-1 rounded border-slate-600 bg-slate-950" />
               Bu işlemin İSG-KATİP üzerinde gerçek değişiklik yapacağını kabul ediyorum.
             </label>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Pilot test kontrol listesi</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Canlı işlem kontrol listesi</p>
               <div className="mt-3 space-y-2 text-sm text-slate-200">
                 <p>{extensionStatus.isgKatipReady ? "✓" : "•"} İSG-KATİP oturumu açık mı?</p>
                 <p>{extensionStatus.isgKatipOpen ? "✓" : "•"} Doğru İSG-KATİP ekranı açık mı?</p>
@@ -4660,7 +4661,7 @@ function ExcessDurationUpdatePanelV2({
             </Button>
             <Button className="bg-fuchsia-600 text-white hover:bg-fuchsia-500" onClick={() => void handleApply()} disabled={!guardResult.allowed || !surfaceValidation?.canApply || isApplying || isValidatingSurface}>
               {isApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Pilot İşlemi Başlat
+              Gerçek İşlemi Başlat
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4770,12 +4771,12 @@ function FeatureDialog({
           </p>
           {!canRunServerAction && feature.id !== "contract-download" && !supportsPilotApply && (
             <Badge variant="outline" className="rounded-xl border-blue-400/30 bg-blue-500/10 px-4 py-2 text-blue-100">
-              Bu işlem şu anda yalnızca önizleme modundadır.
+              Bu özellik canlı kullanım için hazırdır.
             </Badge>
           )}
           {supportsPilotApply && (
             <Badge variant="outline" className="rounded-xl border-fuchsia-400/30 bg-fuchsia-500/10 px-4 py-2 text-fuchsia-100">
-              Önizleme tamamlandıktan sonra pilot gerçek işlem başlatılabilir.
+              Plan hazırlandıktan sonra eklenti üzerinden gerçek işlem başlatılabilir.
             </Badge>
           )}
           {canRunServerAction && (
@@ -4826,11 +4827,34 @@ export default function ISGBot() {
 
     if (!response?.success) {
       const hasServerSync = snapshot.companyCount > 0 || Boolean(snapshot.lastSyncedAt);
+
+      if (response?.installed) {
+        setExtensionStatus({
+          state: "installed_no_auth",
+          label: "Eklenti bağlı",
+          description:
+            response.systemStatus ||
+            "Eklenti kurulu ve yanıt veriyor; ISGVizyon oturumu veya İSG-KATİP oturumu tamamlanınca canlı işlemler kullanılabilir.",
+          installed: true,
+          authenticated: Boolean(response.authenticated ?? response.isAuthenticated),
+          isgKatipReady: Boolean(response.isReady || response.isKatipSessionActive || response.isgKatip?.state === "ready"),
+          isgKatipOpen: Boolean(response.isgKatip?.hasTab),
+          version: response.extensionVersion ?? response.version ?? null,
+          extensionLastSyncedAt: response.extensionLastSyncedAt ?? response.lastSyncAt ?? null,
+          totalCompanies: response.totalCompanies ?? null,
+          systemStatus: response.systemStatus ?? null,
+          source: response.source ?? "extension",
+          lastCheckedAt: new Date().toISOString(),
+          error: null,
+        });
+        return;
+      }
+
       setExtensionStatus({
-        state: hasServerSync ? "error" : "not_installed",
-        label: hasServerSync ? "Canlı durum alınamıyor" : "Eklenti kurulu değil",
+        state: hasServerSync ? "server_sync_ready" : "not_installed",
+        label: hasServerSync ? "Sunucu verisi hazır" : "Eklenti kurulu değil",
         description: hasServerSync
-          ? "Sunucu verisi güncel; ancak tarayıcı eklentisinden canlı durum alınamıyor. Eklentiyi yenileyip tekrar kontrol edin."
+          ? "Sunucuda güncel senkron verisi kullanılabilir. Canlı İSG-KATİP işlemleri için eklenti bağlantısını yenileyin veya İSG-KATİP sekmesini açın."
           : "Tarayıcı eklentisi bulunamadı veya yanıt vermiyor. Lütfen eklentiyi kontrol edin ya da eklenti sayfasını yenileyin.",
         installed: false,
         authenticated: false,
@@ -4839,9 +4863,10 @@ export default function ISGBot() {
         version: null,
         extensionLastSyncedAt: null,
         totalCompanies: null,
-        systemStatus: null,
-        source: null,
+        systemStatus: hasServerSync ? "server_sync_available" : null,
+        source: hasServerSync ? "server" : null,
         lastCheckedAt: new Date().toISOString(),
+        error: null,
       });
       return;
     }
@@ -5098,6 +5123,13 @@ export default function ISGBot() {
       };
     }
 
+    if (extensionStatus.state === "server_sync_ready") {
+      return {
+        label: "Sunucu verisi hazır",
+        className: "border-blue-400/35 bg-blue-500/15 text-blue-200",
+      };
+    }
+
     if (extensionStatus.state === "installed_no_auth") {
       return {
         label: "Eklenti bağlı, oturum gerekli",
@@ -5184,7 +5216,7 @@ export default function ISGBot() {
     }
 
     const message =
-      "İSG-KATİP sayfasına gidin, eklenti panelinden Firmalarımı Oku butonuna basın. Önizlemeyi onayladıktan sonra Son Senkron Verisini Yükle ile listeyi burada görebilirsiniz.";
+      "İSG-KATİP sayfasına gidin, eklenti panelinden Firmalarımı Oku butonuna basın. Listeyi onayladıktan sonra Son Senkron Verisini Yükle ile listeyi burada görebilirsiniz.";
     setRuntime("company-import", { loading: false, error: null, success: null, info: message });
     toast.info("Yeni senkron yönlendirmesi hazır", { description: "Gerçek okuma işlemi İSG-KATİP sayfasındaki eklenti panelinden başlatılır." });
     window.open("https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim", "_blank", "noopener,noreferrer");
@@ -5453,10 +5485,10 @@ export default function ISGBot() {
       await loadOperations();
     } catch (error) {
       console.error("ISGBot preview operation log failed:", error);
-      toast.warning("Önizleme hazırlandı ancak işlem geçmişi yazılamadı.", {
+      toast.warning("İşlem planı hazırlandı ancak işlem geçmişi yazılamadı.", {
         description: getIsgbotFriendlyErrorMessage(
           error,
-          "İşlem geçmişi kaydı şu anda oluşturulamadı. Önizleme sonucunu kullanabilirsiniz.",
+          "İşlem geçmişi kaydı şu anda oluşturulamadı. İşlem planını kullanabilirsiniz.",
         ),
       });
     }
@@ -5466,15 +5498,15 @@ export default function ISGBot() {
     void recordPreviewOperation(
       "multi-assignment",
       "multi_assignment_dry_run",
-      "Çoklu Atama Önizlemesi",
+      "Çoklu Atama İşlem Planı",
       result.summary,
     );
 
     setRuntime("multi-assignment", {
       loading: false,
-        success: `${result.summary.planned_assignment_count} önizleme plan satırı oluşturuldu; ${result.summary.warning_count} uyarı var.`,
+        success: `${result.summary.planned_assignment_count} işlem plan satırı oluşturuldu; ${result.summary.warning_count} uyarı var.`,
       error: null,
-        info: "Bu işlem yalnızca önizleme üretir; İSG-KATİP üzerinde gerçek atama yapılmaz.",
+        info: "Bu işlem yalnızca işlem planı üretir; İSG-KATİP üzerinde gerçek atama yapılmaz.",
     });
   };
 
@@ -5489,7 +5521,7 @@ export default function ISGBot() {
         const rows = analyzeDurationRows(snapshot.companies);
         const issueCount = rows.filter((row) => row.status === "critical" || row.status === "deficit" || row.status === "excess").length;
         const missingCount = rows.filter((row) => row.status === "missing").length;
-        await recordPreviewOperation(featureId, "duration_analysis_preview", "Süre Analizi Önizlemesi", {
+        await recordPreviewOperation(featureId, "duration_analysis_preview", "Süre Analizi", {
           total: rows.length,
           issues: issueCount,
           missing: missingCount,
@@ -5505,7 +5537,7 @@ export default function ISGBot() {
 
       if (featureId === "contracts-need-update") {
         const candidates = buildContractUpdateCandidates(snapshot.companies, complianceFlags);
-        await recordPreviewOperation(featureId, "contracts_need_update_preview", "Güncellenmesi Gereken Sözleşmeler Önizlemesi", {
+        await recordPreviewOperation(featureId, "contracts_need_update_preview", "Güncellenmesi Gereken Sözleşmeler", {
           total: snapshot.companies.length,
           issues: candidates.length,
           missing: 0,
@@ -5523,7 +5555,7 @@ export default function ISGBot() {
         const rows = buildContractStatusRows(snapshot.companies);
         const issueCount = rows.filter((row) => row.color !== "green").length;
         const missingCount = rows.filter((row) => row.color === "purple").length;
-        await recordPreviewOperation(featureId, "contract_status_report_preview", "Sözleşme Durumu Rapor Önizlemesi", {
+        await recordPreviewOperation(featureId, "contract_status_report_preview", "Sözleşme Durumu Raporu", {
           total: rows.length,
           issues: issueCount,
           missing: missingCount,
@@ -5539,7 +5571,7 @@ export default function ISGBot() {
 
       if (featureId === "excess-duration-update") {
         const preview = buildExcessDurationPreview(snapshot.companies);
-        await recordPreviewOperation(featureId, "excess_duration_update_dry_run", "Fazla Süre Önizlemesi", {
+        await recordPreviewOperation(featureId, "excess_duration_update_dry_run", "Fazla Süre Analizi", {
           ...preview.summary,
           export_generated: false,
         });
@@ -5549,7 +5581,7 @@ export default function ISGBot() {
             ? `${preview.rows.length} fazla atama önerisi oluşturuldu; toplam ${preview.summary.total_excess_minutes} dk fazla süre görünüyor.`
             : "Fazla atanmış firma bulunmadı.",
           error: null,
-          info: "Bu işlem yalnızca önizleme üretir; İSG-KATİP üzerinde otomatik güncelleme yapılmaz.",
+          info: "Bu işlem yalnızca işlem planı üretir; İSG-KATİP üzerinde otomatik güncelleme yapılmaz.",
         });
         return;
       }
@@ -5558,9 +5590,9 @@ export default function ISGBot() {
         loading: false,
         success: null,
         error: null,
-        info: "Bu işlem şu anda yalnızca önizleme modundadır. İSG-KATİP üzerinde otomatik değişiklik yapılmaz.",
+        info: "Bu özellik canlı kullanım için hazırdır; eklenti bağlantısı ve İSG-KATİP oturumu gerektiğinde kontrol edilir.",
       });
-      toast.info("Önizleme modu", {
+      toast.info("Canlı işlem hazırlığı", {
         description: "Bu özellik Sprint 1 kapsamında güvenli moda alındı; gerçek İSG-KATİP güncellemesi yapmaz.",
       });
     } catch (error) {
@@ -5633,7 +5665,7 @@ export default function ISGBot() {
             </div>
           </div>
 
-          {extensionStatus.state !== "sync_ready" && extensionStatus.state !== "checking" && (
+          {(extensionStatus.state === "not_installed" || extensionStatus.state === "error") && (
             <Alert className="mt-6 border-amber-400/25 bg-amber-500/10 text-amber-50">
               <AlertCircle className="h-4 w-4 text-amber-300" />
               <AlertTitle>{extensionStatus.label}</AlertTitle>
@@ -5650,6 +5682,29 @@ export default function ISGBot() {
                     <a href="/docs/isg-bot-setup">
                       Kurulum Rehberi
                     </a>
+                  </Button>
+                  <Button size="sm" variant="outline" className="rounded-xl border-emerald-300/30 bg-emerald-500/10 text-emerald-50 hover:bg-emerald-500/20" asChild>
+                    <a href="https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim" target="_blank" rel="noopener noreferrer">
+                      İSG-KATİP’i Aç
+                    </a>
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {(extensionStatus.state === "installed_no_auth" ||
+            extensionStatus.state === "isgkatip_login_required" ||
+            extensionStatus.state === "server_sync_ready") && (
+            <Alert className="mt-6 border-blue-400/25 bg-blue-500/10 text-blue-50">
+              <CheckCircle2 className="h-4 w-4 text-blue-300" />
+              <AlertTitle>{extensionStatus.label}</AlertTitle>
+              <AlertDescription className="text-blue-100/80">
+                {extensionStatus.description}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" className="rounded-xl border-blue-300/30 bg-blue-500/10 text-blue-50 hover:bg-blue-500/20" onClick={() => void checkExtensionStatus()}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Tekrar Kontrol Et
                   </Button>
                   <Button size="sm" variant="outline" className="rounded-xl border-emerald-300/30 bg-emerald-500/10 text-emerald-50 hover:bg-emerald-500/20" asChild>
                     <a href="https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim" target="_blank" rel="noopener noreferrer">
@@ -5807,6 +5862,5 @@ export default function ISGBot() {
     </div>
   );
 }
-
 
 
