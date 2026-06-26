@@ -4,6 +4,7 @@ import {
   Briefcase,
   Download,
   Gauge,
+  Info,
   Plus,
   RefreshCcw,
   Search,
@@ -44,13 +45,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  deleteOsgbAssignment,
-} from "@/lib/osgbOperations";
 import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
-import { useAccessRole } from "@/hooks/useAccessRole";
+import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import { downloadCsv } from "@/lib/csvExport";
 import {
+  deleteOsgbAssignmentWorkspace,
   getOsgbWorkspaceAssignmentRecommendation,
   getOsgbWorkspaceCompanyAssignedMinutesTotal,
   getOsgbWorkspacePersonnelAssignedMinutesTotal,
@@ -85,7 +84,7 @@ const emptyForm: AssignmentFormState = {
   personnelId: "",
   assignedRole: "igu",
   assignedMinutes: "",
-  startDate: "",
+  startDate: new Date().toISOString().slice(0, 10),
   endDate: "",
   status: "active",
   notes: "",
@@ -129,7 +128,8 @@ const roleMinutes = (
 export default function OSGBAssignments() {
   const { user, profile } = useAuth();
   const organizationId = profile?.organization_id || null;
-  const { canManage } = useAccessRole();
+  const osgbAccess = useOsgbAccess();
+  const canManage = ["owner", "admin", "operations_manager", "secretary"].includes(osgbAccess.role);
   const [records, setRecords] = useState<OsgbWorkspaceAssignmentRecord[]>([]);
   const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
   const [personnel, setPersonnel] = useState<OsgbWorkspacePersonnelRecord[]>([]);
@@ -191,6 +191,37 @@ export default function OSGBAssignments() {
         if (active) {
           setCompanies([]);
           toast.error(err instanceof Error ? err.message : "OSGB firma listesi yüklenemedi.");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [organizationId]);
+
+  useEffect(() => {
+    if (!organizationId) {
+      setPersonnel([]);
+      return;
+    }
+
+    let active = true;
+    setPersonnelLoading(true);
+    void listOsgbWorkspacePersonnel(organizationId, true)
+      .then((rows) => {
+        if (active) {
+          setPersonnel(rows);
+        }
+      })
+      .catch((err) => {
+        if (active) {
+          setPersonnel([]);
+          toast.error(err instanceof Error ? err.message : "Aktif personel listesi yüklenemedi.");
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setPersonnelLoading(false);
         }
       });
 
@@ -295,7 +326,7 @@ export default function OSGBAssignments() {
   }, [clearAssignmentDraft, pendingRestoredEditingId, records]);
 
   const ensurePersonnelOptions = async () => {
-    if (!organizationId || personnel.length > 0) return;
+    if (!organizationId || personnel.length > 0 || personnelLoading) return;
     setPersonnelLoading(true);
     try {
       const personnelRows = await listOsgbWorkspacePersonnel(organizationId, true);
@@ -412,6 +443,25 @@ export default function OSGBAssignments() {
     return records;
   }, [records]);
 
+  const personnelByRole = useMemo(
+    () => ({
+      igu: personnel.filter((item) => item.role === "igu"),
+      hekim: personnel.filter((item) => item.role === "hekim"),
+      dsp: personnel.filter((item) => item.role === "dsp"),
+    }),
+    [personnel],
+  );
+
+  const selectedPersonnel = useMemo(
+    () => personnel.find((item) => item.id === form.personnelId) || null,
+    [form.personnelId, personnel],
+  );
+
+  const selectedCompany = useMemo(
+    () => companies.find((item) => item.id === form.companyId) || null,
+    [companies, form.companyId],
+  );
+
   const summary = useMemo(() => {
     const active = filteredRecords.filter((item) => item.status === "active").length;
     const passive = filteredRecords.filter((item) => item.status === "passive").length;
@@ -449,7 +499,7 @@ export default function OSGBAssignments() {
       }
     }
     setEditing(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
     setCompanyAssignedMinutes(0);
     setPersonnelAssignedMinutes(0);
     setDialogOpen(true);
@@ -496,6 +546,10 @@ export default function OSGBAssignments() {
       toast.error("Firma, personel ve dakika alanları zorunludur.");
       return;
     }
+    if (selectedPersonnel && selectedPersonnel.role !== form.assignedRole) {
+      toast.error("Seçilen personelin rolü ile görevlendirme rolü aynı olmalıdır.");
+      return;
+    }
     if (Number(form.assignedMinutes) <= 0) {
       toast.error("Atanan dakika sıfırdan büyük olmalıdır.");
       return;
@@ -525,7 +579,7 @@ export default function OSGBAssignments() {
       await loadData(true);
       setDialogOpen(false);
       setEditing(null);
-      setForm(emptyForm);
+      setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
       clearAssignmentDraft();
       toast.success(editing ? "Görevlendirme güncellendi." : "Personel firmaya atandı.");
     } catch (err) {
@@ -542,7 +596,8 @@ export default function OSGBAssignments() {
     }
     if (!confirm("Bu görevlendirmeyi silmek istiyor musunuz?")) return;
     try {
-      await deleteOsgbAssignment(id);
+      if (!organizationId) throw new Error("Organizasyon bilgisi bulunamadı.");
+      await deleteOsgbAssignmentWorkspace(organizationId, id);
       await loadData(true);
       toast.success("Görevlendirme silindi.");
     } catch (err) {
@@ -574,7 +629,10 @@ export default function OSGBAssignments() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-white">OSGB Personel Görevlendirme</h1>
               <p className="text-sm text-slate-400">
-                Her firmaya tek aktif atama kuralı ile personel görevlendirin. Mükerrer aktif atamalar hem uygulamada hem veritabanında engellenir.
+                Firma, personel ve rolü seçip önerilen dakikayı uygulayarak OSGB görevlendirmelerini hızlıca oluşturun.
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                OSGB rolünüz: {osgbAccess.roleLabel} • {canManage ? "Kayıt oluşturma yetkiniz var." : "Bu ekranda yalnızca görüntüleme yapabilirsiniz."}
               </p>
             </div>
           </div>
@@ -621,9 +679,41 @@ export default function OSGBAssignments() {
 
       <Alert>
         <ShieldBan className="h-4 w-4" />
-        <AlertTitle>Mükerrer atama engeli aktif</AlertTitle>
-        <AlertDescription>Bir firmada aynı anda yalnızca bir aktif personel görevlendirmesi olabilir. Yeni aktif kayıt eklenmeye çalışılırsa işlem reddedilir.</AlertDescription>
+        <AlertTitle>Mükerrer aktif rol engeli aktif</AlertTitle>
+        <AlertDescription>
+          Aynı firma ve aynı rol için ikinci aktif görevlendirme oluşturulamaz. İGU, hekim ve DSP atamaları ayrı ayrı yönetilir.
+        </AlertDescription>
       </Alert>
+
+      {!canManage ? (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Görevlendirme yetkisi yok</AlertTitle>
+          <AlertDescription>
+            Kayıt oluşturmak için OSGB rolünüz owner, admin, operasyon sorumlusu veya sekreterya olmalıdır.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {canManage && companies.length === 0 ? (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Atanacak OSGB firması bulunamadı</AlertTitle>
+          <AlertDescription>
+            Önce OSGB Firmaları ekranında firmaları OSGB yönetimli hale getirin. Firma listesi dolduğunda burada seçilebilir olacak.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {canManage && personnel.length === 0 ? (
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle>Aktif OSGB personeli bulunamadı</AlertTitle>
+          <AlertDescription>
+            Önce Personel Havuzu ekranında İGU, işyeri hekimi veya DSP kaydı oluşturun/aktif edin. Aktif personel olmadan görevlendirme yapılamaz.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {error ? (
         <Alert variant="destructive">
@@ -746,24 +836,66 @@ export default function OSGBAssignments() {
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Görevlendirme düzenle" : "Yeni görevlendirme oluştur"}</DialogTitle>
-            <DialogDescription>Firma, personel ve dakika bilgilerini girin. Bir firmada tek aktif görevlendirme kuralı uygulanır.</DialogDescription>
+            <DialogDescription>
+              Firma ve personeli seçin. Personelin rolü otomatik atanır; önerilen dakika ile mevzuat açığını hızlıca kapatabilirsiniz.
+            </DialogDescription>
           </DialogHeader>
+          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-3 text-sm text-cyan-100">
+            {selectedCompany ? (
+              <span>
+                {selectedCompany.companyName}: {roleLabel[form.assignedRole]} ihtiyacı {roleMinutes(selectedCompany.requiredMinutesByRole, form.assignedRole)} dk,
+                mevcut aktif atama {roleMinutes(selectedCompany.assignedMinutesByRole, form.assignedRole)} dk.
+              </span>
+            ) : (
+              <span>Atama oluşturmak için önce firma ve personel seçin.</span>
+            )}
+          </div>
           <div className="grid gap-4 py-2 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Firma</Label>
               <Select value={form.companyId} onValueChange={(value) => setForm((prev) => ({ ...prev, companyId: value }))}>
                 <SelectTrigger><SelectValue placeholder="Firma seçin" /></SelectTrigger>
-                <SelectContent>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.companyName}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {companies.length === 0 ? (
+                    <SelectItem value="__no_company" disabled>OSGB yönetimli firma yok</SelectItem>
+                  ) : companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.companyName} • açık {company.deficitMinutes} dk
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Personel</Label>
-              <Select value={form.personnelId} onValueChange={(value) => setForm((prev) => ({ ...prev, personnelId: value }))}>
+              <Select
+                value={form.personnelId}
+                onValueChange={(value) => {
+                  const person = personnel.find((item) => item.id === value);
+                  setForm((prev) => ({
+                    ...prev,
+                    personnelId: value,
+                    assignedRole: person?.role ?? prev.assignedRole,
+                  }));
+                }}
+              >
                 <SelectTrigger><SelectValue placeholder="Personel seçin" /></SelectTrigger>
                 <SelectContent>
                   {personnelLoading ? (
                     <SelectItem value="__loading" disabled>Yükleniyor...</SelectItem>
-                  ) : personnel.map((item) => <SelectItem key={item.id} value={item.id}>{item.full_name} • {item.role.toUpperCase()}</SelectItem>)}
+                  ) : personnel.length === 0 ? (
+                    <SelectItem value="__no_personnel" disabled>Aktif personel yok</SelectItem>
+                  ) : (
+                    <>
+                      {(["igu", "hekim", "dsp"] as const).map((role) =>
+                        personnelByRole[role].map((item) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.full_name} • {roleLabel[item.role]} • kapasite {item.monthly_capacity_minutes} dk
+                          </SelectItem>
+                        )),
+                      )}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -780,7 +912,27 @@ export default function OSGBAssignments() {
             </div>
             <div className="space-y-2">
               <Label>Atanan süre (dk)</Label>
-              <Input type="number" min="0" value={form.assignedMinutes} onChange={(e) => setForm((prev) => ({ ...prev, assignedMinutes: e.target.value }))} />
+              <div className="flex gap-2">
+                <Input type="number" min="0" value={form.assignedMinutes} onChange={(e) => setForm((prev) => ({ ...prev, assignedMinutes: e.target.value }))} />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const recommended =
+                      regulationRecommendation?.remainingGapMinutes && regulationRecommendation.remainingGapMinutes > 0
+                        ? regulationRecommendation.remainingGapMinutes
+                        : regulationRecommendation?.recommendedMinutes || liveCompanyRequirement?.gap || liveCompanyRequirement?.required || 0;
+                    if (recommended > 0) {
+                      setForm((prev) => ({ ...prev, assignedMinutes: String(recommended) }));
+                    } else {
+                      toast.info("Bu rol için hesaplanmış açık bulunamadı.");
+                    }
+                  }}
+                  disabled={!form.companyId}
+                >
+                  Öner
+                </Button>
+              </div>
             </div>
             {regulationRecommendation ? (
               <div className="space-y-2 md:col-span-2">
@@ -869,7 +1021,7 @@ export default function OSGBAssignments() {
               onClick={() => {
                 setDialogOpen(false);
                 setEditing(null);
-                setForm(emptyForm);
+                setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
                 clearAssignmentDraft();
               }}
             >

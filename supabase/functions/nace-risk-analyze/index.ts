@@ -154,8 +154,33 @@ Sadece asagidaki formatta gecerli JSON dondur:
 }`;
 }
 
+function parseGeminiJson(text: string) {
+  const cleaned = cleanJsonText(text);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (firstError) {
+    const repaired = cleaned
+      .replace(/,\s*([}\]])/g, "$1")
+      .replace(/}\s*{/g, "},{")
+      .replace(/]\s*"/g, '],"')
+      .replace(/"\s*\n\s*"/g, '",\n"');
+
+    try {
+      return JSON.parse(repaired);
+    } catch {
+      throw new GeminiHttpError(
+        502,
+        "invalid_model_json",
+        "Yapay zeka yaniti gecerli JSON formatinda degil.",
+        firstError instanceof Error ? firstError.message : String(firstError),
+      );
+    }
+  }
+}
+
 function parseResponse(text: string) {
-  const parsed = JSON.parse(cleanJsonText(text));
+  const parsed = parseGeminiJson(text);
   const risks = Array.isArray(parsed?.risks) ? parsed.risks : [];
 
   if (risks.length === 0) {
@@ -264,7 +289,7 @@ function buildFallbackRisks(
   const activity = body.naceTitle || body.sector || "Faaliyet alani";
   return {
     risks: [
-      fallbackRisk(body, "Isyeri ortam tehlikeleri", `${activity} kapsaminda calisma ortami duzensizligi, uygun olmayan gecis yollari veya kontrolsuz calisma kosullari yaralanma ve is kaybina yol acabilir.`, ["Calisma alanlari duzenli kontrol edilmeli ve uygunsuzluklar kayit altina alinmalidir.", "Gecis yollari, calisma platformlari ve acil cikislar surekli acik tutulmalidir.", "Calisanlara gorev bazli ISG talimatlari teblig edilmelidir."], "Yaralanma, is gucu kaybi ve operasyon aksamasI"),
+      fallbackRisk(body, "Isyeri ortam tehlikeleri", `${activity} kapsaminda calisma ortami duzensizligi, uygun olmayan gecis yollari veya kontrolsuz calisma kosullari yaralanma ve is kaybina yol acabilir.`, ["Calisma alanlari duzenli kontrol edilmeli ve uygunsuzluklar kayit altina alinmalidir.", "Gecis yollari, calisma platformlari ve acil cikislar surekli acik tutulmalidir.", "Calisanlara gorev bazli ISG talimatlari teblig edilmelidir."], "Yaralanma, is gucu kaybi ve operasyon aksaması"),
       fallbackRisk(body, "Makine ve ekipman kullanimi", "Faaliyet sirasinda kullanilan ekipmanlarin uygunsuz kullanimi, bakim eksikligi veya koruyucu donanim yetersizligi yaralanma riski olusturabilir.", ["Makine ve ekipmanlarin periyodik bakim ve kontrol kayitlari tutulmalidir.", "Koruyucu duzenekler devre disi birakilmamalidir.", "Yetkisiz kisilerin ekipman kullanmasi engellenmelidir."], "Ezilme, kesilme, yaralanma veya maddi hasar"),
       fallbackRisk(body, "Elektrik kaynakli tehlikeler", "Elektrik tesisati, uzatma kablolari veya panolardaki uygunsuzluklar elektrik carpmasi ve yangin riskine neden olabilir.", ["Elektrik panolari kilitli ve yetkisiz erisime kapali olmalidir.", "Kacak akim roleleri ve topraklama kontrolleri duzenli yapilmalidir.", "Hasarli kablo ve prizler kullanilmadan once degistirilmelidir."], "Elektrik carpmasi, yanik veya yangin"),
       fallbackRisk(body, "Yangin ve acil durum hazirligi", "Yanici malzemeler, uygunsuz depolama veya acil durum ekipmanlarinin yetersizligi yangin ve tahliye risklerini artirabilir.", ["Yangin sondurme ekipmanlari erisilebilir ve periyodik kontrollu olmalidir.", "Acil cikis ve tahliye yollari isaretlenmeli ve acik tutulmalidir.", "Acil durum tatbikatlari planli sekilde yapilmalidir."], "Yangin, yaralanma, panik ve maddi kayip"),
@@ -465,7 +490,39 @@ Deno.serve(async (req) => {
     });
 
     logInfo(requestId, "gemini:parse_started");
-    const parsed = parseResponse(text);
+    let parsed: ReturnType<typeof parseResponse>;
+    try {
+      parsed = parseResponse(text);
+    } catch (error) {
+      if (error instanceof GeminiHttpError && error.code === "invalid_model_json") {
+        logWarn(requestId, "gemini:parse_failed_using_fallback", {
+          status: error.status,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          textLength: text.length,
+          textPreview: text.slice(0, 800),
+          durationMs: Date.now() - startedAt,
+        });
+
+        const fallback = buildFallbackRisks({ naceCode, sector, hazardClass, naceTitle });
+        logInfo(requestId, "response:fallback_success", {
+          reason: "invalid_model_json",
+          riskCount: fallback.risks.length,
+          durationMs: Date.now() - startedAt,
+        });
+
+        return jsonResponse(200, {
+          success: true,
+          requestId,
+          fallback: true,
+          fallbackReason: "invalid_model_json",
+          ...fallback,
+        });
+      }
+
+      throw error;
+    }
     logInfo(requestId, "gemini:parse_succeeded", {
       riskCount: parsed.risks.length,
       durationMs: Date.now() - startedAt,

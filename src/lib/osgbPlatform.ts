@@ -1301,6 +1301,19 @@ export const upsertOsgbAssignmentWorkspace = async (
   return data as OsgbWorkspaceAssignmentRecord;
 };
 
+export const deleteOsgbAssignmentWorkspace = async (
+  organizationId: string,
+  id: string,
+) => {
+  const { error } = await (supabase as any)
+    .from("osgb_assignments")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("id", id);
+
+  if (error) throw error;
+};
+
 export const getOsgbPersonnelCapacityPanel = async (
   organizationId: string,
   serviceMonth = getServiceMonth(),
