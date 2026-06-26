@@ -13,6 +13,21 @@ interface RiskHazard {
   hazard: string;
   risk: string;
   preventiveMeasures: string[];
+  departmentActivity?: string;
+  currentMeasure?: string;
+  possibleOutcome?: string;
+  probability?: string | number;
+  frequency?: string | number;
+  severity?: string | number;
+  riskScore?: string | number;
+  riskLevel?: string;
+  postProbability?: string | number;
+  postFrequency?: string | number;
+  postSeverity?: string | number;
+  postRiskScore?: string | number;
+  postRiskLevel?: string;
+  deadline?: string;
+  responsible?: string;
 }
 
 interface RequestBody {
@@ -28,24 +43,54 @@ function buildPrompt(
 ) {
   return `Sen Turkiye'deki is sagligi ve guvenligi mevzuatina hakim bir uzmansin.
 
-Asagidaki NACE bilgilerine gore en yaygin 5 mesleki tehlikeyi analiz et:
+Asagidaki NACE bilgilerine gore en yaygin 5 mesleki tehlikeyi Fine-Kinney risk tablosu formatinda analiz et:
 - NACE Kodu: ${body.naceCode}
 - Sektor: ${body.sector}
 - Tehlike Sinifi: ${body.hazardClass}
 ${body.naceTitle ? `- Faaliyet Tanimi: ${body.naceTitle}` : ""}
 
 Her kayit icin:
+- departmentActivity: FAALIYET / BOLUM
 - hazard: tehlikenin adi
-- risk: 2-3 cumlelik risk aciklamasi
-- preventiveMeasures: 3 ila 5 maddelik somut onlem listesi
+- risk: RISK aciklamasi
+- currentMeasure: MEVCUT DURUM
+- probability: O degeri
+- frequency: F degeri
+- severity: S degeri
+- riskScore: R degeri, O x F x S
+- riskLevel: RISKIN TANIMI. Degerlerden biri: Kabul Edilebilir Risk, Olasi Risk, Onemli Risk, Yuksek Risk, Cok Yuksek Risk
+- possibleOutcome: OLASI SONUC
+- preventiveMeasures: DUZELTICI / ONLEYICI FAALIYET icin 3 ila 5 maddelik somut onlem listesi
+- postProbability: DOF sonrasi O degeri
+- postFrequency: DOF sonrasi F degeri
+- postSeverity: DOF sonrasi S degeri
+- postRiskScore: DOF sonrasi R degeri
+- postRiskLevel: RISKIN TANIMI (DOF SONRASI)
+- deadline: TERMIN. Ornek: 30 gun
+- responsible: SORUMLU. Her zaman "Isveren" yaz
 
 Sadece asagidaki formatta gecerli JSON dondur:
 {
   "risks": [
     {
+      "departmentActivity": "string",
       "hazard": "string",
       "risk": "string",
-      "preventiveMeasures": ["string", "string", "string"]
+      "currentMeasure": "string",
+      "probability": "string",
+      "frequency": "string",
+      "severity": "string",
+      "riskScore": "string",
+      "riskLevel": "string",
+      "possibleOutcome": "string",
+      "preventiveMeasures": ["string", "string", "string"],
+      "postProbability": "string",
+      "postFrequency": "string",
+      "postSeverity": "string",
+      "postRiskScore": "string",
+      "postRiskLevel": "string",
+      "deadline": "string",
+      "responsible": "Isveren"
     }
   ]
 }`;
@@ -81,6 +126,21 @@ function parseResponse(text: string) {
         hazard: item.hazard.trim(),
         risk: item.risk.trim(),
         preventiveMeasures,
+        departmentActivity: typeof item?.departmentActivity === "string" ? item.departmentActivity.trim() : "",
+        currentMeasure: typeof item?.currentMeasure === "string" ? item.currentMeasure.trim() : "",
+        possibleOutcome: typeof item?.possibleOutcome === "string" ? item.possibleOutcome.trim() : "",
+        probability: item?.probability ?? "",
+        frequency: item?.frequency ?? "",
+        severity: item?.severity ?? "",
+        riskScore: item?.riskScore ?? "",
+        riskLevel: typeof item?.riskLevel === "string" ? item.riskLevel.trim() : "",
+        postProbability: item?.postProbability ?? "",
+        postFrequency: item?.postFrequency ?? "",
+        postSeverity: item?.postSeverity ?? "",
+        postRiskScore: item?.postRiskScore ?? "",
+        postRiskLevel: typeof item?.postRiskLevel === "string" ? item.postRiskLevel.trim() : "",
+        deadline: typeof item?.deadline === "string" ? item.deadline.trim() : "",
+        responsible: "Isveren",
       } satisfies RiskHazard;
     }),
   };

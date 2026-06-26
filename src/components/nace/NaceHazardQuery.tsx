@@ -16,6 +16,7 @@ import {
   BookOpen,
   CheckCircle2,
   Database,
+  Download,
   Info,
   Layers,
   Lightbulb,
@@ -34,6 +35,12 @@ import {
   validateAIConfig,
 } from "@/services/aiRiskService";
 import { cn } from "@/lib/utils";
+import {
+  buildNaceFineKinneyRows,
+  exportNaceRiskAnalysisPdf,
+  saveNaceRiskRowsForRiskWizard,
+  type NaceRiskWizardTransferPayload,
+} from "@/lib/naceRiskTransfer";
 
 interface NaceResult {
   nace_code: string;
@@ -153,6 +160,49 @@ export default function NaceHazardQuery() {
   };
 
   const selectedHazardMeta = result ? getHazardMeta(result.hazard_class) : null;
+  const fineKinneyRows = useMemo(() => {
+    if (!result || !aiAnalysis) return [];
+    return buildNaceFineKinneyRows({
+      risks: aiAnalysis.risks,
+      naceCode: result.nace_code,
+      sector: result.sector,
+      hazardClass: result.hazard_class,
+      naceTitle: result.nace_title,
+    });
+  }, [aiAnalysis, result]);
+
+  const buildTransferPayload = (): NaceRiskWizardTransferPayload | null => {
+    if (!result || fineKinneyRows.length === 0) return null;
+    return {
+      createdAt: new Date().toISOString(),
+      naceCode: result.nace_code,
+      naceTitle: result.nace_title,
+      sector: result.sector,
+      hazardClass: result.hazard_class,
+      rows: fineKinneyRows,
+    };
+  };
+
+  const handleExportPdf = () => {
+    const payload = buildTransferPayload();
+    if (!payload) {
+      toast.error("PDF için önce AI risk analizi oluşturun.");
+      return;
+    }
+    exportNaceRiskAnalysisPdf(payload);
+    toast.success("Renkli AI risk analizi PDF olarak indirildi.");
+  };
+
+  const handleSendToRiskWizard = () => {
+    const payload = buildTransferPayload();
+    if (!payload) {
+      toast.error("Aktarım için önce AI risk analizi oluşturun.");
+      return;
+    }
+    saveNaceRiskRowsForRiskWizard(payload);
+    toast.success(`${payload.rows.length} risk maddesi Risk Wizard için hazırlandı.`);
+    window.location.href = "/risk-wizard";
+  };
 
   return (
     <div className="w-full min-w-0 space-y-6 p-4 text-slate-100 sm:p-6">
@@ -305,24 +355,59 @@ export default function NaceHazardQuery() {
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">AI Risk Çıktısı</p>
                   <h2 className="mt-2 text-2xl font-black text-white">Sektörel risk önerileri</h2>
                 </div>
-                <Badge className="w-fit bg-violet-500/15 text-violet-100 hover:bg-violet-500/15">{aiAnalysis.risks.length} risk</Badge>
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="w-fit bg-violet-500/15 text-violet-100 hover:bg-violet-500/15">{aiAnalysis.risks.length} risk</Badge>
+                  <Button
+                    type="button"
+                    onClick={handleExportPdf}
+                    className="h-9 rounded-xl bg-rose-600 text-white hover:bg-rose-500"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Renkli PDF Al
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSendToRiskWizard}
+                    className="h-9 rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 font-black text-white hover:from-emerald-500 hover:to-cyan-500"
+                  >
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Risk Wizard'a Aktar
+                  </Button>
+                </div>
               </div>
               <div className="grid gap-4">
-                {aiAnalysis.risks.map((risk, index) => (
-                  <Card key={`${risk.hazard}-${index}`} className="border-slate-800 bg-slate-950/80 text-slate-100 shadow-lg shadow-slate-950/20">
+                {fineKinneyRows.map((risk, index) => (
+                  <Card key={`${risk.hazardSource}-${index}`} className="border-slate-800 bg-slate-950/80 text-slate-100 shadow-lg shadow-slate-950/20">
                     <CardContent className="p-5">
                       <div className="flex gap-4">
                         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 text-sm font-black text-cyan-200 ring-1 ring-cyan-400/20">{index + 1}</span>
                         <div className="min-w-0 flex-1 space-y-4">
                           <div>
-                            <h3 className="text-lg font-black text-white">{risk.hazard}</h3>
-                            <p className="mt-2 text-sm leading-6 text-slate-300">{risk.risk}</p>
+                            <h3 className="text-lg font-black text-white">{risk.hazardSource}</h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">{risk.riskConsequence}</p>
                           </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Önleyici Tedbirler</p>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            {[
+                              ["Faaliyet / Bölüm", risk.departmentActivity],
+                              ["Mevcut Durum", risk.currentMeasure],
+                              ["O F Ş R", `${risk.probability} · ${risk.frequency} · ${risk.severity} · ${risk.riskScore}`],
+                              ["Riskin Tanımı", risk.riskLevel],
+                              ["Olası Sonuç", risk.possibleOutcome],
+                              ["DÖF Sonrası", `${risk.postProbability} · ${risk.postFrequency} · ${risk.postSeverity} · ${risk.postRiskScore}`],
+                              ["Risk Tanımı (DÖF)", risk.postRiskLevel],
+                              ["Termin / Sorumlu", `${risk.deadline} · ${risk.responsible}`],
+                            ].map(([label, value]) => (
+                              <div key={label} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-3">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
+                                <p className="mt-2 text-sm font-semibold leading-5 text-slate-200">{value || "-"}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-200">Düzeltici / Önleyici Faaliyet</p>
                             <ul className="mt-3 space-y-2">
-                              {risk.preventiveMeasures.map((measure, measureIndex) => (
-                                <li key={`${measure}-${measureIndex}`} className="flex gap-2 text-sm leading-6 text-slate-300">
+                              {risk.additionalMeasures.split("\n").filter(Boolean).map((measure, measureIndex) => (
+                                <li key={`${measure}-${measureIndex}`} className="flex gap-2 text-sm leading-6 text-slate-200">
                                   <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
                                   <span>{measure}</span>
                                 </li>

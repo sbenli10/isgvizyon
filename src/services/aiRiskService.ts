@@ -4,6 +4,21 @@ export interface RiskHazard {
   hazard: string;
   risk: string;
   preventiveMeasures: string[];
+  departmentActivity?: string;
+  currentMeasure?: string;
+  possibleOutcome?: string;
+  probability?: string | number;
+  frequency?: string | number;
+  severity?: string | number;
+  riskScore?: string | number;
+  riskLevel?: string;
+  postProbability?: string | number;
+  postFrequency?: string | number;
+  postSeverity?: string | number;
+  postRiskScore?: string | number;
+  postRiskLevel?: string;
+  deadline?: string;
+  responsible?: string;
 }
 
 export interface RiskAnalysisResponse {

@@ -86,6 +86,10 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import {
+  NACE_RISK_WIZARD_TRANSFER_KEY,
+  type NaceRiskWizardTransferPayload,
+} from "@/lib/naceRiskTransfer";
 
 type HazardClass = "Az Tehlikeli" | "Tehlikeli" | "Çok Tehlikeli" | "";
 type RiskMethod = "5x5 Matris" | "Fine-Kinney" | "L Tipi Matris" | "Diger";
@@ -1797,6 +1801,60 @@ export default function RiskAssessmentWizard() {
       })),
     );
   };
+
+  useEffect(() => {
+    const rawPayload = window.localStorage.getItem(NACE_RISK_WIZARD_TRANSFER_KEY);
+    if (!rawPayload) return;
+
+    try {
+      const payload = JSON.parse(rawPayload) as NaceRiskWizardTransferPayload;
+      const rows = Array.isArray(payload.rows) ? payload.rows : [];
+      if (rows.length === 0) {
+        window.localStorage.removeItem(NACE_RISK_WIZARD_TRANSFER_KEY);
+        return;
+      }
+
+      const mappedRows: RiskWizardTableItem[] = rows.map((row, index) => ({
+        id: createId("nace-risk"),
+        no: index + 1,
+        departmentActivity: cleanText(row.departmentActivity || payload.sector),
+        hazardSource: cleanText(row.hazardSource),
+        riskConsequence: cleanText(row.riskConsequence),
+        affectedPeople: cleanText(row.affectedPeople),
+        currentMeasure: cleanText(row.currentMeasure),
+        probability: cleanText(row.probability),
+        frequency: cleanText(row.frequency || "1"),
+        severity: cleanText(row.severity),
+        riskScore: cleanText(row.riskScore),
+        riskLevel: cleanText(row.riskLevel),
+        additionalMeasures: cleanText(row.additionalMeasures),
+        postProbability: cleanText(row.postProbability || "0.2"),
+        postFrequency: cleanText(row.postFrequency || "1"),
+        postSeverity: cleanText(row.postSeverity || "1"),
+        postRiskScore: cleanText(row.postRiskScore),
+        postRiskLevel: cleanText(row.postRiskLevel),
+        responsible: cleanText(row.responsible || "İşveren"),
+        deadline: cleanText(row.deadline),
+      }));
+
+      appendRiskItems(mappedRows);
+      setRiskAdditionMethod("manual");
+      setCurrentStep(RISK_TABLE_STEP_INDEX);
+      if (!cleanText(aiSector)) setAiSector(payload.sector || payload.naceTitle || "");
+      if (!cleanText(scopeInfo.evaluatedSections)) {
+        updateScopeInfo(
+          "evaluatedSections",
+          [payload.naceCode, payload.naceTitle, payload.sector].filter(Boolean).join(" - "),
+        );
+      }
+      toast.success(`${mappedRows.length} NACE AI risk maddesi manuel risk tablosuna aktarıldı.`);
+    } catch (error) {
+      console.error("NACE risk transfer import failed", error);
+      toast.error("NACE AI risk aktarımı okunamadı.");
+    } finally {
+      window.localStorage.removeItem(NACE_RISK_WIZARD_TRANSFER_KEY);
+    }
+  }, []);
 
   const buildBuiltInRiskRows = (sector: string, targetCount: number) => {
     const templates = generateSectorRiskTemplates(
