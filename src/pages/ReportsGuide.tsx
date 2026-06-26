@@ -167,41 +167,42 @@ export default function ReportsGuide() {
   const navigate = useNavigate();
 
   return (
-    <div className="w-full min-w-0 space-y-6 px-4 py-6 lg:px-6">
-      <section className="relative overflow-hidden rounded-2xl border border-slate-700/70 bg-gradient-to-br from-slate-950 via-slate-900 to-[#0b1f4d] p-6 shadow-[0_18px_60px_rgba(2,6,23,0.45)]">
-        <div className="absolute -right-24 -top-24 h-56 w-56 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-blue-500/15 blur-3xl" />
+    <div className="w-full min-w-0 space-y-6">
+      <section className="relative overflow-hidden rounded-[30px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-[#071a3d] to-[#0f3b8f] p-6 shadow-2xl shadow-black/25 lg:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-cyan-400/25 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 -left-20 h-72 w-72 rounded-full bg-violet-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.10),transparent_22%),linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:auto,42px_42px,42px_42px] opacity-80" />
 
         <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border-cyan-400/30 bg-cyan-500/15 text-cyan-100">Reports Rehberi</Badge>
-              <Badge className="border-blue-400/30 bg-blue-500/15 text-blue-100">Saha Risk Analizi</Badge>
+              <Badge className="rounded-full border-cyan-400/30 bg-cyan-500/15 px-3 py-1 text-cyan-100">Reports Rehberi</Badge>
+              <Badge className="rounded-full border-blue-400/30 bg-blue-500/15 px-3 py-1 text-blue-100">Saha Risk Analizi</Badge>
             </div>
 
-            <h1 className="text-2xl font-black tracking-tight text-slate-100 lg:text-4xl">
-              Reports Nasıl Kullanılır?
+            <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white lg:text-5xl">
+              Reports ile saha riskini doğru veriyle analiz edin
             </h1>
-            <p className="max-w-3xl text-sm text-slate-300 lg:text-base">
+            <p className="max-w-3xl text-sm leading-6 text-slate-300 lg:text-base">
               Bu ekran bir mevzuat özetleyicisi değil, saha uygunsuzluğu analiz ekranıdır.
               Fotoğraf, saha notu ve destekleyici mevzuat bağlamı ile hızlı Fine-Kinney analizi üretmek için tasarlanmıştır.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => navigate("/reports")}>
+            <Button variant="outline" className="gap-2 rounded-2xl border-white/15 bg-white/10 text-white hover:bg-white/15" onClick={() => navigate("/reports")}>
               <ArrowLeft className="h-4 w-4" /> Reports'a Dön
             </Button>
-            <Button className="gap-2" onClick={() => navigate("/reports")}>
+            <Button className="gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-cyan-950/30 hover:from-blue-500 hover:to-cyan-400" onClick={() => navigate("/reports")}>
               <CircleHelp className="h-4 w-4" /> Hemen Analize Geç
             </Button>
           </div>
         </div>
       </section>
 
-      <Card className="border-amber-500/40 bg-gradient-to-r from-amber-500/15 to-orange-500/10">
+      <Card className="overflow-hidden rounded-3xl border-amber-400/30 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-slate-950/70 shadow-xl shadow-amber-950/10">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-200">
+          <CardTitle className="flex items-center gap-2 text-amber-100">
             <TriangleAlert className="h-5 w-5" /> En Kritik Kural
           </CardTitle>
         </CardHeader>
@@ -216,28 +217,28 @@ export default function ReportsGuide() {
       </Card>
 
       <section className="grid gap-4 lg:grid-cols-4">
-        <Card className="border-slate-700/70 bg-slate-950/60">
+        <Card className="rounded-3xl border-slate-700/70 bg-slate-950/80 shadow-xl shadow-black/10">
           <CardContent className="pt-6">
             <p className="text-xs text-slate-400">Ana girdi</p>
             <p className="mt-1 text-2xl font-black text-slate-100">Fotoğraf / Not</p>
             <p className="mt-1 text-xs text-slate-400">zorunlu</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-700/70 bg-slate-950/60">
+        <Card className="rounded-3xl border-slate-700/70 bg-slate-950/80 shadow-xl shadow-black/10">
           <CardContent className="pt-6">
             <p className="text-xs text-slate-400">Destekleyici belge</p>
             <p className="mt-1 text-2xl font-black text-slate-100">PDF / DOCX</p>
             <p className="mt-1 text-xs text-slate-400">opsiyonel bağlam</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-700/70 bg-slate-950/60">
+        <Card className="rounded-3xl border-slate-700/70 bg-slate-950/80 shadow-xl shadow-black/10">
           <CardContent className="pt-6">
             <p className="text-xs text-slate-400">Önerilen fotoğraf</p>
             <p className="mt-1 text-2xl font-black text-slate-100">1-3</p>
             <p className="mt-1 text-xs text-slate-400">aynı risk için</p>
           </CardContent>
         </Card>
-        <Card className="border-slate-700/70 bg-slate-950/60">
+        <Card className="rounded-3xl border-slate-700/70 bg-slate-950/80 shadow-xl shadow-black/10">
           <CardContent className="pt-6">
             <p className="text-xs text-slate-400">Çıktı</p>
             <p className="mt-1 text-2xl font-black text-slate-100">PDF / Word</p>
@@ -246,13 +247,13 @@ export default function ReportsGuide() {
         </Card>
       </section>
 
-      <section className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4 lg:p-6">
+      <section className="rounded-[28px] border border-slate-700/70 bg-slate-950/70 p-4 shadow-2xl shadow-black/10 lg:p-6">
         <h2 className="text-lg font-bold text-slate-100 lg:text-xl">Adım Adım Kullanım</h2>
         <Separator className="my-4 bg-slate-700/70" />
 
         <div className="grid gap-3">
           {usageSteps.map((step) => (
-            <Card key={step.id} className="border-slate-700/70 bg-slate-950/65">
+            <Card key={step.id} className="rounded-3xl border-slate-700/70 bg-slate-950/75 transition hover:border-cyan-400/35">
               <CardContent className="flex items-start gap-4 p-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-500/10 text-cyan-200">
                   <step.icon className="h-5 w-5" />
@@ -332,7 +333,7 @@ export default function ReportsGuide() {
         </Card>
       </section>
 
-      <section className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4 lg:p-6">
+      <section className="rounded-[28px] border border-slate-700/70 bg-slate-950/70 p-4 shadow-2xl shadow-black/10 lg:p-6">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slate-100 lg:text-xl">Örnek Akış Kartları</h2>

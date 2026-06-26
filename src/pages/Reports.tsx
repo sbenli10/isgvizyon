@@ -792,26 +792,50 @@ Yasal Atıf: ${analysis.legalReference}`,
   };
 
   return (
-    <div className="space-y-8">
+    <div className="min-w-0 space-y-6">
       {/* HEADER */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-            Saha Risk Analizi
-          </h1>
-          <p className="text-sm text-muted-foreground mt-2">
-            Fotoğraf, saha notu ve destekleyici mevzuat belgeleri ile Fine-Kinney risk analizi oluşturun.
-          </p>
+      <section className="relative overflow-hidden rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-slate-900 to-[#08204f] p-6 shadow-2xl shadow-black/25 lg:p-8">
+        <div className="pointer-events-none absolute -right-28 -top-28 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:38px_38px] opacity-30" />
+
+        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-cyan-100">
+                AI Destekli Fine-Kinney
+              </span>
+              <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-xs font-bold text-blue-100">
+                Saha fotoğrafı + mevzuat bağlamı
+              </span>
+            </div>
+            <h1 className="mt-4 text-3xl font-black tracking-tight text-white lg:text-5xl">
+              Saha Risk Analizi
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
+              Fotoğraf, saha notu ve destekleyici mevzuat belgeleriyle Fine-Kinney risk puanı, aksiyon planı, yasal dayanak ve kurumsal PDF/Word çıktısı üretin.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 rounded-2xl border-white/15 bg-white/10 text-white hover:bg-white/15"
+              onClick={() => navigate("/reports/guide")}
+            >
+              <CircleHelp className="h-4 w-4" /> Nasıl Kullanılır?
+            </Button>
+            <Button
+              type="button"
+              className="gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 text-white shadow-lg shadow-cyan-950/30 hover:from-blue-500 hover:to-cyan-400"
+              onClick={() => imagePickerRef.current?.click()}
+            >
+              <ImageIcon className="h-4 w-4" /> Fotoğraf Ekle
+            </Button>
+          </div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="gap-2"
-          onClick={() => navigate("/reports/guide")}
-        >
-          <CircleHelp className="h-4 w-4" /> Nasıl Kullanılır?
-        </Button>
-      </div>
+      </section>
 
       {activeCompanyId ? (
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
@@ -838,23 +862,27 @@ Yasal Atıf: ${analysis.legalReference}`,
       ) : null}
 
       {/* DASHBOARD TOP (Stats + Heatmap) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-2 gap-4">
-          <div className="glass-card p-5 border border-border/50 flex flex-col justify-center">
-            <p className="text-sm text-muted-foreground">Toplam Analiz</p>
-            <p className="text-4xl font-black text-foreground">{stats.total}</p>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
+          <div className="rounded-3xl border border-slate-700/70 bg-slate-950/80 p-5 shadow-xl shadow-black/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Toplam Analiz</p>
+            <p className="mt-3 text-4xl font-black text-white">{stats.total}</p>
+            <p className="mt-2 text-xs text-slate-500">Kayıtlı saha risk raporu</p>
           </div>
-          <div className="glass-card p-5 border border-destructive/30 bg-destructive/5 flex flex-col justify-center">
-            <p className="text-sm text-destructive font-semibold">🔴 Kritik / Yüksek</p>
-            <p className="text-4xl font-black text-destructive">{stats.critical}</p>
+          <div className="rounded-3xl border border-rose-400/25 bg-rose-500/10 p-5 shadow-xl shadow-rose-950/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-200">Kritik / Yüksek</p>
+            <p className="mt-3 text-4xl font-black text-rose-100">{stats.critical}</p>
+            <p className="mt-2 text-xs text-rose-200/70">Öncelikli aksiyon gerektirir</p>
           </div>
-          <div className="glass-card p-5 border border-warning/30 bg-warning/5 flex flex-col justify-center">
-            <p className="text-sm text-warning font-semibold">🟡 Önemli</p>
-            <p className="text-4xl font-black text-warning">{stats.medium}</p>
+          <div className="rounded-3xl border border-amber-400/25 bg-amber-500/10 p-5 shadow-xl shadow-amber-950/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Önemli</p>
+            <p className="mt-3 text-4xl font-black text-amber-100">{stats.medium}</p>
+            <p className="mt-2 text-xs text-amber-200/70">Takip ve termin planı</p>
           </div>
-          <div className="glass-card p-5 border border-success/30 bg-success/5 flex flex-col justify-center">
-            <p className="text-sm text-success font-semibold">🟢 Düşük / Kabul Edilebilir</p>
-            <p className="text-4xl font-black text-success">{stats.low}</p>
+          <div className="rounded-3xl border border-emerald-400/25 bg-emerald-500/10 p-5 shadow-xl shadow-emerald-950/10">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-200">Düşük / Kabul Edilebilir</p>
+            <p className="mt-3 text-4xl font-black text-emerald-100">{stats.low}</p>
+            <p className="mt-2 text-xs text-emerald-200/70">Kontrollü risk alanları</p>
           </div>
         </div>
         
@@ -864,18 +892,16 @@ Yasal Atıf: ${analysis.legalReference}`,
       </div>
 
       {/* AI ANALYZER SECTION */}
-      <div className="glass-card p-6 border border-primary/20 space-y-4 shadow-sm shadow-primary/10 relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-primary/5 blur-3xl pointer-events-none"></div>
+      <div className="relative overflow-hidden rounded-[28px] border border-slate-700/70 bg-slate-950/80 p-5 shadow-2xl shadow-black/20 lg:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"></div>
 
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
+        <div className="mb-6 rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4">
           <div className="flex items-start gap-3">
-            <Lightbulb className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+            <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
             <div>
-              <p className="text-sm font-semibold text-blue-700 mb-2">Bu ekran nasıl kullanılır?</p>
+              <p className="mb-2 text-sm font-black text-blue-100">Hızlı kullanım notları</p>
               <div className="space-y-1">
-                {tips.map((tip, idx) => (
-                  <p key={idx} className="text-xs text-blue-600">• {tip}</p>
-                ))}
+                {tips.map((tip) => <p key={tip} className="text-xs text-blue-100/80">• {tip}</p>)}
               </div>
             </div>
           </div>
@@ -1253,17 +1279,70 @@ Yasal Atıf: ${analysis.legalReference}`,
       </div>
 
       {/* HISTORY SECTION */}
-      <div className="space-y-4 pt-8">
-        <div className="flex items-center justify-between border-b border-border pb-4">
-          <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <History className="h-6 w-6 text-primary" />
-            Önceki Analiz Kayıtları
-          </h2>
+      <div className="space-y-4 rounded-[28px] border border-slate-700/70 bg-slate-950/70 p-5 shadow-2xl shadow-black/10 lg:p-6">
+        <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">Rapor Arşivi</p>
+            <h2 className="mt-2 flex items-center gap-2 text-2xl font-black text-white">
+              <History className="h-6 w-6 text-cyan-300" />
+              Önceki Analiz Kayıtları
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Risk seviyesine göre filtreleyin, geçmiş bulguları inceleyin ve tekrar PDF/Word raporu alın.
+            </p>
+          </div>
+
+          <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] xl:max-w-3xl">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Tehlike, aksiyon veya mevzuat ara..."
+                className="h-11 rounded-2xl border-slate-700 bg-slate-950 pl-10 text-slate-100 placeholder:text-slate-500"
+              />
+            </div>
+            <Select value={filterRisk} onValueChange={setFilterRisk}>
+              <SelectTrigger className="h-11 rounded-2xl border-slate-700 bg-slate-950 text-slate-100">
+                <SelectValue placeholder="Risk filtresi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tüm riskler</SelectItem>
+                <SelectItem value="Kritik">Kritik</SelectItem>
+                <SelectItem value="Yüksek">Yüksek</SelectItem>
+                <SelectItem value="Önemli">Önemli</SelectItem>
+                <SelectItem value="Düşük">Düşük</SelectItem>
+                <SelectItem value="Kabul Edilebilir">Kabul Edilebilir</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-2xl border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
+              onClick={() => {
+                setSearchText("");
+                setFilterRisk("all");
+              }}
+            >
+              <Filter className="mr-2 h-4 w-4" />
+              Sıfırla
+            </Button>
+          </div>
         </div>
 
         {historyLoading ? (
           <div className="py-12 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
+          </div>
+        ) : filteredHistory.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/70 p-10 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
+              <FileText className="h-7 w-7" />
+            </div>
+            <p className="mt-4 text-lg font-black text-white">Kayıt bulunamadı</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
+              Filtreleri değiştirin veya yeni bir saha risk analizi oluşturarak arşivi doldurun.
+            </p>
           </div>
         ) : (
           <div className="grid gap-4">
@@ -1272,8 +1351,8 @@ Yasal Atıf: ${analysis.legalReference}`,
               const isOldFormat = !aiData?.riskScore || typeof aiData.riskScore === 'string';
 
               return (
-                <div key={item.id} className="glass-card border border-border/50 hover:border-primary/40 transition-all shadow-sm overflow-hidden">
-                  <div className="p-5 flex items-start justify-between gap-4 cursor-pointer bg-card/50" onClick={() => { setSelectedHistory(item); setDetailsOpen(selectedHistory?.id !== item.id ? true : !detailsOpen); }}>
+                <div key={item.id} className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/80 shadow-lg shadow-black/10 transition-all hover:border-cyan-400/35">
+                  <div className="flex cursor-pointer items-start justify-between gap-4 bg-slate-900/70 p-5" onClick={() => { setSelectedHistory(item); setDetailsOpen(selectedHistory?.id !== item.id ? true : !detailsOpen); }}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 flex-wrap mb-3">
                         {isOldFormat ? (
@@ -1284,22 +1363,22 @@ Yasal Atıf: ${analysis.legalReference}`,
                             <span className="text-xs font-black bg-secondary/80 px-2 py-1 rounded text-foreground">Skor: {aiData.riskScore}</span>
                           </>
                         )}
-                        <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                        <span className="flex items-center gap-1 text-xs font-medium text-slate-400">
                           <Clock className="h-3 w-3" /> {new Date(item.created_at).toLocaleDateString("tr-TR", {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
                         </span>
                       </div>
-                      <p className="text-base font-semibold text-foreground line-clamp-2 leading-snug">
+                      <p className="line-clamp-2 text-base font-semibold leading-snug text-slate-100">
                         {isOldFormat ? item.hazard_description : aiData.hazardDescription}
                       </p>
                     </div>
 
-                    <Button size="icon" variant="ghost" className="text-muted-foreground shrink-0 hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteAnalysis(item.id); }}>
+                    <Button size="icon" variant="ghost" className="shrink-0 text-slate-500 hover:bg-rose-500/10 hover:text-rose-200" onClick={(e) => { e.stopPropagation(); deleteAnalysis(item.id); }}>
                       <Trash2 className="h-5 w-5" />
                     </Button>
                   </div>
 
                   {selectedHistory?.id === item.id && detailsOpen && (
-                    <div className="p-5 border-t border-border bg-secondary/5 space-y-4 animate-fade-in text-sm">
+                    <div className="animate-fade-in space-y-4 border-t border-slate-800 bg-slate-950 p-5 text-sm">
                       {!isOldFormat && (
                         <>
                           <div className="grid md:grid-cols-2 gap-6">
