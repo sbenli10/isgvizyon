@@ -3349,8 +3349,8 @@ function MultiAssignmentPanelV2({
   const [personnelText, setPersonnelText] = useState("");
   const [personnel, setPersonnel] = useState<IsgbotPersonnel[]>([]);
   const [selectedPersonnelId, setSelectedPersonnelId] = useState<string | null>(null);
-  const [sgkText, setSgkText] = useState("");
-  const [parsedSgkInputs, setParsedSgkInputs] = useState<ReturnType<typeof parseSgkNumbers>>([]);
+  const [companyQuery, setCompanyQuery] = useState("");
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [plan, setPlan] = useState<MultiAssignmentDryRunResult | null>(null);
   const [planHash, setPlanHash] = useState<string | null>(null);
   const [selectedPlanRowIds, setSelectedPlanRowIds] = useState<string[]>([]);
@@ -3366,8 +3366,36 @@ function MultiAssignmentPanelV2({
   const [applyStage, setApplyStage] = useState("Hazır");
   const [applyResults, setApplyResults] = useState<ApplyResultRow[]>([]);
 
-  const invalidSgkInputs = parsedSgkInputs.filter((input) => !input.valid);
-  const validSgkNumbers = parsedSgkInputs.filter((input) => input.valid).map((input) => input.normalized);
+  const filteredAssignmentCompanies = useMemo(() => {
+    const normalizedQuery = companyQuery.trim().toLocaleLowerCase("tr-TR");
+    if (!normalizedQuery) return companies;
+
+    return companies.filter((company) =>
+      [
+        getCompanyValue(company, "company_name"),
+        getCompanyValue(company, "sgk_no"),
+        getCompanyValue(company, "hazard_class"),
+        getCompanyValue(company, "nace_code"),
+      ]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR")
+        .includes(normalizedQuery),
+    );
+  }, [companies, companyQuery]);
+  const selectedCompanies = useMemo(
+    () => companies.filter((company) => selectedCompanyIds.includes(String(company.id))),
+    [companies, selectedCompanyIds],
+  );
+  const parsedCompanySgkInputs = useMemo(
+    () => parseSgkNumbers(selectedCompanies.map((company) => getCompanyValue(company, "sgk_no")).filter(Boolean).join("\n")),
+    [selectedCompanies],
+  );
+  const invalidSgkInputs = parsedCompanySgkInputs.filter((input) => !input.valid);
+  const companiesWithoutSgk = useMemo(
+    () => selectedCompanies.filter((company) => !getCompanyValue(company, "sgk_no").trim()),
+    [selectedCompanies],
+  );
+  const validSgkNumbers = parsedCompanySgkInputs.filter((input) => input.valid).map((input) => input.normalized);
   const matchPreview = useMemo(
     () => (validSgkNumbers.length ? buildMultiAssignmentPlan(companies, validSgkNumbers, personnel, selectedPersonnelId).matches : []),
     [companies, personnel, selectedPersonnelId, validSgkNumbers],
@@ -3413,8 +3441,8 @@ function MultiAssignmentPanelV2({
     return null;
   }, [blockedPlanRows.length, plan, selectablePlanRows.length, selectedPlanRows.length]);
 
-  const resetApplyState = () => {
-    const initialSelectableRows = result.planRows.filter(
+  const resetApplyState = (nextPlanRows: MultiAssignmentPlanRow[] = []) => {
+    const initialSelectableRows = nextPlanRows.filter(
       (row) => row.status === "Planlanabilir" || row.status === "Uyarılı",
     );
     setSelectedPlanRowIds(initialSelectableRows.slice(0, ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION).map((row) => row.id));
@@ -3498,6 +3526,29 @@ function MultiAssignmentPanelV2({
     setSurfaceValidation(null);
   }, [planHash, selectedPlanRowIds]);
 
+  const resetPlanForCompanySelection = () => {
+    setPlan(null);
+    setPlanHash(null);
+    resetApplyState();
+  };
+
+  const toggleAssignmentCompany = (companyId: string) => {
+    setSelectedCompanyIds((current) =>
+      current.includes(companyId) ? current.filter((id) => id !== companyId) : [...current, companyId],
+    );
+    resetPlanForCompanySelection();
+  };
+
+  const selectFilteredAssignmentCompanies = () => {
+    setSelectedCompanyIds(filteredAssignmentCompanies.map((company) => String(company.id)));
+    resetPlanForCompanySelection();
+  };
+
+  const clearSelectedAssignmentCompanies = () => {
+    setSelectedCompanyIds([]);
+    resetPlanForCompanySelection();
+  };
+
   const handleParsePersonnel = () => {
     const result = parsePersonnelText(personnelText);
     setPersonnel(result.personnel);
@@ -3525,26 +3576,18 @@ function MultiAssignmentPanelV2({
     });
   };
 
-  const handleParseSgk = () => {
-    const parsed = parseSgkNumbers(sgkText);
-    setParsedSgkInputs(parsed);
-    setPlan(null);
-    setPlanHash(null);
-    resetApplyState();
-
-    if (!sgkText.trim() || parsed.length === 0) {
-      toast.error("SGK sicil numarası girilmedi.");
+  const handleBuildPlan = () => {
+    if (selectedCompanies.length === 0) {
+      toast.error("Firma seçilmedi.", {
+        description: "Atama planı için listeden en az bir firma seçin.",
+      });
       return;
     }
 
-    toast.success("SGK listesi hazırlandı", {
-      description: `${parsed.filter((input) => input.valid).length} geçerli SGK no; ${parsed.filter((input) => !input.valid).length} uyarı.`,
-    });
-  };
-
-  const handleBuildPlan = () => {
     if (validSgkNumbers.length === 0) {
-      toast.error("SGK sicil numarası girilmedi.");
+      toast.error("Seçili firmalarda geçerli SGK sicil numarası bulunamadı.", {
+        description: "Firma kayıtlarında SGK sicil numarası olan firmaları seçin veya firma bilgisini güncelleyin.",
+      });
       return;
     }
 
@@ -3557,9 +3600,9 @@ function MultiAssignmentPanelV2({
 
     const result = buildMultiAssignmentPlan(companies, validSgkNumbers, personnel, selectedPersonnelId);
     result.invalidInputs = invalidSgkInputs;
-    result.parsedSgk = parsedSgkInputs;
-    result.summary.invalid_input_count = invalidSgkInputs.length;
-    result.summary.warning_count += invalidSgkInputs.length;
+    result.parsedSgk = parsedCompanySgkInputs;
+    result.summary.invalid_input_count = invalidSgkInputs.length + companiesWithoutSgk.length;
+    result.summary.warning_count += invalidSgkInputs.length + companiesWithoutSgk.length;
     setPlan(result);
     setPlanHash(
       createPlanHash({
@@ -3576,7 +3619,7 @@ function MultiAssignmentPanelV2({
         })),
       }),
     );
-    setSelectedPlanRowIds([]);
+    resetApplyState(result.planRows);
     setApplyResults(
       result.planRows.map((row) =>
         normalizeApplyResult({
@@ -3596,7 +3639,7 @@ function MultiAssignmentPanelV2({
 
     const hasWarnings = result.summary.warning_count > 0 || result.summary.unmatched_sgk_count > 0;
     toast(hasWarnings ? "Atama planı uyarılı oluşturuldu" : "Atama planı oluşturuldu", {
-      description: `${result.summary.planned_assignment_count} plan satırı hazırlandı. Gerçek İSG-KATİP ataması yapılmadı.`,
+      description: `${result.summary.planned_assignment_count} plan satırı hazırlandı. Firmalar kullanıcı seçimine göre alındı.`,
     });
   };
 
@@ -3859,17 +3902,84 @@ function MultiAssignmentPanelV2({
           </div>
 
           <div className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 transition hover:border-violet-500/40">
-            <h4 className="mb-3 font-black text-white">SGK Sicil Numarası Girişi</h4>
-            <Textarea value={sgkText} onChange={(event) => setSgkText(event.target.value)} className="min-h-[150px] border-slate-700 bg-slate-950/90 text-slate-100 placeholder:text-slate-500" placeholder="SGK sicil numaralarını yapıştırın veya yazın..." />
-            <Button className="mt-3 w-full rounded-xl bg-violet-500 text-white hover:bg-violet-400" onClick={handleParseSgk}>
-              Sicil Numaralarını Ekle
-            </Button>
-            {invalidSgkInputs.length > 0 && (
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h4 className="font-black text-white">Firma Seçimi</h4>
+                <p className="mt-1 text-xs text-slate-400">SGK kodu yazmadan, işlem yapılacak firmaları listeden seçin.</p>
+              </div>
+              <Badge className="rounded-full bg-cyan-500/15 text-cyan-100 hover:bg-cyan-500/15">
+                {selectedCompanies.length} seçili
+              </Badge>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                value={companyQuery}
+                onChange={(event) => setCompanyQuery(event.target.value)}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 pl-9 text-slate-100 placeholder:text-slate-500"
+                placeholder="Firma adı, SGK no, tehlike sınıfı ara..."
+              />
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" className="rounded-xl border-slate-700 bg-slate-950/60 text-slate-100 hover:bg-slate-800" onClick={selectFilteredAssignmentCompanies}>
+                Filtrelenenleri Seç
+              </Button>
+              <Button type="button" variant="ghost" className="rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white" onClick={clearSelectedAssignmentCompanies}>
+                Seçimi Temizle
+              </Button>
+            </div>
+
+            <div className="mt-3 max-h-[250px] space-y-2 overflow-y-auto pr-1">
+              {filteredAssignmentCompanies.length === 0 ? (
+                <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-4 text-sm text-slate-400">
+                  Aramanızla eşleşen firma bulunamadı.
+                </div>
+              ) : (
+                filteredAssignmentCompanies.map((company) => {
+                  const companyId = String(company.id);
+                  const checked = selectedCompanyIds.includes(companyId);
+                  const sgkNo = getCompanyValue(company, "sgk_no", "-");
+                  const employeeCount = getCompanyValue(company, "employee_count", "-");
+                  const hazardClass = getCompanyValue(company, "hazard_class", "-");
+
+                  return (
+                    <label
+                      key={companyId}
+                      className={cn(
+                        "flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition",
+                        checked
+                          ? "border-cyan-400/40 bg-cyan-500/10 shadow-lg shadow-cyan-950/20"
+                          : "border-slate-700 bg-slate-950/70 hover:border-violet-400/35 hover:bg-slate-900",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleAssignmentCompany(companyId)}
+                        className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-950 text-cyan-500 focus:ring-cyan-500"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-white">{getCompanyValue(company, "company_name", "Firma")}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-400">
+                          <span>SGK: {sgkNo}</span>
+                          <span>Çalışan: {employeeCount}</span>
+                          <span>Tehlike: {hazardClass}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            {(companiesWithoutSgk.length > 0 || invalidSgkInputs.length > 0) && (
               <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-xs text-amber-100">
-                {invalidSgkInputs.slice(0, 4).map((input) => (
+                {companiesWithoutSgk.length > 0 && <p>{companiesWithoutSgk.length} seçili firmada SGK sicil numarası yok.</p>}
+                {invalidSgkInputs.slice(0, 3).map((input) => (
                   <p key={`${input.raw}-${input.reason}`}>{input.raw}: {input.reason}</p>
                 ))}
-                {invalidSgkInputs.length > 4 && <p>+{invalidSgkInputs.length - 4} uyarı daha</p>}
               </div>
             )}
           </div>
@@ -3878,7 +3988,7 @@ function MultiAssignmentPanelV2({
         <div className="rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30 transition hover:border-violet-500/40">
           <h4 className="mb-3 font-black text-white">Firma Listesi</h4>
           {matchPreview.length === 0 ? (
-            <EmptyState title="Henüz firma sorgulanmadı" description="SGK numaralarını ekleyip sorgulayın." icon={ShieldCheck} />
+            <EmptyState title="Henüz firma seçilmedi" description="Soldaki listeden işlem yapılacak firmaları seçin." icon={ShieldCheck} />
           ) : (
             <div className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
               {matchPreview.map((match) => (
@@ -3915,7 +4025,7 @@ function MultiAssignmentPanelV2({
           </div>
 
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <MetricTile label="Toplam Firma" value={plan?.summary.parsed_sgk_count ?? validSgkNumbers.length} tone="blue" />
+            <MetricTile label="Seçili Firma" value={plan?.summary.parsed_sgk_count ?? selectedCompanies.length} tone="blue" />
             <MetricTile label="Planlanabilir" value={plan?.planRows.filter((row) => row.status === "Planlanabilir").length ?? 0} tone="emerald" />
             <MetricTile label="Uyarılı" value={plan?.planRows.filter((row) => row.status === "Uyarılı").length ?? 0} tone="amber" />
             <MetricTile label="Kapasite Yetersiz" value={plan?.summary.capacity_insufficient_count ?? 0} tone="rose" />
@@ -3948,7 +4058,7 @@ function MultiAssignmentPanelV2({
           ) : null}
 
           {!plan ? (
-            <EmptyState title="Henüz atama planı yok" description="Personel ve SGK listesini hazırlayıp işlem planı oluşturun." icon={Layers} />
+            <EmptyState title="Henüz atama planı yok" description="Personeli ve firmaları seçip işlem planı oluşturun." icon={Layers} />
           ) : (
             <div className="mt-4 max-h-[330px] space-y-2 overflow-y-auto pr-1">
               {plan.planRows.map((row) => (
