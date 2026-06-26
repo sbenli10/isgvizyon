@@ -146,6 +146,75 @@ function parseResponse(text: string) {
   };
 }
 
+function defaultNumbers(hazardClass: string) {
+  if (hazardClass.includes("Çok") || hazardClass.includes("Cok") || hazardClass.includes("Ã‡ok")) {
+    return { probability: 6, frequency: 1, severity: 15 };
+  }
+  if (hazardClass.includes("Tehlikeli")) {
+    return { probability: 3, frequency: 1, severity: 7 };
+  }
+  return { probability: 1, frequency: 1, severity: 3 };
+}
+
+function riskLevelFromScore(score: number) {
+  if (score > 400) return "Cok Yuksek Risk";
+  if (score >= 200) return "Yuksek Risk";
+  if (score >= 70) return "Onemli Risk";
+  if (score >= 20) return "Olasi Risk";
+  return "Kabul Edilebilir Risk";
+}
+
+function fallbackRisk(
+  body: Required<Pick<RequestBody, "naceCode" | "sector" | "hazardClass">> & Pick<RequestBody, "naceTitle">,
+  hazard: string,
+  risk: string,
+  preventiveMeasures: string[],
+  possibleOutcome: string,
+): RiskHazard {
+  const numbers = defaultNumbers(body.hazardClass);
+  const riskScore = numbers.probability * numbers.frequency * numbers.severity;
+  const postProbability = 0.2;
+  const postFrequency = 1;
+  const postSeverity = Math.min(numbers.severity, 3);
+  const postRiskScore = postProbability * postFrequency * postSeverity;
+
+  return {
+    departmentActivity: body.naceTitle || body.sector || body.naceCode,
+    hazard,
+    risk,
+    currentMeasure: "Mevcut durum saha kontrolunde degerlendirilecek; standart ISG tedbirleri takip edilecektir.",
+    probability: String(numbers.probability),
+    frequency: String(numbers.frequency),
+    severity: String(numbers.severity),
+    riskScore: String(riskScore),
+    riskLevel: riskLevelFromScore(riskScore),
+    possibleOutcome,
+    preventiveMeasures,
+    postProbability: String(postProbability),
+    postFrequency: String(postFrequency),
+    postSeverity: String(postSeverity),
+    postRiskScore: String(postRiskScore),
+    postRiskLevel: riskLevelFromScore(postRiskScore),
+    deadline: "30 gun",
+    responsible: "Isveren",
+  };
+}
+
+function buildFallbackRisks(
+  body: Required<Pick<RequestBody, "naceCode" | "sector" | "hazardClass">> & Pick<RequestBody, "naceTitle">,
+) {
+  const activity = body.naceTitle || body.sector || "Faaliyet alani";
+  return {
+    risks: [
+      fallbackRisk(body, "Isyeri ortam tehlikeleri", `${activity} kapsaminda calisma ortami duzensizligi, uygun olmayan gecis yollari veya kontrolsuz calisma kosullari yaralanma ve is kaybina yol acabilir.`, ["Calisma alanlari duzenli kontrol edilmeli ve uygunsuzluklar kayit altina alinmalidir.", "Gecis yollari, calisma platformlari ve acil cikislar surekli acik tutulmalidir.", "Calisanlara gorev bazli ISG talimatlari teblig edilmelidir."], "Yaralanma, is gucu kaybi ve operasyon aksamasI"),
+      fallbackRisk(body, "Makine ve ekipman kullanimi", "Faaliyet sirasinda kullanilan ekipmanlarin uygunsuz kullanimi, bakim eksikligi veya koruyucu donanim yetersizligi yaralanma riski olusturabilir.", ["Makine ve ekipmanlarin periyodik bakim ve kontrol kayitlari tutulmalidir.", "Koruyucu duzenekler devre disi birakilmamalidir.", "Yetkisiz kisilerin ekipman kullanmasi engellenmelidir."], "Ezilme, kesilme, yaralanma veya maddi hasar"),
+      fallbackRisk(body, "Elektrik kaynakli tehlikeler", "Elektrik tesisati, uzatma kablolari veya panolardaki uygunsuzluklar elektrik carpmasi ve yangin riskine neden olabilir.", ["Elektrik panolari kilitli ve yetkisiz erisime kapali olmalidir.", "Kacak akim roleleri ve topraklama kontrolleri duzenli yapilmalidir.", "Hasarli kablo ve prizler kullanilmadan once degistirilmelidir."], "Elektrik carpmasi, yanik veya yangin"),
+      fallbackRisk(body, "Yangin ve acil durum hazirligi", "Yanici malzemeler, uygunsuz depolama veya acil durum ekipmanlarinin yetersizligi yangin ve tahliye risklerini artirabilir.", ["Yangin sondurme ekipmanlari erisilebilir ve periyodik kontrollu olmalidir.", "Acil cikis ve tahliye yollari isaretlenmeli ve acik tutulmalidir.", "Acil durum tatbikatlari planli sekilde yapilmalidir."], "Yangin, yaralanma, panik ve maddi kayip"),
+      fallbackRisk(body, "Ergonomi ve elle tasima", "Uygun olmayan calisma pozisyonlari, tekrarlayan isler veya elle tasima faaliyetleri kas iskelet sistemi rahatsizliklarina yol acabilir.", ["Elle tasima isleri icin calisanlara dogru kaldirma ve tasima egitimi verilmelidir.", "Agir yuklerde mekanik yardimci ekipman kullanilmalidir.", "Calisma duzeni ergonomik riskleri azaltacak sekilde planlanmalidir."], "Kas iskelet sistemi rahatsizligi ve is gucu kaybi"),
+    ],
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -180,7 +249,9 @@ Deno.serve(async (req) => {
         ? getGoogleRobustModel()
         : getGoogleLiteModel();
 
-    const { payload } = await callGeminiWithRetryAndFallback({
+    let payload: unknown;
+    try {
+      const response = await callGeminiWithRetryAndFallback({
       apiKey: getRequiredGoogleApiKey(),
       model: preferredModel,
       modelPreference:
@@ -199,7 +270,23 @@ Deno.serve(async (req) => {
           maxOutputTokens: 4096,
         },
       },
-    });
+      });
+      payload = response.payload;
+    } catch (error) {
+      if (error instanceof GeminiHttpError) {
+        console.warn("nace-risk-analyze Gemini fallback used", {
+          code: error.code,
+          status: error.status,
+          message: error.message,
+        });
+        return jsonResponse(200, {
+          success: true,
+          fallback: true,
+          ...buildFallbackRisks({ naceCode, sector, hazardClass, naceTitle }),
+        });
+      }
+      throw error;
+    }
 
     return jsonResponse(200, {
       success: true,
