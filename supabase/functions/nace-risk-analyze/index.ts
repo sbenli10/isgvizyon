@@ -37,6 +37,64 @@ interface RequestBody {
   naceTitle?: string;
 }
 
+const FUNCTION_NAME = "nace-risk-analyze";
+
+function createRequestId() {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+function safeError(error: unknown) {
+  if (error instanceof GeminiHttpError) {
+    return {
+      name: error.name,
+      status: error.status,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      stack: error.stack,
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    name: typeof error,
+    message: String(error),
+  };
+}
+
+function logInfo(requestId: string, step: string, meta: Record<string, unknown> = {}) {
+  console.info(`[${FUNCTION_NAME}] ${step}`, {
+    requestId,
+    ...meta,
+  });
+}
+
+function logWarn(requestId: string, step: string, meta: Record<string, unknown> = {}) {
+  console.warn(`[${FUNCTION_NAME}] ${step}`, {
+    requestId,
+    ...meta,
+  });
+}
+
+function logError(requestId: string, step: string, error: unknown, meta: Record<string, unknown> = {}) {
+  console.error(`[${FUNCTION_NAME}] ${step}`, {
+    requestId,
+    ...meta,
+    error: safeError(error),
+  });
+}
+
 function buildPrompt(
   body: Required<Pick<RequestBody, "naceCode" | "sector" | "hazardClass">> &
     Pick<RequestBody, "naceTitle">,
@@ -216,27 +274,85 @@ function buildFallbackRisks(
 }
 
 Deno.serve(async (req) => {
+  const requestId = createRequestId();
+  const startedAt = Date.now();
+
+  logInfo(requestId, "request:received", {
+    method: req.method,
+    url: req.url,
+    userAgent: req.headers.get("user-agent"),
+    origin: req.headers.get("origin"),
+    contentType: req.headers.get("content-type"),
+  });
+
   if (req.method === "OPTIONS") {
+    logInfo(requestId, "request:options", {
+      durationMs: Date.now() - startedAt,
+    });
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
     if (req.method !== "POST") {
+      logWarn(requestId, "request:method_not_allowed", {
+        method: req.method,
+        durationMs: Date.now() - startedAt,
+      });
       return jsonResponse(405, {
         success: false,
+        requestId,
         error: { code: "method_not_allowed", message: "Yalnizca POST desteklenir." },
       });
     }
 
-    const body = (await req.json()) as RequestBody;
+    let body: RequestBody;
+    try {
+      body = (await req.json()) as RequestBody;
+      logInfo(requestId, "request:body_parsed", {
+        bodyKeys: Object.keys(body ?? {}),
+        hasNaceCode: typeof body?.naceCode === "string" && body.naceCode.trim().length > 0,
+        hasSector: typeof body?.sector === "string" && body.sector.trim().length > 0,
+        hasHazardClass: typeof body?.hazardClass === "string" && body.hazardClass.trim().length > 0,
+        hasNaceTitle: typeof body?.naceTitle === "string" && body.naceTitle.trim().length > 0,
+      });
+    } catch (error) {
+      logError(requestId, "request:json_parse_failed", error, {
+        durationMs: Date.now() - startedAt,
+      });
+      return jsonResponse(400, {
+        success: false,
+        requestId,
+        error: {
+          code: "invalid_json",
+          message: "Istek govdesi gecerli JSON formatinda degil.",
+        },
+      });
+    }
+
     const naceCode = typeof body?.naceCode === "string" ? body.naceCode.trim() : "";
     const sector = typeof body?.sector === "string" ? body.sector.trim() : "";
     const hazardClass = typeof body?.hazardClass === "string" ? body.hazardClass.trim() : "";
     const naceTitle = typeof body?.naceTitle === "string" ? body.naceTitle.trim() : "";
 
+    logInfo(requestId, "request:normalized", {
+      naceCode,
+      sectorLength: sector.length,
+      hazardClass,
+      naceTitleLength: naceTitle.length,
+    });
+
     if (!naceCode || !sector || !hazardClass) {
+      logWarn(requestId, "request:invalid_payload", {
+        missing: {
+          naceCode: !naceCode,
+          sector: !sector,
+          hazardClass: !hazardClass,
+        },
+        durationMs: Date.now() - startedAt,
+      });
       return jsonResponse(400, {
         success: false,
+        requestId,
         error: {
           code: "invalid_payload",
           message: "`naceCode`, `sector` ve `hazardClass` alanlari zorunludur.",
@@ -249,60 +365,135 @@ Deno.serve(async (req) => {
         ? getGoogleRobustModel()
         : getGoogleLiteModel();
 
+    const googleApiKey = Deno.env.get("GOOGLE_API_KEY");
+    const googleModel = Deno.env.get("GOOGLE_MODEL");
+    const googleRobustModel = Deno.env.get("GOOGLE_MODEL_ROBUST");
+    const googleFallbackModel = Deno.env.get("GOOGLE_MODEL_FALLBACK");
+    const modelPreference =
+      hazardClass === "Cok Tehlikeli" || hazardClass === "Çok Tehlikeli" ? "robust" : "lite";
+
+    logInfo(requestId, "env:checked", {
+      hasGoogleApiKey: Boolean(googleApiKey),
+      googleApiKeyLength: googleApiKey?.length ?? 0,
+      googleModel: googleModel || null,
+      googleRobustModel: googleRobustModel || null,
+      googleFallbackModel: googleFallbackModel || null,
+      preferredModel,
+      modelPreference,
+    });
+
+    const prompt = buildPrompt({ naceCode, sector, hazardClass, naceTitle });
+    logInfo(requestId, "prompt:built", {
+      promptLength: prompt.length,
+      maxOutputTokens: 4096,
+    });
+
     let payload: unknown;
     try {
-      const response = await callGeminiWithRetryAndFallback({
-      apiKey: getRequiredGoogleApiKey(),
-      model: preferredModel,
-      modelPreference:
-        hazardClass === "Cok Tehlikeli" || hazardClass === "Çok Tehlikeli" ? "robust" : "lite",
-      requestLabel: "nace-risk-analyze",
-      body: {
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: buildPrompt({ naceCode, sector, hazardClass, naceTitle }) }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          responseMimeType: "application/json",
-          maxOutputTokens: 4096,
-        },
-      },
+      logInfo(requestId, "gemini:call_started", {
+        preferredModel,
+        modelPreference,
       });
+
+      const response = await callGeminiWithRetryAndFallback({
+        apiKey: getRequiredGoogleApiKey(),
+        model: preferredModel,
+        modelPreference,
+        requestLabel: `${FUNCTION_NAME}:${requestId}`,
+        logMeta: {
+          requestId,
+          naceCode,
+          hazardClass,
+          sectorLength: sector.length,
+          naceTitleLength: naceTitle.length,
+        },
+        body: {
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json",
+            maxOutputTokens: 4096,
+          },
+        },
+      });
+
       payload = response.payload;
+      logInfo(requestId, "gemini:call_succeeded", {
+        resolvedModel: response.model,
+        hasPayload: Boolean(payload),
+      });
     } catch (error) {
       if (error instanceof GeminiHttpError) {
-        console.warn("nace-risk-analyze Gemini fallback used", {
-          code: error.code,
+        logWarn(requestId, "gemini:call_failed_using_fallback", {
           status: error.status,
+          code: error.code,
           message: error.message,
+          details: error.details,
+          durationMs: Date.now() - startedAt,
         });
+
+        const fallback = buildFallbackRisks({ naceCode, sector, hazardClass, naceTitle });
+        logInfo(requestId, "response:fallback_success", {
+          riskCount: fallback.risks.length,
+          durationMs: Date.now() - startedAt,
+        });
+
         return jsonResponse(200, {
           success: true,
+          requestId,
           fallback: true,
-          ...buildFallbackRisks({ naceCode, sector, hazardClass, naceTitle }),
+          ...fallback,
         });
       }
+
+      logError(requestId, "gemini:call_unexpected_error", error, {
+        durationMs: Date.now() - startedAt,
+      });
       throw error;
     }
 
+    logInfo(requestId, "gemini:extract_text_started");
+    const text = extractTextFromGeminiResponse(payload);
+    logInfo(requestId, "gemini:text_extracted", {
+      textLength: text.length,
+      textPreview: text.slice(0, 240),
+    });
+
+    logInfo(requestId, "gemini:parse_started");
+    const parsed = parseResponse(text);
+    logInfo(requestId, "gemini:parse_succeeded", {
+      riskCount: parsed.risks.length,
+      durationMs: Date.now() - startedAt,
+    });
+
     return jsonResponse(200, {
       success: true,
-      ...parseResponse(extractTextFromGeminiResponse(payload)),
+      requestId,
+      ...parsed,
     });
   } catch (error) {
     if (error instanceof GeminiHttpError) {
+      logError(requestId, "response:gemini_http_error", error, {
+        durationMs: Date.now() - startedAt,
+      });
       return jsonResponse(error.status, {
         success: false,
+        requestId,
         error: { code: error.code, message: error.message, details: error.details },
       });
     }
 
-    console.error("nace-risk-analyze error:", error);
+    logError(requestId, "response:unexpected_error", error, {
+      durationMs: Date.now() - startedAt,
+    });
     return jsonResponse(500, {
       success: false,
+      requestId,
       error: { code: "unexpected_error", message: "NACE risk analizi olusturulamadi." },
     });
   }
