@@ -84,11 +84,28 @@ const emptyForm: AssignmentFormState = {
   personnelId: "",
   assignedRole: "igu",
   assignedMinutes: "",
-  startDate: new Date().toISOString().slice(0, 10),
+  startDate: "",
   endDate: "",
   status: "active",
   notes: "",
 };
+
+const buildFreshAssignmentForm = (): AssignmentFormState => ({
+  ...emptyForm,
+  startDate: new Date().toISOString().slice(0, 10),
+});
+
+const hasMeaningfulAssignmentForm = (form: AssignmentFormState | null | undefined) =>
+  Boolean(
+    form?.companyId ||
+      form?.personnelId ||
+      form?.assignedMinutes ||
+      form?.endDate ||
+      form?.notes.trim(),
+  );
+
+const hasMeaningfulAssignmentDraft = (draft: AssignmentDraft | null | undefined) =>
+  Boolean(draft?.editingId || hasMeaningfulAssignmentForm(draft?.form));
 
 const statusLabel: Record<OsgbWorkspaceAssignmentRecord["status"], string> = {
   active: "Aktif",
@@ -160,7 +177,11 @@ export default function OSGBAssignments() {
     restoreDraft: restoreAssignmentDraft,
   } = usePersistentDraft<AssignmentDraft>({
     key: "osgb-assignments:dialog",
-    enabled: Boolean(user?.id && dialogOpen),
+    enabled: Boolean(
+      user?.id &&
+        dialogOpen &&
+        (hasMeaningfulAssignmentForm(form) || Boolean(editing?.id)),
+    ),
     autoRestore: false,
     version: 1,
     storage: "localStorage",
@@ -288,30 +309,6 @@ export default function OSGBAssignments() {
       setPage(totalPages);
     }
   }, [page, totalPages]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const draft = restoreAssignmentDraft();
-    if (!draft?.form) return;
-    const hasContent = Boolean(
-      draft.editingId ||
-        draft.form.companyId ||
-        draft.form.personnelId ||
-        draft.form.assignedMinutes ||
-        draft.form.startDate ||
-        draft.form.endDate ||
-        draft.form.notes.trim(),
-    );
-    if (!hasContent) return;
-
-    void ensurePersonnelOptions().then(() => {
-      setForm(draft.form);
-      setPendingRestoredEditingId(draft.mode === "edit" ? draft.editingId || null : null);
-      setDialogOpen(true);
-      toast.info("Kaydedilmemiş görevlendirme taslağı geri yüklendi.");
-    });
-  }, [restoreAssignmentDraft, user?.id]);
 
   useEffect(() => {
     if (!pendingRestoredEditingId || records.length === 0) return;
@@ -479,27 +476,10 @@ export default function OSGBAssignments() {
       return;
     }
     await ensurePersonnelOptions();
-    const draft = restoreAssignmentDraft();
-    if (draft?.form && draft.mode === "create") {
-      const hasContent = Boolean(
-        draft.editingId ||
-          draft.form.companyId ||
-          draft.form.personnelId ||
-          draft.form.assignedMinutes ||
-          draft.form.startDate ||
-          draft.form.endDate ||
-          draft.form.notes.trim(),
-      );
-      if (hasContent) {
-        setForm(draft.form);
-        setPendingRestoredEditingId(null);
-        setDialogOpen(true);
-        toast.info("Kaydedilmemiş görevlendirme taslağı geri yüklendi.");
-        return;
-      }
-    }
+    clearAssignmentDraft();
     setEditing(null);
-    setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
+    setPendingRestoredEditingId(null);
+    setForm(buildFreshAssignmentForm());
     setCompanyAssignedMinutes(0);
     setPersonnelAssignedMinutes(0);
     setDialogOpen(true);
@@ -515,7 +495,8 @@ export default function OSGBAssignments() {
     if (
       restoredDraft?.form &&
       restoredDraft.mode === "edit" &&
-      restoredDraft.editingId === record.id
+      restoredDraft.editingId === record.id &&
+      hasMeaningfulAssignmentDraft(restoredDraft)
     ) {
       setEditing(record);
       setForm(restoredDraft.form);
@@ -579,7 +560,7 @@ export default function OSGBAssignments() {
       await loadData(true);
       setDialogOpen(false);
       setEditing(null);
-      setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
+      setForm(buildFreshAssignmentForm());
       clearAssignmentDraft();
       toast.success(editing ? "Görevlendirme güncellendi." : "Personel firmaya atandı.");
     } catch (err) {
@@ -1021,7 +1002,7 @@ export default function OSGBAssignments() {
               onClick={() => {
                 setDialogOpen(false);
                 setEditing(null);
-                setForm({ ...emptyForm, startDate: new Date().toISOString().slice(0, 10) });
+                setForm(buildFreshAssignmentForm());
                 clearAssignmentDraft();
               }}
             >
