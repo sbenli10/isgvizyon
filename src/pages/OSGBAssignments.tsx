@@ -475,7 +475,6 @@ export default function OSGBAssignments() {
       toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
       return;
     }
-    await ensurePersonnelOptions();
     clearAssignmentDraft();
     setEditing(null);
     setPendingRestoredEditingId(null);
@@ -483,6 +482,7 @@ export default function OSGBAssignments() {
     setCompanyAssignedMinutes(0);
     setPersonnelAssignedMinutes(0);
     setDialogOpen(true);
+    void ensurePersonnelOptions();
   };
 
   const openEdit = async (record: OsgbWorkspaceAssignmentRecord) => {
@@ -813,8 +813,20 @@ export default function OSGBAssignments() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl">
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            setEditing(null);
+            setPendingRestoredEditingId(null);
+          }
+        }}
+      >
+        <DialogContent
+          overlayClassName="z-[140] bg-slate-950/80"
+          className="z-[150] border-slate-700 bg-slate-950 text-slate-50 sm:max-w-2xl"
+        >
           <DialogHeader>
             <DialogTitle>{editing ? "Görevlendirme düzenle" : "Yeni görevlendirme oluştur"}</DialogTitle>
             <DialogDescription>
