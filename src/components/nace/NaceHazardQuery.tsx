@@ -1,40 +1,31 @@
-// ====================================================
-// NACE HAZARD QUERY - "NASIL KULLANILIR?" BÖLÜMÜ EKLENMİŞ
+﻿// ====================================================
+// NACE HAZARD QUERY
 // ====================================================
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import {
-  Search,
-  Loader2,
   AlertTriangle,
-  CheckCircle2,
-  Shield,
-  Lightbulb,
-  TrendingUp,
-  Info,
-  HelpCircle,
+  ArrowRight,
   BookOpen,
-  Zap,
+  CheckCircle2,
+  Database,
+  Info,
+  Layers,
+  Lightbulb,
+  Loader2,
+  Search,
+  Shield,
+  Sparkles,
   Target,
-  PlayCircle,
+  TrendingUp,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -42,6 +33,7 @@ import {
   type RiskAnalysisResponse,
   validateAIConfig,
 } from "@/services/aiRiskService";
+import { cn } from "@/lib/utils";
 
 interface NaceResult {
   nace_code: string;
@@ -50,16 +42,59 @@ interface NaceResult {
   sector: string;
 }
 
+const exampleCodes = [
+  { code: "41.20", title: "Bina inşaatı", tone: "blue" },
+  { code: "47.11", title: "Market perakende", tone: "emerald" },
+  { code: "25.11", title: "Metal yapı imalat", tone: "amber" },
+];
+
+const hazardMeta: Record<string, { className: string; softClassName: string; label: string; description: string }> = {
+  "Az Tehlikeli": {
+    className: "border-emerald-400/30 bg-emerald-500/15 text-emerald-100",
+    softClassName: "border-emerald-400/20 bg-emerald-500/10 text-emerald-200",
+    label: "Düşük risk",
+    description: "Temel iş güvenliği tedbirleri ve periyodik kontroller çoğu süreç için yeterlidir.",
+  },
+  Tehlikeli: {
+    className: "border-amber-400/30 bg-amber-500/15 text-amber-100",
+    softClassName: "border-amber-400/20 bg-amber-500/10 text-amber-200",
+    label: "Orta risk",
+    description: "Daha düzenli izleme, eğitim ve dokümante edilmiş kontrol tedbirleri gerekir.",
+  },
+  "Çok Tehlikeli": {
+    className: "border-rose-400/30 bg-rose-500/15 text-rose-100",
+    softClassName: "border-rose-400/20 bg-rose-500/10 text-rose-200",
+    label: "Yüksek risk",
+    description: "Sıkı kontrol, sürekli denetim ve ayrıntılı risk değerlendirme yaklaşımı zorunludur.",
+  },
+};
+
+const getHazardMeta = (hazardClass: string) =>
+  hazardMeta[hazardClass] ?? {
+    className: "border-slate-500/30 bg-slate-500/15 text-slate-100",
+    softClassName: "border-slate-500/20 bg-slate-500/10 text-slate-200",
+    label: "Bilinmiyor",
+    description: "Bu tehlike sınıfı için standart açıklama bulunamadı.",
+  };
+
 export default function NaceHazardQuery() {
-  const [naceCode, setNaceCode] = useState("");
+  const [searchParams] = useSearchParams();
+  const [naceCode, setNaceCode] = useState(() => searchParams.get("code") ?? "");
   const [loading, setLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [result, setResult] = useState<NaceResult | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<RiskAnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizedInput = useMemo(() => naceCode.trim(), [naceCode]);
+
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (code) setNaceCode(code);
+  }, [searchParams]);
+
   const handleSearch = async () => {
-    if (!naceCode.trim()) {
+    if (!normalizedInput) {
       toast.error("Lütfen NACE kodu girin");
       return;
     }
@@ -70,29 +105,17 @@ export default function NaceHazardQuery() {
     setAiAnalysis(null);
 
     try {
-      console.log("🔍 Searching NACE code:", naceCode);
-
       const { data, error } = await supabase.functions.invoke("nace-query", {
-        body: { nace: naceCode.trim() },
+        body: { nace: normalizedInput },
       });
 
-      if (error) {
-        console.error("❌ Supabase function error:", error);
-        throw new Error(error.message || "NACE kodu bulunamadı");
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || "NACE kodu bulunamadı");
-      }
-
-      console.log("✅ NACE result:", data.data);
+      if (error) throw new Error(error.message || "NACE kodu bulunamadı");
+      if (!data.success) throw new Error(data.error || "NACE kodu bulunamadı");
 
       setResult(data.data);
       toast.success("NACE kodu bulundu");
     } catch (err) {
-      console.error("❌ Search error:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "NACE kodu bulunamadı";
+      const errorMessage = err instanceof Error ? err.message : "NACE kodu bulunamadı";
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -111,8 +134,6 @@ export default function NaceHazardQuery() {
     setAiLoading(true);
 
     try {
-      console.log("🤖 Starting AI risk analysis...");
-
       const analysis = await generateNaceRiskAnalysis({
         naceCode: result.nace_code,
         sector: result.sector,
@@ -120,13 +141,10 @@ export default function NaceHazardQuery() {
         naceTitle: result.nace_title,
       });
 
-      console.log("✅ AI analysis completed:", analysis);
-
       setAiAnalysis(analysis);
       toast.success(`${analysis.risks.length} risk tespit edildi`);
     } catch (err) {
-      console.error("❌ AI analysis error:", err);
-      toast.error("AI analizi başar��sız", {
+      toast.error("AI analizi başarısız", {
         description: err instanceof Error ? err.message : "Bilinmeyen hata",
       });
     } finally {
@@ -134,553 +152,227 @@ export default function NaceHazardQuery() {
     }
   };
 
-  const getHazardColor = (hazardClass: string) => {
-    switch (hazardClass) {
-      case "Az Tehlikeli":
-        return "bg-green-500";
-      case "Tehlikeli":
-        return "bg-yellow-500";
-      case "Çok Tehlikeli":
-        return "bg-red-500";
-      default:
-        return "bg-gray-500";
-    }
-  };
-
-  const getHazardIcon = (hazardClass: string) => {
-    switch (hazardClass) {
-      case "Az Tehlikeli":
-        return <CheckCircle2 className="h-5 w-5" />;
-      case "Tehlikeli":
-        return <AlertTriangle className="h-5 w-5" />;
-      case "Çok Tehlikeli":
-        return <AlertTriangle className="h-5 w-5" />;
-      default:
-        return <Shield className="h-5 w-5" />;
-    }
-  };
+  const selectedHazardMeta = result ? getHazardMeta(result.hazard_class) : null;
 
   return (
-    <div className="w-full min-w-0 space-y-6 py-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold flex items-center gap-3">
-          <Shield className="h-8 w-8 text-primary" />
-          NACE Kod Tehlike Sınıfı Sorgulama
-        </h1>
-        <p className="text-muted-foreground">
-          NACE koduna göre tehlike sınıfı sorgulama ve AI destekli risk analizi
-        </p>
-      </div>
-
-      {/* ✅ NASIL KULLANILIR? BÖLÜMÜ */}
-      <Card className="border-blue-500/20 bg-gradient-to-br from-blue-950/20 to-purple-950/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <HelpCircle className="h-5 w-5 text-blue-500" />
-            Nasıl Kullanılır?
-          </CardTitle>
-          <CardDescription>
-            NACE kod sorgulama ve AI risk analizi için adım adım rehber
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Accordion type="single" collapsible className="w-full">
-            {/* Adım 1 */}
-            <AccordionItem value="step-1">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white font-bold">
-                    1
-                  </div>
-                  <span className="font-semibold">NACE Kodunu Girin</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pl-11">
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    İşyerinizin NACE (ekonomik faaliyet) kodunu aşağıdaki
-                    formatlarda girebilirsiniz:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Card className="bg-muted/50">
-                      <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-4 w-4 text-green-500" />
-                          <span className="font-mono font-semibold">41.20</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Noktalı format
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-muted/50">
-                      <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-4 w-4 text-green-500" />
-                          <span className="font-mono font-semibold">4120</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Noktasız format
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-muted/50">
-                      <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Target className="h-4 w-4 text-green-500" />
-                          <span className="font-mono font-semibold">47.11</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Her iki format da
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                  <Alert>
-                    <BookOpen className="h-4 w-4" />
-                    <AlertDescription>
-                      <strong>NACE kodunuzu bilmiyor musunuz?</strong> "Sektör
-                      Listesi" sayfasından tüm kodları inceleyebilirsiniz.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Adım 2 */}
-            <AccordionItem value="step-2">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white font-bold">
-                    2
-                  </div>
-                  <span className="font-semibold">Tehlike Sınıfını Görün</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pl-11">
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    Sorgulama sonucunda işyerinizin tehlike sınıfını öğreneceksiniz:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Card className="border-green-500/50">
-                      <CardContent className="pt-4">
-                        <Badge className="bg-green-500 text-white mb-2">
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Az Tehlikeli
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          Düşük risk seviyesi. Temel iş güvenliği tedbirleri yeterli.
-                        </p>
-                        <p className="text-xs font-semibold mt-2">
-                          Örnek: Ofis, market, eğitim
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card className="border-yellow-500/50">
-                      <CardContent className="pt-4">
-                        <Badge className="bg-yellow-500 text-white mb-2">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Tehlikeli
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          Orta risk seviyesi. Kapsamlı güvenlik tedbirleri gerekir.
-                        </p>
-                        <p className="text-xs font-semibold mt-2">
-                          Örnek: İmalat, lojistik, gıda
-                        </p>
-                      </CardContent>
-                    </Card>
-                    <Card className="border-red-500/50">
-                      <CardContent className="pt-4">
-                        <Badge className="bg-red-500 text-white mb-2">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          Çok Tehlikeli
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          Yüksek risk. Sıkı tedbirler ve sürekli denetim zorunlu.
-                        </p>
-                        <p className="text-xs font-semibold mt-2">
-                          Örnek: İnşaat, madencilik, kimya
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Adım 3 */}
-            <AccordionItem value="step-3">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white font-bold">
-                    3
-                  </div>
-                  <span className="font-semibold">
-                    AI Risk Analizi Yapın
-                    <Badge className="ml-2 bg-purple-500/20 text-purple-400 border-purple-500/30">
-                      AI
-                    </Badge>
-                  </span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pl-11">
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    Sonuç geldikten sonra "AI Risk Analizi" butonuna basarak
-                    yapay zeka destekli detaylı risk analizi alın.
-                  </p>
-                  <div className="bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20 rounded-lg p-4">
-                    <div className="flex items-start gap-3">
-                      <Zap className="h-5 w-5 text-purple-400 mt-0.5" />
-                      <div>
-                        <h4 className="font-semibold mb-2">AI Size Ne Sağlar?</h4>
-                        <ul className="space-y-2 text-sm text-muted-foreground">
-                          <li className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                            <span>
-                              Sektörünüze özel <strong>5 ana tehlike</strong>
-                            </span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                            <span>
-                              Her tehlike için <strong>detaylı risk açıklaması</strong>
-                            </span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                            <span>
-                              <strong>Önleyici tedbirler</strong> ve öneriler
-                            </span>
-                          </li>
-                          <li className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                            <span>
-                              <strong>6331 sayılı İSG Kanunu</strong> uyumlu analiz
-                            </span>
-                          </li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      AI analizi <strong>30-60 saniye</strong> sürebilir.
-                      Google Gemini AI motorunu kullanır.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Adım 4 */}
-            <AccordionItem value="step-4">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-500 text-white font-bold">
-                    4
-                  </div>
-                  <span className="font-semibold">Sonuçları Kullanın</span>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="pl-11">
-                <div className="space-y-3 pt-2">
-                  <p className="text-sm text-muted-foreground">
-                    AI risk analizi sonuçlarını farklı modüllerde kullanabilirsiniz:
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Card>
-                      <CardContent className="pt-4">
-                        <TrendingUp className="h-8 w-8 text-blue-500 mb-2" />
-                        <h4 className="font-semibold mb-1">Fine Kinney</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Riskleri skorlayarak öncelik belirleyin
-                        </p>
-                        <Badge variant="outline" className="mt-2">
-                          Yakında
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <Shield className="h-8 w-8 text-orange-500 mb-2" />
-                        <h4 className="font-semibold mb-1">ADEP Planı</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Acil durum eylem planı oluşturun
-                        </p>
-                        <Badge variant="outline" className="mt-2">
-                          Yakında
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardContent className="pt-4">
-                        <BookOpen className="h-8 w-8 text-purple-500 mb-2" />
-                        <h4 className="font-semibold mb-1">Risk Kütüphanesi</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Riskleri kütüphanenize kaydedin
-                        </p>
-                        <Badge variant="outline" className="mt-2">
-                          Yakında
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-
-          {/* Quick Start */}
-          <div className="mt-6 pt-6 border-t">
-            <div className="flex items-center gap-2 mb-3">
-              <PlayCircle className="h-5 w-5 text-green-500" />
-              <h4 className="font-semibold">Hızlı Başlangıç Örnekleri</h4>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Button
-                variant="outline"
-                className="justify-start h-auto py-3"
-                onClick={() => setNaceCode("41.20")}
-              >
-                <div className="text-left">
-                  <div className="font-mono font-bold">41.20</div>
-                  <div className="text-xs text-muted-foreground">
-                    Bina İnşaatı
-                  </div>
-                </div>
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start h-auto py-3"
-                onClick={() => setNaceCode("47.11")}
-              >
-                <div className="text-left">
-                  <div className="font-mono font-bold">47.11</div>
-                  <div className="text-xs text-muted-foreground">
-                    Market Perakende
-                  </div>
-                </div>
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start h-auto py-3"
-                onClick={() => setNaceCode("25.11")}
-              >
-                <div className="text-left">
-                  <div className="font-mono font-bold">25.11</div>
-                  <div className="text-xs text-muted-foreground">
-                    Metal Yapı İmalat
-                  </div>
-                </div>
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Info Alert */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          NACE (Avrupa Topluluğu'nda Ekonomik Faaliyetlerin İstatistiki
-          Sınıflandırması) koduna göre işyeri tehlike sınıfını ve iş sağlığı
-          güvenliği risklerini öğrenin.
-        </AlertDescription>
-      </Alert>
-
-      {/* Search Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>NACE Kodu Sorgula</CardTitle>
-          <CardDescription>
-            Örnek: 41.20, 4120, 47.11 veya 4711 formatında girebilirsiniz
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Input
-              placeholder="NACE kodunu girin (örn: 41.20)"
-              value={naceCode}
-              onChange={(e) => setNaceCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1"
-            />
-            <Button onClick={handleSearch} disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4" />
-              )}
-              <span className="ml-2">Sorgula</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Error Display */}
-      {error && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Result Display */}
-      {result && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Tehlike Sınıfı Sonucu</CardTitle>
-                <CardDescription>NACE: {result.nace_code}</CardDescription>
-              </div>
-              <Button onClick={handleAIAnalysis} disabled={aiLoading}>
-                {aiLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Lightbulb className="h-4 w-4 mr-2" />
-                )}
-                AI Risk Analizi
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* NACE Info */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Faaliyet
-                </label>
-                <p className="text-lg font-semibold">{result.nace_title}</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  Sektör
-                </label>
-                <p className="text-lg font-semibold">{result.sector}</p>
-              </div>
-            </div>
-
-            {/* Hazard Class Badge */}
+    <div className="w-full min-w-0 space-y-6 p-4 text-slate-100 sm:p-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.20),transparent_32%),linear-gradient(135deg,#020617_0%,#0f172a_48%,#082f49_100%)] p-6 shadow-2xl shadow-slate-950/40 lg:p-8">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 right-8 h-40 w-40 rounded-full bg-violet-500/20 blur-3xl" />
+        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+          <div className="space-y-5">
+            <Badge className="w-fit border border-cyan-300/25 bg-cyan-400/10 text-cyan-100 hover:bg-cyan-400/10">
+              <Sparkles className="mr-2 h-3.5 w-3.5" />
+              NACE Tehlike Sınıfı ve AI Risk Analizi
+            </Badge>
             <div>
-              <label className="text-sm font-medium text-muted-foreground block mb-2">
-                Tehlike Sınıfı
-              </label>
-              <Badge
-                className={`${getHazardColor(
-                  result.hazard_class
-                )} text-white text-lg px-4 py-2`}
-              >
-                <span className="mr-2">{getHazardIcon(result.hazard_class)}</span>
-                {result.hazard_class}
-              </Badge>
+              <h1 className="max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
+                NACE kodundan tehlike sınıfını ve ön risk başlıklarını hızlıca bulun
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">
+                Faaliyet kodunu girin; sistem tehlike sınıfını, sektör bilgisini ve AI destekli risk önerilerini profesyonel bir özet halinde hazırlasın.
+              </p>
             </div>
-
-            {/* Hazard Class Info */}
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                {result.hazard_class === "Az Tehlikeli" && (
-                  <span>
-                    <strong>Az Tehlikeli:</strong> Düşük risk seviyesi. Temel iş
-                    güvenliği tedbirleri yeterlidir.
-                  </span>
-                )}
-                {result.hazard_class === "Tehlikeli" && (
-                  <span>
-                    <strong>Tehlikeli:</strong> Orta risk seviyesi. Kapsamlı
-                    güvenlik tedbirleri gerektirir.
-                  </span>
-                )}
-                {result.hazard_class === "Çok Tehlikeli" && (
-                  <span>
-                    <strong>Çok Tehlikeli:</strong> Yüksek risk seviyesi. Sıkı
-                    güvenlik tedbirleri ve sürekli denetim zorunludur.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* AI Analysis Results */}
-      {aiAnalysis && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold">AI Risk Analizi Sonuçları</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Kod sorgulama", value: "Anlık", icon: Database },
+                { label: "Tehlike sınıfı", value: "Resmi veri", icon: Shield },
+                { label: "AI risk analizi", value: "Sektörel", icon: Zap },
+              ].map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur">
+                    <Icon className="h-5 w-5 text-cyan-200" />
+                    <p className="mt-3 text-lg font-black text-white">{item.value}</p>
+                    <p className="text-xs text-slate-400">{item.label}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {aiAnalysis.risks.map((risk, index) => (
-              <Card key={index} className="border-l-4 border-l-primary">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <span className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
-                      {index + 1}
-                    </span>
-                    {risk.hazard}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Risk Description */}
-                  <div>
-                    <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                      Risk Tanımı
-                    </h4>
-                    <p className="text-sm leading-relaxed">{risk.risk}</p>
-                  </div>
-
-                  {/* Preventive Measures */}
-                  <div>
-                    <h4 className="font-semibold text-sm text-muted-foreground mb-2">
-                      Önleyici Tedbirler
-                    </h4>
-                    <ul className="space-y-2">
-                      {risk.preventiveMeasures.map((measure, mIndex) => (
-                        <li
-                          key={mIndex}
-                          className="flex items-start gap-2 text-sm"
-                        >
-                          <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                          <span>{measure}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Action Buttons */}
-          <Card className="bg-muted">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button variant="outline" className="flex-1">
-                  <TrendingUp className="h-4 w-4 mr-2" />
-                  Fine Kinney Analizi Oluştur
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Shield className="h-4 w-4 mr-2" />
-                  ADEP Planına Ekle
-                </Button>
-                <Button variant="outline" className="flex-1">
-                  <Info className="h-4 w-4 mr-2" />
-                  Risk Kütüphanesine Kaydet
+          <Card className="border-white/10 bg-slate-950/70 text-slate-100 shadow-2xl shadow-black/30 backdrop-blur-xl">
+            <CardContent className="space-y-4 p-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-200">Hızlı Sorgu</p>
+                <h2 className="mt-2 text-xl font-black text-white">NACE kodu girin</h2>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
+                <div className="relative flex-1">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <Input
+                    id="nace-code"
+                    name="naceCode"
+                    placeholder="Örn: 41.20 veya 4120"
+                    value={naceCode}
+                    onChange={(event) => setNaceCode(event.target.value)}
+                    onKeyDown={(event) => event.key === "Enter" && void handleSearch()}
+                    className="h-12 rounded-2xl border-slate-700 bg-slate-950 pl-11 text-base font-bold text-white placeholder:text-slate-500 focus:border-cyan-400 focus:ring-cyan-400/20"
+                  />
+                </div>
+                <Button onClick={() => void handleSearch()} disabled={loading} className="h-12 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-6 font-black text-white shadow-lg shadow-cyan-950/30 hover:from-blue-500 hover:to-cyan-400">
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  Sorgula
                 </Button>
               </div>
+              <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                {exampleCodes.map((item) => (
+                  <button
+                    key={item.code}
+                    type="button"
+                    onClick={() => setNaceCode(item.code)}
+                    className="rounded-2xl border border-slate-700 bg-slate-900/70 p-3 text-left transition hover:border-cyan-400/50 hover:bg-slate-800"
+                  >
+                    <span className="font-mono text-sm font-black text-white">{item.code}</span>
+                    <span className="mt-1 block text-xs text-slate-400">{item.title}</span>
+                  </button>
+                ))}
+              </div>
+              <Link to="/nace-query/sectors" className="inline-flex items-center text-sm font-bold text-cyan-200 hover:text-cyan-100">
+                Sektör listesinden kod seç
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
             </CardContent>
           </Card>
         </div>
-      )}
+      </section>
+
+      {error ? (
+        <Alert className="border-rose-400/25 bg-rose-500/10 text-rose-50">
+          <AlertTriangle className="h-4 w-4 text-rose-300" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-6">
+          {result ? (
+            <Card className="overflow-hidden border-slate-800 bg-slate-950/80 text-slate-100 shadow-xl shadow-slate-950/30">
+              <CardContent className="p-0">
+                <div className="border-b border-slate-800 bg-slate-900/80 p-5 sm:p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                      <Badge variant="outline" className="border-cyan-400/30 bg-cyan-500/10 font-mono text-cyan-100">
+                        NACE {result.nace_code}
+                      </Badge>
+                      <h2 className="mt-3 text-2xl font-black text-white">{result.nace_title}</h2>
+                      <p className="mt-2 text-sm text-slate-400">{result.sector}</p>
+                    </div>
+                    <Button onClick={() => void handleAIAnalysis()} disabled={aiLoading} className="rounded-2xl bg-gradient-to-r from-violet-600 to-cyan-500 font-black text-white shadow-lg shadow-violet-950/30 hover:from-violet-500 hover:to-cyan-400">
+                      {aiLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
+                      AI Risk Analizi
+                    </Button>
+                  </div>
+                </div>
+                <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 lg:col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Faaliyet Açıklaması</p>
+                    <p className="mt-3 text-lg font-bold leading-7 text-white">{result.nace_title}</p>
+                    <p className="mt-4 text-sm leading-6 text-slate-400">Bu faaliyet kodu için tehlike sınıfı, İSG planlaması, uzman/hekim süreleri ve risk dokümanı hazırlığında temel referans olarak kullanılabilir.</p>
+                  </div>
+                  <div className={cn("rounded-2xl border p-4", selectedHazardMeta?.softClassName)}>
+                    <div className="flex items-center gap-3">
+                      {result.hazard_class === "Az Tehlikeli" ? <CheckCircle2 className="h-6 w-6" /> : <AlertTriangle className="h-6 w-6" />}
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] opacity-80">Tehlike Sınıfı</p>
+                        <p className="text-xl font-black">{result.hazard_class}</p>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm font-semibold">{selectedHazardMeta?.label}</p>
+                    <p className="mt-2 text-sm leading-6 opacity-90">{selectedHazardMeta?.description}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed border-slate-800 bg-slate-950/60 text-slate-100">
+              <CardContent className="grid min-h-[260px] place-items-center p-8 text-center">
+                <div>
+                  <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-cyan-500/10 text-cyan-200 ring-1 ring-cyan-400/20">
+                    <Search className="h-6 w-6" />
+                  </div>
+                  <h2 className="mt-4 text-xl font-black text-white">Sorgu sonucu burada görünecek</h2>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">NACE kodunu girip sorguladığınızda faaliyet, sektör ve tehlike sınıfı özetini bu alanda inceleyebilirsiniz.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {aiAnalysis ? (
+            <section className="space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">AI Risk Çıktısı</p>
+                  <h2 className="mt-2 text-2xl font-black text-white">Sektörel risk önerileri</h2>
+                </div>
+                <Badge className="w-fit bg-violet-500/15 text-violet-100 hover:bg-violet-500/15">{aiAnalysis.risks.length} risk</Badge>
+              </div>
+              <div className="grid gap-4">
+                {aiAnalysis.risks.map((risk, index) => (
+                  <Card key={`${risk.hazard}-${index}`} className="border-slate-800 bg-slate-950/80 text-slate-100 shadow-lg shadow-slate-950/20">
+                    <CardContent className="p-5">
+                      <div className="flex gap-4">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-cyan-500/10 text-sm font-black text-cyan-200 ring-1 ring-cyan-400/20">{index + 1}</span>
+                        <div className="min-w-0 flex-1 space-y-4">
+                          <div>
+                            <h3 className="text-lg font-black text-white">{risk.hazard}</h3>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">{risk.risk}</p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Önleyici Tedbirler</p>
+                            <ul className="mt-3 space-y-2">
+                              {risk.preventiveMeasures.map((measure, measureIndex) => (
+                                <li key={`${measure}-${measureIndex}`} className="flex gap-2 text-sm leading-6 text-slate-300">
+                                  <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
+                                  <span>{measure}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+
+        <aside className="space-y-4">
+          <Card className="border-slate-800 bg-slate-950/80 text-slate-100 shadow-xl shadow-slate-950/20">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-500/10 text-blue-200 ring-1 ring-blue-400/20">
+                  <BookOpen className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-white">Nasıl kullanılır?</h3>
+                  <p className="text-xs text-slate-400">4 kısa adım</p>
+                </div>
+              </div>
+              {[
+                "NACE kodunu yazın veya sektör listesinden seçin.",
+                "Tehlike sınıfı ve sektör bilgisini kontrol edin.",
+                "AI risk analizini çalıştırın.",
+                "Riskleri değerlendirme ve planlama ekranlarında kullanın.",
+              ].map((step, index) => (
+                <div key={step} className="flex gap-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3">
+                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-cyan-500/10 text-xs font-black text-cyan-200">{index + 1}</span>
+                  <p className="text-sm leading-6 text-slate-300">{step}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Alert className="border-blue-400/20 bg-blue-500/10 text-blue-50">
+            <Info className="h-4 w-4 text-blue-200" />
+            <AlertDescription className="text-blue-100/90">
+              NACE kodu tehlike sınıfı, iş güvenliği hizmet süreleri ve dokümantasyon kapsamı için temel referanstır.
+            </AlertDescription>
+          </Alert>
+        </aside>
+      </div>
     </div>
   );
 }

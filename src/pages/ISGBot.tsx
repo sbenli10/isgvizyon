@@ -238,6 +238,7 @@ type ContractStatusReportRow = {
 const ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION = 1;
 const ISGBOT_FORM_SURFACE_ERROR_MESSAGE =
   "İSG-KATİP form alanları doğrulanamadı. Sayfa yapısı değişmiş olabilir veya yanlış ekranda olabilirsiniz.";
+const ISGKATIP_PERSON_CARD_URL = "https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim";
 
 type ExtensionInstallState =
   | "checking"
@@ -460,10 +461,6 @@ const getIsgbotFriendlyErrorMessage = (
     return "Bu işlem için yetkiniz doğrulanamadı. Kurum/organizasyon erişiminizi kontrol edip tekrar deneyin.";
   }
 
-  if (normalized.includes("relation") || normalized.includes("does not exist") || normalized.includes("schema cache") || normalized.includes("42p01")) {
-    return "Gerekli veritabanı tablosu veya migration eksik görünüyor. Lütfen sistem kurulumunu/migration durumunu kontrol edin.";
-  }
-
   if (normalized.includes("duplicate") || normalized.includes("23505") || normalized.includes("unique")) {
     return "Bu kayıt sistemde zaten bulunuyor. Mevcut kaydı güncelleyebilir veya farklı bir kayıt seçebilirsiniz.";
   }
@@ -478,6 +475,10 @@ const getIsgbotFriendlyErrorMessage = (
 
   if (normalized.includes("receiving end does not exist") || normalized.includes("message port") || normalized.includes("extension")) {
     return "Tarayıcı eklentisiyle bağlantı kurulamadı. Eklentinin açık, güncel ve İSG-KATİP oturumunun aktif olduğundan emin olun.";
+  }
+
+  if (normalized.includes("relation") || normalized.includes("does not exist") || normalized.includes("schema cache") || normalized.includes("42p01")) {
+    return "Gerekli veritabanı tablosu veya migration eksik görünüyor. Lütfen sistem kurulumunu/migration durumunu kontrol edin.";
   }
 
   if (normalized.includes("form") || normalized.includes("selector") || normalized.includes("alanları doğrulanamadı")) {
@@ -3335,6 +3336,7 @@ function MultiAssignmentPanelV2({
   userId,
   organizationId,
   onOperationsRefresh,
+  onExtensionRefresh,
 }: {
   companies: IsgkatipCompanyRow[];
   onRecordDryRun: (result: MultiAssignmentDryRunResult) => void;
@@ -3342,6 +3344,7 @@ function MultiAssignmentPanelV2({
   userId?: string | null;
   organizationId?: string | null;
   onOperationsRefresh: () => Promise<void> | void;
+  onExtensionRefresh: () => Promise<void> | void;
 }) {
   const [personnelText, setPersonnelText] = useState("");
   const [personnel, setPersonnel] = useState<IsgbotPersonnel[]>([]);
@@ -3433,6 +3436,16 @@ function MultiAssignmentPanelV2({
       return false;
     }
 
+    if (!extensionStatus.installed || !extensionStatus.isgKatipReady || extensionStatus.state !== "sync_ready") {
+      setSurfaceValidation({
+        canApply: false,
+        blockingReasons: [
+          "Canlı işlem için eklenti bağlantısı ve İSG-KATİP oturumu hazır olmalıdır. İSG-KATİP sekmesini açıp eklentiyi yenileyin, sonra tekrar kontrol edin.",
+        ],
+      });
+      return false;
+    }
+
     if (selectedPlanRows.length === 0) {
       setSurfaceValidation({
         canApply: false,
@@ -3458,7 +3471,7 @@ function MultiAssignmentPanelV2({
         (response?.validation as SurfaceValidationResult) ||
         ({
           canApply: false,
-          blockingReasons: [response?.error || ISGBOT_FORM_SURFACE_ERROR_MESSAGE],
+          blockingReasons: [getIsgbotFriendlyErrorMessage(response?.error, ISGBOT_FORM_SURFACE_ERROR_MESSAGE)],
         } satisfies SurfaceValidationResult);
 
       setSurfaceValidation(nextValidation);
@@ -3474,7 +3487,7 @@ function MultiAssignmentPanelV2({
     } finally {
       setIsValidatingSurface(false);
     }
-  }, [planHash, selectedPlanRows]);
+  }, [extensionStatus.installed, extensionStatus.isgKatipReady, extensionStatus.state, planHash, selectedPlanRows]);
 
   const openApplyDialog = async () => {
     setApplyDialogOpen(true);
@@ -4074,17 +4087,39 @@ function MultiAssignmentPanelV2({
                         : "Form yüzeyi doğrulanmadan işlem başlatılamaz."}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
-                  onClick={() => void validateApplySurface()}
-                  disabled={isValidatingSurface}
-                >
-                  {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Tekrar Doğrula
-                </Button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-400/30 bg-blue-500/10 text-blue-50 hover:bg-blue-500/20"
+                    onClick={() => window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    İSG-KATİP'i Aç
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/20"
+                    onClick={() => void onExtensionRefresh()}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Bağlantıyı Kontrol Et
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
+                    onClick={() => void validateApplySurface()}
+                    disabled={isValidatingSurface}
+                  >
+                    {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Tekrar Doğrula
+                  </Button>
+                </div>
               </div>
               {surfaceValidation?.formSurface ? (
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
@@ -4155,6 +4190,7 @@ function ExcessDurationUpdatePanelV2({
   userId,
   organizationId,
   onOperationsRefresh,
+  onExtensionRefresh,
 }: {
   runtime: FeatureRuntimeState;
   onRun: () => void;
@@ -4163,6 +4199,7 @@ function ExcessDurationUpdatePanelV2({
   userId?: string | null;
   organizationId?: string | null;
   onOperationsRefresh: () => Promise<void> | void;
+  onExtensionRefresh: () => Promise<void> | void;
 }) {
   const [previewGenerated, setPreviewGenerated] = useState(false);
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -4244,6 +4281,16 @@ function ExcessDurationUpdatePanelV2({
       return false;
     }
 
+    if (!extensionStatus.installed || !extensionStatus.isgKatipReady || extensionStatus.state !== "sync_ready") {
+      setSurfaceValidation({
+        canApply: false,
+        blockingReasons: [
+          "Canlı işlem için eklenti bağlantısı ve İSG-KATİP oturumu hazır olmalıdır. İSG-KATİP sekmesini açıp eklentiyi yenileyin, sonra tekrar kontrol edin.",
+        ],
+      });
+      return false;
+    }
+
     if (selectedRows.length === 0) {
       setSurfaceValidation({
         canApply: false,
@@ -4270,7 +4317,7 @@ function ExcessDurationUpdatePanelV2({
         (response?.validation as SurfaceValidationResult) ||
         ({
           canApply: false,
-          blockingReasons: [response?.error || ISGBOT_FORM_SURFACE_ERROR_MESSAGE],
+          blockingReasons: [getIsgbotFriendlyErrorMessage(response?.error, ISGBOT_FORM_SURFACE_ERROR_MESSAGE)],
         } satisfies SurfaceValidationResult);
 
       setSurfaceValidation(nextValidation);
@@ -4286,7 +4333,7 @@ function ExcessDurationUpdatePanelV2({
     } finally {
       setIsValidatingSurface(false);
     }
-  }, [planHash, selectedRows]);
+  }, [extensionStatus.installed, extensionStatus.isgKatipReady, extensionStatus.state, planHash, selectedRows]);
 
   const openApplyDialog = async () => {
     setApplyDialogOpen(true);
@@ -4662,17 +4709,39 @@ function ExcessDurationUpdatePanelV2({
                         : "Form yüzeyi doğrulanmadan işlem başlatılamaz."}
                   </p>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
-                  onClick={() => void validateApplySurface()}
-                  disabled={isValidatingSurface}
-                >
-                  {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                  Tekrar Doğrula
-                </Button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-400/30 bg-blue-500/10 text-blue-50 hover:bg-blue-500/20"
+                    onClick={() => window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    İSG-KATİP'i Aç
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-cyan-400/30 bg-cyan-500/10 text-cyan-50 hover:bg-cyan-500/20"
+                    onClick={() => void onExtensionRefresh()}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Bağlantıyı Kontrol Et
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
+                    onClick={() => void validateApplySurface()}
+                    disabled={isValidatingSurface}
+                  >
+                    {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Tekrar Doğrula
+                  </Button>
+                </div>
               </div>
               {surfaceValidation?.formSurface ? (
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
@@ -4751,6 +4820,7 @@ function FeatureDialog({
   userId,
   organizationId,
   onOperationsRefresh,
+  onExtensionRefresh,
 }: {
   feature: BotFeature | null;
   open: boolean;
@@ -4765,6 +4835,7 @@ function FeatureDialog({
   userId?: string | null;
   organizationId?: string | null;
   onOperationsRefresh: () => Promise<void> | void;
+  onExtensionRefresh: () => Promise<void> | void;
 }) {
   if (!feature) return null;
   const Icon = feature.icon;
@@ -4801,6 +4872,7 @@ function FeatureDialog({
               userId={userId}
               organizationId={organizationId}
               onOperationsRefresh={onOperationsRefresh}
+              onExtensionRefresh={onExtensionRefresh}
             />
           )}
           {feature.id === "contract-download" && (
@@ -4811,6 +4883,7 @@ function FeatureDialog({
               userId={userId}
               organizationId={organizationId}
               onOperationsRefresh={onOperationsRefresh}
+              onExtensionRefresh={onExtensionRefresh}
             />
           )}
           {feature.id === "contracts-need-update" && <ContractsNeedUpdatePanel runtime={runtime} onRun={onRun} companies={companies} flags={flags} />}
@@ -5273,7 +5346,7 @@ export default function ISGBot() {
       const message = "İSG-KATİP oturumu açılmalıdır. İSG-KATİP sayfasına gidip giriş yaptıktan sonra eklenti panelinden Firmalarımı Oku butonuna basın.";
       setRuntime("company-import", { loading: false, error: null, success: null, info: message });
       toast.info("İSG-KATİP oturumu gerekli", { description: "Sayfa açılıyor; giriş yaptıktan sonra eklenti panelinden senkronu başlatın." });
-      window.open("https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim", "_blank", "noopener,noreferrer");
+      window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer");
       await checkExtensionStatus();
       await finishClientOperation(operation, "partial", { guidance_only: true, reason: "isgkatip_login_required" });
       await loadOperations();
@@ -5284,7 +5357,7 @@ export default function ISGBot() {
       "İSG-KATİP sayfasına gidin, eklenti panelinden Firmalarımı Oku butonuna basın. Listeyi onayladıktan sonra Son Senkron Verisini Yükle ile listeyi burada görebilirsiniz.";
     setRuntime("company-import", { loading: false, error: null, success: null, info: message });
     toast.info("Yeni senkron yönlendirmesi hazır", { description: "Gerçek okuma işlemi İSG-KATİP sayfasındaki eklenti panelinden başlatılır." });
-    window.open("https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim", "_blank", "noopener,noreferrer");
+    window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer");
     await finishClientOperation(operation, "partial", { guidance_only: true, next_step: "extension_panel_sync" });
     await loadOperations();
   };
@@ -5749,7 +5822,7 @@ export default function ISGBot() {
                     </a>
                   </Button>
                   <Button size="sm" variant="outline" className="rounded-xl border-emerald-300/30 bg-emerald-500/10 text-emerald-50 hover:bg-emerald-500/20" asChild>
-                    <a href="https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim" target="_blank" rel="noopener noreferrer">
+                    <a href={ISGKATIP_PERSON_CARD_URL} target="_blank" rel="noopener noreferrer">
                       İSG-KATİP’i Aç
                     </a>
                   </Button>
@@ -5772,7 +5845,7 @@ export default function ISGBot() {
                     Tekrar Kontrol Et
                   </Button>
                   <Button size="sm" variant="outline" className="rounded-xl border-emerald-300/30 bg-emerald-500/10 text-emerald-50 hover:bg-emerald-500/20" asChild>
-                    <a href="https://isgkatip.csgb.gov.tr/kisi-kurum/kisi-karti/kisi-kartim" target="_blank" rel="noopener noreferrer">
+                    <a href={ISGKATIP_PERSON_CARD_URL} target="_blank" rel="noopener noreferrer">
                       İSG-KATİP’i Aç
                     </a>
                   </Button>
@@ -5885,6 +5958,7 @@ export default function ISGBot() {
         userId={user?.id}
         organizationId={profile?.organization_id}
         onOperationsRefresh={loadOperations}
+        onExtensionRefresh={checkExtensionStatus}
       />
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
@@ -5927,6 +6001,9 @@ export default function ISGBot() {
     </div>
   );
 }
+
+
+
 
 
 
