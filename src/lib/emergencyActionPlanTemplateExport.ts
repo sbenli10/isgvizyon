@@ -5,6 +5,10 @@ import Docxtemplater from "docxtemplater";
 const TEMPLATE_PATH = "/templates/ACİL EYLEM PLANI (1).docx";
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const WORD_NAMESPACE = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const REL_NAMESPACE = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const WP_NAMESPACE = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const DRAWING_NAMESPACE = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const PICTURE_NAMESPACE = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 
 export type EmergencyTeamMember = {
   fullName: string;
@@ -81,6 +85,7 @@ export type EmergencyActionPlanPayload = {
     safetyExpertName: string;
     employerName: string;
   };
+  logoDataUrl?: string;
   fileName?: string;
 };
 
@@ -261,6 +266,148 @@ const buildFileName = (payload: EmergencyActionPlanPayload) => {
 
 const createWordElement = (document: XMLDocument, tagName: string) =>
   document.createElementNS(WORD_NAMESPACE, `w:${tagName}`);
+const createXmlElement = (document: XMLDocument, namespace: string, tagName: string) =>
+  document.createElementNS(namespace, tagName);
+
+const getLogoMime = (dataUrl?: string) => {
+  const match = cleanText(dataUrl).match(/^data:(image\/(?:png|jpeg|jpg));base64,/i);
+  return match?.[1]?.toLowerCase() || "";
+};
+
+const dataUrlToArrayBuffer = async (dataUrl: string) => {
+  const response = await fetch(dataUrl);
+  if (!response.ok) throw new Error("LOGO_READ_FAILED");
+  return response.arrayBuffer();
+};
+
+const ensureImageContentType = (zip: PizZip, extension: string) => {
+  const file = zip.file("[Content_Types].xml");
+  if (!file) return;
+  const xml = new DOMParser().parseFromString(file.asText(), "application/xml");
+  const exists = Array.from(xml.getElementsByTagName("Default")).some(
+    (node) => node.getAttribute("Extension") === extension,
+  );
+  if (exists) return;
+  const node = xml.createElement("Default");
+  node.setAttribute("Extension", extension);
+  node.setAttribute("ContentType", extension === "png" ? "image/png" : "image/jpeg");
+  xml.documentElement.appendChild(node);
+  zip.file("[Content_Types].xml", new XMLSerializer().serializeToString(xml));
+};
+
+const addLogoRelationship = async (zip: PizZip, dataUrl: string) => {
+  const mime = getLogoMime(dataUrl);
+  if (!mime) return null;
+  const extension = mime.includes("png") ? "png" : "jpg";
+  const relsFile = zip.file("word/_rels/document.xml.rels");
+  if (!relsFile) return null;
+  const relsDocument = new DOMParser().parseFromString(relsFile.asText(), "application/xml");
+  const relationships = Array.from(relsDocument.getElementsByTagName("Relationship"));
+  const nextRelNumber =
+    relationships.reduce((max, relation) => {
+      const numeric = Number((relation.getAttribute("Id") || "").replace("rId", ""));
+      return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+    }, 0) + 1;
+  const relId = `rId${nextRelNumber}`;
+  const imageName = `adep-kapak-logo-${Date.now()}.${extension}`;
+  ensureImageContentType(zip, extension);
+  zip.file(`word/media/${imageName}`, await dataUrlToArrayBuffer(dataUrl));
+  const relationship = relsDocument.createElement("Relationship");
+  relationship.setAttribute("Id", relId);
+  relationship.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+  relationship.setAttribute("Target", `media/${imageName}`);
+  relsDocument.documentElement.appendChild(relationship);
+  zip.file("word/_rels/document.xml.rels", new XMLSerializer().serializeToString(relsDocument));
+  return { relId, imageName };
+};
+
+const createLogoRun = (document: XMLDocument, relId: string, imageName: string) => {
+  const run = createWordElement(document, "r");
+  const drawing = createWordElement(document, "drawing");
+  const inline = createXmlElement(document, WP_NAMESPACE, "wp:inline");
+  inline.setAttribute("distT", "0");
+  inline.setAttribute("distB", "0");
+  inline.setAttribute("distL", "0");
+  inline.setAttribute("distR", "0");
+  const extent = createXmlElement(document, WP_NAMESPACE, "wp:extent");
+  extent.setAttribute("cx", "1450000");
+  extent.setAttribute("cy", "725000");
+  const effectExtent = createXmlElement(document, WP_NAMESPACE, "wp:effectExtent");
+  effectExtent.setAttribute("l", "0");
+  effectExtent.setAttribute("t", "0");
+  effectExtent.setAttribute("r", "0");
+  effectExtent.setAttribute("b", "0");
+  const docPr = createXmlElement(document, WP_NAMESPACE, "wp:docPr");
+  docPr.setAttribute("id", "7201");
+  docPr.setAttribute("name", "Acil Durum Kapak Logosu");
+  const graphic = createXmlElement(document, DRAWING_NAMESPACE, "a:graphic");
+  const graphicData = createXmlElement(document, DRAWING_NAMESPACE, "a:graphicData");
+  graphicData.setAttribute("uri", "http://schemas.openxmlformats.org/drawingml/2006/picture");
+  const pic = createXmlElement(document, PICTURE_NAMESPACE, "pic:pic");
+  const nvPicPr = createXmlElement(document, PICTURE_NAMESPACE, "pic:nvPicPr");
+  const cNvPr = createXmlElement(document, PICTURE_NAMESPACE, "pic:cNvPr");
+  cNvPr.setAttribute("id", "0");
+  cNvPr.setAttribute("name", imageName);
+  nvPicPr.appendChild(cNvPr);
+  nvPicPr.appendChild(createXmlElement(document, PICTURE_NAMESPACE, "pic:cNvPicPr"));
+  const blipFill = createXmlElement(document, PICTURE_NAMESPACE, "pic:blipFill");
+  const blip = createXmlElement(document, DRAWING_NAMESPACE, "a:blip");
+  blip.setAttributeNS(REL_NAMESPACE, "r:embed", relId);
+  const stretch = createXmlElement(document, DRAWING_NAMESPACE, "a:stretch");
+  stretch.appendChild(createXmlElement(document, DRAWING_NAMESPACE, "a:fillRect"));
+  blipFill.appendChild(blip);
+  blipFill.appendChild(stretch);
+  const spPr = createXmlElement(document, PICTURE_NAMESPACE, "pic:spPr");
+  const xfrm = createXmlElement(document, DRAWING_NAMESPACE, "a:xfrm");
+  const off = createXmlElement(document, DRAWING_NAMESPACE, "a:off");
+  off.setAttribute("x", "0");
+  off.setAttribute("y", "0");
+  const ext = createXmlElement(document, DRAWING_NAMESPACE, "a:ext");
+  ext.setAttribute("cx", "1450000");
+  ext.setAttribute("cy", "725000");
+  xfrm.appendChild(off);
+  xfrm.appendChild(ext);
+  const prstGeom = createXmlElement(document, DRAWING_NAMESPACE, "a:prstGeom");
+  prstGeom.setAttribute("prst", "rect");
+  prstGeom.appendChild(createXmlElement(document, DRAWING_NAMESPACE, "a:avLst"));
+  spPr.appendChild(xfrm);
+  spPr.appendChild(prstGeom);
+  pic.appendChild(nvPicPr);
+  pic.appendChild(blipFill);
+  pic.appendChild(spPr);
+  graphicData.appendChild(pic);
+  graphic.appendChild(graphicData);
+  inline.appendChild(extent);
+  inline.appendChild(effectExtent);
+  inline.appendChild(docPr);
+  inline.appendChild(createXmlElement(document, WP_NAMESPACE, "wp:cNvGraphicFramePr"));
+  inline.appendChild(graphic);
+  drawing.appendChild(inline);
+  run.appendChild(drawing);
+  return run;
+};
+
+const insertCoverLogo = async (zip: PizZip, document: XMLDocument, dataUrl?: string) => {
+  if (!dataUrl) return;
+  const image = await addLogoRelationship(zip, dataUrl);
+  if (!image) return;
+  const paragraphs = Array.from(document.getElementsByTagNameNS(WORD_NAMESPACE, "p"));
+  const companyTitleParagraph = paragraphs.find((paragraph) => cleanText(getElementText(paragraph)) === "{companyTitle}");
+  const titleParagraph = paragraphs.find((paragraph) => {
+    const text = cleanText(getElementText(paragraph)).toLocaleLowerCase("tr-TR");
+    return text.includes("eylem") && text.includes("plani");
+  });
+  const target = companyTitleParagraph || titleParagraph;
+  if (!target?.parentNode) return;
+  const paragraph = createWordElement(document, "p");
+  const paragraphProps = createWordElement(document, "pPr");
+  const justification = createWordElement(document, "jc");
+  justification.setAttribute("w:val", "center");
+  paragraphProps.appendChild(justification);
+  paragraph.appendChild(paragraphProps);
+  paragraph.appendChild(createLogoRun(document, image.relId, image.imageName));
+  target.parentNode.insertBefore(paragraph, target);
+};
 
 const getElementText = (element: Element) =>
   Array.from(element.getElementsByTagNameNS(WORD_NAMESPACE, "t"))
@@ -512,7 +659,7 @@ const fillDetailedTeamRows = (document: XMLDocument, tables: Element[]) => {
   });
 };
 
-const prepareEmergencyTemplatePlaceholders = (zip: PizZip) => {
+const prepareEmergencyTemplatePlaceholders = async (zip: PizZip, payload: EmergencyActionPlanPayload) => {
   const documentFile = zip.file("word/document.xml");
   if (!documentFile) return;
 
@@ -527,6 +674,7 @@ const prepareEmergencyTemplatePlaceholders = (zip: PizZip) => {
   fillCellAfterLabel(xmlDocument, tables, "TEHLİKE SINIFI", "hazardClass");
   fillCellAfterLabel(xmlDocument, tables, "SGK SİCİL NO", "sgkNumber");
   fillCoverTitleAndDate(xmlDocument);
+  await insertCoverLogo(zip, xmlDocument, payload.logoDataUrl);
   fillPreparedParagraphs(xmlDocument);
   fillEmergencyMarkRows(xmlDocument, tables);
   fillSupportSummaryRows(xmlDocument, tables);
@@ -543,7 +691,7 @@ export async function generateEmergencyActionPlanDocx(payload: EmergencyActionPl
 
   const templateBytes = await response.arrayBuffer();
   const zip = new PizZip(templateBytes);
-  prepareEmergencyTemplatePlaceholders(zip);
+  await prepareEmergencyTemplatePlaceholders(zip, payload);
   const doc = new Docxtemplater(zip, {
     paragraphLoop: true,
     linebreaks: true,

@@ -146,6 +146,7 @@ type RiskWizardTableItem = {
   riskConsequence: string;
   affectedPeople: string;
   currentMeasure: string;
+  detectionDate: string;
   probability: string;
   frequency: string;
   severity: string;
@@ -754,6 +755,7 @@ const createEmptyRiskItem = (no: number): RiskWizardTableItem => ({
   riskConsequence: "",
   affectedPeople: "",
   currentMeasure: "",
+  detectionDate: today,
   probability: "",
   frequency: "",
   severity: "",
@@ -833,6 +835,7 @@ const createRiskRowFromGeneratedRisk = (
     riskConsequence: cleanText(item.risk),
     affectedPeople: "Çalışanlar, ziyaretçiler ve ilgili üçüncü kisiler",
     currentMeasure: "Mevcut durum saha kontrolünde degerlendirilecektir.",
+    detectionDate: today,
     probability: formatRiskNumber(probability),
     frequency: formatRiskNumber(frequency),
     severity: formatRiskNumber(severity),
@@ -943,6 +946,7 @@ const mapEditorRiskItemToWizardRow = (
   riskConsequence: cleanText(item.risk),
   affectedPeople: cleanText(item.affected_people),
   currentMeasure: cleanText(item.existing_controls),
+  detectionDate: cleanText(String((item as RiskItem & { detection_date?: string; detectionDate?: string }).detection_date || (item as RiskItem & { detection_date?: string; detectionDate?: string }).detectionDate || today)),
   probability: item.probability_1 ? String(item.probability_1) : "",
   frequency: item.frequency_1 ? String(item.frequency_1) : "",
   severity: item.severity_1 ? String(item.severity_1) : "",
@@ -969,6 +973,7 @@ const mapSavedRiskItemToWizardRow = (
   riskConsequence: cleanText(item.risk),
   affectedPeople: "Çalışanlar",
   currentMeasure: cleanText(item.currentStatus || item.riskDefinitionBefore),
+  detectionDate: cleanText(String((item as SavedRiskItem & { detectionDate?: string; detection_date?: string }).detectionDate || (item as SavedRiskItem & { detectionDate?: string; detection_date?: string }).detection_date || today)),
   probability: item.probabilityBefore ? String(item.probabilityBefore) : "",
   frequency: item.frequencyBefore ? String(item.frequencyBefore) : "1",
   severity: item.severityBefore ? String(item.severityBefore) : "",
@@ -1010,6 +1015,7 @@ const mapTemplateRiskItemToWizardRow = (
         "",
     ),
   ),
+  detectionDate: cleanText(String(item.detectionDate || item.detection_date || item.findingDate || item.assessmentDate || today)),
   probability: item.probability
     ? String(item.probability)
     : item.probability_1
@@ -1064,6 +1070,7 @@ const mapManualLibraryItemToWizardRow = (
   riskConsequence: cleanText(item.riskConsequence),
   affectedPeople: cleanText(item.affectedPeople || "Çalışanlar"),
   currentMeasure: cleanText(item.currentMeasure),
+  detectionDate: cleanText(String((item as ManualRiskLibraryItem & { detectionDate?: string; detection_date?: string }).detectionDate || (item as ManualRiskLibraryItem & { detectionDate?: string; detection_date?: string }).detection_date || today)),
   probability: cleanText(item.probability),
   frequency:
     inferFrequencyFromScore(item.probability, item.severity, item.riskScore) ||
@@ -1121,6 +1128,7 @@ const buildRiskItemsSummary = (items: RiskWizardTableItem[]) =>
     return {
       ...item,
       no: index + 1,
+      detectionDate: cleanText(item.detectionDate) || today,
       frequency,
       riskScore,
       riskLevel:
@@ -1822,6 +1830,7 @@ export default function RiskAssessmentWizard() {
         riskConsequence: cleanText(row.riskConsequence),
         affectedPeople: cleanText(row.affectedPeople),
         currentMeasure: cleanText(row.currentMeasure),
+        detectionDate: cleanText(String(row.detectionDate || today)),
         probability: cleanText(row.probability),
         frequency: cleanText(row.frequency || "1"),
         severity: cleanText(row.severity),
@@ -2221,6 +2230,7 @@ export default function RiskAssessmentWizard() {
       },
     },
     emergencyInfo: selectedCompany?.emergencyTeamInfo || undefined,
+    logoDataUrl: logo?.dataUrl || undefined,
     riskItems: summaryItems.map((item) => ({
       no: item.no,
       departmentActivity: item.departmentActivity,
@@ -2228,6 +2238,7 @@ export default function RiskAssessmentWizard() {
       riskConsequence: item.riskConsequence,
       affectedPeople: item.affectedPeople,
       currentMeasure: item.currentMeasure,
+      detectionDate: item.detectionDate,
       probability: item.probability,
       frequency: item.frequency,
       severity: item.severity,
@@ -3620,7 +3631,7 @@ export default function RiskAssessmentWizard() {
                           O × F × S = R
                         </Badge>
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
                         {renderInput(
                           "Olasilik (O)",
                           item.probability,
@@ -3647,6 +3658,13 @@ export default function RiskAssessmentWizard() {
                           (value) =>
                             updateRiskItem(item.id, "riskScore", value),
                           { type: "number" },
+                        )}
+                        {renderInput(
+                          "Tespit Tarihi",
+                          item.detectionDate,
+                          (value) =>
+                            updateRiskItem(item.id, "detectionDate", value),
+                          { type: "date" },
                         )}
                         {renderInput("Risk Düzeyi", item.riskLevel, (value) =>
                           updateRiskItem(item.id, "riskLevel", value),
@@ -4534,3 +4552,4 @@ export default function RiskAssessmentWizard() {
     </div>
   );
 }
+

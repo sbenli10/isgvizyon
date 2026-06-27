@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -7,6 +7,7 @@ import {
   Download,
   ExternalLink,
   FileCheck2,
+  ImagePlus,
   Loader2,
   MapPinned,
   PackagePlus,
@@ -15,6 +16,7 @@ import {
   ShieldCheck,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -61,6 +63,12 @@ import {
 
 type WizardTab = "company" | "professionals" | "teams" | "inventory";
 type TemplateEmergencyKey = keyof EmergencyActionPlanPayload["selectedEmergencies"];
+
+type TemplateLogo = {
+  name: string;
+  type: string;
+  dataUrl: string;
+} | null;
 
 interface CompanyOption {
   id: string;
@@ -217,6 +225,8 @@ export default function ADEPWizard() {
   const [saving, setSaving] = useState(false);
   const [templateExporting, setTemplateExporting] = useState(false);
   const [blankTemplateExporting, setBlankTemplateExporting] = useState(false);
+  const [templateLogo, setTemplateLogo] = useState<TemplateLogo>(null);
+  const templateLogoInputRef = useRef<HTMLInputElement | null>(null);
   const [planData, setPlanData] = useState<ADEPPlanData>(DEFAULT_ADEP_PLAN_DATA);
   const [selectedEmergencies, setSelectedEmergencies] =
     useState<EmergencyActionPlanPayload["selectedEmergencies"]>(defaultSelectedEmergencies);
@@ -228,6 +238,31 @@ export default function ADEPWizard() {
     const company = planData.firma_bilgileri.unvan || "Firma";
     return `${company} Acil Durum Eylem Planı`;
   }, [planData.firma_bilgileri.unvan]);
+
+  const handleTemplateLogoUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/png") && !file.type.startsWith("image/jpeg")) {
+      toast.error("Kapak logosu icin PNG veya JPG dosyasi secin.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Kapak logosu en fazla 2 MB olabilir.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      if (!dataUrl) {
+        toast.error("Kapak logosu okunamadi.");
+        return;
+      }
+      setTemplateLogo({ name: file.name, type: file.type, dataUrl });
+    };
+    reader.onerror = () => toast.error("Kapak logosu okunamadi.");
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     setSavedSketches(loadSavedEvacuationProjects());
@@ -788,6 +823,7 @@ export default function ADEPWizard() {
 
     return {
       planDate: preparedDate,
+      logoDataUrl: templateLogo?.dataUrl || "",
       companyTitle: planData.firma_bilgileri.unvan,
       companyAddress: planData.firma_bilgileri.adres || planData.isyeri_bilgileri.adres,
       companyContact,
@@ -836,6 +872,7 @@ export default function ADEPWizard() {
 
   const buildBlankEmergencyActionPlanPayload = (): EmergencyActionPlanPayload => ({
     planDate: "",
+    logoDataUrl: "",
     companyTitle: "",
     companyAddress: "",
     companyContact: "",
@@ -1337,6 +1374,36 @@ export default function ADEPWizard() {
                       </Field>
                     </div>
                   )}
+                </div>
+
+                <div className="rounded-[24px] border border-blue-400/15 bg-blue-400/5 p-5">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-300/20 bg-blue-400/10 text-blue-200">
+                        <ImagePlus className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-white">Kapak Logosu</p>
+                        <p className="mt-1 text-sm text-slate-300">Acil durum plani kapagina basilacak PNG/JPG logoyu secin.</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      {templateLogo ? (
+                        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-950/60 px-3 py-2">
+                          <img src={templateLogo.dataUrl} alt={templateLogo.name} className="h-10 w-16 rounded-lg object-contain bg-white" />
+                          <span className="max-w-[160px] truncate text-xs text-slate-200">{templateLogo.name}</span>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setTemplateLogo(null)} className="h-8 w-8 text-slate-300 hover:bg-white/10 hover:text-white">
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : null}
+                      <Button type="button" variant="outline" onClick={() => templateLogoInputRef.current?.click()} className="gap-2 border-blue-400/30 bg-blue-500/5 text-blue-100 hover:bg-blue-500/10 hover:text-blue-50">
+                        <ImagePlus className="h-4 w-4" />
+                        Logo Sec
+                      </Button>
+                      <input ref={templateLogoInputRef} type="file" accept="image/png,image/jpeg" onChange={handleTemplateLogoUpload} className="hidden" />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="rounded-[24px] border border-cyan-400/15 bg-cyan-400/5 p-5">

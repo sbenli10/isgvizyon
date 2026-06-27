@@ -7,6 +7,10 @@ import { addInterFontsToJsPDF } from "@/utils/fonts";
 
 const WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const XML_NS = "http://www.w3.org/XML/1998/namespace";
+const REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const WP_NS = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
+const DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/main";
+const PIC_NS = "http://schemas.openxmlformats.org/drawingml/2006/picture";
 const TEMPLATE_PATH = "/templates/risk-analizi-sablonu.docx";
 
 export type RiskTemplatePerson = {
@@ -45,6 +49,7 @@ export type RiskTemplateRow = {
   riskConsequence?: string;
   affectedPeople?: string;
   currentMeasure?: string;
+  detectionDate?: string;
   probability?: string;
   frequency?: string;
   severity?: string;
@@ -64,6 +69,7 @@ export type RiskTemplateExportPayload = {
   companyInfo: RiskTemplateCompanyInfo;
   teamInfo: RiskTemplateTeamInfo;
   emergencyInfo?: RiskTemplateEmergencyInfo;
+  logoDataUrl?: string;
   riskItems: RiskTemplateRow[];
 };
 
@@ -89,6 +95,150 @@ const createText = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:t");
 const createBreak = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:br");
 const createParagraphProps = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:pPr");
 const createRunProps = (xml: XMLDocument) => xml.createElementNS(WORD_NS, "w:rPr");
+const createXmlElement = (xml: XMLDocument, namespace: string, tagName: string) => xml.createElementNS(namespace, tagName);
+
+const getLogoMime = (dataUrl?: string) => {
+  const match = cleanText(dataUrl).match(/^data:(image\/(?:png|jpeg|jpg));base64,/i);
+  return match?.[1]?.toLowerCase() || "";
+};
+
+const dataUrlToArrayBuffer = async (dataUrl: string) => {
+  const response = await fetch(dataUrl);
+  if (!response.ok) throw new Error("Logo okunamadi.");
+  return response.arrayBuffer();
+};
+
+const getImageExtension = (mime: string) => (mime.includes("png") ? "png" : "jpg");
+
+const ensureImageContentType = async (zip: JSZip, extension: string) => {
+  const file = zip.file("[Content_Types].xml");
+  if (!file) return;
+  const xml = parseXml(await file.async("string"));
+  const exists = Array.from(xml.getElementsByTagName("Default")).some(
+    (node) => node.getAttribute("Extension") === extension,
+  );
+  if (!exists) {
+    const node = xml.createElement("Default");
+    node.setAttribute("Extension", extension);
+    node.setAttribute("ContentType", extension === "png" ? "image/png" : "image/jpeg");
+    xml.documentElement.appendChild(node);
+    zip.file("[Content_Types].xml", serializeXml(xml));
+  }
+};
+
+const addImageRelationship = async (zip: JSZip, dataUrl: string) => {
+  const mime = getLogoMime(dataUrl);
+  if (!mime) return null;
+  const extension = getImageExtension(mime);
+  const relsFile = zip.file("word/_rels/document.xml.rels");
+  if (!relsFile) return null;
+
+  const imageBuffer = await dataUrlToArrayBuffer(dataUrl);
+  await ensureImageContentType(zip, extension);
+  const relsDoc = parseXml(await relsFile.async("string"));
+  const relationships = Array.from(relsDoc.getElementsByTagName("Relationship"));
+  const nextRelNumber =
+    relationships.reduce((max, relation) => {
+      const id = relation.getAttribute("Id") || "";
+      const numeric = Number(id.replace("rId", ""));
+      return Number.isFinite(numeric) ? Math.max(max, numeric) : max;
+    }, 0) + 1;
+
+  const relId = `rId${nextRelNumber}`;
+  const imageName = `risk-kapak-logo-${Date.now()}.${extension}`;
+  zip.file(`word/media/${imageName}`, imageBuffer);
+
+  const relationship = relsDoc.createElement("Relationship");
+  relationship.setAttribute("Id", relId);
+  relationship.setAttribute("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image");
+  relationship.setAttribute("Target", `media/${imageName}`);
+  relsDoc.documentElement.appendChild(relationship);
+  zip.file("word/_rels/document.xml.rels", serializeXml(relsDoc));
+  return { relId, imageName };
+};
+
+const createInlineImageRun = (xml: XMLDocument, relId: string, imageName: string) => {
+  const run = createRun(xml);
+  const drawing = createXmlElement(xml, WORD_NS, "w:drawing");
+  const inline = createXmlElement(xml, WP_NS, "wp:inline");
+  inline.setAttribute("distT", "0");
+  inline.setAttribute("distB", "0");
+  inline.setAttribute("distL", "0");
+  inline.setAttribute("distR", "0");
+
+  const extent = createXmlElement(xml, WP_NS, "wp:extent");
+  extent.setAttribute("cx", "1350000");
+  extent.setAttribute("cy", "675000");
+  const effectExtent = createXmlElement(xml, WP_NS, "wp:effectExtent");
+  effectExtent.setAttribute("l", "0");
+  effectExtent.setAttribute("t", "0");
+  effectExtent.setAttribute("r", "0");
+  effectExtent.setAttribute("b", "0");
+  const docPr = createXmlElement(xml, WP_NS, "wp:docPr");
+  docPr.setAttribute("id", "6101");
+  docPr.setAttribute("name", "Risk Analizi Kapak Logosu");
+  const cNvGraphicFramePr = createXmlElement(xml, WP_NS, "wp:cNvGraphicFramePr");
+  const graphic = createXmlElement(xml, DRAWING_NS, "a:graphic");
+  const graphicData = createXmlElement(xml, DRAWING_NS, "a:graphicData");
+  graphicData.setAttribute("uri", "http://schemas.openxmlformats.org/drawingml/2006/picture");
+  const pic = createXmlElement(xml, PIC_NS, "pic:pic");
+  const nvPicPr = createXmlElement(xml, PIC_NS, "pic:nvPicPr");
+  const cNvPr = createXmlElement(xml, PIC_NS, "pic:cNvPr");
+  cNvPr.setAttribute("id", "0");
+  cNvPr.setAttribute("name", imageName);
+  nvPicPr.appendChild(cNvPr);
+  nvPicPr.appendChild(createXmlElement(xml, PIC_NS, "pic:cNvPicPr"));
+  const blipFill = createXmlElement(xml, PIC_NS, "pic:blipFill");
+  const blip = createXmlElement(xml, DRAWING_NS, "a:blip");
+  blip.setAttributeNS(REL_NS, "r:embed", relId);
+  const stretch = createXmlElement(xml, DRAWING_NS, "a:stretch");
+  stretch.appendChild(createXmlElement(xml, DRAWING_NS, "a:fillRect"));
+  blipFill.appendChild(blip);
+  blipFill.appendChild(stretch);
+  const spPr = createXmlElement(xml, PIC_NS, "pic:spPr");
+  const xfrm = createXmlElement(xml, DRAWING_NS, "a:xfrm");
+  const off = createXmlElement(xml, DRAWING_NS, "a:off");
+  off.setAttribute("x", "0");
+  off.setAttribute("y", "0");
+  const ext = createXmlElement(xml, DRAWING_NS, "a:ext");
+  ext.setAttribute("cx", "1350000");
+  ext.setAttribute("cy", "675000");
+  xfrm.appendChild(off);
+  xfrm.appendChild(ext);
+  const prstGeom = createXmlElement(xml, DRAWING_NS, "a:prstGeom");
+  prstGeom.setAttribute("prst", "rect");
+  prstGeom.appendChild(createXmlElement(xml, DRAWING_NS, "a:avLst"));
+  spPr.appendChild(xfrm);
+  spPr.appendChild(prstGeom);
+  pic.appendChild(nvPicPr);
+  pic.appendChild(blipFill);
+  pic.appendChild(spPr);
+  graphicData.appendChild(pic);
+  graphic.appendChild(graphicData);
+  inline.appendChild(extent);
+  inline.appendChild(effectExtent);
+  inline.appendChild(docPr);
+  inline.appendChild(cNvGraphicFramePr);
+  inline.appendChild(graphic);
+  drawing.appendChild(inline);
+  run.appendChild(drawing);
+  return run;
+};
+
+const insertCoverLogoBeforeHeading = async (zip: JSZip, xml: XMLDocument, dataUrl?: string) => {
+  if (!dataUrl) return;
+  const image = await addImageRelationship(zip, dataUrl);
+  if (!image) return;
+  const heading = getParagraphs(xml).find((paragraph) => {
+    const text = normalizeText(getParagraphText(paragraph));
+    return text.includes("risk") && text.includes("anal") && text.includes("deger");
+  });
+  if (!heading?.parentNode) return;
+  const paragraph = createParagraph(xml);
+  setParagraphAlignment(paragraph, "center");
+  paragraph.appendChild(createInlineImageRun(xml, image.relId, image.imageName));
+  heading.parentNode.insertBefore(paragraph, heading);
+};
 
 const getParagraphText = (paragraph: Element) => cleanText(getTextNodes(paragraph).map((node) => node.textContent || "").join(""));
 const getCellText = (cell: Element) => cleanText(getTextNodes(cell).map((node) => node.textContent || "").join(""));
@@ -310,7 +460,7 @@ const templateRiskRows = (riskItems: RiskTemplateRow[]) =>
       cleanText(item.hazardSource),
       cleanText(item.riskConsequence),
       cleanText(item.currentMeasure),
-      formatDate(new Date().toISOString().split("T")[0]),
+      formatDate(item.detectionDate),
       probability,
       frequency,
       severity,
@@ -575,7 +725,7 @@ const fillRiskTable = (table: Element | undefined, riskItems: RiskTemplateRow[])
       cleanText(item.hazardSource),
       cleanText(item.riskConsequence),
       cleanText(item.currentMeasure),
-      formatDate(new Date().toISOString().split("T")[0]),
+      formatDate(item.detectionDate),
       probability,
       frequency,
       severity,
@@ -648,6 +798,7 @@ export async function generateRiskAnalysisTemplateDocx(payload: RiskTemplateExpo
   const xml = parseXml(await documentFile.async("string"));
   const tables = getTables(xml);
 
+  await insertCoverLogoBeforeHeading(zip, xml, payload.logoDataUrl);
   addCompanyTitleAboveHeading(xml, payload.companyInfo.companyTitle);
   fillInfoTable(findTableByKeywords(tables, ["FİRMA ADI", "TEHLİKE SINIFI", "SGK SİCİL NO", "GEÇERLİLİK"]), payload);
   fillRiskTable(findTableByKeywords(tables, ["SIRA NO", "FAALİYET", "RİSKİN TANIMI", "SORUMLU"]), payload.riskItems);
@@ -668,7 +819,7 @@ export async function generateRiskAnalysisTemplatePdf(payload: RiskTemplateExpor
   doc.setFont("Inter", "normal");
 
   drawTemplatePdfHeader(doc, payload);
-  let cursorY = drawTemplateInfoTable(doc, payload, 36) + 4;
+  let cursorY = drawTemplateInfoTable(doc, payload, payload.logoDataUrl ? 55 : 36) + 4;
   cursorY = drawTemplateRiskTable(doc, payload, cursorY) + 5;
 
   const pageHeight = doc.internal.pageSize.getHeight();
