@@ -60,6 +60,11 @@ interface Violation {
 }
 
 interface AnalysisResult {
+  analysis_status?: "risks_found" | "no_risk_detected" | "needs_review";
+  executive_summary?: string;
+  no_risk_explanation?: string;
+  limitations?: string[];
+  next_actions?: string[];
   project_info: ProjectInfo;
   equipment_inventory: Equipment[];
   safety_violations: Violation[];
@@ -152,6 +157,51 @@ const complianceProgressValue = (score: number | null | undefined): number =>
 
 const formatAreaWithUnit = (area: number | null | undefined): string =>
   typeof area === "number" ? `${area} m\u00B2` : "N/A";
+
+const getActionableViolations = (result: AnalysisResult | null): Violation[] =>
+  result?.safety_violations?.filter((violation) => violation.severity !== "info") ?? [];
+
+const getAnalysisStatus = (result: AnalysisResult | null): NonNullable<AnalysisResult["analysis_status"]> => {
+  if (!result) return "needs_review";
+  if (result.analysis_status) return result.analysis_status;
+  return getActionableViolations(result).length > 0 ? "risks_found" : "no_risk_detected";
+};
+
+const getAnalysisStatusCopy = (result: AnalysisResult) => {
+  const status = getAnalysisStatus(result);
+
+  if (status === "risks_found") {
+    return {
+      title: "Aksiyon gerektiren risk bulguları var",
+      description:
+        result.executive_summary ||
+        "AI, krokide sahada doğrulanması ve aksiyon planına alınması gereken güvenlik bulguları tespit etti.",
+      cardClass: "border-rose-400/30 bg-rose-500/10",
+      iconClass: "text-rose-300",
+    };
+  }
+
+  if (status === "no_risk_detected") {
+    return {
+      title: "Açık risk bulgusu tespit edilmedi",
+      description:
+        result.no_risk_explanation ||
+        result.executive_summary ||
+        "Yapay zeka, yüklenen krokide açıkça risk oluşturan bir bulgu görmedi. Bu sonuç, sahadaki gerçek uygunluk kontrolünün yerine geçmez.",
+      cardClass: "border-emerald-400/30 bg-emerald-500/10",
+      iconClass: "text-emerald-300",
+    };
+  }
+
+  return {
+    title: "Manuel inceleme gerekli",
+    description:
+      result.executive_summary ||
+      "Kroki kalitesi veya içerik eksikliği nedeniyle AI analizi kesinleştirilemedi. Daha net bir planla tekrar analiz edin.",
+    cardClass: "border-amber-400/30 bg-amber-500/10",
+    iconClass: "text-amber-300",
+  };
+};
 export default function BlueprintAnalyzer() {
   const { user } = useAuth();
     const navigate = useNavigate();
@@ -496,18 +546,29 @@ export default function BlueprintAnalyzer() {
         });
       }
 
-      // ✅ Success notification
-      toast.success(
-        `✅ Analiz tamamlandı! Uygunluk: ${formatCompliance(data.analysis.compliance_score)}`,
-        {
-          duration: 5000,
-          description: `${data.analysis.equipment_inventory.length} ekipman türü tespit edildi`,
-          action: {
-            label: "ADEP'e Aktar",
-            onClick: () => navigate("/adep-wizard", { state: { blueprintData: data.analysis } })
-          }
-        }
-      );
+      const status = getAnalysisStatus(data.analysis);
+      const actionableCount = getActionableViolations(data.analysis).length;
+      const toastTitle =
+        status === "risks_found"
+          ? `Analiz tamamlandı: ${actionableCount} aksiyon bulgusu var`
+          : status === "no_risk_detected"
+          ? "Analiz tamamlandı: açık risk bulgusu görülmedi"
+          : "Analiz tamamlandı: manuel inceleme gerekli";
+
+      toast.success(toastTitle, {
+        duration: 6000,
+        description:
+          status === "risks_found"
+            ? "Bulguları inceleyip ADEP veya aksiyon planına aktarabilirsiniz."
+            : "Sonucu sahada doğrulamanız önerilir.",
+        action: {
+          label: status === "risks_found" ? "ADEP'e Aktar" : "Sonuçları Gör",
+          onClick: () =>
+            status === "risks_found"
+              ? navigate("/adep-wizard", { state: { blueprintData: data.analysis } })
+              : setActiveTab("results"),
+        },
+      });
 
       setActiveTab("results");
 
@@ -989,7 +1050,7 @@ export default function BlueprintAnalyzer() {
             <div>
               <h1 className="flex items-center gap-3 text-3xl font-black tracking-tight text-white lg:text-4xl">
                 <Building2 className="h-9 w-9 text-cyan-300" />
-                Blueprint Analyzer
+                AI Kroki Analiz
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 lg:text-base">
                 Teknik çizimleri, kat planlarını ve tahliye krokilerini daha sade bir ekranda analiz edin; ekipman, uygunsuzluk ve yol haritasını sayfalı görünümle inceleyin.
@@ -1276,9 +1337,9 @@ export default function BlueprintAnalyzer() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Uyumsuzluklar</p>
+                <p className="text-xs text-muted-foreground">Aksiyon Bulguları</p>
                 <p className="text-3xl font-black text-destructive mt-1">
-                  {analysisResult.safety_violations.length}
+                  {getActionableViolations(analysisResult).length}
                 </p>
               </div>
               <AlertTriangle className="h-8 w-8 text-destructive" />
@@ -1375,6 +1436,90 @@ export default function BlueprintAnalyzer() {
         </DialogContent>
       </Dialog>
       </div>
+
+      {(() => {
+        const statusCopy = getAnalysisStatusCopy(analysisResult);
+        const actionableViolations = getActionableViolations(analysisResult);
+        const nextActions = analysisResult.next_actions?.length
+          ? analysisResult.next_actions
+          : getAnalysisStatus(analysisResult) === "risks_found"
+          ? ["Bulguları sahada doğrulayın.", "ADEP'e aktararak sorumlu ve termin belirleyin."]
+          : ["Saha kontrol listesiyle manuel doğrulama yapın.", "Daha net kroki varsa yeniden analiz edin."];
+
+        return (
+          <Card className={`${statusCopy.cardClass} shadow-[0_18px_48px_rgba(2,6,23,0.28)]`}>
+            <CardContent className="p-5">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/50">
+                    {getAnalysisStatus(analysisResult) === "risks_found" ? (
+                      <AlertTriangle className={`h-6 w-6 ${statusCopy.iconClass}`} />
+                    ) : getAnalysisStatus(analysisResult) === "no_risk_detected" ? (
+                      <CheckCircle2 className={`h-6 w-6 ${statusCopy.iconClass}`} />
+                    ) : (
+                      <CircleHelp className={`h-6 w-6 ${statusCopy.iconClass}`} />
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-black text-white">{statusCopy.title}</h3>
+                      {actionableViolations.length > 0 && (
+                        <Badge className="rounded-full bg-rose-500/20 text-rose-100">
+                          {actionableViolations.length} aksiyon
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="max-w-3xl text-sm leading-6 text-slate-300">{statusCopy.description}</p>
+                    {analysisResult.limitations?.length ? (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {analysisResult.limitations.slice(0, 3).map((item, idx) => (
+                          <span
+                            key={`${item}-${idx}`}
+                            className="rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-xs font-semibold text-slate-300"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="min-w-0 rounded-2xl border border-white/10 bg-slate-950/35 p-4 lg:w-[360px]">
+                  <p className="mb-3 text-xs font-black uppercase tracking-[0.2em] text-cyan-200">
+                    Sonraki Aksiyonlar
+                  </p>
+                  <ul className="space-y-2">
+                    {nextActions.slice(0, 4).map((action, idx) => (
+                      <li key={`${action}-${idx}`} className="flex items-start gap-2 text-sm text-slate-200">
+                        <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" />
+                        <span>{action}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <Button
+                      size="sm"
+                      onClick={() => navigate("/adep-wizard", { state: { blueprintData: analysisResult } })}
+                      className="rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400"
+                    >
+                      ADEP'e Aktar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={exportPDF}
+                      className="rounded-xl border-white/10 bg-white/[0.03] hover:bg-white/[0.08]"
+                    >
+                      Rapor Al
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
@@ -1484,10 +1629,10 @@ export default function BlueprintAnalyzer() {
               <div className="text-center py-12">
                 <CheckCircle2 className="h-16 w-16 text-success mx-auto mb-4" />
                 <p className="font-bold text-success text-lg">
-                  Kritik uyumsuzluk tespit edilmedi!
+                  Açık uyumsuzluk bulgusu tespit edilmedi
                 </p>
                 <p className="text-sm text-muted-foreground mt-2">
-                  Tüm güvenlik standartları karşılanıyor.
+                  AI, yüklenen görselde somut bir risk bulgusu görmedi. Nihai karar için saha kontrolü ve mevzuat uygunluk doğrulaması yapılmalıdır.
                 </p>
               </div>
             ) : (
