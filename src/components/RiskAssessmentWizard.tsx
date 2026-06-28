@@ -2291,6 +2291,7 @@ export default function RiskAssessmentWizard() {
     },
     emergencyInfo: selectedCompany?.emergencyTeamInfo || undefined,
     riskAnalysisPageCount: "1",
+    assessmentDate: companyInfo.assessmentDate || today,
   });
 
   const handleRiskProcedureDownload = async () => {

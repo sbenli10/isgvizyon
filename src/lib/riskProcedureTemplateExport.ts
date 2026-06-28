@@ -27,6 +27,7 @@ export type RiskProcedureTemplatePayload = {
   teamInfo: RiskProcedureTeamInfo;
   emergencyInfo?: RiskTemplateEmergencyInfo | null;
   riskAnalysisPageCount?: string | number | null;
+  assessmentDate?: string | Date | null;
 };
 
 const cleanText = (value?: string | number | null) => String(value ?? "").replace(/\s+/g, " ").trim();
@@ -37,6 +38,21 @@ const formatDate = (date = new Date()) =>
     month: "2-digit",
     year: "numeric",
   }).format(date);
+
+const formatDateValue = (value?: string | Date | null) => {
+  if (!value) return formatDate();
+  if (value instanceof Date) return formatDate(value);
+
+  const cleaned = cleanText(value);
+  const isoMatch = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return `${isoMatch[3]}.${isoMatch[2]}.${isoMatch[1]}`;
+  }
+
+  const parsed = new Date(cleaned);
+  if (!Number.isNaN(parsed.getTime())) return formatDate(parsed);
+  return cleaned;
+};
 
 const sanitizeFileName = (value?: string | null) =>
   cleanText(value)
@@ -49,7 +65,7 @@ const buildTemplateData = (payload: RiskProcedureTemplatePayload) => {
   const emergency = payload.emergencyInfo || {};
   return {
     firma_adi: cleanText(payload.companyInfo.companyTitle),
-    rapor_tarihi: formatDate(),
+    rapor_tarihi: formatDateValue(payload.assessmentDate),
     risk_sayfa_sayisi: cleanText(payload.riskAnalysisPageCount) || "1",
     sgk_no: cleanText(payload.companyInfo.workplaceRegistryNo),
     tehlike_sinifi: cleanText(payload.companyInfo.hazardClass),

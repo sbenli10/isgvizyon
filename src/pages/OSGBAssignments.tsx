@@ -679,9 +679,9 @@ export default function OSGBAssignments() {
       {canManage && companies.length === 0 ? (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Atanacak OSGB firması bulunamadı</AlertTitle>
+          <AlertTitle>Atanacak firma bulunamadı</AlertTitle>
           <AlertDescription>
-            Önce OSGB Firmaları ekranında firmaları OSGB yönetimli hale getirin. Firma listesi dolduğunda burada seçilebilir olacak.
+            Önce OSGB Firmaları ekranından firma ekleyin veya İSG-KATİP firma listesini senkronize edin. Firma listesi dolduğunda burada seçilebilir olacak.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -689,9 +689,9 @@ export default function OSGBAssignments() {
       {canManage && personnel.length === 0 ? (
         <Alert>
           <Info className="h-4 w-4" />
-          <AlertTitle>Aktif OSGB personeli bulunamadı</AlertTitle>
+          <AlertTitle>OSGB personeli bulunamadı</AlertTitle>
           <AlertDescription>
-            Önce Personel Havuzu ekranında İGU, işyeri hekimi veya DSP kaydı oluşturun/aktif edin. Aktif personel olmadan görevlendirme yapılamaz.
+            Önce Personel Havuzu ekranında İGU, işyeri hekimi veya DSP kaydı oluşturun. Personel listesi dolduğunda görevlendirme oluşturabilirsiniz.
           </AlertDescription>
         </Alert>
       ) : null}

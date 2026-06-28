@@ -599,9 +599,6 @@ export const listOsgbWorkspaceCompanies = async (
   serviceMonth = getServiceMonth(),
 ): Promise<OsgbWorkspaceCompanyOption[]> => {
   const managedCompanyIds = await listManagedOsgbCompanyIds(organizationId);
-  if (managedCompanyIds.length === 0) {
-    return [];
-  }
 
   const [companiesResponse, complianceResponse, contractsResponse] = await Promise.all([
     (supabase as any)
@@ -610,7 +607,6 @@ export const listOsgbWorkspaceCompanies = async (
       .eq("org_id", organizationId)
       .eq("is_deleted", false)
       .eq("is_osgb_managed", true)
-      .in("id", managedCompanyIds)
       .order("company_name", { ascending: true }),
     (supabase as any)
       .from("osgb_monthly_company_compliance")
@@ -644,6 +640,19 @@ export const listOsgbWorkspaceCompanies = async (
   if (complianceResponse.error) throw complianceResponse.error;
   if (contractsResponse.error) throw contractsResponse.error;
 
+  let companyRows = companiesResponse.data ?? [];
+  if (companyRows.length === 0 && managedCompanyIds.length === 0) {
+    const fallbackCompaniesResponse = await (supabase as any)
+      .from("isgkatip_companies")
+      .select("id, company_name, sgk_no, hazard_class, employee_count")
+      .eq("org_id", organizationId)
+      .eq("is_deleted", false)
+      .order("company_name", { ascending: true });
+
+    if (fallbackCompaniesResponse.error) throw fallbackCompaniesResponse.error;
+    companyRows = fallbackCompaniesResponse.data ?? [];
+  }
+
   const contractsByCompany = new Map<string, { ends_on: string | null }>();
   for (const contract of contractsResponse.data ?? []) {
     if (!contractsByCompany.has(contract.company_id)) {
@@ -656,7 +665,7 @@ export const listOsgbWorkspaceCompanies = async (
     complianceByCompany.set(row.company_id, row);
   }
 
-  return (companiesResponse.data ?? []).map((company: any) => {
+  return companyRows.map((company: any) => {
     const compliance = complianceByCompany.get(company.id);
     return {
       id: company.id,
@@ -694,6 +703,18 @@ export const listOsgbWorkspacePersonnel = async (
   organizationId: string,
   activeOnly = false,
 ): Promise<OsgbWorkspacePersonnelRecord[]> => {
+  const normalizePersonnelRows = (rows: any[]): OsgbWorkspacePersonnelRecord[] =>
+    rows
+      .map((row: any) => ({
+        id: row.id,
+        full_name: row.full_name || "İsimsiz personel",
+        role: row.role === "hekim" || row.role === "dsp" ? row.role : "igu",
+        monthly_capacity_minutes: Number(row.monthly_capacity_minutes || 0),
+        is_active: row.is_active !== false,
+        certificate_expiry_date: row.certificate_expiry_date || null,
+      }))
+      .filter((row: OsgbWorkspacePersonnelRecord) => Boolean(row.id));
+
   let query = (supabase as any)
     .from("osgb_personnel")
     .select("id, full_name, role, monthly_capacity_minutes, is_active, certificate_expiry_date")
@@ -706,7 +727,18 @@ export const listOsgbWorkspacePersonnel = async (
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as OsgbWorkspacePersonnelRecord[];
+  if (!activeOnly || (data ?? []).length > 0) {
+    return normalizePersonnelRows(data ?? []);
+  }
+
+  const fallbackResponse = await (supabase as any)
+    .from("osgb_personnel")
+    .select("id, full_name, role, monthly_capacity_minutes, is_active, certificate_expiry_date")
+    .eq("organization_id", organizationId)
+    .order("full_name", { ascending: true });
+
+  if (fallbackResponse.error) throw fallbackResponse.error;
+  return normalizePersonnelRows(fallbackResponse.data ?? []);
 };
 
 const mapOsgbCompanyPortalAccount = (row: any): OsgbCompanyPortalAccountRecord => ({
