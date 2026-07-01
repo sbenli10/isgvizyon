@@ -23,7 +23,7 @@ export const SAVED_RISK_EXCEL_HEADERS = [
   "SORUMLU",
 ] as const;
 
-export type SavedRiskSource = "manual" | "excel" | "ai" | "template";
+export type SavedRiskSource = "manual" | "excel" | "word" | "ai" | "template";
 
 export interface SavedRiskItem {
   id: string;
@@ -296,11 +296,11 @@ const headerScore = (row: unknown[]) => {
   return requiredFound * 4 + optionalFound;
 };
 
-const findHeaderRowIndex = (rows: unknown[][]) => {
+const findHeaderRowIndex = (rows: unknown[][], scanLimit = 30) => {
   let bestIndex = -1;
   let bestScore = 0;
 
-  rows.slice(0, 30).forEach((row, index) => {
+  rows.slice(0, scanLimit).forEach((row, index) => {
     const score = headerScore(row);
     if (score > bestScore) {
       bestScore = score;
@@ -322,6 +322,7 @@ const mapRowToInput = (
   columnMap: SavedRiskColumnMap,
   userId: string,
   organizationId?: string | null,
+  source: SavedRiskSource = "excel",
 ): SavedRiskExcelRow => {
   const probabilityBefore = toIntegerOrNull(valueAt(row, columnMap, "probabilityBefore"));
   const frequencyBefore = toIntegerOrNull(valueAt(row, columnMap, "frequencyBefore"));
@@ -363,7 +364,7 @@ const mapRowToInput = (
     riskDefinitionAfter: emptyToNull(clean(valueAt(row, columnMap, "riskDefinitionAfter"))),
     deadline: parseSavedRiskDate(valueAt(row, columnMap, "deadline")),
     responsible: emptyToNull(clean(valueAt(row, columnMap, "responsible"))),
-    source: "excel",
+    source,
   };
 
   const errors: string[] = [];
@@ -399,6 +400,53 @@ export const parseSavedRiskExcel = async (
 
   const dataRows = rows.slice(headerRowIndex + 1).filter((row) => row.some((cell) => clean(cell)));
   const parsedRows = dataRows.map((row, index) => mapRowToInput(row, headerRowIndex + index + 2, columnMap, userId, organizationId));
+
+  return {
+    totalRows: dataRows.length,
+    validRows: missingRequiredHeaders.length ? [] : parsedRows.filter((row) => row.errors.length === 0),
+    invalidRows: missingRequiredHeaders.length
+      ? parsedRows.map((row) => ({ ...row, errors: [...row.errors, `Zorunlu kolon eksik: ${missingRequiredHeaders.join(", ")}`] }))
+      : parsedRows.filter((row) => row.errors.length > 0),
+    missingHeaders,
+  };
+};
+
+export const parseSavedRiskWord = async (
+  file: File,
+  userId: string,
+  organizationId?: string | null,
+): Promise<SavedRiskExcelParseResult> => {
+  const mammoth = await import("mammoth");
+  const result = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+  const document = new DOMParser().parseFromString(result.value, "text/html");
+  const rows = Array.from(document.querySelectorAll("tr"))
+    .map((row) =>
+      Array.from(row.querySelectorAll("th,td")).map((cell) =>
+        clean(cell.textContent)
+          .replace(/\u00a0/g, " ")
+          .replace(/\s+/g, " ")
+          .trim(),
+      ),
+    )
+    .filter((row) => row.some((cell) => clean(cell)));
+
+  const headerRowIndex = findHeaderRowIndex(rows, 200);
+
+  if (headerRowIndex < 0) {
+    return {
+      totalRows: 0,
+      validRows: [],
+      invalidRows: [],
+      missingHeaders: ["Başlık satırı bulunamadı. Word dosyasında FAALİYET ve TEHLİKE başlıklarını içeren risk tablosu bulunamadı."],
+    };
+  }
+
+  const columnMap = buildColumnMap(rows[headerRowIndex] ?? []);
+  const missingRequiredHeaders = requiredMissing(columnMap);
+  const missingHeaders = missingRequiredHeaders.length ? [`Şu zorunlu kolonlar eksik: ${missingRequiredHeaders.join(", ")}`] : [];
+
+  const dataRows = rows.slice(headerRowIndex + 1).filter((row) => row.some((cell) => clean(cell)));
+  const parsedRows = dataRows.map((row, index) => mapRowToInput(row, headerRowIndex + index + 2, columnMap, userId, organizationId, "word"));
 
   return {
     totalRows: dataRows.length,

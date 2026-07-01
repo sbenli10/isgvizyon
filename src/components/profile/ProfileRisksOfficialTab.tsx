@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Download, Edit2, FileSpreadsheet, Loader2, Plus, Search, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ import {
   downloadSavedRiskTemplate,
   listSavedRiskItems,
   parseSavedRiskExcel,
+  parseSavedRiskWord,
   updateSavedRiskItem,
   type SavedRiskExcelParseResult,
   type SavedRiskInput,
@@ -156,6 +157,54 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+function BulkRiskValidPreview({ parseResult }: { parseResult: SavedRiskExcelParseResult }) {
+  const rows = parseResult.validRows.slice(0, 50);
+
+  return (
+    <div className="mt-4 max-h-72 overflow-auto rounded-xl border border-slate-800">
+      <table className="w-full min-w-[1120px] text-left text-xs">
+        <thead className="bg-slate-900 text-slate-300">
+          <tr>
+            <th className="px-3 py-2">Satır</th>
+            <th className="px-3 py-2">Faaliyet</th>
+            <th className="px-3 py-2">Tehlike</th>
+            <th className="px-3 py-2">Risk</th>
+            <th className="px-3 py-2">Mevcut Durum</th>
+            <th className="px-3 py-2">O/F/Ş/R</th>
+            <th className="px-3 py-2">DÖF</th>
+            <th className="px-3 py-2">Termin</th>
+            <th className="px-3 py-2">Sorumlu</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.rowNumber} className="border-t border-slate-800">
+              <td className="px-3 py-2 text-slate-400">{row.rowNumber}</td>
+              <td className="px-3 py-2 font-semibold text-slate-100">{row.input?.activity || "-"}</td>
+              <td className="px-3 py-2 text-slate-300">{row.input?.hazard || "-"}</td>
+              <td className="px-3 py-2 text-slate-300">{row.input?.risk || "-"}</td>
+              <td className="px-3 py-2 text-slate-400">{row.input?.currentStatus || "-"}</td>
+              <td className="px-3 py-2 text-amber-200">
+                {[row.input?.probabilityBefore, row.input?.frequencyBefore, row.input?.severityBefore, row.input?.riskScoreBefore]
+                  .map((value) => value ?? "-")
+                  .join("/")}
+              </td>
+              <td className="px-3 py-2 text-slate-400">{row.input?.correctivePreventiveAction || "-"}</td>
+              <td className="px-3 py-2 text-slate-400">{row.input?.deadline || "-"}</td>
+              <td className="px-3 py-2 text-slate-400">{row.input?.responsible || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {parseResult.validRows.length > rows.length ? (
+        <p className="border-t border-slate-800 px-3 py-2 text-xs text-slate-500">
+          İlk {rows.length} geçerli satır gösteriliyor. Onayladığınızda tüm geçerli satırlar eklenecek.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProfileRisksTab() {
   const { user, profile } = useAuth();
   const [risks, setRisks] = useState<SavedRiskItem[]>([]);
@@ -187,7 +236,7 @@ export function ProfileRisksTab() {
       setRisks(riskRows);
       setCompanies((companyResponse.data ?? []).map((row: any) => ({ id: row.id, name: row.company_name || "Firma" })));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Riskler yüklenemedi.");
+      toast.error(error instanceof Error ? error.message : "Riskler yÃ¼klenemedi.");
     } finally {
       setLoading(false);
     }
@@ -269,7 +318,7 @@ export function ProfileRisksTab() {
 
   const saveRisk = async () => {
     if (!form.activity.trim() || !form.hazard.trim() || !form.risk.trim()) {
-      toast.error("FAALİYET, TEHLİKE ve RİSK zorunludur.");
+      toast.error("FAALÄ°YET, TEHLÄ°KE ve RÄ°SK zorunludur.");
       return;
     }
     setSaving(true);
@@ -277,7 +326,7 @@ export function ProfileRisksTab() {
       const input = buildInput();
       const saved = editingRisk ? await updateSavedRiskItem(editingRisk.id, input) : await createSavedRiskItem(input);
       setRisks((current) => editingRisk ? current.map((risk) => (risk.id === saved.id ? saved : risk)) : [saved, ...current]);
-      toast.success(editingRisk ? "Risk maddesi güncellendi." : "Risk maddesi eklendi.");
+      toast.success(editingRisk ? "Risk maddesi gÃ¼ncellendi." : "Risk maddesi eklendi.");
       setAddOpen(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Risk maddesi kaydedilemedi.");
@@ -301,21 +350,23 @@ export function ProfileRisksTab() {
     await bulkDeleteSavedRiskItems(ids);
     setRisks((current) => current.filter((risk) => !selectedIds.has(risk.id)));
     setSelectedIds(new Set());
-    toast.success("Seçilen risk maddeleri silindi.");
+    toast.success("SeÃ§ilen risk maddeleri silindi.");
   };
 
   const handleFile = async (file?: File | null) => {
     if (!file || !user?.id) return;
-    if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      toast.error("Sadece .xlsx, .xls veya .csv formatında dosya yükleyebilirsiniz.");
+    if (!/\.(xlsx|xls|csv|docx)$/i.test(file.name)) {
+      toast.error("Sadece .xlsx, .xls, .csv veya .docx formatinda dosya yukleyebilirsiniz.");
       return;
     }
     try {
       setSelectedFileName(file.name);
-      const result = await parseSavedRiskExcel(file, user.id, profile?.organization_id || null);
+      const result = /\.docx$/i.test(file.name)
+        ? await parseSavedRiskWord(file, user.id, profile?.organization_id || null)
+        : await parseSavedRiskExcel(file, user.id, profile?.organization_id || null);
       setParseResult(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Excel dosyası okunamadı.");
+      toast.error(error instanceof Error ? error.message : "Dosya okunamadi.");
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -327,12 +378,12 @@ export function ProfileRisksTab() {
     try {
       const result = await bulkCreateSavedRiskItems(parseResult.validRows.map((row) => row.input!).filter(Boolean), risks);
       setRisks((current) => [...result.inserted, ...current]);
-      toast.success(`${result.inserted.length} risk maddesi yüklendi.`, { description: result.skipped ? `${result.skipped} kayıt zaten vardı, atlandı.` : undefined });
+      toast.success(`${result.inserted.length} risk maddesi yÃ¼klendi.`, { description: result.skipped ? `${result.skipped} kayÄ±t zaten vardÄ±, atlandÄ±.` : undefined });
       setUploadOpen(false);
       setParseResult(null);
       setSelectedFileName("");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Risk maddeleri yüklenemedi.");
+      toast.error(error instanceof Error ? error.message : "Risk maddeleri yÃ¼klenemedi.");
     } finally {
       setSaving(false);
     }
@@ -355,14 +406,14 @@ export function ProfileRisksTab() {
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300"><TriangleAlert className="h-6 w-6" /></div>
             <div>
               <h2 className="text-2xl font-black text-white">Risklerim</h2>
-              <p className="mt-1 max-w-3xl text-sm text-slate-400">Resmi risk tablo başlıklarıyla manuel kayıt oluşturun veya Excel şablonu üzerinden toplu yükleyin.</p>
+              <p className="mt-1 max-w-3xl text-sm text-slate-400">Resmi risk tablo basliklariyla manuel kayit olusturun veya Excel/Word dosyasi uzerinden toplu yukleyin.</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={openCreate} className="rounded-xl bg-amber-500 text-white hover:bg-amber-400"><Plus className="mr-2 h-4 w-4" />Risk Ekle</Button>
-            <Button type="button" onClick={() => setUploadOpen(true)} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Excel’den Toplu Yükle</Button>
-            <Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button>
-            <Button type="button" variant="outline" disabled={selectedIds.size === 0} onClick={() => void handleBulkDelete()} className="rounded-xl border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"><Trash2 className="mr-2 h-4 w-4" />Seçilenleri Sil</Button>
+            <Button type="button" onClick={() => setUploadOpen(true)} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Toplu Risk Yukle</Button>
+            <Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"><Download className="mr-2 h-4 w-4" />Åžablon Ä°ndir</Button>
+            <Button type="button" variant="outline" disabled={selectedIds.size === 0} onClick={() => void handleBulkDelete()} className="rounded-xl border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"><Trash2 className="mr-2 h-4 w-4" />SeÃ§ilenleri Sil</Button>
           </div>
         </div>
       </div>
@@ -373,10 +424,10 @@ export function ProfileRisksTab() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Faaliyet, tehlike, risk veya sorumlu ara..." className={cn(inputClass, "pl-9")} />
           </div>
-          <Select value={companyFilter} onValueChange={setCompanyFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Firma" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tüm Firmalar</SelectItem>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent></Select>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kategori/Sektör" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tüm Kategoriler</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent></Select>
-          <Select value={sourceFilter} onValueChange={setSourceFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kaynak" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tümü</SelectItem><SelectItem value="manual">Manuel</SelectItem><SelectItem value="excel">Excel</SelectItem><SelectItem value="ai">AI</SelectItem><SelectItem value="template">Şablon</SelectItem></SelectContent></Select>
-          <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Sıralama" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="newest">Tarihe göre</SelectItem><SelectItem value="az">A-Z</SelectItem></SelectContent></Select>
+          <Select value={companyFilter} onValueChange={setCompanyFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Firma" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">TÃ¼m Firmalar</SelectItem>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent></Select>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kategori/SektÃ¶r" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">TÃ¼m Kategoriler</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent></Select>
+          <Select value={sourceFilter} onValueChange={setSourceFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kaynak" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">TÃ¼mÃ¼</SelectItem><SelectItem value="manual">Manuel</SelectItem><SelectItem value="excel">Excel</SelectItem><SelectItem value="word">Word</SelectItem><SelectItem value="ai">AI</SelectItem><SelectItem value="template">Åžablon</SelectItem></SelectContent></Select>
+          <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="SÄ±ralama" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="newest">Tarihe gÃ¶re</SelectItem><SelectItem value="az">A-Z</SelectItem></SelectContent></Select>
         </div>
       </div>
 
@@ -386,12 +437,12 @@ export function ProfileRisksTab() {
             <thead className="bg-slate-900/80 text-xs font-black uppercase text-slate-300">
               <tr>
                 <th className="px-3 py-3"><input type="checkbox" checked={filteredRisks.length > 0 && filteredRisks.every((risk) => selectedIds.has(risk.id))} onChange={(event) => setSelectedIds(event.target.checked ? new Set(filteredRisks.map((risk) => risk.id)) : new Set())} /></th>
-                {['FAALİYET','TEHLİKE','RİSK','MEVCUT DURUM','TESPİT TARİHİ','O/F/Ş/R','RİSKİN TANIMI','OLASI SONUÇ','DÖF','O/F/Ş/R DÖF SONRASI','TERMİN','SORUMLU','İşlemler'].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}
+                {['FAALÄ°YET','TEHLÄ°KE','RÄ°SK','MEVCUT DURUM','TESPÄ°T TARÄ°HÄ°','O/F/Åž/R','RÄ°SKÄ°N TANIMI','OLASI SONUÃ‡','DÃ–F','O/F/Åž/R DÃ–F SONRASI','TERMÄ°N','SORUMLU','Ä°ÅŸlemler'].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}
               </tr>
             </thead>
             <tbody>
               {loading ? <tr><td colSpan={14} className="h-40 text-center text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr> : filteredRisks.length === 0 ? (
-                <tr><td colSpan={14} className="h-52 px-4 text-center"><div className="text-base font-bold text-slate-300">Henüz risk maddesi eklenmemiş</div><p className="mt-2 text-sm text-slate-500">Manuel risk ekleyebilir veya Excel şablonu ile toplu yükleyebilirsiniz.</p></td></tr>
+                <tr><td colSpan={14} className="h-52 px-4 text-center"><div className="text-base font-bold text-slate-300">Henuz risk maddesi eklenmemis</div><p className="mt-2 text-sm text-slate-500">Manuel risk ekleyebilir veya Excel/Word dosyasi ile toplu yukleyebilirsiniz.</p></td></tr>
               ) : filteredRisks.map((risk) => (
                 <tr key={risk.id} className="border-t border-slate-800/80 align-top transition hover:bg-slate-900/60">
                   <td className="px-3 py-4"><input type="checkbox" checked={selectedIds.has(risk.id)} onChange={() => toggleSelected(risk.id)} /></td>
@@ -417,31 +468,33 @@ export function ProfileRisksTab() {
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-h-[calc(100dvh-24px)] w-[calc(100vw-20px)] overflow-y-auto border-slate-800 bg-slate-900 p-0 text-slate-100 sm:max-w-[900px]">
-          <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle>{editingRisk ? "Risk Maddesini Düzenle" : "Risk Maddesi Ekle"}</DialogTitle><DialogDescription>Resmi tablo başlıklarına göre risk maddesi bilgilerini girin.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle>{editingRisk ? "Risk Maddesini DÃ¼zenle" : "Risk Maddesi Ekle"}</DialogTitle><DialogDescription>Resmi tablo baÅŸlÄ±klarÄ±na gÃ¶re risk maddesi bilgilerini girin.</DialogDescription></DialogHeader>
           <div className="space-y-4 px-5 py-4">
-            <Section title="Temel Bilgiler"><div className="grid gap-3 md:grid-cols-3"><FormInput label="FAALİYET" required value={form.activity} onChange={(value) => updateForm("activity", value)} /><FormInput label="TEHLİKE" required value={form.hazard} onChange={(value) => updateForm("hazard", value)} /><FormInput label="RİSK" required value={form.risk} onChange={(value) => updateForm("risk", value)} /></div><div className="mt-3 grid gap-3 md:grid-cols-3"><FormInput label="MEVCUT DURUM" value={form.currentStatus} onChange={(value) => updateForm("currentStatus", value)} /><FormInput label="TESPİT TARİHİ" type="date" value={form.detectionDate} onChange={(value) => updateForm("detectionDate", value)} /><FormInput label="SORUMLU" value={form.responsible} onChange={(value) => updateForm("responsible", value)} /></div></Section>
-            <Section title="Mevcut Risk Skoru"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityBefore} onChange={(value) => updateForm("probabilityBefore", value)} /><FormInput label="F" type="number" value={form.frequencyBefore} onChange={(value) => updateForm("frequencyBefore", value)} /><FormInput label="Ş" type="number" value={form.severityBefore} onChange={(value) => updateForm("severityBefore", value)} /><FormInput label="R" type="number" value={form.riskScoreBefore} onChange={(value) => updateForm("riskScoreBefore", value)} /><FormInput label="Kategori/Sektör" value={form.category} onChange={(value) => updateForm("category", value)} /></div><div className="mt-3"><FormTextarea label="RİSKİN TANIMI" value={form.riskDefinitionBefore} onChange={(value) => updateForm("riskDefinitionBefore", value)} /></div></Section>
-            <Section title="Önleyici Faaliyet"><div className="grid gap-3 md:grid-cols-2"><FormTextarea label="OLASI SONUÇ" value={form.possibleConsequence} onChange={(value) => updateForm("possibleConsequence", value)} /><FormTextarea label="DÜZELTİCİ / ÖNLEYİCİ FAALİYET" value={form.correctivePreventiveAction} onChange={(value) => updateForm("correctivePreventiveAction", value)} /></div></Section>
-            <Section title="DÖF Sonrası Risk"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityAfter} onChange={(value) => updateForm("probabilityAfter", value)} /><FormInput label="F" type="number" value={form.frequencyAfter} onChange={(value) => updateForm("frequencyAfter", value)} /><FormInput label="Ş" type="number" value={form.severityAfter} onChange={(value) => updateForm("severityAfter", value)} /><FormInput label="R" type="number" value={form.riskScoreAfter} onChange={(value) => updateForm("riskScoreAfter", value)} /><FormInput label="TERMİN" type="date" value={form.deadline} onChange={(value) => updateForm("deadline", value)} /></div><div className="mt-3"><FormTextarea label="RİSKİN TANIMI (DÖF SONRASI)" value={form.riskDefinitionAfter} onChange={(value) => updateForm("riskDefinitionAfter", value)} /></div></Section>
+            <Section title="Temel Bilgiler"><div className="grid gap-3 md:grid-cols-3"><FormInput label="FAALÄ°YET" required value={form.activity} onChange={(value) => updateForm("activity", value)} /><FormInput label="TEHLÄ°KE" required value={form.hazard} onChange={(value) => updateForm("hazard", value)} /><FormInput label="RÄ°SK" required value={form.risk} onChange={(value) => updateForm("risk", value)} /></div><div className="mt-3 grid gap-3 md:grid-cols-3"><FormInput label="MEVCUT DURUM" value={form.currentStatus} onChange={(value) => updateForm("currentStatus", value)} /><FormInput label="TESPÄ°T TARÄ°HÄ°" type="date" value={form.detectionDate} onChange={(value) => updateForm("detectionDate", value)} /><FormInput label="SORUMLU" value={form.responsible} onChange={(value) => updateForm("responsible", value)} /></div></Section>
+            <Section title="Mevcut Risk Skoru"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityBefore} onChange={(value) => updateForm("probabilityBefore", value)} /><FormInput label="F" type="number" value={form.frequencyBefore} onChange={(value) => updateForm("frequencyBefore", value)} /><FormInput label="Åž" type="number" value={form.severityBefore} onChange={(value) => updateForm("severityBefore", value)} /><FormInput label="R" type="number" value={form.riskScoreBefore} onChange={(value) => updateForm("riskScoreBefore", value)} /><FormInput label="Kategori/SektÃ¶r" value={form.category} onChange={(value) => updateForm("category", value)} /></div><div className="mt-3"><FormTextarea label="RÄ°SKÄ°N TANIMI" value={form.riskDefinitionBefore} onChange={(value) => updateForm("riskDefinitionBefore", value)} /></div></Section>
+            <Section title="Ã–nleyici Faaliyet"><div className="grid gap-3 md:grid-cols-2"><FormTextarea label="OLASI SONUÃ‡" value={form.possibleConsequence} onChange={(value) => updateForm("possibleConsequence", value)} /><FormTextarea label="DÃœZELTÄ°CÄ° / Ã–NLEYÄ°CÄ° FAALÄ°YET" value={form.correctivePreventiveAction} onChange={(value) => updateForm("correctivePreventiveAction", value)} /></div></Section>
+            <Section title="DÃ–F SonrasÄ± Risk"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityAfter} onChange={(value) => updateForm("probabilityAfter", value)} /><FormInput label="F" type="number" value={form.frequencyAfter} onChange={(value) => updateForm("frequencyAfter", value)} /><FormInput label="Åž" type="number" value={form.severityAfter} onChange={(value) => updateForm("severityAfter", value)} /><FormInput label="R" type="number" value={form.riskScoreAfter} onChange={(value) => updateForm("riskScoreAfter", value)} /><FormInput label="TERMÄ°N" type="date" value={form.deadline} onChange={(value) => updateForm("deadline", value)} /></div><div className="mt-3"><FormTextarea label="RÄ°SKÄ°N TANIMI (DÃ–F SONRASI)" value={form.riskDefinitionAfter} onChange={(value) => updateForm("riskDefinitionAfter", value)} /></div></Section>
           </div>
-          <DialogFooter className="border-t border-slate-800 px-5 py-4"><Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">İptal</Button><Button type="button" disabled={saving} onClick={() => void saveRisk()} className="rounded-xl bg-amber-500 text-white hover:bg-amber-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Kaydet</Button></DialogFooter>
+          <DialogFooter className="border-t border-slate-800 px-5 py-4"><Button type="button" variant="outline" onClick={() => setAddOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">Ä°ptal</Button><Button type="button" disabled={saving} onClick={() => void saveRisk()} className="rounded-xl bg-amber-500 text-white hover:bg-amber-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Kaydet</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
         <DialogContent className="max-h-[calc(100dvh-24px)] w-[calc(100vw-20px)] overflow-y-auto border-slate-800 bg-slate-900 p-0 text-slate-100 sm:max-w-4xl">
-          <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-violet-300" />Excel’den Toplu Risk Yükle</DialogTitle><DialogDescription>.xlsx, .xls veya .csv dosyanızdaki resmi başlıkları okuyarak risk maddelerini önizleyin.</DialogDescription></DialogHeader>
+          <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-violet-300" />Toplu Risk Yükle</DialogTitle><DialogDescription>Excel veya Word dosyanızdaki resmi başlıkları okuyarak risk maddelerini satır satır önizleyin.</DialogDescription></DialogHeader>
           <div className="space-y-4 px-5 py-5">
             <div className="grid min-h-[130px] place-items-center rounded-2xl border border-dashed border-slate-600 bg-slate-950/30 p-6 text-center transition hover:border-violet-400/70" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleFile(event.dataTransfer.files?.[0]); }}>
-              <div><Upload className="mx-auto h-8 w-8 text-slate-500" /><p className="mt-2 font-semibold text-slate-200">Dosya seçin veya şablonu indirip doldurun</p><p className="mt-1 text-xs text-slate-500">Kabul edilen formatlar: .xlsx, .xls, .csv</p><div className="mt-4 flex flex-wrap justify-center gap-2"><Button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Dosya Seç</Button><Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button></div></div>
-              <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(event) => void handleFile(event.target.files?.[0])} />
+              <div><Upload className="mx-auto h-8 w-8 text-slate-500" /><p className="mt-2 font-semibold text-slate-200">Dosya seçin veya şablonu indirip doldurun</p><p className="mt-1 text-xs text-slate-500">Kabul edilen formatlar: .xlsx, .xls, .csv, .docx</p><div className="mt-4 flex flex-wrap justify-center gap-2"><Button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Dosya Seç</Button><Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button></div></div>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.docx" className="hidden" onChange={(event) => void handleFile(event.target.files?.[0])} />
             </div>
-            {selectedFileName ? <p className="text-xs text-slate-400">Seçilen dosya: {selectedFileName}</p> : null}
-            {parseResult ? <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-slate-800/70 p-3"><p className="text-xs text-slate-400">Toplam satır</p><p className="text-2xl font-black text-white">{parseResult.totalRows}</p></div><div className="rounded-xl bg-emerald-500/10 p-3"><p className="text-xs text-emerald-300">Geçerli satır</p><p className="text-2xl font-black text-emerald-200">{parseResult.validRows.length}</p></div><div className="rounded-xl bg-rose-500/10 p-3"><p className="text-xs text-rose-300">Hatalı satır</p><p className="text-2xl font-black text-rose-200">{parseResult.invalidRows.length}</p></div></div>{parseResult.missingHeaders.length ? <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">Eksik / hatalı başlıklar: {parseResult.missingHeaders.join(", ")}</div> : null}{parseResult.invalidRows.length ? <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-800"><table className="w-full text-xs"><tbody>{parseResult.invalidRows.slice(0, 20).map((row) => <tr key={row.rowNumber} className="border-b border-slate-800"><td className="px-3 py-2 text-slate-400">Satır {row.rowNumber}</td><td className="px-3 py-2 text-rose-300">{row.errors.join(" ")}</td></tr>)}</tbody></table></div> : null}</div> : null}
+            {selectedFileName ? <p className="text-xs text-slate-400">SeÃ§ilen dosya: {selectedFileName}</p> : null}
+            {parseResult ? <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-slate-800/70 p-3"><p className="text-xs text-slate-400">Toplam satÄ±r</p><p className="text-2xl font-black text-white">{parseResult.totalRows}</p></div><div className="rounded-xl bg-emerald-500/10 p-3"><p className="text-xs text-emerald-300">GeÃ§erli satÄ±r</p><p className="text-2xl font-black text-emerald-200">{parseResult.validRows.length}</p></div><div className="rounded-xl bg-rose-500/10 p-3"><p className="text-xs text-rose-300">HatalÄ± satÄ±r</p><p className="text-2xl font-black text-rose-200">{parseResult.invalidRows.length}</p></div></div>{parseResult.missingHeaders.length ? <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">Eksik / hatalÄ± baÅŸlÄ±klar: {parseResult.missingHeaders.join(", ")}</div> : null}{parseResult.validRows.length ? <BulkRiskValidPreview parseResult={parseResult} /> : null}{parseResult.invalidRows.length ? <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-800"><table className="w-full text-xs"><tbody>{parseResult.invalidRows.slice(0, 20).map((row) => <tr key={row.rowNumber} className="border-b border-slate-800"><td className="px-3 py-2 text-slate-400">SatÄ±r {row.rowNumber}</td><td className="px-3 py-2 text-rose-300">{row.errors.join(" ")}</td></tr>)}</tbody></table></div> : null}</div> : null}
           </div>
-          <DialogFooter className="border-t border-slate-800 px-5 py-4"><Button type="button" variant="outline" onClick={() => setUploadOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button><Button type="button" disabled={saving || !parseResult?.validRows.length} onClick={() => void importParsedRows()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{parseResult?.validRows.length || 0} Kaydı Yükle</Button></DialogFooter>
+          <DialogFooter className="border-t border-slate-800 px-5 py-4"><Button type="button" variant="outline" onClick={() => setUploadOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button><Button type="button" disabled={saving || !parseResult?.validRows.length} onClick={() => void importParsedRows()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{parseResult?.validRows.length || 0} KaydÄ± YÃ¼kle</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+
