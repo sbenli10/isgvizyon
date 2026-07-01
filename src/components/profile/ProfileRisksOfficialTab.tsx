@@ -158,47 +158,59 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function BulkRiskValidPreview({ parseResult }: { parseResult: SavedRiskExcelParseResult }) {
-  const rows = parseResult.validRows.slice(0, 50);
+  const rows = parseResult.validRows.slice(0, 8);
 
   return (
-    <div className="mt-4 max-h-72 overflow-auto rounded-xl border border-slate-800">
-      <table className="w-full min-w-[1120px] text-left text-xs">
-        <thead className="bg-slate-900 text-slate-300">
-          <tr>
-            <th className="px-3 py-2">Satır</th>
-            <th className="px-3 py-2">Faaliyet</th>
-            <th className="px-3 py-2">Tehlike</th>
-            <th className="px-3 py-2">Risk</th>
-            <th className="px-3 py-2">Mevcut Durum</th>
-            <th className="px-3 py-2">O/F/Ş/R</th>
-            <th className="px-3 py-2">DÖF</th>
-            <th className="px-3 py-2">Termin</th>
-            <th className="px-3 py-2">Sorumlu</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.rowNumber} className="border-t border-slate-800">
-              <td className="px-3 py-2 text-slate-400">{row.rowNumber}</td>
-              <td className="px-3 py-2 font-semibold text-slate-100">{row.input?.activity || "-"}</td>
-              <td className="px-3 py-2 text-slate-300">{row.input?.hazard || "-"}</td>
-              <td className="px-3 py-2 text-slate-300">{row.input?.risk || "-"}</td>
-              <td className="px-3 py-2 text-slate-400">{row.input?.currentStatus || "-"}</td>
-              <td className="px-3 py-2 text-amber-200">
-                {[row.input?.probabilityBefore, row.input?.frequencyBefore, row.input?.severityBefore, row.input?.riskScoreBefore]
-                  .map((value) => value ?? "-")
-                  .join("/")}
-              </td>
-              <td className="px-3 py-2 text-slate-400">{row.input?.correctivePreventiveAction || "-"}</td>
-              <td className="px-3 py-2 text-slate-400">{row.input?.deadline || "-"}</td>
-              <td className="px-3 py-2 text-slate-400">{row.input?.responsible || "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-3">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-black text-slate-100">Okunan risk önizlemesi</p>
+          <p className="text-xs text-slate-500">İlk satırlar kart görünümünde listelendi. Onayladığınızda tüm geçerli satırlar eklenecek.</p>
+        </div>
+        <Badge className="w-fit border-emerald-500/30 bg-emerald-500/10 text-emerald-200">
+          {parseResult.validRows.length} geçerli kayıt
+        </Badge>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2">
+        {rows.map((row) => {
+          const score = [row.input?.probabilityBefore, row.input?.frequencyBefore, row.input?.severityBefore, row.input?.riskScoreBefore]
+            .map((value) => value ?? "-")
+            .join("/");
+
+          return (
+            <div key={row.rowNumber} className="rounded-xl border border-slate-800 bg-slate-900/70 p-3">
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-100">{row.input?.activity || "Faaliyet yok"}</p>
+                  <p className="mt-0.5 line-clamp-2 text-xs text-slate-400">{row.input?.hazard || "Tehlike belirtilmemiş"}</p>
+                </div>
+                <Badge className="shrink-0 border-amber-500/30 bg-amber-500/10 text-amber-200">Satır {row.rowNumber}</Badge>
+              </div>
+              <div className="grid gap-2 text-xs sm:grid-cols-2">
+                <div className="rounded-lg bg-slate-950/60 p-2">
+                  <p className="text-slate-500">Risk</p>
+                  <p className="mt-1 line-clamp-2 font-semibold text-slate-200">{row.input?.risk || "-"}</p>
+                </div>
+                <div className="rounded-lg bg-slate-950/60 p-2">
+                  <p className="text-slate-500">Mevcut durum</p>
+                  <p className="mt-1 line-clamp-2 font-semibold text-slate-200">{row.input?.currentStatus || "-"}</p>
+                </div>
+                <div className="rounded-lg bg-slate-950/60 p-2">
+                  <p className="text-slate-500">O/F/Ş/R</p>
+                  <p className="mt-1 font-semibold text-amber-200">{score}</p>
+                </div>
+                <div className="rounded-lg bg-slate-950/60 p-2">
+                  <p className="text-slate-500">Sorumlu / Termin</p>
+                  <p className="mt-1 truncate font-semibold text-slate-200">{row.input?.responsible || "-"} / {row.input?.deadline || "-"}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
       {parseResult.validRows.length > rows.length ? (
-        <p className="border-t border-slate-800 px-3 py-2 text-xs text-slate-500">
-          İlk {rows.length} geçerli satır gösteriliyor. Onayladığınızda tüm geçerli satırlar eklenecek.
+        <p className="mt-3 rounded-xl border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-xs text-cyan-100">
+          İlk {rows.length} kayıt gösteriliyor. Kalan {parseResult.validRows.length - rows.length} geçerli kayıt da onay sonrası eklenecek.
         </p>
       ) : null}
     </div>
@@ -480,17 +492,32 @@ export function ProfileRisksTab() {
       </Dialog>
 
       <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-        <DialogContent className="max-h-[calc(100dvh-24px)] w-[calc(100vw-20px)] overflow-y-auto border-slate-800 bg-slate-900 p-0 text-slate-100 sm:max-w-4xl">
-          <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-violet-300" />Toplu Risk Yükle</DialogTitle><DialogDescription>Excel veya Word dosyanızdaki resmi başlıkları okuyarak risk maddelerini satır satır önizleyin.</DialogDescription></DialogHeader>
-          <div className="space-y-4 px-5 py-5">
-            <div className="grid min-h-[130px] place-items-center rounded-2xl border border-dashed border-slate-600 bg-slate-950/30 p-6 text-center transition hover:border-violet-400/70" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleFile(event.dataTransfer.files?.[0]); }}>
-              <div><Upload className="mx-auto h-8 w-8 text-slate-500" /><p className="mt-2 font-semibold text-slate-200">Dosya seçin veya şablonu indirip doldurun</p><p className="mt-1 text-xs text-slate-500">Kabul edilen formatlar: .xlsx, .xls, .csv, .docx</p><div className="mt-4 flex flex-wrap justify-center gap-2"><Button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Dosya Seç</Button><Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button></div></div>
+        <DialogContent className="max-h-[calc(100dvh-24px)] w-[calc(100vw-20px)] overflow-hidden border-slate-800 bg-slate-900 p-0 text-slate-100 sm:max-w-5xl">
+          <DialogHeader className="border-b border-slate-800 bg-slate-950/40 px-5 py-4">
+            <DialogTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5 text-violet-300" />Toplu Risk Yükle</DialogTitle>
+            <DialogDescription>Excel veya Word dosyanızdaki resmi başlıkları okuyarak risk maddelerini onay öncesi özetleyin.</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[calc(100dvh-170px)] space-y-4 overflow-y-auto overflow-x-hidden px-5 py-5">
+            <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-slate-600 bg-slate-950/30 p-4 transition hover:border-violet-400/70 sm:flex-row sm:items-center sm:justify-between" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleFile(event.dataTransfer.files?.[0]); }}>
+              <div className="flex items-start gap-3">
+                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/10 text-violet-300">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-100">Dosya seçin veya buraya bırakın</p>
+                  <p className="mt-1 text-xs text-slate-500">Kabul edilen formatlar: .xlsx, .xls, .csv, .docx</p>
+                  {selectedFileName ? <p className="mt-2 break-all text-xs font-semibold text-violet-200">Seçilen dosya: {selectedFileName}</p> : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button type="button" onClick={() => fileInputRef.current?.click()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Dosya Seç</Button>
+                <Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button>
+              </div>
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv,.docx" className="hidden" onChange={(event) => void handleFile(event.target.files?.[0])} />
             </div>
-            {selectedFileName ? <p className="text-xs text-slate-400">Seçilen dosya: {selectedFileName}</p> : null}
             {parseResult ? <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl bg-slate-800/70 p-3"><p className="text-xs text-slate-400">Toplam satır</p><p className="text-2xl font-black text-white">{parseResult.totalRows}</p></div><div className="rounded-xl bg-emerald-500/10 p-3"><p className="text-xs text-emerald-300">Geçerli satır</p><p className="text-2xl font-black text-emerald-200">{parseResult.validRows.length}</p></div><div className="rounded-xl bg-rose-500/10 p-3"><p className="text-xs text-rose-300">Hatalı satır</p><p className="text-2xl font-black text-rose-200">{parseResult.invalidRows.length}</p></div></div>{parseResult.missingHeaders.length ? <div className="mt-4 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">Eksik / hatalı başlıklar: {parseResult.missingHeaders.join(", ")}</div> : null}{parseResult.validRows.length ? <BulkRiskValidPreview parseResult={parseResult} /> : null}{parseResult.invalidRows.length ? <div className="mt-4 max-h-48 overflow-y-auto rounded-xl border border-slate-800"><table className="w-full text-xs"><tbody>{parseResult.invalidRows.slice(0, 20).map((row) => <tr key={row.rowNumber} className="border-b border-slate-800"><td className="px-3 py-2 text-slate-400">Satır {row.rowNumber}</td><td className="px-3 py-2 text-rose-300">{row.errors.join(" ")}</td></tr>)}</tbody></table></div> : null}</div> : null}
           </div>
-          <DialogFooter className="border-t border-slate-800 px-5 py-4"><Button type="button" variant="outline" onClick={() => setUploadOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button><Button type="button" disabled={saving || !parseResult?.validRows.length} onClick={() => void importParsedRows()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{parseResult?.validRows.length || 0} Kaydı Yükle</Button></DialogFooter>
+          <DialogFooter className="border-t border-slate-800 bg-slate-950/40 px-5 py-4"><Button type="button" variant="outline" onClick={() => setUploadOpen(false)} className="rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700">Kapat</Button><Button type="button" disabled={saving || !parseResult?.validRows.length} onClick={() => void importParsedRows()} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:bg-slate-700 disabled:text-slate-400">{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{parseResult?.validRows.length || 0} Kaydı Yükle</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
