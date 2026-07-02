@@ -51,6 +51,7 @@ export interface SavedRiskItem {
   riskDefinitionAfter: string | null;
   deadline: string | null;
   responsible: string | null;
+  folderName: string | null;
   source: SavedRiskSource;
   isActive: boolean;
   createdAt: string;
@@ -82,6 +83,7 @@ export interface SavedRiskInput {
   riskDefinitionAfter?: string | null;
   deadline?: string | null;
   responsible?: string | null;
+  folderName?: string | null;
   source?: SavedRiskSource;
 }
 
@@ -484,6 +486,7 @@ const mapSavedRisk = (row: any): SavedRiskItem => ({
   riskDefinitionAfter: row.risk_definition_after || null,
   deadline: row.deadline || row.due_date || null,
   responsible: row.responsible || null,
+  folderName: row.folder_name || null,
   source: row.source || "manual",
   isActive: row.is_active ?? true,
   createdAt: row.created_at,
@@ -519,6 +522,7 @@ const toPayload = (input: SavedRiskInput) => {
     risk_definition_after: input.riskDefinitionAfter || null,
     deadline: input.deadline || null,
     responsible: input.responsible || null,
+    folder_name: input.folderName || null,
     source: input.source || "manual",
     is_active: true,
 
@@ -577,11 +581,11 @@ export const bulkDeleteSavedRiskItems = async (ids: string[]) => {
 
 export const bulkCreateSavedRiskItems = async (inputs: SavedRiskInput[], existing: SavedRiskItem[] = []) => {
   const known = new Set(
-    existing.map((item) => `${item.activity}|${item.hazard}|${item.risk}|${item.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR")),
+    existing.map((item) => `${item.folderName || ""}|${item.activity}|${item.hazard}|${item.risk}|${item.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR")),
   );
 
   const uniqueInputs = inputs.filter((input) => {
-    const key = `${input.activity}|${input.hazard}|${input.risk}|${input.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR");
+    const key = `${input.folderName || ""}|${input.activity}|${input.hazard}|${input.risk}|${input.correctivePreventiveAction || ""}`.toLocaleLowerCase("tr-TR");
     if (known.has(key)) return false;
     known.add(key);
     return true;

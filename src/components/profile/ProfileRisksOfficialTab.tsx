@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Download, Edit2, FileSpreadsheet, Loader2, Plus, Search, Trash2, TriangleAlert, Upload } from "lucide-react";
+import { Download, Edit2, FileSpreadsheet, FolderOpen, FolderPlus, Loader2, MoveRight, Plus, Search, Share2, Sparkles, Trash2, TriangleAlert, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +13,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   bulkCreateSavedRiskItems,
-  bulkDeleteSavedRiskItems,
   createSavedRiskItem,
   deleteSavedRiskItem,
   downloadSavedRiskTemplate,
@@ -50,6 +49,7 @@ type RiskFormState = {
   riskDefinitionAfter: string;
   deadline: string;
   responsible: string;
+  folderName: string;
   category: string;
   sectorKey: string;
   companyId: string;
@@ -81,6 +81,7 @@ const emptyForm: RiskFormState = {
   riskDefinitionAfter: "",
   deadline: "",
   responsible: "",
+  folderName: "",
   category: "",
   sectorKey: "",
   companyId: "all",
@@ -121,6 +122,7 @@ const itemToForm = (item: SavedRiskItem): RiskFormState => ({
   riskDefinitionAfter: item.riskDefinitionAfter || "",
   deadline: item.deadline || "",
   responsible: item.responsible || "",
+  folderName: item.folderName || "",
   category: item.category || "",
   sectorKey: item.sectorKey || "",
   companyId: item.companyId || "all",
@@ -217,6 +219,10 @@ function BulkRiskValidPreview({ parseResult }: { parseResult: SavedRiskExcelPars
   );
 }
 
+const defaultBulkFolderName = () => `Toplu Riskler - ${new Date().toLocaleDateString("tr-TR")}`;
+
+const fileNameToFolderName = (fileName: string) => fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+
 export function ProfileRisksTab() {
   const { user, profile } = useAuth();
   const [risks, setRisks] = useState<SavedRiskItem[]>([]);
@@ -225,12 +231,14 @@ export function ProfileRisksTab() {
   const [companyFilter, setCompanyFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [folderFilter, setFolderFilter] = useState("all");
   const [sortMode, setSortMode] = useState<SortMode>("newest");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<RiskFormState>(emptyForm);
   const [editingRisk, setEditingRisk] = useState<SavedRiskItem | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadFolderName, setUploadFolderName] = useState(defaultBulkFolderName);
   const [parseResult, setParseResult] = useState<SavedRiskExcelParseResult | null>(null);
   const [selectedFileName, setSelectedFileName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -259,6 +267,7 @@ export function ProfileRisksTab() {
   }, [user?.id]);
 
   const categories = useMemo(() => Array.from(new Set(risks.map((risk) => risk.category || risk.sectorKey).filter(Boolean))) as string[], [risks]);
+  const folders = useMemo(() => Array.from(new Set(risks.map((risk) => risk.folderName).filter(Boolean))) as string[], [risks]);
 
   const filteredRisks = useMemo(() => {
     const term = query.trim().toLocaleLowerCase("tr-TR");
@@ -268,10 +277,11 @@ export function ProfileRisksTab() {
       const matchesCompany = companyFilter === "all" || risk.companyId === companyFilter;
       const matchesCategory = categoryFilter === "all" || risk.category === categoryFilter || risk.sectorKey === categoryFilter;
       const matchesSource = sourceFilter === "all" || risk.source === sourceFilter;
-      return matchesQuery && matchesCompany && matchesCategory && matchesSource;
+      const matchesFolder = folderFilter === "all" || risk.folderName === folderFilter;
+      return matchesQuery && matchesCompany && matchesCategory && matchesSource && matchesFolder;
     });
     return [...rows].sort((a, b) => (sortMode === "az" ? a.activity.localeCompare(b.activity, "tr-TR") : (b.createdAt || "").localeCompare(a.createdAt || "")));
-  }, [categoryFilter, companyFilter, query, risks, sortMode, sourceFilter]);
+  }, [categoryFilter, companyFilter, folderFilter, query, risks, sortMode, sourceFilter]);
 
   const updateForm = (field: keyof RiskFormState, value: string) => {
     setForm((current) => {
@@ -290,8 +300,15 @@ export function ProfileRisksTab() {
 
   const openCreate = () => {
     setEditingRisk(null);
-    setForm(emptyForm);
+    setForm({ ...emptyForm, folderName: folderFilter === "all" ? "" : folderFilter });
     setAddOpen(true);
+  };
+
+  const openUploadDialog = () => {
+    setParseResult(null);
+    setSelectedFileName("");
+    setUploadFolderName(folderFilter === "all" ? defaultBulkFolderName() : folderFilter);
+    setUploadOpen(true);
   };
 
   const openEdit = (risk: SavedRiskItem) => {
@@ -325,6 +342,7 @@ export function ProfileRisksTab() {
     riskDefinitionAfter: form.riskDefinitionAfter.trim() || null,
     deadline: form.deadline || null,
     responsible: form.responsible.trim() || null,
+    folderName: form.folderName.trim() || null,
     source: "manual",
   });
 
@@ -355,14 +373,32 @@ export function ProfileRisksTab() {
     toast.success("Risk maddesi silindi.");
   };
 
-  const handleBulkDelete = async () => {
+  const handleMoveSelected = async () => {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
-    if (!window.confirm(`${ids.length} risk maddesini silmek istiyor musunuz?`)) return;
-    await bulkDeleteSavedRiskItems(ids);
-    setRisks((current) => current.filter((risk) => !selectedIds.has(risk.id)));
-    setSelectedIds(new Set());
-    toast.success("Seçilen risk maddeleri silindi.");
+    const folderName = window.prompt("Seçilen risk maddeleri hangi klasöre taşınsın?", folderFilter === "all" ? defaultBulkFolderName() : folderFilter);
+    if (folderName === null) return;
+    const cleanedFolderName = folderName.trim();
+    if (!cleanedFolderName) {
+      toast.error("Klasör adı boş olamaz.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error } = await db
+        .from("saved_risk_items")
+        .update({ folder_name: cleanedFolderName, updated_at: new Date().toISOString() })
+        .in("id", ids);
+      if (error) throw error;
+      setRisks((current) => current.map((risk) => (selectedIds.has(risk.id) ? { ...risk, folderName: cleanedFolderName, updatedAt: new Date().toISOString() } : risk)));
+      setFolderFilter(cleanedFolderName);
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} risk maddesi "${cleanedFolderName}" klasörüne taşındı.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Risk maddeleri taşınamadı.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleFile = async (file?: File | null) => {
@@ -373,6 +409,11 @@ export function ProfileRisksTab() {
     }
     try {
       setSelectedFileName(file.name);
+      setUploadFolderName((current) => {
+        const cleaned = current.trim();
+        if (cleaned && !cleaned.startsWith("Toplu Riskler -")) return current;
+        return fileNameToFolderName(file.name) || defaultBulkFolderName();
+      });
       const result = /\.docx$/i.test(file.name)
         ? await parseSavedRiskWord(file, user.id, profile?.organization_id || null)
         : await parseSavedRiskExcel(file, user.id, profile?.organization_id || null);
@@ -388,12 +429,18 @@ export function ProfileRisksTab() {
     if (!parseResult || parseResult.validRows.length === 0) return;
     setSaving(true);
     try {
-      const result = await bulkCreateSavedRiskItems(parseResult.validRows.map((row) => row.input!).filter(Boolean), risks);
+      const folderName = uploadFolderName.trim() || defaultBulkFolderName();
+      const result = await bulkCreateSavedRiskItems(
+        parseResult.validRows.map((row) => ({ ...row.input!, folderName })).filter(Boolean),
+        risks,
+      );
       setRisks((current) => [...result.inserted, ...current]);
-      toast.success(`${result.inserted.length} risk maddesi yüklendi.`, { description: result.skipped ? `${result.skipped} kayıt zaten vardı, atlandı.` : undefined });
+      setFolderFilter(folderName);
+      toast.success(`${result.inserted.length} risk maddesi "${folderName}" klasörüne yüklendi.`, { description: result.skipped ? `${result.skipped} kayıt zaten vardı, atlandı.` : undefined });
       setUploadOpen(false);
       setParseResult(null);
       setSelectedFileName("");
+      setUploadFolderName(defaultBulkFolderName());
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Risk maddeleri yüklenemedi.");
     } finally {
@@ -411,78 +458,148 @@ export function ProfileRisksTab() {
   };
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-amber-500/20 bg-gradient-to-br from-slate-900 via-slate-950 to-amber-950/20 p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-300"><TriangleAlert className="h-6 w-6" /></div>
-            <div>
-              <h2 className="text-2xl font-black text-white">Risklerim</h2>
-              <p className="mt-1 max-w-3xl text-sm text-slate-400">Resmi risk tablo başlıklarıyla manuel kayıt oluşturun veya Excel/Word dosyası üzerinden toplu yükleyin.</p>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={openCreate} className="rounded-xl bg-amber-500 text-white hover:bg-amber-400"><Plus className="mr-2 h-4 w-4" />Risk Ekle</Button>
-            <Button type="button" onClick={() => setUploadOpen(true)} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500"><Upload className="mr-2 h-4 w-4" />Toplu Risk Yükle</Button>
-            <Button type="button" variant="outline" onClick={downloadSavedRiskTemplate} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"><Download className="mr-2 h-4 w-4" />Şablon İndir</Button>
-            <Button type="button" variant="outline" disabled={selectedIds.size === 0} onClick={() => void handleBulkDelete()} className="rounded-xl border-rose-500/30 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"><Trash2 className="mr-2 h-4 w-4" />Seçilenleri Sil</Button>
-          </div>
+    <div className="min-h-[520px] space-y-5">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+        <div className="relative w-full xl:max-w-[580px]">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Risk ara..." className={cn(inputClass, "pl-9")} />
+        </div>
+        <div className="text-sm font-semibold text-slate-300">
+          Toplam: <span className="text-cyan-300">{filteredRisks.length}</span>
+        </div>
+        <div className="flex flex-1 flex-wrap gap-2 xl:justify-end">
+          <Button
+            type="button"
+            onClick={() => {
+              const name = window.prompt("Klasör adı", defaultBulkFolderName());
+              if (!name?.trim()) return;
+              setFolderFilter(name.trim());
+              setUploadFolderName(name.trim());
+              toast.success(`"${name.trim()}" klasörü hazırlandı. Risk ekleyebilir veya toplu yükleme yapabilirsiniz.`);
+            }}
+            className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500"
+          >
+            <FolderPlus className="mr-2 h-4 w-4" />Klasör
+          </Button>
+          <Button type="button" disabled={selectedIds.size === 0 || saving} onClick={() => void handleMoveSelected()} className="rounded-xl bg-slate-700 text-slate-300 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500">
+            <MoveRight className="mr-2 h-4 w-4" />Toplu Taşı
+          </Button>
+          <Button type="button" onClick={openUploadDialog} className="rounded-xl bg-violet-600 text-white hover:bg-violet-500">
+            <Upload className="mr-2 h-4 w-4" />Toplu Yükle
+          </Button>
+          <Button type="button" onClick={downloadSavedRiskTemplate} className="rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-500">
+            <Sparkles className="mr-2 h-4 w-4" />Excel'den AI Şablon
+          </Button>
+          <Button type="button" onClick={() => toast.info("Paylaşılan şablon galerisi yakında bu alana bağlanacak.")} className="rounded-xl bg-sky-600 text-white hover:bg-sky-500">
+            <Share2 className="mr-2 h-4 w-4" />Paylaşılan Şablonlar
+          </Button>
+          <Button type="button" onClick={openCreate} className="rounded-xl bg-amber-500 text-white hover:bg-amber-400">
+            <Plus className="mr-2 h-4 w-4" />Ekle
+          </Button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-        <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_180px_160px_160px]">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Faaliyet, tehlike, risk veya sorumlu ara..." className={cn(inputClass, "pl-9")} />
-          </div>
-          <Select value={companyFilter} onValueChange={setCompanyFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Firma" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tüm Firmalar</SelectItem>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent></Select>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kategori/Sektör" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tüm Kategoriler</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent></Select>
-          <Select value={sourceFilter} onValueChange={setSourceFilter}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kaynak" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="all">Tümü</SelectItem><SelectItem value="manual">Manuel</SelectItem><SelectItem value="excel">Excel</SelectItem><SelectItem value="word">Word</SelectItem><SelectItem value="ai">AI</SelectItem><SelectItem value="template">Şablon</SelectItem></SelectContent></Select>
-          <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}><SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Sıralama" /></SelectTrigger><SelectContent className={selectContentClass}><SelectItem value="newest">Tarihe göre</SelectItem><SelectItem value="az">A-Z</SelectItem></SelectContent></Select>
+      {folders.length ? (
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" variant="outline" onClick={() => setFolderFilter("all")} className={cn("rounded-full border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800", folderFilter === "all" && "border-cyan-400 bg-cyan-500/10 text-cyan-200")}>
+            Tüm Riskler
+          </Button>
+          {folders.map((folder) => (
+            <Button key={folder} type="button" size="sm" variant="outline" onClick={() => setFolderFilter(folder)} className={cn("rounded-full border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800", folderFilter === folder && "border-emerald-400 bg-emerald-500/10 text-emerald-200")}>
+              <FolderOpen className="mr-2 h-3.5 w-3.5" />{folder}
+            </Button>
+          ))}
         </div>
+      ) : null}
+
+      <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900/45 p-3 md:grid-cols-4">
+        <Select value={companyFilter} onValueChange={setCompanyFilter}>
+          <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Firma" /></SelectTrigger>
+          <SelectContent className={selectContentClass}><SelectItem value="all">Tüm Firmalar</SelectItem>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kategori/Sektör" /></SelectTrigger>
+          <SelectContent className={selectContentClass}><SelectItem value="all">Tüm Kategoriler</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{category}</SelectItem>)}</SelectContent>
+        </Select>
+        <Select value={sourceFilter} onValueChange={setSourceFilter}>
+          <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Kaynak" /></SelectTrigger>
+          <SelectContent className={selectContentClass}><SelectItem value="all">Tüm Kaynaklar</SelectItem><SelectItem value="manual">Manuel</SelectItem><SelectItem value="excel">Excel</SelectItem><SelectItem value="word">Word</SelectItem><SelectItem value="ai">AI</SelectItem><SelectItem value="template">Şablon</SelectItem></SelectContent>
+        </Select>
+        <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+          <SelectTrigger className={selectTriggerClass}><SelectValue placeholder="Sıralama" /></SelectTrigger>
+          <SelectContent className={selectContentClass}><SelectItem value="newest">Tarihe göre</SelectItem><SelectItem value="az">A-Z</SelectItem></SelectContent>
+        </Select>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/50">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1680px] text-left text-sm">
-            <thead className="bg-slate-900/80 text-xs font-black uppercase text-slate-300">
-              <tr>
-                <th className="px-3 py-3"><input type="checkbox" checked={filteredRisks.length > 0 && filteredRisks.every((risk) => selectedIds.has(risk.id))} onChange={(event) => setSelectedIds(event.target.checked ? new Set(filteredRisks.map((risk) => risk.id)) : new Set())} /></th>
-                {['FAALİYET','TEHLİKE','RİSK','MEVCUT DURUM','TESPİT TARİHİ','O/F/Ş/R','RİSKİN TANIMI','OLASI SONUÇ','DÖF','O/F/Ş/R DÖF SONRASI','TERMİN','SORUMLU','İşlemler'].map((header) => <th key={header} className="px-3 py-3">{header}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? <tr><td colSpan={14} className="h-40 text-center text-slate-500"><Loader2 className="mx-auto h-5 w-5 animate-spin" /></td></tr> : filteredRisks.length === 0 ? (
-                <tr><td colSpan={14} className="h-52 px-4 text-center"><div className="text-base font-bold text-slate-300">Henüz risk maddesi eklenmemiş</div><p className="mt-2 text-sm text-slate-500">Manuel risk ekleyebilir veya Excel/Word dosyası ile toplu yükleyebilirsiniz.</p></td></tr>
-              ) : filteredRisks.map((risk) => (
-                <tr key={risk.id} className="border-t border-slate-800/80 align-top transition hover:bg-slate-900/60">
-                  <td className="px-3 py-4"><input type="checkbox" checked={selectedIds.has(risk.id)} onChange={() => toggleSelected(risk.id)} /></td>
-                  <td className="px-3 py-4 font-semibold text-slate-100">{risk.activity}</td>
-                  <td className="px-3 py-4 text-slate-300">{risk.hazard}</td>
-                  <td className="px-3 py-4 text-slate-300">{risk.risk}</td>
-                  <td className="px-3 py-4 text-slate-400">{risk.currentStatus || "-"}</td>
-                  <td className="px-3 py-4 text-slate-400">{risk.detectionDate || "-"}</td>
-                  <td className="px-3 py-4"><Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">{scoreBadge([risk.probabilityBefore, risk.frequencyBefore, risk.severityBefore, risk.riskScoreBefore])}</Badge></td>
-                  <td className="px-3 py-4 text-slate-400">{risk.riskDefinitionBefore || "-"}</td>
-                  <td className="px-3 py-4 text-slate-400">{risk.possibleConsequence || "-"}</td>
-                  <td className="px-3 py-4 text-slate-400">{risk.correctivePreventiveAction || "-"}</td>
-                  <td className="px-3 py-4"><Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200">{scoreBadge([risk.probabilityAfter, risk.frequencyAfter, risk.severityAfter, risk.riskScoreAfter])}</Badge></td>
-                  <td className="px-3 py-4 text-slate-400">{risk.deadline || "-"}</td>
-                  <td className="px-3 py-4 text-slate-400">{risk.responsible || "-"}</td>
-                  <td className="px-3 py-4"><div className="flex gap-1"><Button type="button" size="icon" variant="ghost" onClick={() => openEdit(risk)} className="h-8 w-8 rounded-lg text-slate-300 hover:bg-slate-800"><Edit2 className="h-4 w-4" /></Button><Button type="button" size="icon" variant="ghost" onClick={() => void handleDelete(risk.id)} className="h-8 w-8 rounded-lg text-rose-300 hover:bg-rose-500/10"><Trash2 className="h-4 w-4" /></Button></div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className="grid min-h-[340px] place-items-center rounded-2xl border border-slate-800 bg-slate-950/30 text-slate-500">
+          <Loader2 className="h-6 w-6 animate-spin" />
         </div>
-      </div>
+      ) : filteredRisks.length === 0 ? (
+        <div className="grid min-h-[360px] place-items-center rounded-2xl border border-slate-900/40 bg-slate-950/10">
+          <div className="text-center">
+            <TriangleAlert className="mx-auto h-11 w-11 text-slate-500" />
+            <p className="mt-4 text-sm text-slate-300">Henüz risk maddesi eklenmemiş</p>
+            <Button type="button" onClick={openCreate} className="mt-5 rounded-xl bg-amber-500 text-white hover:bg-amber-400">
+              <Plus className="mr-2 h-4 w-4" />İlk Risk Maddesini Ekle
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {filteredRisks.map((risk) => (
+            <article key={risk.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 transition hover:border-cyan-500/40 hover:bg-slate-900">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 gap-3">
+                  <input className="mt-1 h-4 w-4 accent-cyan-500" type="checkbox" checked={selectedIds.has(risk.id)} onChange={() => toggleSelected(risk.id)} />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-base font-black text-slate-100">{risk.activity}</h3>
+                      {risk.folderName ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-200"><FolderOpen className="mr-1 h-3 w-3" />{risk.folderName}</Badge> : null}
+                      <Badge className="border-slate-600 bg-slate-800 text-slate-300">{risk.source === "word" ? "Word" : risk.source === "excel" ? "Excel" : risk.source === "ai" ? "AI" : "Manuel"}</Badge>
+                    </div>
+                    <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                        <p className="text-xs font-bold uppercase text-slate-500">Tehlike</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-200">{risk.hazard || "-"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                        <p className="text-xs font-bold uppercase text-slate-500">Risk</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-200">{risk.risk || "-"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                        <p className="text-xs font-bold uppercase text-slate-500">Düzeltici / Önleyici Faaliyet</p>
+                        <p className="mt-1 line-clamp-2 text-sm font-semibold text-slate-200">{risk.correctivePreventiveAction || "-"}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                      <Badge className="border-amber-500/30 bg-amber-500/10 text-amber-200">O/F/Ş/R: {scoreBadge([risk.probabilityBefore, risk.frequencyBefore, risk.severityBefore, risk.riskScoreBefore])}</Badge>
+                      <Badge className="border-cyan-500/30 bg-cyan-500/10 text-cyan-200">DÖF: {scoreBadge([risk.probabilityAfter, risk.frequencyAfter, risk.severityAfter, risk.riskScoreAfter])}</Badge>
+                      <Badge className="border-slate-600 bg-slate-800 text-slate-300">Tespit: {risk.detectionDate || "-"}</Badge>
+                      <Badge className="border-slate-600 bg-slate-800 text-slate-300">Termin: {risk.deadline || "-"}</Badge>
+                      <Badge className="border-slate-600 bg-slate-800 text-slate-300">Sorumlu: {risk.responsible || "-"}</Badge>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button type="button" size="icon" variant="ghost" onClick={() => openEdit(risk)} className="h-9 w-9 rounded-xl text-slate-300 hover:bg-slate-800">
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => void handleDelete(risk.id)} className="h-9 w-9 rounded-xl text-rose-300 hover:bg-rose-500/10">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-h-[calc(100dvh-24px)] w-[calc(100vw-20px)] overflow-y-auto border-slate-800 bg-slate-900 p-0 text-slate-100 sm:max-w-[900px]">
           <DialogHeader className="border-b border-slate-800 px-5 py-4"><DialogTitle>{editingRisk ? "Risk Maddesini Düzenle" : "Risk Maddesi Ekle"}</DialogTitle><DialogDescription>Resmi tablo başlıklarına göre risk maddesi bilgilerini girin.</DialogDescription></DialogHeader>
           <div className="space-y-4 px-5 py-4">
-            <Section title="Temel Bilgiler"><div className="grid gap-3 md:grid-cols-3"><FormInput label="FAALİYET" required value={form.activity} onChange={(value) => updateForm("activity", value)} /><FormInput label="TEHLİKE" required value={form.hazard} onChange={(value) => updateForm("hazard", value)} /><FormInput label="RİSK" required value={form.risk} onChange={(value) => updateForm("risk", value)} /></div><div className="mt-3 grid gap-3 md:grid-cols-3"><FormInput label="MEVCUT DURUM" value={form.currentStatus} onChange={(value) => updateForm("currentStatus", value)} /><FormInput label="TESPİT TARİHİ" type="date" value={form.detectionDate} onChange={(value) => updateForm("detectionDate", value)} /><FormInput label="SORUMLU" value={form.responsible} onChange={(value) => updateForm("responsible", value)} /></div></Section>
+            <Section title="Temel Bilgiler"><div className="grid gap-3 md:grid-cols-3"><FormInput label="FAALİYET" required value={form.activity} onChange={(value) => updateForm("activity", value)} /><FormInput label="TEHLİKE" required value={form.hazard} onChange={(value) => updateForm("hazard", value)} /><FormInput label="RİSK" required value={form.risk} onChange={(value) => updateForm("risk", value)} /></div><div className="mt-3 grid gap-3 md:grid-cols-4"><FormInput label="KLASÖR" value={form.folderName} onChange={(value) => updateForm("folderName", value)} placeholder="Örn. İnşaat Riskleri" /><FormInput label="MEVCUT DURUM" value={form.currentStatus} onChange={(value) => updateForm("currentStatus", value)} /><FormInput label="TESPİT TARİHİ" type="date" value={form.detectionDate} onChange={(value) => updateForm("detectionDate", value)} /><FormInput label="SORUMLU" value={form.responsible} onChange={(value) => updateForm("responsible", value)} /></div></Section>
             <Section title="Mevcut Risk Skoru"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityBefore} onChange={(value) => updateForm("probabilityBefore", value)} /><FormInput label="F" type="number" value={form.frequencyBefore} onChange={(value) => updateForm("frequencyBefore", value)} /><FormInput label="Ş" type="number" value={form.severityBefore} onChange={(value) => updateForm("severityBefore", value)} /><FormInput label="R" type="number" value={form.riskScoreBefore} onChange={(value) => updateForm("riskScoreBefore", value)} /><FormInput label="Kategori/Sektör" value={form.category} onChange={(value) => updateForm("category", value)} /></div><div className="mt-3"><FormTextarea label="RİSKİN TANIMI" value={form.riskDefinitionBefore} onChange={(value) => updateForm("riskDefinitionBefore", value)} /></div></Section>
             <Section title="Önleyici Faaliyet"><div className="grid gap-3 md:grid-cols-2"><FormTextarea label="OLASI SONUÇ" value={form.possibleConsequence} onChange={(value) => updateForm("possibleConsequence", value)} /><FormTextarea label="DÜZELTİCİ / ÖNLEYİCİ FAALİYET" value={form.correctivePreventiveAction} onChange={(value) => updateForm("correctivePreventiveAction", value)} /></div></Section>
             <Section title="DÖF Sonrası Risk"><div className="grid gap-3 md:grid-cols-5"><FormInput label="O" type="number" value={form.probabilityAfter} onChange={(value) => updateForm("probabilityAfter", value)} /><FormInput label="F" type="number" value={form.frequencyAfter} onChange={(value) => updateForm("frequencyAfter", value)} /><FormInput label="Ş" type="number" value={form.severityAfter} onChange={(value) => updateForm("severityAfter", value)} /><FormInput label="R" type="number" value={form.riskScoreAfter} onChange={(value) => updateForm("riskScoreAfter", value)} /><FormInput label="TERMİN" type="date" value={form.deadline} onChange={(value) => updateForm("deadline", value)} /></div><div className="mt-3"><FormTextarea label="RİSKİN TANIMI (DÖF SONRASI)" value={form.riskDefinitionAfter} onChange={(value) => updateForm("riskDefinitionAfter", value)} /></div></Section>
@@ -498,6 +615,21 @@ export function ProfileRisksTab() {
             <DialogDescription>Excel veya Word dosyanızdaki resmi başlıkları okuyarak risk maddelerini onay öncesi özetleyin.</DialogDescription>
           </DialogHeader>
           <div className="max-h-[calc(100dvh-170px)] space-y-4 overflow-y-auto overflow-x-hidden px-5 py-5">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <Label className="text-xs font-black uppercase tracking-wide text-emerald-200">Bu yükleme için klasör adı</Label>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <Input
+                  value={uploadFolderName}
+                  onChange={(event) => setUploadFolderName(event.target.value)}
+                  placeholder="Örn. İnşaat Risk Analizi"
+                  className={cn(inputClass, "border-emerald-500/30 focus-visible:ring-emerald-500/30")}
+                />
+                <Button type="button" variant="outline" onClick={() => setUploadFolderName(selectedFileName ? fileNameToFolderName(selectedFileName) : defaultBulkFolderName())} className="rounded-xl border-emerald-500/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20">
+                  <FolderOpen className="mr-2 h-4 w-4" />Otomatik Adlandır
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-emerald-100/70">Onaylanan tüm risk maddeleri bu klasörün içinde listelenecek.</p>
+            </div>
             <div className="flex flex-col gap-4 rounded-2xl border border-dashed border-slate-600 bg-slate-950/30 p-4 transition hover:border-violet-400/70 sm:flex-row sm:items-center sm:justify-between" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); void handleFile(event.dataTransfer.files?.[0]); }}>
               <div className="flex items-start gap-3">
                 <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-violet-500/10 text-violet-300">
