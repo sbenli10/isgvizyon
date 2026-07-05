@@ -288,6 +288,35 @@ interface RiskAssessmentTemplateRecord {
 }
 
 const today = new Date().toISOString().split("T")[0];
+const COMPANY_PAGE_SIZE = 120;
+const COMPANY_SELECT_COLUMNS = [
+  "id",
+  "name",
+  "email",
+  "phone",
+  "address",
+  "sgk_workplace_number",
+  "workplace_registration_number",
+  "employee_count",
+  "hazard_class",
+  "industry",
+  "organization_id",
+  "employer_representative_name",
+  "employer_representative_tc_no",
+  "employer_representative_phone",
+  "occupational_safety_specialist_name",
+  "occupational_safety_specialist_tc_no",
+  "occupational_safety_specialist_phone",
+  "occupational_safety_specialist_certificate_no",
+  "workplace_doctor_name",
+  "workplace_doctor_tc_no",
+  "workplace_doctor_phone",
+  "workplace_doctor_certificate_no",
+  "employee_representative_name",
+  "employee_representative_tc_no",
+  "employee_representative_phone",
+  "emergency_team_info",
+].join(", ");
 
 const WIZARD_STEPS: WizardStep[] = [
   {
@@ -1180,6 +1209,9 @@ export default function RiskAssessmentWizard() {
   const [currentStep, setCurrentStep] = useState(0);
   const [companies, setCompanies] = useState<WizardCompanyOption[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [companySearch, setCompanySearch] = useState("");
+  const [debouncedCompanySearch, setDebouncedCompanySearch] = useState("");
+  const [companyListLimited, setCompanyListLimited] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState(
     locationState?.companyId || "",
   );
@@ -1362,15 +1394,24 @@ export default function RiskAssessmentWizard() {
   }, [profile?.organization_id, riskTemplateDialogOpen]);
 
   useEffect(() => {
+    const timeoutId = window.setTimeout(
+      () => setDebouncedCompanySearch(companySearch.trim()),
+      350,
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [companySearch]);
+
+  useEffect(() => {
     let active = true;
     const loadCompanies = async () => {
       setCompaniesLoading(true);
       try {
         let query = supabase
           .from("companies")
-          .select("*")
+          .select(COMPANY_SELECT_COLUMNS)
           .eq("is_active", true)
-          .order("name", { ascending: true });
+          .order("name", { ascending: true })
+          .limit(COMPANY_PAGE_SIZE);
 
         if (profile?.organization_id) {
           query = query.eq("organization_id", profile.organization_id);
@@ -1378,35 +1419,17 @@ export default function RiskAssessmentWizard() {
           query = query.eq("user_id", user.id);
         }
 
+        if (debouncedCompanySearch) {
+          query = query.ilike("name", `%${debouncedCompanySearch}%`);
+        }
+
         const { data, error } = await query;
         if (error) throw error;
         if (!active) return;
 
         const companyRows = (data || []) as Array<Record<string, unknown>>;
-        const companyIds = companyRows
-          .map((row) => String(row.id))
-          .filter(Boolean);
-        let assignments: CompanyAssignmentForRisk[] = [];
         let organizationInfo: OrganizationForRisk | null = null;
-
-        if (companyIds.length > 0) {
-          const { data: assignmentRows, error: assignmentError } =
-            await supabase
-              .from("company_assignments")
-              .select(
-                "company_id, role_type, person_name, certificate_no, phone, email, notes, is_active",
-              )
-              .in("company_id", companyIds);
-
-          if (assignmentError) {
-            console.warn(
-              "Risk wizard company assignment fetch warning",
-              assignmentError,
-            );
-          } else {
-            assignments = (assignmentRows || []) as CompanyAssignmentForRisk[];
-          }
-        }
+        setCompanyListLimited(companyRows.length >= COMPANY_PAGE_SIZE);
 
         if (profile?.organization_id) {
           const { data: organizationRow, error: organizationError } =
@@ -1557,7 +1580,7 @@ export default function RiskAssessmentWizard() {
         }));
 
         setCompanies(
-          enrichCompaniesWithAssignments(mappedCompanies, assignments),
+          mappedCompanies,
         );
       } catch (error) {
         console.error("Risk wizard company fetch error", error);
@@ -1571,7 +1594,7 @@ export default function RiskAssessmentWizard() {
     return () => {
       active = false;
     };
-  }, [profile?.organization_id, user?.id]);
+  }, [debouncedCompanySearch, profile?.organization_id, user?.id]);
 
   const previewRiskItems = useMemo(
     () => buildRiskItemsSummary(riskItems),
@@ -1665,10 +1688,42 @@ export default function RiskAssessmentWizard() {
   const touchField = (key: string) =>
     setTouched((prev) => ({ ...prev, [key]: true }));
 
-  const applyCompanyToWizard = (companyId: string) => {
+  const fetchAssignmentsForCompany = async (
+    companyId: string,
+  ): Promise<CompanyAssignmentForRisk[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("company_assignments")
+        .select(
+          "company_id, role_type, person_name, certificate_no, phone, email, notes, is_active",
+        )
+        .eq("company_id", companyId)
+        .eq("is_active", true);
+
+      if (error) throw error;
+      return (data || []) as CompanyAssignmentForRisk[];
+    } catch (error) {
+      console.warn("Risk wizard selected company assignment fetch warning", error);
+      return [];
+    }
+  };
+
+  const applyCompanyToWizard = async (companyId: string) => {
     setSelectedCompanyId(companyId);
-    const company = companies.find((item) => item.id === companyId);
-    if (!company) return;
+    const baseCompany = companies.find((item) => item.id === companyId);
+    if (!baseCompany) return;
+
+    const assignments = await fetchAssignmentsForCompany(companyId);
+    const company =
+      assignments.length > 0
+        ? enrichCompaniesWithAssignments([baseCompany], assignments)[0]
+        : baseCompany;
+
+    if (assignments.length > 0) {
+      setCompanies((current) =>
+        current.map((item) => (item.id === company.id ? company : item)),
+      );
+    }
 
     setCompanyInfo((prev) => {
       const profileInfo = buildCompanyInfoFromProfile(company);
@@ -2495,10 +2550,19 @@ export default function RiskAssessmentWizard() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    value={companySearch}
+                    onChange={(event) => setCompanySearch(event.target.value)}
+                    placeholder="Firma adı ile ara..."
+                    className="h-10 rounded-xl border-slate-300 bg-white pl-9 text-slate-900 shadow-sm placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                  />
+                </div>
                 <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
                   <Select
                     value={selectedCompanyId}
-                    onValueChange={applyCompanyToWizard}
+                    onValueChange={(value) => void applyCompanyToWizard(value)}
                     disabled={companiesLoading}
                   >
                     <SelectTrigger className="h-10 rounded-xl border-slate-300 bg-white text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100">
@@ -2528,6 +2592,12 @@ export default function RiskAssessmentWizard() {
                     <ChevronRight className="ml-2 h-4 w-4" />
                   </Button>
                 </div>
+                {companyListLimited ? (
+                  <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-800 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-200">
+                    Performans için ilk {COMPANY_PAGE_SIZE} firma listeleniyor.
+                    Aradığınız firmayı bulamazsanız yukarıdaki arama alanına firma adını yazın.
+                  </div>
+                ) : null}
                 {selectedCompany &&
                 selectedCompanyMissingTeamFields.length > 0 ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-100">
