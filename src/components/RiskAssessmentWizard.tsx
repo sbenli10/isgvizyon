@@ -356,6 +356,10 @@ const WIZARD_STEPS: WizardStep[] = [
 const RISK_TABLE_STEP_INDEX = WIZARD_STEPS.findIndex(
   (step) => step.id === "risk-table",
 );
+const RISK_METHOD_STEP_INDEX = WIZARD_STEPS.findIndex(
+  (step) => step.id === "risk-method",
+);
+const SAVED_RISK_UNFOLDERED_LABEL = "Klasörsüz Riskler";
 
 const REQUIRED_COMPANY_FIELDS: Array<keyof RiskWizardCompanyInfo> = [];
 
@@ -1250,6 +1254,10 @@ export default function RiskAssessmentWizard() {
   const [expandedManualCategories, setExpandedManualCategories] = useState<
     Record<string, boolean>
   >({});
+  const [savedRiskItems, setSavedRiskItems] = useState<SavedRiskItem[]>([]);
+  const [loadingSavedRiskItems, setLoadingSavedRiskItems] = useState(false);
+  const [savedRiskFolderFilter, setSavedRiskFolderFilter] = useState("all");
+  const [savedRiskSearch, setSavedRiskSearch] = useState("");
 
   const draftContextKey = useMemo(
     () =>
@@ -1655,6 +1663,40 @@ export default function RiskAssessmentWizard() {
       );
   }, [manualRiskSearch]);
 
+  const savedRiskFolders = useMemo(() => {
+    const grouped = new Map<string, number>();
+    savedRiskItems.forEach((item) => {
+      const folderName = cleanText(item.folderName) || "Klasörsüz Riskler";
+      grouped.set(folderName, (grouped.get(folderName) || 0) + 1);
+    });
+    return Array.from(grouped.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((first, second) => first.name.localeCompare(second.name, "tr-TR"));
+  }, [savedRiskItems]);
+
+  const filteredSavedRiskItems = useMemo(() => {
+    const search = savedRiskSearch.toLocaleLowerCase("tr-TR").trim();
+    return savedRiskItems.filter((item) => {
+      const folderName = cleanText(item.folderName) || "Klasörsüz Riskler";
+      const matchesFolder =
+        savedRiskFolderFilter === "all" ||
+        folderName === savedRiskFolderFilter;
+      const searchableText = [
+        item.folderName,
+        item.activity,
+        item.hazard,
+        item.risk,
+        item.currentStatus,
+        item.correctivePreventiveAction,
+        item.responsible,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+      return matchesFolder && (!search || searchableText.includes(search));
+    });
+  }, [savedRiskFolderFilter, savedRiskItems, savedRiskSearch]);
+
   const progressRatio = ((currentStep + 1) / WIZARD_STEPS.length) * 100;
 
   const isStepValid = (
@@ -2027,6 +2069,57 @@ export default function RiskAssessmentWizard() {
     }));
   };
 
+  const loadSavedRiskLibrary = async () => {
+    if (!user?.id) {
+      toast.error("Kayıtlı riskleri görüntülemek için oturum bulunamadı.");
+      return;
+    }
+
+    setLoadingSavedRiskItems(true);
+    try {
+      const rows = await listSavedRiskItems(user.id);
+      setSavedRiskItems(rows);
+      if (rows.length === 0) {
+        toast.info("Profilim > Risklerim alanında kayıtlı risk bulunamadı.");
+      }
+    } catch (error) {
+      console.error("Risk wizard saved risk library error", error);
+      toast.error("Kayıtlı risk klasörleri yüklenemedi.");
+    } finally {
+      setLoadingSavedRiskItems(false);
+    }
+  };
+
+  const addSavedRiskItemsToWizard = (items: SavedRiskItem[]) => {
+    if (items.length === 0) {
+      toast.error("Aktarılacak risk maddesi bulunamadı.");
+      return;
+    }
+
+    const mappedItems = items.map((item, index) =>
+      mapSavedRiskItemToWizardRow(item, index),
+    );
+    appendRiskItems(mappedItems);
+    setRiskAdditionMethod("saved");
+    toast.success(`${mappedItems.length} kayıtlı risk maddesi tabloya eklendi.`);
+  };
+
+  const addSavedRiskFolderToWizard = (folderName: string) => {
+    const folderItems = savedRiskItems.filter((item) => {
+      const hasExplicitFolder = Boolean(cleanText(item.folderName));
+      const itemFolderName =
+        cleanText(item.folderName) || SAVED_RISK_UNFOLDERED_LABEL;
+      return (
+        itemFolderName === folderName ||
+        (!hasExplicitFolder && folderName === "KlasÃ¶rsÃ¼z Riskler")
+      );
+    });
+    addSavedRiskItemsToWizard(folderItems);
+    if (folderItems.length > 0) {
+      setCurrentStep(RISK_TABLE_STEP_INDEX);
+    }
+  };
+
   const handleRiskAdditionMethodSelect = (method: RiskAdditionMethod) => {
     setRiskAdditionMethod(method);
 
@@ -2040,7 +2133,8 @@ export default function RiskAssessmentWizard() {
     }
 
     if (method === "saved") {
-      void importRiskItemsFromAssessment();
+      setSavedRiskFolderFilter("all");
+      void loadSavedRiskLibrary();
     }
   };
 
@@ -3439,6 +3533,235 @@ export default function RiskAssessmentWizard() {
               </Card>
             ) : null}
 
+            {riskAdditionMethod === "saved" ? (
+              <Card className="overflow-hidden border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+                <CardHeader className="border-b border-slate-200 dark:border-slate-800">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-cyan-600 text-white">
+                        <FolderOpen className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg text-slate-900 dark:text-slate-100">
+                          Risklerim Klasörleri
+                        </CardTitle>
+                        <CardDescription className="mt-1 text-slate-500 dark:text-slate-400">
+                          Profilim &gt; Risklerim alanında toplu yüklediğiniz
+                          klasörleri seçin, tek tek veya toplu olarak risk
+                          tablosuna ekleyin.
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={loadingSavedRiskItems}
+                      onClick={() => void loadSavedRiskLibrary()}
+                      className="w-fit rounded-xl border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300 dark:hover:bg-cyan-950/50"
+                    >
+                      {loadingSavedRiskItems ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                      )}
+                      Klasörleri Yenile
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5 p-5">
+                  <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500 dark:text-slate-400" />
+                      <Input
+                        value={savedRiskSearch}
+                        onChange={(event) =>
+                          setSavedRiskSearch(event.target.value)
+                        }
+                        placeholder="Klasör, faaliyet, tehlike, risk veya önlem ara..."
+                        className="h-11 rounded-xl border-slate-200 bg-white pl-10 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                    <Badge className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300">
+                      {filteredSavedRiskItems.length} / {savedRiskItems.length} risk
+                    </Badge>
+                  </div>
+
+                  {loadingSavedRiskItems ? (
+                    <div className="flex min-h-[220px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400">
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Risk klasörleri yükleniyor...
+                    </div>
+                  ) : savedRiskItems.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center dark:border-slate-800 dark:bg-slate-950/40">
+                      <FolderOpen className="mx-auto h-10 w-10 text-slate-400" />
+                      <p className="mt-4 text-sm font-black text-slate-900 dark:text-slate-100">
+                        Henüz kayıtlı risk klasörü yok
+                      </p>
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        Profilim &gt; Risklerim ekranından toplu risk yükleyerek
+                        klasör oluşturabilirsiniz.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => navigate("/profile?tab=risks")}
+                        className="mt-5 rounded-xl border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300 dark:hover:bg-cyan-950/50"
+                      >
+                        Risklerim Ekranına Git
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setSavedRiskFolderFilter("all")}
+                          className={cn(
+                            "h-9 rounded-full px-4 text-xs font-black",
+                            savedRiskFolderFilter === "all"
+                              ? "border-cyan-400 bg-cyan-500 text-white hover:bg-cyan-500"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
+                          )}
+                        >
+                          Tüm Klasörler
+                        </Button>
+                        {savedRiskFolders.map((folder) => {
+                          const displayName =
+                            folder.name === "KlasÃ¶rsÃ¼z Riskler"
+                              ? SAVED_RISK_UNFOLDERED_LABEL
+                              : folder.name;
+                          return (
+                            <Button
+                              key={folder.name}
+                              type="button"
+                              variant="outline"
+                              onClick={() =>
+                                setSavedRiskFolderFilter(folder.name)
+                              }
+                              className={cn(
+                                "h-9 rounded-full px-4 text-xs font-black",
+                                savedRiskFolderFilter === folder.name
+                                  ? "border-cyan-400 bg-cyan-500 text-white hover:bg-cyan-500"
+                                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
+                              )}
+                            >
+                              {displayName}
+                              <span className="ml-2 rounded-full bg-slate-900/10 px-2 py-0.5 dark:bg-white/10">
+                                {folder.count}
+                              </span>
+                            </Button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex flex-col gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 dark:border-cyan-800 dark:bg-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-black text-slate-900 dark:text-slate-100">
+                            Seçili görünüm:{" "}
+                            {savedRiskFolderFilter === "all"
+                              ? "Tüm klasörler"
+                              : savedRiskFolderFilter === "KlasÃ¶rsÃ¼z Riskler"
+                                ? SAVED_RISK_UNFOLDERED_LABEL
+                                : savedRiskFolderFilter}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Görünen riskleri tek tuşla Risk Değerlendirme
+                            Tablosu'na ekleyebilirsiniz.
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          {savedRiskFolderFilter !== "all" ? (
+                            <Button
+                              type="button"
+                              onClick={() =>
+                                addSavedRiskFolderToWizard(savedRiskFolderFilter)
+                              }
+                              className="rounded-xl bg-cyan-600 text-white hover:bg-cyan-500"
+                            >
+                              <FolderOpen className="mr-2 h-4 w-4" />
+                              Bu Klasörü Ekle
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              addSavedRiskItemsToWizard(filteredSavedRiskItems);
+                              if (filteredSavedRiskItems.length > 0) {
+                                setCurrentStep(RISK_TABLE_STEP_INDEX);
+                              }
+                            }}
+                            className="rounded-xl border-cyan-300 bg-white text-cyan-700 hover:bg-cyan-50 dark:border-cyan-800 dark:bg-slate-950 dark:text-cyan-300 dark:hover:bg-cyan-950/30"
+                          >
+                            Görünenleri Ekle
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid max-h-[520px] gap-3 overflow-y-auto pr-1 xl:grid-cols-2">
+                        {filteredSavedRiskItems.length === 0 ? (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-400 xl:col-span-2">
+                            Aramanıza uygun kayıtlı risk bulunamadı.
+                          </div>
+                        ) : (
+                          filteredSavedRiskItems.map((item) => {
+                            const folderName =
+                              cleanText(item.folderName) ||
+                              SAVED_RISK_UNFOLDERED_LABEL;
+                            return (
+                              <div
+                                key={item.id}
+                                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <Badge className="mb-3 rounded-full border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300">
+                                      {folderName}
+                                    </Badge>
+                                    <p className="text-sm font-black text-slate-900 dark:text-slate-100">
+                                      {item.activity || "Faaliyet belirtilmedi"}
+                                    </p>
+                                    <p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                      {item.hazard || "Tehlike belirtilmedi"}
+                                    </p>
+                                    <p className="mt-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+                                      {item.risk || "Risk açıklaması yok"}
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    onClick={() => addSavedRiskItemsToWizard([item])}
+                                    className="shrink-0 rounded-xl bg-cyan-600 text-white hover:bg-cyan-500"
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Ekle
+                                  </Button>
+                                </div>
+                                <div className="mt-4 grid gap-2 text-xs text-slate-500 dark:text-slate-400 sm:grid-cols-3">
+                                  <span className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-900">
+                                    O/F/Ş/R: {item.probability || "-"} /{" "}
+                                    {item.frequency || "-"} / {item.severity || "-"} /{" "}
+                                    {item.riskScore || "-"}
+                                  </span>
+                                  <span className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-900">
+                                    Termin: {item.deadline || "-"}
+                                  </span>
+                                  <span className="rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-900">
+                                    Sorumlu: {item.responsible || "-"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            ) : null}
+
             {riskAdditionMethod === "ai" ? (
               <Card className="border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
                 <CardHeader>
@@ -3565,16 +3888,24 @@ export default function RiskAssessmentWizard() {
               <Button
                 type="button"
                 variant="outline"
-                disabled={importingRiskItems}
-                onClick={importRiskItemsFromAssessment}
+                disabled={importingRiskItems || loadingSavedRiskItems}
+                onClick={() => {
+                  if (importAssessmentId) {
+                    void importRiskItemsFromAssessment();
+                    return;
+                  }
+                  setRiskAdditionMethod("saved");
+                  setCurrentStep(RISK_METHOD_STEP_INDEX);
+                  void loadSavedRiskLibrary();
+                }}
                 className="rounded-xl border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-300 dark:hover:bg-cyan-950/50"
               >
-                {importingRiskItems ? (
+                {importingRiskItems || loadingSavedRiskItems ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Download className="mr-2 h-4 w-4" />
                 )}
-                Kayitli Riskleri Aktar
+                Risklerim Klasörlerinden Ekle
               </Button>
             </div>
             {!importAssessmentId ? (
