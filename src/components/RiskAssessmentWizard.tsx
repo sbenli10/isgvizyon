@@ -42,7 +42,11 @@ import {
   getSectorMinimumRiskItemCount,
   RISK_TEMPLATE_CONFIGS,
 } from "@/lib/risk/riskTemplateConfig";
-import { listSavedRiskItems, type SavedRiskItem } from "@/lib/profileRisks";
+import {
+  bulkDeleteSavedRiskItems,
+  listSavedRiskItems,
+  type SavedRiskItem,
+} from "@/lib/profileRisks";
 import {
   calculateRiskValidityDate,
   generateRiskAnalysisTemplateDocx,
@@ -2120,6 +2124,59 @@ export default function RiskAssessmentWizard() {
     }
   };
 
+  const deleteSavedRiskFolderFromLibrary = async (folderName: string) => {
+    if (!user?.id) {
+      toast.error("Klasör silmek için oturum bulunamadı.");
+      return;
+    }
+
+    const folderItems = savedRiskItems.filter((item) => {
+      const itemFolderName =
+        cleanText(item.folderName) || SAVED_RISK_UNFOLDERED_LABEL;
+      return (
+        itemFolderName === folderName ||
+        (!cleanText(item.folderName) && folderName === "KlasÃ¶rsÃ¼z Riskler")
+      );
+    });
+
+    if (folderItems.length === 0) {
+      toast.error("Bu klasörde silinecek risk maddesi bulunamadı.");
+      return;
+    }
+
+    const displayName =
+      folderName === "KlasÃ¶rsÃ¼z Riskler"
+        ? SAVED_RISK_UNFOLDERED_LABEL
+        : folderName;
+
+    if (
+      !window.confirm(
+        `"${displayName}" klasörü ve içindeki ${folderItems.length} risk maddesi silinsin mi?`,
+      )
+    ) {
+      return;
+    }
+
+    setLoadingSavedRiskItems(true);
+    try {
+      const ids = folderItems.map((item) => item.id);
+      await bulkDeleteSavedRiskItems(ids);
+      const idSet = new Set(ids);
+      setSavedRiskItems((current) =>
+        current.filter((item) => !idSet.has(item.id)),
+      );
+      if (savedRiskFolderFilter === folderName) {
+        setSavedRiskFolderFilter("all");
+      }
+      toast.success(`"${displayName}" klasörü silindi.`);
+    } catch (error) {
+      console.error("Risk wizard saved risk folder delete error", error);
+      toast.error("Kayıtlı risk klasörü silinemedi.");
+    } finally {
+      setLoadingSavedRiskItems(false);
+    }
+  };
+
   const handleRiskAdditionMethodSelect = (method: RiskAdditionMethod) => {
     setRiskAdditionMethod(method);
 
@@ -3632,25 +3689,42 @@ export default function RiskAssessmentWizard() {
                               ? SAVED_RISK_UNFOLDERED_LABEL
                               : folder.name;
                           return (
-                            <Button
+                            <div
                               key={folder.name}
-                              type="button"
-                              variant="outline"
-                              onClick={() =>
-                                setSavedRiskFolderFilter(folder.name)
-                              }
                               className={cn(
-                                "h-9 rounded-full px-4 text-xs font-black",
+                                "flex overflow-hidden rounded-full border text-xs font-black",
                                 savedRiskFolderFilter === folder.name
                                   ? "border-cyan-400 bg-cyan-500 text-white hover:bg-cyan-500"
                                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-900",
                               )}
                             >
-                              {displayName}
-                              <span className="ml-2 rounded-full bg-slate-900/10 px-2 py-0.5 dark:bg-white/10">
-                                {folder.count}
-                              </span>
-                            </Button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSavedRiskFolderFilter(folder.name)
+                                }
+                                className="inline-flex h-9 items-center px-4"
+                              >
+                                {displayName}
+                                <span className="ml-2 rounded-full bg-slate-900/10 px-2 py-0.5 dark:bg-white/10">
+                                  {folder.count}
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={loadingSavedRiskItems}
+                                onClick={() =>
+                                  void deleteSavedRiskFolderFromLibrary(
+                                    folder.name,
+                                  )
+                                }
+                                className="inline-flex h-9 w-9 items-center justify-center border-l border-slate-200/70 text-rose-500 hover:bg-rose-500/10 hover:text-rose-400 disabled:opacity-50 dark:border-slate-700"
+                                title={`${displayName} klasörünü sil`}
+                                aria-label={`${displayName} klasörünü sil`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           );
                         })}
                       </div>

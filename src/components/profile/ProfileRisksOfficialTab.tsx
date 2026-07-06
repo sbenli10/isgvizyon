@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   bulkCreateSavedRiskItems,
+  bulkDeleteSavedRiskItems,
   createSavedRiskItem,
   deleteSavedRiskItem,
   downloadSavedRiskTemplate,
@@ -373,6 +374,42 @@ export function ProfileRisksTab() {
     toast.success("Risk maddesi silindi.");
   };
 
+  const handleDeleteFolder = async (folder: string) => {
+    const folderRisks = risks.filter((risk) => risk.folderName === folder);
+    if (folderRisks.length === 0) {
+      toast.error("Bu klasörde silinecek risk maddesi bulunamadı.");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `"${folder}" klasörü ve içindeki ${folderRisks.length} risk maddesi silinsin mi?`,
+      )
+    ) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const ids = folderRisks.map((risk) => risk.id);
+      await bulkDeleteSavedRiskItems(ids);
+      const idSet = new Set(ids);
+      setRisks((current) => current.filter((risk) => !idSet.has(risk.id)));
+      setSelectedIds((current) => new Set([...current].filter((id) => !idSet.has(id))));
+      if (folderFilter === folder) {
+        setFolderFilter("all");
+      }
+      if (uploadFolderName === folder) {
+        setUploadFolderName(defaultBulkFolderName());
+      }
+      toast.success(`"${folder}" klasörü silindi.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Klasör silinemedi.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleMoveSelected = async () => {
     const ids = [...selectedIds];
     if (ids.length === 0) return;
@@ -505,9 +542,33 @@ export function ProfileRisksTab() {
             Tüm Riskler
           </Button>
           {folders.map((folder) => (
-            <Button key={folder} type="button" size="sm" variant="outline" onClick={() => setFolderFilter(folder)} className={cn("rounded-full border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800", folderFilter === folder && "border-emerald-400 bg-emerald-500/10 text-emerald-200")}>
-              <FolderOpen className="mr-2 h-3.5 w-3.5" />{folder}
-            </Button>
+            <div
+              key={folder}
+              className={cn(
+                "flex overflow-hidden rounded-full border border-slate-700 bg-slate-900/70 text-slate-300",
+                folderFilter === folder &&
+                  "border-emerald-400 bg-emerald-500/10 text-emerald-200",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => setFolderFilter(folder)}
+                className="inline-flex h-9 items-center gap-2 px-3 text-sm font-semibold hover:bg-slate-800"
+              >
+                <FolderOpen className="h-3.5 w-3.5" />
+                {folder}
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleDeleteFolder(folder)}
+                className="inline-flex h-9 w-9 items-center justify-center border-l border-slate-700 text-rose-300 hover:bg-rose-500/10 hover:text-rose-200 disabled:opacity-50"
+                title={`${folder} klasörünü sil`}
+                aria-label={`${folder} klasörünü sil`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           ))}
         </div>
       ) : null}
