@@ -1229,12 +1229,48 @@ const handleForceReset2FA = async () => {
       id: "general" as const,
       label: "Genel",
       icon: <SettingsIcon className="h-4 w-4" />,
+      description: "Profil, kurum ve ekip erişimleri",
+      metric: organizationData ? "Kurumsal" : "Bireysel",
+      tone: "from-cyan-500/20 via-blue-500/10 to-transparent",
+      activeTone: "border-cyan-400/40 bg-cyan-500/15 text-cyan-50",
       badgeCount: pendingJoinRequests.length > 0 ? pendingJoinRequests.length : undefined,
     },
-    { id: "security" as const, label: "Güvenlik", icon: <Shield className="h-4 w-4" /> },
-    { id: "billing" as const, label: "Faturalama", icon: <CreditCard className="h-4 w-4" /> },
-    { id: "notifications" as const, label: "Bildirimler", icon: <Bell className="h-4 w-4" /> },
-    { id: "ai-health" as const, label: "AI Sağlık", icon: <Bot className="h-4 w-4" /> },
+    {
+      id: "security" as const,
+      label: "Güvenlik",
+      icon: <Shield className="h-4 w-4" />,
+      description: "2FA, cihazlar ve oturumlar",
+      metric: twoFactorEnabled ? "2FA aktif" : "2FA kapalı",
+      tone: "from-emerald-500/20 via-cyan-500/10 to-transparent",
+      activeTone: "border-emerald-400/40 bg-emerald-500/15 text-emerald-50",
+    },
+    {
+      id: "billing" as const,
+      label: "Faturalama",
+      icon: <CreditCard className="h-4 w-4" />,
+      description: "Plan, limit ve fatura geçmişi",
+      metric: activePlanLabel,
+      tone: "from-fuchsia-500/20 via-violet-500/10 to-transparent",
+      activeTone: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-50",
+    },
+    {
+      id: "notifications" as const,
+      label: "Bildirimler",
+      icon: <Bell className="h-4 w-4" />,
+      description: "Uyarı ve rapor tercihleri",
+      metric: `${Object.values(notifications).filter(Boolean).length}/5 açık`,
+      tone: "from-amber-500/20 via-orange-500/10 to-transparent",
+      activeTone: "border-amber-400/40 bg-amber-500/15 text-amber-50",
+    },
+    {
+      id: "ai-health" as const,
+      label: "AI Sağlık",
+      icon: <Bot className="h-4 w-4" />,
+      description: "AI fonksiyon çalışma durumu",
+      metric: `${aiFunctionLogs.length} log`,
+      tone: "from-sky-500/20 via-indigo-500/10 to-transparent",
+      activeTone: "border-sky-400/40 bg-sky-500/15 text-sky-50",
+    },
   ];
 
   const getDeviceIcon = (deviceType: string) => {
@@ -1352,6 +1388,38 @@ const handleForceReset2FA = async () => {
       : aiErrorCount <= Math.max(1, Math.round(aiFunctionLogs.length * 0.2))
         ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
         : "border-rose-400/20 bg-rose-400/10 text-rose-100";
+
+  const activeTab = tabs.find((tab) => tab.id === currentTab) ?? tabs[0];
+  const settingsOverview = [
+    {
+      label: "Profil",
+      value: formData.fullName || "Tamamlanmalı",
+      detail: formData.position || "Görev bilgisi ekleyin",
+      icon: <SettingsIcon className="h-4 w-4" />,
+      tone: "border-cyan-400/20 bg-cyan-500/10 text-cyan-100",
+    },
+    {
+      label: "Güvenlik",
+      value: `${securityScore}/100`,
+      detail: twoFactorEnabled ? "Ek doğrulama aktif" : "2FA kurulumu önerilir",
+      icon: <Shield className="h-4 w-4" />,
+      tone: securityRiskTone,
+    },
+    {
+      label: "Plan",
+      value: activePlanLabel,
+      detail: enabledFeatureCount ? `${enabledFeatureCount} özellik açık` : "Temel erişim",
+      icon: <Crown className="h-4 w-4" />,
+      tone: subscriptionTone,
+    },
+    {
+      label: "AI Durumu",
+      value: aiErrorCount > 0 ? `${aiErrorCount} hata` : "Stabil",
+      detail: `${aiSuccessCount} başarılı istek`,
+      icon: <Bot className="h-4 w-4" />,
+      tone: aiHealthTone,
+    },
+  ];
 
   const handleRefreshAiLogs = async () => {
     await fetchSettingsData(true);
@@ -1524,28 +1592,78 @@ const handleForceReset2FA = async () => {
           </Card>
         )}
 
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {settingsOverview.map((item) => (
+            <div
+              key={item.label}
+              className={`rounded-[22px] border p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${item.tone}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] opacity-75">{item.label}</p>
+                  <p className="mt-2 text-lg font-semibold text-white">{item.value}</p>
+                  <p className="mt-1 text-xs leading-5 opacity-80">{item.detail}</p>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/35">
+                  {item.icon}
+                </div>
+              </div>
+            </div>
+          ))}
+        </section>
+
         <Card className="border-white/10 bg-slate-950/55 shadow-[0_24px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
           <CardContent className="p-4 md:p-5">
-            <div className="flex gap-2 overflow-x-auto rounded-2xl border border-white/10 bg-white/5 p-2">
+            <div className="grid gap-3 rounded-[24px] border border-white/10 bg-slate-950/35 p-3 md:grid-cols-2 xl:grid-cols-5">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setCurrentTab(tab.id)}
-                  className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all whitespace-nowrap ${
+                  className={`group relative overflow-hidden rounded-2xl border p-4 text-left transition-all ${
                     currentTab === tab.id
-                      ? "bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white shadow-[0_12px_30px_rgba(34,211,238,0.22)]"
-                      : "text-slate-300 hover:bg-white/10 hover:text-white"
+                      ? `${tab.activeTone} shadow-[0_18px_40px_rgba(34,211,238,0.16)]`
+                      : "border-white/10 bg-white/[0.03] text-slate-300 hover:border-white/20 hover:bg-white/[0.07] hover:text-white"
                   }`}
                 >
-                  {tab.icon}
-                  {tab.label}
-                  {tab.badgeCount ? (
-                    <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-rose-100">
-                      {tab.badgeCount}
+                  <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${tab.tone}`} />
+                  <div className="relative flex items-start justify-between gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/40">
+                      {tab.icon}
                     </span>
-                  ) : null}
+                    {tab.badgeCount ? (
+                      <span className="inline-flex min-w-5 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-rose-100">
+                        {tab.badgeCount}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="relative mt-4">
+                    <p className="text-sm font-bold">{tab.label}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-5 opacity-75">{tab.description}</p>
+                    <p className="mt-3 inline-flex rounded-full border border-white/10 bg-slate-950/35 px-2.5 py-1 text-[11px] font-semibold opacity-90">
+                      {tab.metric}
+                    </p>
+                  </div>
                 </button>
               ))}
+            </div>
+
+            <div className={`relative mt-4 overflow-hidden rounded-[24px] border p-5 ${activeTab.activeTone}`}>
+              <div className={`pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-br ${activeTab.tone}`} />
+              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/40">
+                    {activeTab.icon}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] opacity-70">Aktif ayar alanı</p>
+                    <h2 className="mt-1 text-xl font-semibold text-white">{activeTab.label}</h2>
+                    <p className="mt-1 text-sm leading-6 opacity-80">{activeTab.description}</p>
+                  </div>
+                </div>
+                <Badge className="w-fit rounded-full border border-white/10 bg-slate-950/35 px-3 py-1 text-white">
+                  {activeTab.metric}
+                </Badge>
+              </div>
             </div>
 
             {/* Sekme içeriği */}
