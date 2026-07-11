@@ -36,6 +36,10 @@ import {
 } from "@/services/aiRiskService";
 import { cn } from "@/lib/utils";
 import {
+  getUserFacingErrorDescription,
+  notifyUserFacingError,
+} from "@/lib/userFacingError";
+import {
   buildNaceFineKinneyRows,
   exportNaceRiskAnalysisPdf,
   saveNaceRiskRowsForRiskWizard,
@@ -122,9 +126,11 @@ export default function NaceHazardQuery() {
       setResult(data.data);
       toast.success("NACE kodu bulundu");
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "NACE kodu bulunamadı";
-      setError(errorMessage);
-      toast.error(errorMessage);
+      setError(getUserFacingErrorDescription(err));
+      notifyUserFacingError(err, {
+        fallbackTitle: "NACE kodu bulunamadı",
+        fallbackDescription: "Girilen NACE kodu için kayıt bulunamadı. Kodu kontrol edip tekrar deneyin.",
+      });
     } finally {
       setLoading(false);
     }
@@ -151,8 +157,9 @@ export default function NaceHazardQuery() {
       setAiAnalysis(analysis);
       toast.success(`${analysis.risks.length} risk tespit edildi`);
     } catch (err) {
-      toast.error("AI analizi başarısız", {
-        description: err instanceof Error ? err.message : "Bilinmeyen hata",
+      notifyUserFacingError(err, {
+        fallbackTitle: "AI analizi oluşturulamadı",
+        fallbackDescription: "NACE risk analizi şu anda oluşturulamadı. Biraz sonra tekrar deneyin.",
       });
     } finally {
       setAiLoading(false);

@@ -45,6 +45,10 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  getUserFacingErrorDescription,
+  notifyUserFacingError,
+} from "@/lib/userFacingError";
+import {
   createOsgbFinanceRecord,
   createOsgbFixedExpense,
   createOsgbFixedExpenses,
@@ -540,7 +544,7 @@ export default function OSGBFinance() {
       setExpenseRecords(fixedExpenseRows || []);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Finans kayıtları yüklenemedi.");
+      setError(getUserFacingErrorDescription(err));
     } finally {
       setLoading(false);
       setExpensesLoading(false);
@@ -728,7 +732,10 @@ export default function OSGBFinance() {
       setEditingRecord(null);
       await loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Finans kaydı kaydedilemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Finans kaydı kaydedilemedi",
+        fallbackDescription: "Tahsilat kaydı şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }
@@ -741,7 +748,10 @@ export default function OSGBFinance() {
       await loadData();
       toast.success(message);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "İşlem tamamlanamadı.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "İşlem tamamlanamadı",
+        fallbackDescription: "Seçili finans işlemi tamamlanamadı. Biraz sonra tekrar deneyin.",
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -870,7 +880,10 @@ export default function OSGBFinance() {
       setEditingExpenseRecord(null);
       await loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sabit gider kaydı kaydedilemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Sabit gider kaydedilemedi",
+        fallbackDescription: "Sabit gider kaydı şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     } finally {
       setExpenseSaving(false);
     }
@@ -886,7 +899,10 @@ export default function OSGBFinance() {
       await loadData();
       toast.success("Sabit gider kaydı silindi.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Sabit gider kaydı silinemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Sabit gider silinemedi",
+        fallbackDescription: "Sabit gider kaydı şu anda silinemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     } finally {
       setActionLoadingId(null);
     }

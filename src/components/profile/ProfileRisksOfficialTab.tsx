@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { notifyUserFacingError } from "@/lib/userFacingError";
 import {
   bulkCreateSavedRiskItems,
   bulkDeleteSavedRiskItems,
@@ -257,7 +258,10 @@ export function ProfileRisksTab() {
       setRisks(riskRows);
       setCompanies((companyResponse.data ?? []).map((row: any) => ({ id: row.id, name: row.company_name || "Firma" })));
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Riskler yüklenemedi.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Risk maddeleri yüklenemedi",
+        fallbackDescription: "Kayıtlı risk maddeleri şu anda getirilemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     } finally {
       setLoading(false);
     }
@@ -360,7 +364,10 @@ export function ProfileRisksTab() {
       toast.success(editingRisk ? "Risk maddesi güncellendi." : "Risk maddesi eklendi.");
       setAddOpen(false);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Risk maddesi kaydedilemedi.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Risk maddesi kaydedilemedi",
+        fallbackDescription: "Risk maddesi şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }
@@ -404,7 +411,10 @@ export function ProfileRisksTab() {
       }
       toast.success(`"${folder}" klasörü silindi.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Klasör silinemedi.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Klasör silinemedi",
+        fallbackDescription: "Seçili risk klasörü şu anda silinemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }
@@ -432,7 +442,10 @@ export function ProfileRisksTab() {
       setSelectedIds(new Set());
       toast.success(`${ids.length} risk maddesi "${cleanedFolderName}" klasörüne taşındı.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Risk maddeleri taşınamadı.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Risk maddeleri taşınamadı",
+        fallbackDescription: "Seçili risk maddeleri klasöre taşınamadı. Biraz sonra tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }
@@ -456,7 +469,10 @@ export function ProfileRisksTab() {
         : await parseSavedRiskExcel(file, user.id, profile?.organization_id || null);
       setParseResult(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Dosya okunamadı.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Dosya okunamadı",
+        fallbackDescription: "Yüklenen dosya okunamadı. Dosya formatını ve başlık satırlarını kontrol edin.",
+      });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -479,7 +495,10 @@ export function ProfileRisksTab() {
       setSelectedFileName("");
       setUploadFolderName(defaultBulkFolderName());
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Risk maddeleri yüklenemedi.");
+      notifyUserFacingError(error, {
+        fallbackTitle: "Risk maddeleri yüklenemedi",
+        fallbackDescription: "Dosyadan okunan risk maddeleri kaydedilemedi. Biraz sonra tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }

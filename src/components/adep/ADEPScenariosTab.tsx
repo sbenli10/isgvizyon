@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/accordion";
 import { Plus, Edit, Trash2, Flame, Home, Waves, Shield, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { notifyUserFacingError } from "@/lib/userFacingError";
 
 interface Scenario {
   id: string;
@@ -180,7 +181,10 @@ export default function ADEPScenariosTab({ planId }: ADEPScenariosTabProps) {
       toast.success("Standart senaryolar eklendi");
       fetchScenarios();
     } catch (error: any) {
-      toast.error("Hata: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Acil durum senaryoları yüklenemedi",
+        fallbackDescription: "Kayıtlı senaryolar şu anda getirilemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     }
   };
 
@@ -237,7 +241,10 @@ export default function ADEPScenariosTab({ planId }: ADEPScenariosTabProps) {
       fetchScenarios();
     } catch (error: any) {
       console.error("Save scenario error:", error);
-      toast.error("Kaydetme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Senaryo kaydedilemedi",
+        fallbackDescription: "Acil durum senaryosu şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     }
   };
 
@@ -254,7 +261,10 @@ export default function ADEPScenariosTab({ planId }: ADEPScenariosTabProps) {
       toast.success("Senaryo silindi");
       fetchScenarios();
     } catch (error: any) {
-      toast.error("Silme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Senaryo silinemedi",
+        fallbackDescription: "Acil durum senaryosu şu anda silinemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     }
   };
 

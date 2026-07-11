@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { notifyUserFacingError } from "@/lib/userFacingError";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -209,7 +210,10 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
       fetchTeams();
     } catch (error: any) {
       console.error("Save team error:", error);
-      toast.error("Kaydetme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Ekip kaydedilemedi",
+        fallbackDescription: "Acil durum ekibi şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     }
   };
 
@@ -223,7 +227,10 @@ export default function ADEPTeamsTab({ planId }: ADEPTeamsTabProps) {
       toast.success("Ekip silindi");
       fetchTeams();
     } catch (error: any) {
-      toast.error("Silme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Ekip silinemedi",
+        fallbackDescription: "Acil durum ekibi şu anda silinemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     }
   };
 

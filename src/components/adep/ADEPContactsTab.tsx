@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Edit, Trash2, Phone, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { notifyUserFacingError } from "@/lib/userFacingError";
 
 interface EmergencyContact {
   id: string;
@@ -104,7 +105,10 @@ export default function ADEPContactsTab({ planId }: ADEPContactsTabProps) {
       toast.success("Standart numaralar eklendi");
       fetchContacts();
     } catch (error: any) {
-      toast.error("Hata: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "Acil durum numaraları yüklenemedi",
+        fallbackDescription: "Kayıtlı irtibat numaraları şu anda getirilemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     }
   };
 
@@ -161,7 +165,10 @@ export default function ADEPContactsTab({ planId }: ADEPContactsTabProps) {
       fetchContacts();
     } catch (error: any) {
       console.error("Save contact error:", error);
-      toast.error("Kaydetme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "İrtibat numarası kaydedilemedi",
+        fallbackDescription: "Acil durum irtibat bilgisi şu anda kaydedilemedi. Bilgileri kontrol edip tekrar deneyin.",
+      });
     }
   };
 
@@ -178,7 +185,10 @@ export default function ADEPContactsTab({ planId }: ADEPContactsTabProps) {
       toast.success("İletişim silindi");
       fetchContacts();
     } catch (error: any) {
-      toast.error("Silme hatası: " + error.message);
+      notifyUserFacingError(error, {
+        fallbackTitle: "İrtibat numarası silinemedi",
+        fallbackDescription: "Acil durum irtibat bilgisi şu anda silinemedi. Sayfayı yenileyip tekrar deneyin.",
+      });
     }
   };
 

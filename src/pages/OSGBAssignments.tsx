@@ -49,6 +49,10 @@ import { readOsgbPageCache, writeOsgbPageCache } from "@/lib/osgbPageCache";
 import { useOsgbAccess } from "@/hooks/useOsgbAccess";
 import { downloadCsv } from "@/lib/csvExport";
 import {
+  getUserFacingErrorDescription,
+  notifyUserFacingError,
+} from "@/lib/userFacingError";
+import {
   deleteOsgbAssignmentWorkspace,
   getOsgbWorkspaceAssignmentRecommendation,
   getOsgbWorkspaceCompanyAssignedMinutesTotal,
@@ -211,7 +215,11 @@ export default function OSGBAssignments() {
       .catch((err) => {
         if (active) {
           setCompanies([]);
-          toast.error(err instanceof Error ? err.message : "OSGB firma listesi yüklenemedi.");
+          notifyUserFacingError(err, {
+            fallbackTitle: "Firma listesi yüklenemedi",
+            fallbackDescription:
+              "OSGB firmaları şu anda getirilemedi. Sayfayı yenileyip tekrar deneyin.",
+          });
         }
       });
 
@@ -237,7 +245,11 @@ export default function OSGBAssignments() {
       .catch((err) => {
         if (active) {
           setPersonnel([]);
-          toast.error(err instanceof Error ? err.message : "Aktif personel listesi yüklenemedi.");
+          notifyUserFacingError(err, {
+            fallbackTitle: "Personel listesi yüklenemedi",
+            fallbackDescription:
+              "Aktif personel listesi şu anda getirilemedi. Bilgileri kontrol edip tekrar deneyin.",
+          });
         }
       })
       .finally(() => {
@@ -273,7 +285,7 @@ export default function OSGBAssignments() {
       });
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Personel görevlendirme verisi yüklenemedi.");
+      setError(getUserFacingErrorDescription(err));
     } finally {
       setLoading(false);
     }
@@ -329,7 +341,11 @@ export default function OSGBAssignments() {
       const personnelRows = await listOsgbWorkspacePersonnel(organizationId, true);
       setPersonnel(personnelRows);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Aktif personel listesi yüklenemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Personel listesi yüklenemedi",
+        fallbackDescription:
+          "Aktif personel listesi şu anda getirilemedi. Biraz sonra tekrar deneyin.",
+      });
     } finally {
       setPersonnelLoading(false);
     }
@@ -564,7 +580,11 @@ export default function OSGBAssignments() {
       clearAssignmentDraft();
       toast.success(editing ? "Görevlendirme güncellendi." : "Personel firmaya atandı.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Görevlendirme kaydı kaydedilemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Görevlendirme kaydedilemedi",
+        fallbackDescription:
+          "Görevlendirme bilgileri kaydedilemedi. Firma, personel ve yetki bilgilerini kontrol edip tekrar deneyin.",
+      });
     } finally {
       setSaving(false);
     }
@@ -582,7 +602,11 @@ export default function OSGBAssignments() {
       await loadData(true);
       toast.success("Görevlendirme silindi.");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Görevlendirme silinemedi.");
+      notifyUserFacingError(err, {
+        fallbackTitle: "Görevlendirme silinemedi",
+        fallbackDescription:
+          "Kayıt silinemedi. Yetkinizi ve bağlantınızı kontrol edip tekrar deneyin.",
+      });
     }
   };
 
