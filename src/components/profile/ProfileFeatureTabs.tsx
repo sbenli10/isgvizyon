@@ -3006,6 +3006,7 @@ function formatVisitDateLabel(value: string) {
 
 export function ProfileVisitsTab() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const today = new Date().toISOString().slice(0, 10);
   const [selectedDate, setSelectedDate] = useState(today);
   const [currentMonth, setCurrentMonth] = useState(() => {
