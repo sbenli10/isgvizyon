@@ -3,7 +3,6 @@ import {
   Settings as SettingsIcon,
   Shield,
   CreditCard,
-  Bell,
   Lock,
   Eye,
   EyeOff,
@@ -22,8 +21,6 @@ import {
   Clock,
   Upload,
   ImagePlus,
-  Bot,
-  Activity,
   KeyRound,
   UserPlus,
   UserMinus,
@@ -49,10 +46,8 @@ import { terminateSession, recordSession } from "@/utils/sessionManager";
 import type { BillingHistory, UserSession } from "@/types/subscription";
 import { TwoFactorSetupModal } from '@/components/TwoFactorSetupModal';
 import { untrustDevice } from '@/utils/deviceFingerprint';
-import type { Database } from "@/integrations/supabase/types";
 
-type TabType = "general" | "security" | "billing" | "notifications" | "ai-health";
-type AiFunctionLog = Database["public"]["Tables"]["ai_function_logs"]["Row"];
+type TabType = "general" | "security" | "billing";
 
 interface ProfileData {
   id: string;
@@ -175,18 +170,9 @@ export default function Settings() {
     website: "",
   });
 
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    capaAlerts: true,
-    riskAlerts: true,
-    weeklyReport: true,
-    systemUpdates: false,
-  });
-
   // Sessions & Billing
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [billingHistory, setBillingHistory] = useState<BillingHistory[]>([]);
-  const [aiFunctionLogs, setAiFunctionLogs] = useState<AiFunctionLog[]>([]);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [animatedSecurityScore, setAnimatedSecurityScore] = useState(0);
   const [organizationInvites, setOrganizationInvites] = useState<OrganizationInviteSummary[]>([]);
@@ -204,7 +190,7 @@ export default function Settings() {
     const tab = searchParams.get("tab");
     const openUpgrade = searchParams.get("upgrade");
 
-    if (tab === "general" || tab === "security" || tab === "billing" || tab === "notifications" || tab === "ai-health") {
+    if (tab === "general" || tab === "security" || tab === "billing") {
       setCurrentTab(tab);
     }
 
@@ -238,18 +224,8 @@ useEffect(() => {
             website: "",
           }
         );
-        setNotifications(
-          parsed.notifications ?? {
-            emailNotifications: true,
-            capaAlerts: true,
-            riskAlerts: true,
-            weeklyReport: true,
-            systemUpdates: false,
-          }
-        );
         setSessions(parsed.sessions ?? []);
         setBillingHistory(parsed.billingHistory ?? []);
-        setAiFunctionLogs(parsed.aiFunctionLogs ?? []);
         setTwoFactorEnabled(parsed.twoFactorEnabled ?? false);
         setTrustedDevices(parsed.trustedDevices ?? []);
         setLoading(false);
@@ -281,7 +257,6 @@ useEffect(() => {
       let loadedOrganizationData: OrganizationData | null = null;
       let typedSessions: UserSession[] = [];
       let typedBilling: BillingHistory[] = [];
-      let typedAiLogs: AiFunctionLog[] = [];
 
       // Profil verisini çek
       const { data: profileData, error: profileError } = await supabase
@@ -412,23 +387,6 @@ useEffect(() => {
         setBillingHistory(typedBilling);
       }
 
-      const { data: aiLogData, error: aiLogError } = await supabase
-        .from("ai_function_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(40);
-
-      if (!aiLogError && aiLogData) {
-        typedAiLogs = aiLogData;
-        setAiFunctionLogs(aiLogData);
-      }
-
-      // Bildirim tercihlerini localStorage'dan yükle
-      const savedNotifications = localStorage.getItem("userNotifications");
-      if (savedNotifications) {
-        setNotifications(JSON.parse(savedNotifications));
-      }
-
       sessionStorage.setItem(
         getSettingsCacheKey(user.id),
         JSON.stringify({
@@ -447,10 +405,8 @@ useEffect(() => {
             phone: loadedOrganizationData?.phone || "",
             website: loadedOrganizationData?.website || "",
           },
-          notifications: savedNotifications ? JSON.parse(savedNotifications) : notifications,
           sessions: typedSessions ?? [],
           billingHistory: typedBilling ?? [],
-          aiFunctionLogs: typedAiLogs ?? [],
           twoFactorEnabled: profileData.two_factor_enabled || false,
           trustedDevices: trustedDevicesData ?? [],
         })
@@ -898,12 +854,6 @@ const handleForceReset2FA = async () => {
     setSaving(false);
   }
 };
-  // SAVE NOTIFICATIONS
-  const handleSaveNotifications = () => {
-    localStorage.setItem("userNotifications", JSON.stringify(notifications));
-    toast.success("Bildirim tercihleri kaydedildi");
-  };
-
   // TERMINATE SESSION
   const handleTerminateSession = async (sessionId: string) => {
     const success = await terminateSession(sessionId);
@@ -1253,24 +1203,6 @@ const handleForceReset2FA = async () => {
       tone: "from-fuchsia-500/20 via-violet-500/10 to-transparent",
       activeTone: "border-fuchsia-400/40 bg-fuchsia-500/15 text-fuchsia-50",
     },
-    {
-      id: "notifications" as const,
-      label: "Bildirimler",
-      icon: <Bell className="h-4 w-4" />,
-      description: "Uyarı ve rapor tercihleri",
-      metric: `${Object.values(notifications).filter(Boolean).length}/5 açık`,
-      tone: "from-amber-500/20 via-orange-500/10 to-transparent",
-      activeTone: "border-amber-400/40 bg-amber-500/15 text-amber-50",
-    },
-    {
-      id: "ai-health" as const,
-      label: "AI Sağlık",
-      icon: <Bot className="h-4 w-4" />,
-      description: "AI fonksiyon çalışma durumu",
-      metric: `${aiFunctionLogs.length} log`,
-      tone: "from-sky-500/20 via-indigo-500/10 to-transparent",
-      activeTone: "border-sky-400/40 bg-sky-500/15 text-sky-50",
-    },
   ];
 
   const getDeviceIcon = (deviceType: string) => {
@@ -1378,17 +1310,6 @@ const handleForceReset2FA = async () => {
     },
   ];
 
-  const aiSuccessCount = aiFunctionLogs.filter((log) => log.status === "success").length;
-  const aiErrorCount = aiFunctionLogs.filter((log) => log.status === "error").length;
-  const aiFallbackCount = aiFunctionLogs.filter((log) => (log.attempted_models?.length || 0) > 1).length;
-  const latestAiLog = aiFunctionLogs[0] ?? null;
-  const aiHealthTone =
-    aiErrorCount === 0
-      ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
-      : aiErrorCount <= Math.max(1, Math.round(aiFunctionLogs.length * 0.2))
-        ? "border-amber-400/20 bg-amber-400/10 text-amber-100"
-        : "border-rose-400/20 bg-rose-400/10 text-rose-100";
-
   const activeTab = tabs.find((tab) => tab.id === currentTab) ?? tabs[0];
   const settingsOverview = [
     {
@@ -1412,19 +1333,7 @@ const handleForceReset2FA = async () => {
       icon: <Crown className="h-4 w-4" />,
       tone: subscriptionTone,
     },
-    {
-      label: "AI Durumu",
-      value: aiErrorCount > 0 ? `${aiErrorCount} hata` : "Stabil",
-      detail: `${aiSuccessCount} başarılı istek`,
-      icon: <Bot className="h-4 w-4" />,
-      tone: aiHealthTone,
-    },
   ];
-
-  const handleRefreshAiLogs = async () => {
-    await fetchSettingsData(true);
-    toast.success("AI sağlık verileri yenilendi");
-  };
 
   useEffect(() => {
     const duration = 700;
@@ -1592,7 +1501,7 @@ const handleForceReset2FA = async () => {
           </Card>
         )}
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-3">
           {settingsOverview.map((item) => (
             <div
               key={item.label}
@@ -1614,7 +1523,7 @@ const handleForceReset2FA = async () => {
 
         <Card className="border-white/10 bg-slate-950/55 shadow-[0_24px_60px_rgba(2,6,23,0.35)] backdrop-blur-xl">
           <CardContent className="p-4 md:p-5">
-            <div className="grid gap-3 rounded-[24px] border border-white/10 bg-slate-950/35 p-3 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 rounded-[24px] border border-white/10 bg-slate-950/35 p-3 md:grid-cols-3">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -2795,182 +2704,6 @@ const handleForceReset2FA = async () => {
                 </div>
               )}
 
-              {/* NOTIFICATIONS TAB */}
-              {currentTab === "notifications" && (
-                <div className="space-y-4 rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-                  <div className="mb-1">
-                    <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Bildirim akışı</p>
-                    <h2 className="mt-2 text-lg font-semibold text-white">Bildirim Tercihleri</h2>
-                  </div>
-                  {Object.entries(notifications).map(([key, value]) => (
-                    <Card key={key} className="border-white/10 bg-slate-950/50">
-                      <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                          <p className="font-semibold">
-                            {key === "emailNotifications" && "E-posta Bildirimleri"}
-                            {key === "capaAlerts" && "CAPA Uyarıları"}
-                            {key === "riskAlerts" && "Risk Uyarıları"}
-                            {key === "weeklyReport" && "Haftalık Rapor"}
-                            {key === "systemUpdates" && "Sistem Güncellemeleri"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {key === "emailNotifications" &&
-                              "Yeni denetim raporları için"}
-                            {key === "capaAlerts" && "Yüksek riskli bulgular için"}
-                            {key === "riskAlerts" && "Kritik risk tespitleri için"}
-                            {key === "weeklyReport" && "Haftalık özet raporu"}
-                            {key === "systemUpdates" && "Uygulama güncellemeleri"}
-                          </p>
-                        </div>
-                        <Switch
-                          checked={value}
-                          onCheckedChange={(checked) =>
-                            setNotifications({
-                              ...notifications,
-                              [key]: checked,
-                            })
-                          }
-                        />
-                      </CardContent>
-                    </Card>
-                  ))}
-                  <Button
-                    onClick={handleSaveNotifications}
-                    className={premiumPrimaryButtonClassName}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Bildirimleri Kaydet
-                  </Button>
-                </div>
-              )}
-
-              {currentTab === "ai-health" && (
-                <div className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                    <div className={`rounded-[24px] border p-5 ${aiHealthTone}`}>
-                      <p className={microCardEyebrowClassName}>Genel durum</p>
-                      <p className="mt-2 text-xl font-semibold text-white">
-                        {aiErrorCount === 0 ? "Stabil" : aiErrorCount <= Math.max(1, Math.round(aiFunctionLogs.length * 0.2)) ? "Dikkat" : "Yoğun hata"}
-                      </p>
-                      <p className={microCardBodyClassName}>Edge function AI akışlarının son görünümü.</p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                      <p className={microCardEyebrowClassName}>Başarılı istek</p>
-                      <p className="mt-2 text-xl font-semibold text-white">{aiSuccessCount}</p>
-                      <p className={microCardBodyClassName}>Son 40 log içinde başarıyla tamamlanan çağrılar.</p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                      <p className={microCardEyebrowClassName}>Fallback kullanılan</p>
-                      <p className="mt-2 text-xl font-semibold text-white">{aiFallbackCount}</p>
-                      <p className={microCardBodyClassName}>Birden fazla modele düşen istek sayısı.</p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                      <p className={microCardEyebrowClassName}>Son model</p>
-                      <p className="mt-2 text-lg font-semibold text-white">
-                        {latestAiLog?.resolved_model || "Henüz veri yok"}
-                      </p>
-                      <p className={microCardBodyClassName}>En son çalışan isteğin çözülen modeli.</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-                    <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Edge function görünürlüğü</p>
-                        <h2 className="mt-2 text-lg font-semibold text-white">AI Sağlık ve Model Logları</h2>
-                        <p className="mt-1 text-sm text-slate-400">
-                          Hangi isteğin hangi modele düştüğünü, fallback zincirine girip girmediğini ve hata oranını buradan takip edin.
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => void handleRefreshAiLogs()}
-                        className={premiumOutlineButtonClassName}
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Logları Yenile
-                      </Button>
-                    </div>
-
-                    <div className="space-y-3">
-                      {aiFunctionLogs.length === 0 ? (
-                        <Card className="border-white/10 bg-slate-950/50">
-                          <CardContent className="p-8 text-center">
-                            <Activity className="mx-auto mb-4 h-12 w-12 text-slate-500" />
-                            <p className="text-sm text-slate-300">Henüz AI log kaydı oluşmadı.</p>
-                            <p className="mt-2 text-xs text-slate-500">İlk edge function çağrısından sonra model sağlık verileri burada görünecek.</p>
-                          </CardContent>
-                        </Card>
-                      ) : (
-                        aiFunctionLogs.map((log) => {
-                          const metadata =
-                            log.metadata && typeof log.metadata === "object" && !Array.isArray(log.metadata)
-                              ? (log.metadata as Record<string, unknown>)
-                              : {};
-                          const usedFallback = (log.attempted_models?.length || 0) > 1;
-
-                          return (
-                            <Card key={log.id} className="border-white/10 bg-slate-950/50">
-                              <CardContent className="p-4">
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                  <div className="space-y-2">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <Badge className="rounded-full bg-cyan-500/15 text-cyan-100">
-                                        {log.function_name}
-                                      </Badge>
-                                      <Badge
-                                        className={`rounded-full ${
-                                          log.status === "success"
-                                            ? "bg-emerald-500/15 text-emerald-100"
-                                            : "bg-rose-500/15 text-rose-100"
-                                        }`}
-                                      >
-                                        {log.status === "success" ? "Başarılı" : "Hata"}
-                                      </Badge>
-                                      {usedFallback && (
-                                        <Badge className="rounded-full bg-amber-500/15 text-amber-100">
-                                          Fallback kullanıldı
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <div>
-                                      <p className="text-sm font-semibold text-white">
-                                        {log.request_label || "Adsız istek"}
-                                      </p>
-                                      <p className="mt-1 text-xs text-slate-400">
-                                        {new Date(log.created_at).toLocaleString("tr-TR")} · {log.duration_ms ?? 0} ms
-                                      </p>
-                                    </div>
-                                  </div>
-
-                                  <div className="grid gap-2 text-sm text-slate-300 md:grid-cols-2 lg:min-w-[360px]">
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Çözülen model</p>
-                                      <p className="mt-2 font-medium text-white">{log.resolved_model || "-"}</p>
-                                    </div>
-                                    <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-                                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Denenen zincir</p>
-                                      <p className="mt-2 font-medium text-white">{(log.attempted_models || []).join(" → ") || "-"}</p>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                                  <span>Toplam deneme: {log.attempts_count}</span>
-                                  {log.error_code && <span>Hata kodu: {log.error_code}</span>}
-                                  {typeof metadata.imageCount === "number" && <span>Görsel: {metadata.imageCount}</span>}
-                                  {typeof metadata.promptLength === "number" && <span>Prompt: {metadata.promptLength} karakter</span>}
-                                  {typeof metadata.hasPrompt === "boolean" && <span>{metadata.hasPrompt ? "Prompt var" : "Prompt yok"}</span>}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
