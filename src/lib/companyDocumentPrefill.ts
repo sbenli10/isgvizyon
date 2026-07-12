@@ -45,7 +45,9 @@ export const getProfileCompanyDocumentFields = (company?: Partial<Company & Prof
 });
 
 export const getProfileCompanyRegistryNo = (company?: Partial<Company> | null) =>
-  clean(company?.sgk_workplace_number) || clean(company?.workplace_registration_number);
+  clean(company?.sgk_workplace_number) ||
+  clean(company?.workplace_registration_number) ||
+  clean((company as any)?.sgk_number);
 
 export const getProfileCompanyDisplayName = (company?: Partial<Company> | null) =>
   clean(company?.company_name) || clean((company as any)?.name);

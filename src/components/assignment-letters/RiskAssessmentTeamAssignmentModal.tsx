@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getProfileCompanyDocumentFields, getProfileCompanyRegistryNo } from "@/lib/companyDocumentPrefill";
+import { getProfileCompanyDisplayName, getProfileCompanyDocumentFields, getProfileCompanyRegistryNo } from "@/lib/companyDocumentPrefill";
 import {
   generateRiskAssessmentTeamAssignmentDocx,
   type RiskAssessmentTeamMember,
@@ -89,7 +89,7 @@ export function RiskAssessmentTeamAssignmentModal({
       { role: "İlk Yardım Ekip Başkanı", fullName: fields.firstAidSupportPersonName },
     ];
 
-    setWorkplaceTitle(company.company_name || "");
+    setWorkplaceTitle(getProfileCompanyDisplayName(company));
     setWorkplaceRegistrationNo(getProfileCompanyRegistryNo(company));
     setMembers(nextMembers);
     setNotifiedByName(fields.employerRepresentativeName);
@@ -142,14 +142,14 @@ export function RiskAssessmentTeamAssignmentModal({
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="risk-team-company-select">Firma seçimi</Label>
-                <Select value={selectedCompanyId} onValueChange={handleCompanySelect}>
+                <Select value={selectedCompanyId || ""} onValueChange={handleCompanySelect}>
                   <SelectTrigger id="risk-team-company-select">
                     <SelectValue placeholder="Firma seçin" />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((company) => (
                       <SelectItem key={company.id} value={company.id}>
-                        {company.company_name}
+                        {getProfileCompanyDisplayName(company) || "İsimsiz firma"}
                       </SelectItem>
                     ))}
                   </SelectContent>

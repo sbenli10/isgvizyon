@@ -26,6 +26,98 @@ type RawSubscriptionPlan = {
   is_active: boolean | null;
 };
 
+type StaticPlanFeature = BillingCatalogPlan["features"][number];
+
+const premiumFeatureKeys: Array<StaticPlanFeature["featureKey"]> = [
+  "bulk_capa.access",
+  "blueprint_analyzer.access",
+  "form_builder.access",
+  "isg_bot.access",
+];
+
+const osgbFeatureKeys: Array<StaticPlanFeature["featureKey"]> = [
+  "osgb.access",
+];
+
+function feature(
+  featureKey: StaticPlanFeature["featureKey"],
+  isEnabled: boolean,
+  limitValue: number | null = null,
+  period: StaticPlanFeature["period"] = null,
+): StaticPlanFeature {
+  return {
+    featureKey,
+    isEnabled,
+    limitValue,
+    period,
+  };
+}
+
+function buildFreeFeatures(): StaticPlanFeature[] {
+  return [
+    feature("companies.count", true, 1, "lifetime"),
+    feature("employees.count", true, 50, "lifetime"),
+    feature("risk_assessments.count", true, 3, "lifetime"),
+    feature("inspections.count_monthly", true, 5, "monthly"),
+    feature("capa.count", true, 10, "lifetime"),
+    feature("reports.export_monthly", true, 3, "monthly"),
+    feature("adep.count", true, 1, "lifetime"),
+    feature("annual_plans.count", true, 1, "lifetime"),
+    feature("board_meetings.count", true, 2, "lifetime"),
+    feature("periodic_controls.count", true, 10, "lifetime"),
+    feature("ppe.count", true, 50, "lifetime"),
+    feature("health_surveillance.count", true, 50, "lifetime"),
+    feature("assignment_letters.count", true, 10, "lifetime"),
+    feature("storage.upload_mb_monthly", true, 100, "monthly"),
+    feature("team.members", true, 1, "lifetime"),
+    feature("certificates.monthly", false, 0, "monthly"),
+    feature("ai.risk_generation_monthly", false, 0, "monthly"),
+    feature("ai.bulk_capa_analysis_monthly", false, 0, "monthly"),
+    feature("ai.nace_analysis_monthly", false, 0, "monthly"),
+    feature("ai.evacuation_plan_monthly", false, 0, "monthly"),
+    feature("ai.evacuation_image_monthly", false, 0, "monthly"),
+    ...premiumFeatureKeys.map((key) => feature(key, false)),
+    ...osgbFeatureKeys.map((key) => feature(key, false)),
+  ];
+}
+
+function buildPremiumFeatures(): StaticPlanFeature[] {
+  return [
+    feature("companies.count", true, 3, "lifetime"),
+    feature("employees.count", true, null, "lifetime"),
+    feature("risk_assessments.count", true, null, "lifetime"),
+    feature("inspections.count_monthly", true, null, "monthly"),
+    feature("capa.count", true, null, "lifetime"),
+    feature("reports.export_monthly", true, 100, "monthly"),
+    feature("certificates.monthly", true, 100, "monthly"),
+    feature("ai.risk_generation_monthly", true, 100, "monthly"),
+    feature("ai.bulk_capa_analysis_monthly", true, 100, "monthly"),
+    feature("ai.nace_analysis_monthly", true, 100, "monthly"),
+    feature("ai.evacuation_plan_monthly", true, 50, "monthly"),
+    feature("ai.evacuation_image_monthly", true, 50, "monthly"),
+    feature("adep.count", true, null, "lifetime"),
+    feature("annual_plans.count", true, null, "lifetime"),
+    feature("board_meetings.count", true, null, "lifetime"),
+    feature("periodic_controls.count", true, null, "lifetime"),
+    feature("ppe.count", true, null, "lifetime"),
+    feature("health_surveillance.count", true, null, "lifetime"),
+    feature("assignment_letters.count", true, null, "lifetime"),
+    feature("storage.upload_mb_monthly", true, 2048, "monthly"),
+    feature("team.members", true, 3, "lifetime"),
+    ...premiumFeatureKeys.map((key) => feature(key, true)),
+    ...osgbFeatureKeys.map((key) => feature(key, false)),
+  ];
+}
+
+function buildOsgbFeatures(): StaticPlanFeature[] {
+  return [
+    ...buildPremiumFeatures()
+      .filter((item) => !osgbFeatureKeys.includes(item.featureKey))
+      .map((item) => ({ ...item, isEnabled: true, limitValue: null })),
+    ...osgbFeatureKeys.map((key) => feature(key, true)),
+  ];
+}
+
 function getFallbackPlanDescription(planCode: string) {
   if (planCode === "osgb") {
     return "Coklu firma, ekip yonetimi ve OSGB operasyonlari icin.";
@@ -48,7 +140,7 @@ function getStaticBillingCatalog(): BillingCatalogPlan[] {
       currency: "TRY",
       billingPeriod: "monthly",
       isCurrent: true,
-      features: [],
+      features: buildFreeFeatures(),
     },
     {
       planCode: "premium",
@@ -58,7 +150,7 @@ function getStaticBillingCatalog(): BillingCatalogPlan[] {
       currency: "TRY",
       billingPeriod: "monthly",
       isCurrent: false,
-      features: [],
+      features: buildPremiumFeatures(),
     },
     {
       planCode: "osgb",
@@ -68,7 +160,7 @@ function getStaticBillingCatalog(): BillingCatalogPlan[] {
       currency: "TRY",
       billingPeriod: "monthly",
       isCurrent: false,
-      features: [],
+      features: buildOsgbFeatures(),
     },
   ];
 }

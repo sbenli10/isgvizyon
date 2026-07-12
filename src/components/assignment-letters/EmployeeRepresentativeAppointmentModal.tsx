@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { getProfileCompanyDisplayName } from "@/lib/companyDocumentPrefill";
 import type { Company, Employee } from "@/types/companies";
 
 export interface EmployeeRepresentativeAppointmentFormValues {
@@ -95,14 +96,14 @@ export function EmployeeRepresentativeAppointmentModal({
               </div>
             </div>
             {value.company_mode === "system" ? (
-              <Select value={value.company_id || undefined} onValueChange={(selected) => onValueChange({ company_id: selected, employee_id: "" })}>
+              <Select value={value.company_id || ""} onValueChange={(selected) => onValueChange({ company_id: selected, employee_id: "" })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Firma seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
-                      {company.company_name}
+                      {getProfileCompanyDisplayName(company) || "İsimsiz firma"}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -129,7 +130,7 @@ export function EmployeeRepresentativeAppointmentModal({
               </div>
             </div>
             {value.employee_mode === "system" ? (
-              <Select value={value.employee_id || undefined} onValueChange={(selected) => onValueChange({ employee_id: selected })}>
+              <Select value={value.employee_id || ""} onValueChange={(selected) => onValueChange({ employee_id: selected })}>
                 <SelectTrigger>
                   <SelectValue placeholder={value.company_id ? "Çalışan seçin" : "Önce firma seçin"} />
                 </SelectTrigger>

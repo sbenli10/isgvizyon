@@ -107,10 +107,6 @@ export function usePlanLimits() {
         };
       }
 
-      if (canAccessPremium) {
-        return { allowed: true, reason: "allowed", currentPlan, featureKey };
-      }
-
       if (FREE_LOCKED_FEATURES.has(featureKey)) {
         return {
           allowed: false,
@@ -127,6 +123,10 @@ export function usePlanLimits() {
           currentPlan,
           featureKey,
         };
+      }
+
+      if (canAccessPremium) {
+        return { allowed: true, reason: "allowed", currentPlan, featureKey };
       }
 
       return { allowed: true, reason: "allowed", currentPlan, featureKey };

@@ -66,7 +66,7 @@ import { generateIncidentInvestigationReportWord } from "@/lib/incidentInvestiga
 import type { Company, Employee } from "@/types/companies";
 import { uploadFileOptimized } from "@/lib/storageHelper";
 import { buildStorageObjectRef } from "@/lib/storageObject";
-import { getProfileCompanyDocumentFields, getProfileCompanyRegistryNo } from "@/lib/companyDocumentPrefill";
+import { getProfileCompanyDisplayName, getProfileCompanyDocumentFields, getProfileCompanyRegistryNo } from "@/lib/companyDocumentPrefill";
 
 interface CompanyRecord extends Company {
   logo_url?: string | null;
@@ -355,10 +355,12 @@ function mapCompany(row: any): CompanyRecord {
   return {
     ...row,
     owner_id: row.user_id,
-    company_name: row.name,
+    company_name: row.company_name || row.name || "",
     nace_code: row.industry || "",
     hazard_class: normalizeHazardClass(row.hazard_class) as unknown as Company["hazard_class"],
     employee_count: Number(row.employee_count || 0),
+    workplace_registration_number: row.workplace_registration_number || row.sgk_workplace_number || row.sgk_number || "",
+    sgk_workplace_number: row.sgk_workplace_number || row.workplace_registration_number || row.sgk_number || "",
     logo_url: row.logo_url || null,
   };
 }
@@ -2116,13 +2118,14 @@ export default function AssignmentLetters() {
               const registryNo = getProfileCompanyRegistryNo(company);
 
               if (company) {
-                next.workplace_title = company.company_name || next.workplace_title;
+                next.workplace_title = getProfileCompanyDisplayName(company) || next.workplace_title;
                 next.workplace_address =
                   [company.address, company.district, company.city].filter(Boolean).join(", ") || next.workplace_address;
                 next.sgk_registration_no = registryNo || next.sgk_registration_no;
                 next.employer_name = fields.employerRepresentativeName || next.employer_name;
                 next.employer_title = fields.employerRepresentativeName ? "İşveren / İşveren Vekili" : next.employer_title;
                 next.representative_name = fields.employeeRepresentativeName || next.representative_name;
+                next.representative_tc = fields.employeeRepresentativeTcNo || next.representative_tc;
                 next.representative_title = fields.employeeRepresentativeName ? "Çalışan Temsilcisi" : next.representative_title;
                 next.employee_signature_name = fields.employeeRepresentativeName || next.employee_signature_name;
               }
