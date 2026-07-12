@@ -3091,14 +3091,24 @@ export function ProfileVisitsTab() {
           <h2 className="text-2xl font-black text-white">Firma Ziyaretlerim</h2>
           <p className="mt-1 text-sm text-slate-400">Geçmiş firma ziyaretlerinizi takip edin.</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="min-w-[56px] rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-center">
-            <p className="text-xl font-black text-white">{loading ? "..." : visits.length}</p>
-            <p className="mt-1 text-[11px] text-slate-400">Ziyaret</p>
-          </div>
-          <div className="min-w-[56px] rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-center">
-            <p className="text-xl font-black text-white">{loading ? "..." : visitedCompanyCount}</p>
-            <p className="mt-1 text-[11px] text-slate-400">Firma</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            onClick={() => navigate("/dashboard?visit=1")}
+            className="h-12 rounded-xl bg-cyan-500 px-4 text-sm font-black text-cyan-950 shadow-lg shadow-cyan-950/20 hover:bg-cyan-400"
+          >
+            <MapPin className="mr-2 h-4 w-4" />
+            Firma Ziyareti Bildir
+          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="min-w-[56px] rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-center">
+              <p className="text-xl font-black text-white">{loading ? "..." : visits.length}</p>
+              <p className="mt-1 text-[11px] text-slate-400">Ziyaret</p>
+            </div>
+            <div className="min-w-[56px] rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-3 text-center">
+              <p className="text-xl font-black text-white">{loading ? "..." : visitedCompanyCount}</p>
+              <p className="mt-1 text-[11px] text-slate-400">Firma</p>
+            </div>
           </div>
         </div>
       </div>

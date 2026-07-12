@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Archive,
   Bell,
@@ -317,6 +317,7 @@ function EmptyVisitState() {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user, profile } = useAuth();
   const { plan, isPaidPlan } = useSubscription();
   const [loading, setLoading] = useState(true);
@@ -423,6 +424,15 @@ export default function Dashboard() {
     resetVisitDialog();
     setVisitDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get("visit") !== "1") return;
+
+    handleOpenVisitDialog();
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("visit");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleVisitSourceChange = (value: VisitCompanySource) => {
     setVisitSource(value);
