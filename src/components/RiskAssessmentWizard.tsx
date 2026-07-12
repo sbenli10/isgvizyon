@@ -1,6 +1,7 @@
 import {
   type ChangeEvent,
   type ReactNode,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -293,6 +294,7 @@ interface RiskAssessmentTemplateRecord {
 
 const today = new Date().toISOString().split("T")[0];
 const COMPANY_PAGE_SIZE = 120;
+const RISK_TABLE_RENDER_LIMIT = 25;
 const COMPANY_SELECT_COLUMNS = [
   "id",
   "name",
@@ -1229,6 +1231,7 @@ export default function RiskAssessmentWizard() {
   const [scopeInfo, setScopeInfo] =
     useState<RiskWizardScopeInfo>(emptyScopeInfo);
   const [riskItems, setRiskItems] = useState<RiskWizardTableItem[]>([]);
+  const deferredRiskItems = useDeferredValue(riskItems);
   const [correctiveActions, setCorrectiveActions] = useState<
     CorrectivePreventiveAction[]
   >([]);
@@ -1255,6 +1258,7 @@ export default function RiskAssessmentWizard() {
   const [aiRiskCount, setAiRiskCount] = useState("40");
   const [aiGenerating, setAiGenerating] = useState(false);
   const [manualRiskSearch, setManualRiskSearch] = useState("");
+  const deferredManualRiskSearch = useDeferredValue(manualRiskSearch);
   const [expandedManualCategories, setExpandedManualCategories] = useState<
     Record<string, boolean>
   >({});
@@ -1262,6 +1266,8 @@ export default function RiskAssessmentWizard() {
   const [loadingSavedRiskItems, setLoadingSavedRiskItems] = useState(false);
   const [savedRiskFolderFilter, setSavedRiskFolderFilter] = useState("all");
   const [savedRiskSearch, setSavedRiskSearch] = useState("");
+  const deferredSavedRiskSearch = useDeferredValue(savedRiskSearch);
+  const [showAllRiskRows, setShowAllRiskRows] = useState(false);
 
   const draftContextKey = useMemo(
     () =>
@@ -1275,7 +1281,7 @@ export default function RiskAssessmentWizard() {
     version: 3,
     storage: "indexedDb",
     ttlMs: 14 * 24 * 60 * 60 * 1000,
-    debounceMs: 450,
+    debounceMs: 1400,
     value: {
       currentStep,
       selectedCompanyId,
@@ -1609,8 +1615,8 @@ export default function RiskAssessmentWizard() {
   }, [debouncedCompanySearch, profile?.organization_id, user?.id]);
 
   const previewRiskItems = useMemo(
-    () => buildRiskItemsSummary(riskItems),
-    [riskItems],
+    () => buildRiskItemsSummary(deferredRiskItems),
+    [deferredRiskItems],
   );
   const previewActions = useMemo(
     () => buildCorrectiveActionsSummary(correctiveActions),
@@ -1639,7 +1645,7 @@ export default function RiskAssessmentWizard() {
       .map(([label]) => label);
   }, [selectedCompany]);
   const manualRiskCategories = useMemo(() => {
-    const search = manualRiskSearch.toLocaleLowerCase("tr-TR").trim();
+    const search = deferredManualRiskSearch.toLocaleLowerCase("tr-TR").trim();
     const grouped = new Map<string, ManualRiskLibraryItem[]>();
 
     MANUAL_RISK_LIBRARY.forEach((item) => {
@@ -1657,7 +1663,12 @@ export default function RiskAssessmentWizard() {
         .toLocaleLowerCase("tr-TR");
 
       if (search && !searchableText.includes(search)) return;
-      grouped.set(category, [...(grouped.get(category) || []), item]);
+      const categoryItems = grouped.get(category);
+      if (categoryItems) {
+        categoryItems.push(item);
+      } else {
+        grouped.set(category, [item]);
+      }
     });
 
     return Array.from(grouped.entries())
@@ -1665,7 +1676,7 @@ export default function RiskAssessmentWizard() {
       .sort((first, second) =>
         first.category.localeCompare(second.category, "tr-TR"),
       );
-  }, [manualRiskSearch]);
+  }, [deferredManualRiskSearch]);
 
   const savedRiskFolders = useMemo(() => {
     const grouped = new Map<string, number>();
@@ -1679,7 +1690,7 @@ export default function RiskAssessmentWizard() {
   }, [savedRiskItems]);
 
   const filteredSavedRiskItems = useMemo(() => {
-    const search = savedRiskSearch.toLocaleLowerCase("tr-TR").trim();
+    const search = deferredSavedRiskSearch.toLocaleLowerCase("tr-TR").trim();
     return savedRiskItems.filter((item) => {
       const folderName = cleanText(item.folderName) || "Klasörsüz Riskler";
       const matchesFolder =
@@ -1699,7 +1710,19 @@ export default function RiskAssessmentWizard() {
         .toLocaleLowerCase("tr-TR");
       return matchesFolder && (!search || searchableText.includes(search));
     });
-  }, [savedRiskFolderFilter, savedRiskItems, savedRiskSearch]);
+  }, [deferredSavedRiskSearch, savedRiskFolderFilter, savedRiskItems]);
+
+  const visibleRiskItems = useMemo(
+    () =>
+      showAllRiskRows
+        ? riskItems
+        : riskItems.slice(0, RISK_TABLE_RENDER_LIMIT),
+    [riskItems, showAllRiskRows],
+  );
+  const hiddenRiskItemCount = Math.max(
+    0,
+    riskItems.length - visibleRiskItems.length,
+  );
 
   const progressRatio = ((currentStep + 1) / WIZARD_STEPS.length) * 100;
 
@@ -1727,6 +1750,7 @@ export default function RiskAssessmentWizard() {
     setAiRiskCount("40");
     setManualRiskSearch("");
     setExpandedManualCategories({});
+    setShowAllRiskRows(false);
     setTouched({});
     toast.success("Risk degerlendirme taslagi temizlendi.");
   };
@@ -1899,6 +1923,7 @@ export default function RiskAssessmentWizard() {
 
   const addRiskItem = () => {
     setRiskItems((prev) => [...prev, createEmptyRiskItem(prev.length + 1)]);
+    setShowAllRiskRows(false);
   };
 
   const appendRiskItems = (items: RiskWizardTableItem[]) => {
@@ -1909,6 +1934,7 @@ export default function RiskAssessmentWizard() {
         no: index + 1,
       })),
     );
+    setShowAllRiskRows(false);
   };
 
   useEffect(() => {
@@ -3997,11 +4023,28 @@ export default function RiskAssessmentWizard() {
                   AI ile üretin veya kayitli riskleri aktarin.
                 </div>
               ) : (
-                riskItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 p-5 space-y-4"
-                  >
+                <>
+                  {hiddenRiskItemCount > 0 ? (
+                    <div className="flex flex-col gap-3 rounded-2xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900 dark:border-cyan-900/60 dark:bg-cyan-950/25 dark:text-cyan-100 sm:flex-row sm:items-center sm:justify-between">
+                      <span>
+                        Performans için ilk {RISK_TABLE_RENDER_LIMIT} risk
+                        satırı gösteriliyor. {hiddenRiskItemCount} satır gizli.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowAllRiskRows(true)}
+                        className="rounded-xl border-cyan-300 bg-white text-cyan-700 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-slate-950 dark:text-cyan-300 dark:hover:bg-cyan-950/40"
+                      >
+                        Tüm Satırları Göster
+                      </Button>
+                    </div>
+                  ) : null}
+                  {visibleRiskItems.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/60 p-5 space-y-4"
+                    >
                     <div className="flex items-center justify-between">
                       <Badge className="rounded-full border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 text-slate-600 dark:text-slate-300">
                         Risk Maddesi #{item.no}
@@ -4209,7 +4252,8 @@ export default function RiskAssessmentWizard() {
                       </div>
                     </div>
                   </div>
-                ))
+                  ))}
+                </>
               )}
             </div>
           </div>

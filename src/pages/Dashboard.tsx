@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
@@ -607,7 +607,7 @@ export default function Dashboard() {
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <FeatureCard title="Firma Arşivi" description="OSGB yönetim PDF belgelerini yükleyin, indeksleyin ve güvenle saklayın." icon={Archive} badge="Yeni" className="bg-gradient-to-br from-violet-600 to-purple-700" onClick={() => navigate("/profile?tab=archive")} />
-            <FeatureCard title="Firma Yetki." description="OSGB yönetim firmalarınızla portal bağlantısı açın, kendileri yönetsin." icon={Zap} badge="Yeni" className="bg-gradient-to-br from-orange-500 to-amber-600" onClick={() => navigate("/profile?tab=settings")} />
+            <FeatureCard title="Firma Yetki" description="OSGB yönetim firmalarınızla portal bağlantısı açın, kendileri yönetsin." icon={Zap} badge="Yeni" className="bg-gradient-to-br from-orange-500 to-amber-600" onClick={() => navigate("/profile?tab=settings")} />
             <FeatureCard title="Chrome Store" description="İSGBot eklentisini yükleyin, otomatik güncelleme alın." icon={Bot} badge="Google" className="bg-gradient-to-br from-blue-600 to-cyan-600" onClick={() => navigate("/docs/isg-bot-setup")} />
             <FeatureCard title="Risk Sihirbazı" description="Akıllı değerlendirme adımlarıyla risk raporu üretin." icon={ShieldAlert} badge="Yeni" className="bg-gradient-to-br from-rose-600 to-pink-700" onClick={() => navigate("/risk-wizard")} />
             <FeatureCard title="İSG Robot AI" description="Sektörel İSG sorularınız için akıllı danışmanlık alın." icon={Sparkles} badge="AI" className="bg-gradient-to-br from-fuchsia-600 to-violet-700" onClick={() => navigate("/isg-bot")} />
