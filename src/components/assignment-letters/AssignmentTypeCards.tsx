@@ -19,6 +19,7 @@ import type { AssignmentType } from "@/lib/assignmentWordGenerator";
 interface AssignmentTypeCardsProps {
   onCreate: (type: AssignmentType) => void;
   onOpenRiskAssessmentTeamAssignment: () => void;
+  onOpenEmergencySupportAssignment: () => void;
   onOpenEmployeeRepresentativeAppointment: () => void;
   onOpenIsgEntranceExam: () => void;
   onOpenIsgTrainingAttendance: () => void;
@@ -89,6 +90,7 @@ const categoryStyles: Record<
 export function AssignmentTypeCards({
   onCreate,
   onOpenRiskAssessmentTeamAssignment,
+  onOpenEmergencySupportAssignment,
   onOpenEmployeeRepresentativeAppointment,
   onOpenIsgEntranceExam,
   onOpenIsgTrainingAttendance,
@@ -124,6 +126,15 @@ export function AssignmentTypeCards({
         icon: UserCheck,
         colorClass: "bg-blue-500/10 text-blue-700 dark:text-blue-200",
         action: () => onCreate("support_staff"),
+      },
+      {
+        id: "emergency_support_assignment",
+        title: "Acil Durum Destek Elemanı Ataması",
+        description: "Kurtarma, söndürme, ilkyardım ve koruma ekiplerini tek şablonda çoklu atayın.",
+        category: "assignment",
+        icon: Layers3,
+        colorClass: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+        action: onOpenEmergencySupportAssignment,
       },
       {
         id: "employee_representative",
@@ -248,6 +259,7 @@ export function AssignmentTypeCards({
       onOpenDrillForm,
       onOpenEmergencyDrillAttendance,
       onOpenEmployeeRepresentativeAppointment,
+      onOpenEmergencySupportAssignment,
       onOpenEmergencyTeamTrainingAttendance,
       onOpenIsgEntranceExam,
       onOpenIsgTrainingAttendance,
