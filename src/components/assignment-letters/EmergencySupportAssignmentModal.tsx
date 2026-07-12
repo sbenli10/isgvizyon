@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,12 @@ const emptyTeams = (): TeamState => ({
 
 const employeeFullName = (employee: Employee) =>
   (employee.full_name || `${employee.first_name || ""} ${employee.last_name || ""}`).replace(/\s+/g, " ").trim();
+
+const participantKey = (participant: EmergencySupportAssignmentParticipant) =>
+  (participant.tcNo || participant.fullName).toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
+
+const employeeKey = (employee: Employee) =>
+  (employee.tc_number || employeeFullName(employee)).toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
 
 const putFirst = (
   teams: TeamState,
@@ -103,19 +109,47 @@ export function EmergencySupportAssignmentModal({
     setTeams(nextTeams);
   };
 
+  useEffect(() => {
+    if (!open || selectedCompanyId || companies.length === 0) return;
+    handleCompanySelect(companies[0].id);
+  }, [companies, open, selectedCompanyId]);
+
   const importEmployeesToTeam = (teamKey: EmergencySupportTeamKey, rowCount: number) => {
     if (companyEmployees.length === 0) {
       toast.info("Bu firma için aktarılacak çalışan bulunamadı. Satırları manuel doldurabilirsiniz.");
       return;
     }
 
-    setTeams((prev) => ({
-      ...prev,
-      [teamKey]: companyEmployees.slice(0, rowCount).map((employee) => ({
-        fullName: employeeFullName(employee),
-        tcNo: employee.tc_number || "",
-      })),
-    }));
+    setTeams((prev) => {
+      const usedKeys = new Set<string>();
+      Object.entries(prev).forEach(([key, participants]) => {
+        if (key === teamKey) return;
+        participants.forEach((participant) => {
+          const keyValue = participantKey(participant);
+          if (keyValue) usedKeys.add(keyValue);
+        });
+      });
+
+      const availableEmployees = companyEmployees.filter((employee) => !usedKeys.has(employeeKey(employee)));
+      let employeeIndex = 0;
+
+      return {
+        ...prev,
+        [teamKey]: prev[teamKey].slice(0, rowCount).map((participant) => {
+          if (participantKey(participant)) return participant;
+
+          const employee = availableEmployees[employeeIndex];
+          employeeIndex += 1;
+
+          return employee
+            ? {
+                fullName: employeeFullName(employee),
+                tcNo: employee.tc_number || "",
+              }
+            : participant;
+        }),
+      };
+    });
   };
 
   const updateParticipant = (

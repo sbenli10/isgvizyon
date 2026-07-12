@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,9 @@ const findEmployeeByName = (employees: Employee[], name?: string | null) => {
   return employees.find((employee) => employeeFullName(employee).toLocaleLowerCase("tr-TR") === normalized) || null;
 };
 
+const getFallbackEmployeeName = (employees: Employee[], index: number) =>
+  employees[index] ? employeeFullName(employees[index]) : "";
+
 export function RiskAssessmentTeamAssignmentModal({
   open,
   companies,
@@ -87,13 +90,21 @@ export function RiskAssessmentTeamAssignmentModal({
       { role: "Kurtarma Ekip Başkanı", fullName: fields.evacuationSupportPersonName },
       { role: "Koruma Ekip Başkanı", fullName: "" },
       { role: "İlk Yardım Ekip Başkanı", fullName: fields.firstAidSupportPersonName },
-    ];
+    ].map((member, index) => ({
+      ...member,
+      fullName: member.fullName || getFallbackEmployeeName(companyEmployees, index),
+    }));
 
     setWorkplaceTitle(getProfileCompanyDisplayName(company));
     setWorkplaceRegistrationNo(getProfileCompanyRegistryNo(company));
     setMembers(nextMembers);
     setNotifiedByName(fields.employerRepresentativeName);
   };
+
+  useEffect(() => {
+    if (!open || selectedCompanyId || companies.length === 0) return;
+    handleCompanySelect(companies[0].id);
+  }, [companies, employees, open, selectedCompanyId]);
 
   const updateMember = (index: number, patch: Partial<RiskAssessmentTeamMember>) => {
     setMembers((prev) => prev.map((member, itemIndex) => (itemIndex === index ? { ...member, ...patch } : member)));
