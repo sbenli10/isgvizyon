@@ -18,9 +18,11 @@ import type { AssignmentType } from "@/lib/assignmentWordGenerator";
 
 interface AssignmentTypeCardsProps {
   onCreate: (type: AssignmentType) => void;
+  onOpenRiskAssessmentTeamAssignment: () => void;
   onOpenEmployeeRepresentativeAppointment: () => void;
   onOpenIsgEntranceExam: () => void;
   onOpenIsgTrainingAttendance: () => void;
+  onOpenEmergencyTeamTrainingAttendance: () => void;
   onOpenWorkAccidentReport: () => void;
   onOpenReturnToWorkTraining: () => void;
   onOpenRootCauseInvestigation: () => void;
@@ -86,9 +88,11 @@ const categoryStyles: Record<
 
 export function AssignmentTypeCards({
   onCreate,
+  onOpenRiskAssessmentTeamAssignment,
   onOpenEmployeeRepresentativeAppointment,
   onOpenIsgEntranceExam,
   onOpenIsgTrainingAttendance,
+  onOpenEmergencyTeamTrainingAttendance,
   onOpenWorkAccidentReport,
   onOpenReturnToWorkTraining,
   onOpenRootCauseInvestigation,
@@ -110,7 +114,7 @@ export function AssignmentTypeCards({
         category: "assignment",
         icon: ShieldCheck,
         colorClass: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-200",
-        action: () => onCreate("risk_assessment_team"),
+        action: onOpenRiskAssessmentTeamAssignment,
       },
       {
         id: "support_staff",
@@ -156,6 +160,15 @@ export function AssignmentTypeCards({
         icon: GraduationCap,
         colorClass: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-200",
         action: onOpenIsgTrainingAttendance,
+      },
+      {
+        id: "emergency_team_training_attendance",
+        title: "Acil Durum Ekipleri Eğitim Katılım Formu",
+        description: "Söndürme, kurtarma, koruma ve ilk yardım ekipleri için eğitim katılım listesini hazırlayın.",
+        category: "training",
+        icon: ClipboardCheck,
+        colorClass: "bg-amber-500/10 text-amber-700 dark:text-amber-200",
+        action: onOpenEmergencyTeamTrainingAttendance,
       },
       {
         id: "orientation_onboarding",
@@ -235,11 +248,13 @@ export function AssignmentTypeCards({
       onOpenDrillForm,
       onOpenEmergencyDrillAttendance,
       onOpenEmployeeRepresentativeAppointment,
+      onOpenEmergencyTeamTrainingAttendance,
       onOpenIsgEntranceExam,
       onOpenIsgTrainingAttendance,
       onOpenIncidentInvestigationReport,
       onOpenNearMissReport,
       onOpenOrientationOnboardingTraining,
+      onOpenRiskAssessmentTeamAssignment,
       onOpenReturnToWorkTraining,
       onOpenRootCauseInvestigation,
       onOpenWorkAccidentReport,
