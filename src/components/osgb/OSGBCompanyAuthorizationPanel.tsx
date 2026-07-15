@@ -212,6 +212,7 @@ function PortalAccountDialog({
 export function OSGBCompanyAuthorizationPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const { user, profile } = useAuth();
   const organizationId = profile?.organization_id || null;
+  const companyLoginUrl = typeof window !== "undefined" ? `${window.location.origin}/firma-girisi` : "/firma-girisi";
   const [companies, setCompanies] = useState<OsgbWorkspaceCompanyOption[]>([]);
   const [personnel, setPersonnel] = useState<OsgbWorkspacePersonnelRecord[]>([]);
   const [accounts, setAccounts] = useState<OsgbCompanyPortalAccountRecord[]>([]);
@@ -321,7 +322,7 @@ export function OSGBCompanyAuthorizationPanel({ refreshKey = 0 }: { refreshKey?:
         organizationId,
         userId: user.id,
         companyId: selectedCompany.id,
-        username: formUsername,
+        username: formUsername.trim().toLocaleLowerCase("tr-TR"),
         passwordPlain: formPassword,
         isActive: true,
       });
@@ -378,7 +379,7 @@ export function OSGBCompanyAuthorizationPanel({ refreshKey = 0 }: { refreshKey?:
   };
 
   const handleCopy = async (company: OsgbWorkspaceCompanyOption, account: OsgbCompanyPortalAccountRecord) => {
-    const text = [`Firma Portal Girişi`, `Firma: ${company.companyName}`, `Kullanıcı adı: ${account.username}`, `Şifre: ${account.passwordPlain || "(şifre kayıtlı değil)"}`].join("\n");
+    const text = [`Firma Portal Girişi`, `Giriş adresi: ${companyLoginUrl}`, `Firma: ${company.companyName}`, `Kullanıcı adı: ${account.username}`, `Şifre: ${account.passwordPlain || "(şifre kayıtlı değil)"}`].join("\n");
     try {
       await navigator.clipboard.writeText(text);
       toast.success("Firma giriş bilgileri kopyalandı.");

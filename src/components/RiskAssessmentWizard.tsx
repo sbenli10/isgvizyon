@@ -2281,6 +2281,13 @@ export default function RiskAssessmentWizard() {
     );
   };
 
+  const clearRiskItems = () => {
+    if (riskItems.length === 0) return;
+    setRiskItems([]);
+    setShowAllRiskRows(false);
+    toast.success("Risk degerlendirme tablosu temizlendi.");
+  };
+
   const addCorrectiveAction = () => {
     setCorrectiveActions((prev) => [
       ...prev,
@@ -4006,6 +4013,16 @@ export default function RiskAssessmentWizard() {
                   <Download className="mr-2 h-4 w-4" />
                 )}
                 Risklerim Klasörlerinden Ekle
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={riskItems.length === 0}
+                onClick={clearRiskItems}
+                className="rounded-xl border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Temizle
               </Button>
             </div>
             {!importAssessmentId ? (

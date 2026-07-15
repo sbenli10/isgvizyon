@@ -89,6 +89,7 @@ const OsgbClientPortal = lazyWithRetry("osgb-client-portal", () => import("./pag
 const OsgbHowTo = lazyWithRetry("osgb-how-to", () => import("./pages/OsgbHowTo"));
 const ClientCompanyPortal = lazyWithRetry("client-company-portal", () => import("./pages/ClientCompanyPortal"));
 const ClientCompanyPortalHowTo = lazyWithRetry("client-company-portal-how-to", () => import("./pages/ClientCompanyPortalHowTo"));
+const CompanyPortalLogin = lazyWithRetry("company-portal-login", () => import("./pages/CompanyPortalLogin"));
 const CertificatesDashboard = lazyWithRetry("certificates-dashboard", () => import("./pages/CertificatesDashboard"));
 const CertificatesHistory = lazyWithRetry("certificates-history", () => import("./pages/CertificatesHistory"));
 const CertificateJobDetail = lazyWithRetry("certificate-job-detail", () => import("./pages/CertificateJobDetail"));
@@ -460,6 +461,22 @@ const App = () => {
               <Route path="/landing/flow" element={<LandingFlow />} />
               <Route path="/landing/trust" element={<LandingTrust />} />
               <Route path="/landing/pricing" element={<LandingPricing />} />
+              <Route
+                path="/firma-girisi"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <CompanyPortalLogin />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/company-login"
+                element={
+                  <Suspense fallback={<PageLoader />}>
+                    <CompanyPortalLogin />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/portal/company/:token"
                 element={

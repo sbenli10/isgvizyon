@@ -838,6 +838,26 @@ export const deleteOsgbCompanyPortalAccount = async (id: string) => {
   if (error) throw error;
 };
 
+export const authenticateOsgbCompanyPortalAccount = async (
+  username: string,
+  password: string,
+): Promise<{ accessToken: string; portalPath: string }> => {
+  const { data, error } = await (supabase as any).rpc("authenticate_osgb_company_portal_account", {
+    p_username: username.trim(),
+    p_password: password,
+  });
+
+  if (error) throw error;
+  if (!data?.ok || !data?.access_token || !data?.portal_path) {
+    throw new Error(data?.message || "Firma giris bilgileri dogrulanamadi.");
+  }
+
+  return {
+    accessToken: data.access_token,
+    portalPath: data.portal_path,
+  };
+};
+
 
 const osgbCompanyEmployeeSelect = `
   id,
