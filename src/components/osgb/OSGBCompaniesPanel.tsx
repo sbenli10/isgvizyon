@@ -365,11 +365,14 @@ function formFromCompany(company?: OsgbManagedCompanyRecord | null): CompanyForm
   };
 }
 
-function inputFromForm(form: CompanyFormState): OsgbCompanyManagementInput {
+function inputFromForm(form: CompanyFormState, currentCompany?: OsgbManagedCompanyRecord | null): OsgbCompanyManagementInput {
+  const normalizedSgkNo = normalizeSgkNo(form.sgkNo);
+  const existingSgkNo = currentCompany?.sgkNo?.trim() || (currentCompany?.id ? `MANUAL-${currentCompany.id}` : "");
+
   return {
     companyName: form.companyName.trim(),
     branchName: form.branchName.trim() || null,
-    sgkNo: normalizeSgkNo(form.sgkNo),
+    sgkNo: normalizedSgkNo || existingSgkNo || null,
     taxNumber: form.taxNumber.trim() || null,
     employeeCount: Number.isFinite(Number(form.employeeCount)) ? Math.max(0, Number(form.employeeCount)) : 0,
     hazardClass: normalizeHazard(form.hazardClass) || form.hazardClass,
@@ -400,7 +403,7 @@ function CompanyDialog({ open, onOpenChange, company, userId, organizationId, on
 
   const save = async () => {
     if (!userId || !organizationId) return toast.error("Organizasyon bağlantısı gerekli.");
-    const input = inputFromForm(form);
+    const input = inputFromForm(form, company);
     if (!input.companyName) return toast.error("Firma Unvanı zorunludur.");
     if (!input.sgkNo) return toast.error("SGK Sicil No zorunludur.");
     if (!input.hazardClass) return toast.error("Tehlike Sınıfı zorunludur.");

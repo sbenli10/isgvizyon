@@ -1598,7 +1598,7 @@ export default function OSGBFinance() {
                 <SelectTrigger id="osgb-finance-company-id" aria-label="Firma" className="h-9 rounded-xl border-[#30405d] bg-[#111a2d] px-3 text-sm font-semibold text-slate-100">
                   <SelectValue placeholder="Firma seçin" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[10000] rounded-none border border-slate-300 bg-[#111a2d] p-0 text-white shadow-2xl">
                   {companies.map((company) => (
                     <SelectItem key={company.id} value={company.id}>
                       {getCompanyLabel(company as ManagedCompany)}
