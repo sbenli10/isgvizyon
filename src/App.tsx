@@ -278,10 +278,10 @@ const ProtectedShell = () => {
             {/* ============================================ */}
             {/* ISG BOT */}
             {/* ============================================ */}
-            <Route path="/isg-bot" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot premium planda açılır" description="ISG Bot komutları, AI iş akışları ve danışmanlık otomasyonları premium plan ile kullanılabilir."><ISGBot /></FeatureAccessGate>} />
+            <Route path="/isg-bot" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot ücretli planda açılır" description="ISG Bot komutları, AI iş akışları ve danışmanlık otomasyonları Premium, OSGB ve demo erişimlerinde kullanılabilir."><ISGBot /></FeatureAccessGate>} />
             <Route path="/isg-bot-deleted" element={<ISGBotDeleted />} />
-            <Route path="/isg-bot/:tab" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot premium planda açılır" description="ISG Bot sekmeleri ve premium AI akışları yalnızca premium plan ile açılır."><ISGBot /></FeatureAccessGate>} />
-            <Route path="/docs/isg-bot-setup" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot kurulumu premium planda açılır" description="ISG Bot kurulum rehberi ve yönetim akışları premium üyelikle kullanılabilir."><ISGBotSetup /></FeatureAccessGate>} />
+            <Route path="/isg-bot/:tab" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot ücretli planda açılır" description="ISG Bot sekmeleri ve AI akışları Premium, OSGB ve demo erişimlerinde kullanılabilir."><ISGBot /></FeatureAccessGate>} />
+            <Route path="/docs/isg-bot-setup" element={<FeatureAccessGate featureKey="isg_bot.access" title="ISG Bot kurulumu ücretli planda açılır" description="ISG Bot kurulum rehberi ve yönetim akışları Premium, OSGB ve demo erişimlerinde kullanılabilir."><ISGBotSetup /></FeatureAccessGate>} />
 
             {/* ============================================ */}
             {/* FINDINGS */}

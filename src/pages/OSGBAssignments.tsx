@@ -682,6 +682,40 @@ export default function OSGBAssignments() {
         <Card className="border-slate-800 bg-slate-950/70"><CardHeader className="pb-2"><CardDescription>Bu sayfadaki pasif/tamamlanan</CardDescription><CardTitle className="text-3xl text-white">{summary.passive + summary.completedOrCancelled}</CardTitle></CardHeader><CardContent className="text-xs text-slate-400">Görüntülenen sayfadaki aktif dışı görevlendirmeler.</CardContent></Card>
       </div>
 
+      <Card className="border-cyan-500/20 bg-cyan-500/5">
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-400/30 bg-cyan-400/10 text-cyan-200">
+              <Info className="h-5 w-5" />
+            </div>
+            <div>
+              <CardTitle className="text-white">Firma Görevlendirme sistemi nasıl çalışır?</CardTitle>
+              <CardDescription className="mt-1 text-slate-300">
+                Bu ekran OSGB havuzundaki firmalara İGU, işyeri hekimi veya DSP personelini mevzuat dakikası ve personel kapasitesiyle eşleştirerek atama kaydı oluşturur.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm text-slate-300 md:grid-cols-4">
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">1. Firma</div>
+            <p>OSGB Firmaları veya İSG-KATİP senkronundan gelen firma seçilir; tehlike sınıfı ve çalışan sayısına göre ihtiyaç hesabı yapılır.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">2. Personel</div>
+            <p>Personel Havuzu’ndaki aktif İGU, hekim veya DSP seçilir. Seçilen personelin rolü görevlendirme rolüyle aynı olmalıdır.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">3. Dakika</div>
+            <p>Öner butonu, seçili rol için mevzuat hedefini, mevcut aktif atamayı ve kalan açığı gösterir; önerilen dakika tek tıkla uygulanabilir.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-cyan-200">4. Kontrol</div>
+            <p>Sistem aynı firma ve aynı rol için ikinci aktif görevlendirmeyi engeller, ayrıca personelin aylık kapasitesi aşılırsa kayıt yaptırmaz.</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Alert>
         <ShieldBan className="h-4 w-4" />
         <AlertTitle>Mükerrer aktif rol engeli aktif</AlertTitle>

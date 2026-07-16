@@ -109,8 +109,8 @@ export function usePlanLimits() {
 
       if (FREE_LOCKED_FEATURES.has(featureKey)) {
         return {
-          allowed: false,
-          reason: "upgrade_to_premium",
+          allowed: canAccessPremium,
+          reason: canAccessPremium ? "allowed" : "upgrade_to_premium",
           currentPlan,
           featureKey,
         };
