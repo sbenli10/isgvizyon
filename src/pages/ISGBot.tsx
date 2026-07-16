@@ -65,7 +65,7 @@ import {
   type MultiAssignmentDryRunResult,
   type MultiAssignmentPlanRow,
 } from "@/lib/isgbot/assignmentDryRun";
-import { buildExcessDurationPreview, type ExcessDurationPreviewRow } from "@/lib/isgbot/excessDurationDryRun";
+import { buildExcessDurationPreview, type ExcessDurationPreview, type ExcessDurationPreviewRow } from "@/lib/isgbot/excessDurationDryRun";
 import {
   canApplyExcessDuration,
   canApplyMultiAssignment,
@@ -1463,6 +1463,520 @@ const drawContractReportPdf = (rows: IsgkatipCompanyRow[]) => {
   }
 };
 
+const drawContractStatusReportPdf = (rows: ContractStatusReportRow[]) => {
+  if (rows.length === 0) {
+    toast.error("Rapor oluşturmak için filtrelere uyan firma bulunamadı.");
+    return;
+  }
+
+  try {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+    const interLoaded = addInterFontsToJsPDF(doc);
+    const fontFamily = interLoaded ? "Inter" : "helvetica";
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 32;
+    const contentWidth = pageWidth - margin * 2;
+    let y = margin;
+
+    const statusPalette: Record<ContractStatusColor, { label: string; fill: [number, number, number]; text: [number, number, number] }> = {
+      red: { label: "Kırmızı", fill: [254, 226, 226], text: [153, 27, 27] },
+      gray: { label: "Beyaz/Gri", fill: [241, 245, 249], text: [51, 65, 85] },
+      yellow: { label: "Sarı", fill: [254, 243, 199], text: [146, 64, 14] },
+      green: { label: "Yeşil", fill: [209, 250, 229], text: [6, 95, 70] },
+      purple: { label: "Mor", fill: [237, 233, 254], text: [91, 33, 182] },
+    };
+
+    const setText = (size: number, color: [number, number, number], style: "normal" | "bold" = "normal") => {
+      doc.setFont(fontFamily, style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+    };
+
+    const drawFooter = () => {
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, footerY - 12, pageWidth - margin, footerY - 12);
+      setText(7, [100, 116, 139]);
+      doc.text("İSGVİZYON | Hizmet Alan İşyerleri İSG Sözleşme Durumu Analiz Raporu", margin, footerY);
+      doc.text(`Sayfa ${doc.getNumberOfPages()}`, pageWidth - margin, footerY, { align: "right" });
+    };
+
+    const addPageIfNeeded = (height: number) => {
+      if (y + height <= pageHeight - 50) return;
+      drawFooter();
+      doc.addPage();
+      y = margin;
+    };
+
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(margin, y, contentWidth, 86, 12, 12, "F");
+    setText(18, [255, 255, 255], "bold");
+    doc.text("Hizmet Alan İşyerleri İSG Sözleşme Durumu", margin + 18, y + 32);
+    setText(9, [203, 213, 225]);
+    doc.text("İSG-KATİP senkron verilerine göre renk skalalı analiz raporu", margin + 18, y + 52);
+    doc.text(`Oluşturma tarihi: ${new Date().toLocaleString("tr-TR")}`, margin + 18, y + 68);
+    y += 104;
+
+    const counts = {
+      total: rows.length,
+      red: rows.filter((row) => row.color === "red").length,
+      gray: rows.filter((row) => row.color === "gray").length,
+      yellow: rows.filter((row) => row.color === "yellow").length,
+      green: rows.filter((row) => row.color === "green").length,
+      purple: rows.filter((row) => row.color === "purple").length,
+    };
+    const summary = [
+      ["Toplam firma", counts.total, [59, 130, 246] as [number, number, number]],
+      ["Sözleşme yok", counts.red, [244, 63, 94] as [number, number, number]],
+      ["Personel onayı", counts.gray, [148, 163, 184] as [number, number, number]],
+      ["İşyeri onayı", counts.yellow, [245, 158, 11] as [number, number, number]],
+      ["Tam onaylı", counts.green, [16, 185, 129] as [number, number, number]],
+      ["Veri eksik", counts.purple, [139, 92, 246] as [number, number, number]],
+    ];
+    const cardW = (contentWidth - 50) / 6;
+    summary.forEach(([label, value, color], index) => {
+      const x = margin + index * (cardW + 10);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(x, y, cardW, 52, 8, 8, "FD");
+      const rgb = color as [number, number, number];
+      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+      doc.circle(x + 12, y + 14, 4, "F");
+      setText(7, [100, 116, 139], "bold");
+      doc.text(String(label).toLocaleUpperCase("tr-TR"), x + 22, y + 17);
+      setText(16, [15, 23, 42], "bold");
+      doc.text(String(value), x + 10, y + 40);
+    });
+    y += 72;
+
+    setText(10, [15, 23, 42], "bold");
+    doc.text("Renk Skalası", margin, y);
+    y += 16;
+    const legend = [
+      ["Kırmızı", "İSG profesyoneli sözleşmesi yok", "red"],
+      ["Beyaz/Gri", "Personel onayı bekleniyor", "gray"],
+      ["Sarı", "İşyeri onayı bekleniyor", "yellow"],
+      ["Yeşil", "Tam onaylı", "green"],
+      ["Mor", "Hesaplanamayan / veri eksik", "purple"],
+    ] as Array<[string, string, ContractStatusColor]>;
+    legend.forEach(([label, detail, color], index) => {
+      const x = margin + (index % 5) * ((contentWidth - 32) / 5 + 8);
+      const boxW = (contentWidth - 32) / 5;
+      const palette = statusPalette[color];
+      doc.setFillColor(palette.fill[0], palette.fill[1], palette.fill[2]);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(x, y, boxW, 46, 8, 8, "FD");
+      setText(8, palette.text, "bold");
+      doc.text(label, x + 10, y + 17);
+      setText(6.5, [71, 85, 105]);
+      doc.text(doc.splitTextToSize(detail, boxW - 20).slice(0, 2), x + 10, y + 30);
+    });
+    y += 66;
+
+    const headers = ["Firma", "SGK", "Tehlike", "Çalışan", "Durum", "Eksik / Kontrol", "Öneri"];
+    const widths = [150, 90, 78, 48, 118, 104, contentWidth - 588];
+    doc.setFillColor(30, 64, 175);
+    doc.rect(margin, y, contentWidth, 22, "F");
+    let x = margin;
+    setText(7, [255, 255, 255], "bold");
+    headers.forEach((header, index) => {
+      doc.text(header, x + 5, y + 14);
+      x += widths[index];
+    });
+    y += 22;
+
+    rows.forEach((row, index) => {
+      addPageIfNeeded(36);
+      const palette = statusPalette[row.color];
+      doc.setFillColor(index % 2 === 0 ? 248 : 241, index % 2 === 0 ? 250 : 245, index % 2 === 0 ? 252 : 249);
+      doc.rect(margin, y, contentWidth, 34, "F");
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, contentWidth, 34);
+      x = margin;
+      const cells = [
+        row.companyName,
+        row.sgkNo,
+        row.hazardClass,
+        String(row.employeeCount),
+        row.overallStatus,
+        row.missingField,
+        row.recommendation,
+      ];
+      cells.forEach((cell, cellIndex) => {
+        if (cellIndex === 4) {
+          doc.setFillColor(palette.fill[0], palette.fill[1], palette.fill[2]);
+          doc.roundedRect(x + 4, y + 8, widths[cellIndex] - 8, 18, 6, 6, "F");
+          setText(6.5, palette.text, "bold");
+          doc.text(doc.splitTextToSize(cell, widths[cellIndex] - 16).slice(0, 1), x + 8, y + 20);
+        } else {
+          setText(6.5, [30, 41, 59]);
+          doc.text(doc.splitTextToSize(cell || "-", widths[cellIndex] - 8).slice(0, 2), x + 5, y + 12);
+        }
+        x += widths[cellIndex];
+      });
+      y += 34;
+    });
+
+    addPageIfNeeded(54);
+    y += 12;
+    doc.setFillColor(255, 251, 235);
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(margin, y, contentWidth, 42, 8, 8, "FD");
+    setText(8, [146, 64, 14], "bold");
+    doc.text("Analiz notu", margin + 12, y + 16);
+    setText(7, [120, 53, 15]);
+    doc.text(
+      doc.splitTextToSize("Bu çıktı İSG-KATİP resmi sözleşme belgesi değildir. İSGVİZYON tarafından senkron verilerine göre oluşturulan analiz raporudur.", contentWidth - 24),
+      margin + 12,
+      y + 30,
+    );
+
+    drawFooter();
+    doc.save(`isg-katip-sozlesme-durumu-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Sözleşme durum raporu oluşturuldu", { description: `${rows.length} firma PDF raporuna eklendi.` });
+  } catch (error) {
+    console.error("Contract status PDF export failed:", error);
+    toast.error("Sözleşme durum raporu oluşturulamadı.");
+  }
+};
+
+const drawDurationAnalysisPdf = (rows: DurationAnalysisRow[]) => {
+  if (rows.length === 0) {
+    toast.error("Süre analizi raporu oluşturmak için firma verisi bulunamadı.");
+    return;
+  }
+
+  try {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+    const interLoaded = addInterFontsToJsPDF(doc);
+    const fontFamily = interLoaded ? "Inter" : "helvetica";
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 32;
+    const contentWidth = pageWidth - margin * 2;
+    let y = margin;
+
+    const statusPalette: Record<DurationStatus, { fill: [number, number, number]; text: [number, number, number] }> = {
+      missing: { fill: [241, 245, 249], text: [51, 65, 85] },
+      critical: { fill: [254, 226, 226], text: [153, 27, 27] },
+      deficit: { fill: [255, 237, 213], text: [154, 52, 18] },
+      compliant: { fill: [209, 250, 229], text: [6, 95, 70] },
+      excess: { fill: [254, 243, 199], text: [146, 64, 14] },
+    };
+
+    const setText = (size: number, color: [number, number, number], style: "normal" | "bold" = "normal") => {
+      doc.setFont(fontFamily, style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+    };
+
+    const drawFooter = () => {
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, footerY - 12, pageWidth - margin, footerY - 12);
+      setText(7, [100, 116, 139]);
+      doc.text("İSGVİZYON | İSG-KATİP Süre Analizi Raporu", margin, footerY);
+      doc.text(`Sayfa ${doc.getNumberOfPages()}`, pageWidth - margin, footerY, { align: "right" });
+    };
+
+    const addPageIfNeeded = (height: number) => {
+      if (y + height <= pageHeight - 50) return;
+      drawFooter();
+      doc.addPage();
+      y = margin;
+    };
+
+    const summary = {
+      total: rows.length,
+      critical: rows.filter((row) => row.status === "critical").length,
+      deficit: rows.filter((row) => row.status === "deficit").length,
+      excess: rows.filter((row) => row.status === "excess").length,
+      compliant: rows.filter((row) => row.status === "compliant").length,
+      missing: rows.filter((row) => row.status === "missing").length,
+      required: rows.reduce((sum, row) => sum + row.requiredMinutes, 0),
+      assigned: rows.reduce((sum, row) => sum + row.assignedMinutes, 0),
+    };
+
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(margin, y, contentWidth, 86, 12, 12, "F");
+    setText(18, [255, 255, 255], "bold");
+    doc.text("İSG-KATİP Süre Analizi", margin + 18, y + 32);
+    setText(9, [203, 213, 225]);
+    doc.text("Personel atama dakikaları, mevzuat gereksinimi ve doluluk farkı raporu", margin + 18, y + 52);
+    doc.text(`Oluşturma tarihi: ${new Date().toLocaleString("tr-TR")}`, margin + 18, y + 68);
+    y += 104;
+
+    const cards = [
+      ["Toplam firma", summary.total, [59, 130, 246] as [number, number, number]],
+      ["Kritik eksik", summary.critical, [244, 63, 94] as [number, number, number]],
+      ["Eksik süre", summary.deficit, [249, 115, 22] as [number, number, number]],
+      ["Fazla atama", summary.excess, [245, 158, 11] as [number, number, number]],
+      ["Tam uyum", summary.compliant, [16, 185, 129] as [number, number, number]],
+      ["Hesaplanamayan", summary.missing, [148, 163, 184] as [number, number, number]],
+    ];
+    const cardW = (contentWidth - 50) / 6;
+    cards.forEach(([label, value, color], index) => {
+      const x = margin + index * (cardW + 10);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(x, y, cardW, 52, 8, 8, "FD");
+      const rgb = color as [number, number, number];
+      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+      doc.circle(x + 12, y + 14, 4, "F");
+      setText(7, [100, 116, 139], "bold");
+      doc.text(String(label).toLocaleUpperCase("tr-TR"), x + 22, y + 17);
+      setText(16, [15, 23, 42], "bold");
+      doc.text(String(value), x + 10, y + 40);
+    });
+    y += 72;
+
+    doc.setFillColor(239, 246, 255);
+    doc.setDrawColor(191, 219, 254);
+    doc.roundedRect(margin, y, contentWidth, 42, 8, 8, "FD");
+    setText(8, [30, 64, 175], "bold");
+    doc.text("Toplam dakika özeti", margin + 12, y + 16);
+    setText(8, [30, 41, 59]);
+    const totalDiff = summary.assigned - summary.required;
+    doc.text(
+      `Gerekli toplam: ${summary.required} dk/ay  |  Atanmış toplam: ${summary.assigned} dk/ay  |  Fark: ${totalDiff} dk/ay`,
+      margin + 12,
+      y + 31,
+    );
+    y += 62;
+
+    const headers = ["Firma", "SGK", "Tehlike", "Çalışan", "Gerekli", "Atanmış", "Fark", "Oran", "Durum", "Öneri"];
+    const widths = [140, 88, 72, 46, 52, 52, 52, 44, 98, contentWidth - 644];
+    doc.setFillColor(30, 64, 175);
+    doc.rect(margin, y, contentWidth, 22, "F");
+    let x = margin;
+    setText(7, [255, 255, 255], "bold");
+    headers.forEach((header, index) => {
+      doc.text(header, x + 5, y + 14);
+      x += widths[index];
+    });
+    y += 22;
+
+    rows.forEach((row, index) => {
+      addPageIfNeeded(36);
+      const palette = statusPalette[row.status];
+      doc.setFillColor(index % 2 === 0 ? 248 : 241, index % 2 === 0 ? 250 : 245, index % 2 === 0 ? 252 : 249);
+      doc.rect(margin, y, contentWidth, 34, "F");
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(margin, y, contentWidth, 34);
+      x = margin;
+      const cells = [
+        row.companyName,
+        row.sgkNo,
+        row.hazardClass,
+        String(row.employeeCount),
+        `${row.requiredMinutes} dk`,
+        `${row.assignedMinutes} dk`,
+        row.status === "missing" ? "-" : `${row.diffMinutes} dk`,
+        row.ratio === null ? "-" : `%${row.ratio}`,
+        row.statusLabel,
+        row.recommendation,
+      ];
+      cells.forEach((cell, cellIndex) => {
+        if (cellIndex === 8) {
+          doc.setFillColor(palette.fill[0], palette.fill[1], palette.fill[2]);
+          doc.roundedRect(x + 4, y + 8, widths[cellIndex] - 8, 18, 6, 6, "F");
+          setText(6.4, palette.text, "bold");
+          doc.text(doc.splitTextToSize(cell, widths[cellIndex] - 16).slice(0, 1), x + 8, y + 20);
+        } else {
+          setText(6.4, [30, 41, 59]);
+          doc.text(doc.splitTextToSize(cell || "-", widths[cellIndex] - 8).slice(0, 2), x + 5, y + 12);
+        }
+        x += widths[cellIndex];
+      });
+      y += 34;
+    });
+
+    addPageIfNeeded(54);
+    y += 12;
+    doc.setFillColor(255, 251, 235);
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(margin, y, contentWidth, 42, 8, 8, "FD");
+    setText(8, [146, 64, 14], "bold");
+    doc.text("Analiz notu", margin + 12, y + 16);
+    setText(7, [120, 53, 15]);
+    doc.text(
+      doc.splitTextToSize("Bu çıktı resmi İSG-KATİP belgesi değildir. Senkron verilerine göre atanmış ve gerekli dakika farkını gösteren İSGVİZYON analiz raporudur.", contentWidth - 24),
+      margin + 12,
+      y + 30,
+    );
+
+    drawFooter();
+    doc.save(`isg-katip-sure-analizi-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Süre analizi raporu oluşturuldu", { description: `${rows.length} firma PDF raporuna eklendi.` });
+  } catch (error) {
+    console.error("Duration analysis PDF export failed:", error);
+    toast.error("Süre analizi raporu oluşturulamadı.");
+  }
+};
+
+const drawExcessDurationAnalysisPdf = (preview: ExcessDurationPreview) => {
+  if (preview.summary.analyzed_company_count === 0) {
+    toast.error("Fazla süre analizi raporu için firma verisi bulunamadı.");
+    return;
+  }
+
+  try {
+    const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+    const interLoaded = addInterFontsToJsPDF(doc);
+    const fontFamily = interLoaded ? "Inter" : "helvetica";
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 32;
+    const contentWidth = pageWidth - margin * 2;
+    let y = margin;
+
+    const setText = (size: number, color: [number, number, number], style: "normal" | "bold" = "normal") => {
+      doc.setFont(fontFamily, style);
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+    };
+
+    const drawFooter = () => {
+      const footerY = pageHeight - 18;
+      doc.setDrawColor(226, 232, 240);
+      doc.line(margin, footerY - 12, pageWidth - margin, footerY - 12);
+      setText(7, [100, 116, 139]);
+      doc.text("İSGVİZYON | Fazla Süre Güncelleme Analiz Raporu", margin, footerY);
+      doc.text(`Sayfa ${doc.getNumberOfPages()}`, pageWidth - margin, footerY, { align: "right" });
+    };
+
+    const addPageIfNeeded = (height: number) => {
+      if (y + height <= pageHeight - 50) return;
+      drawFooter();
+      doc.addPage();
+      y = margin;
+    };
+
+    doc.setFillColor(15, 23, 42);
+    doc.roundedRect(margin, y, contentWidth, 86, 12, 12, "F");
+    setText(18, [255, 255, 255], "bold");
+    doc.text("Fazla Süre Güncelleme Analizi", margin + 18, y + 32);
+    setText(9, [203, 213, 225]);
+    doc.text("İSG-KATİP senkron verilerine göre fazla atanmış dakika adayları", margin + 18, y + 52);
+    doc.text(`Oluşturma tarihi: ${new Date().toLocaleString("tr-TR")}`, margin + 18, y + 68);
+    y += 104;
+
+    const cards = [
+      ["Analiz edilen", preview.summary.analyzed_company_count, [59, 130, 246] as [number, number, number]],
+      ["Fazla atama", preview.summary.excess_assignment_count, [245, 158, 11] as [number, number, number]],
+      ["Toplam fazla dk", preview.summary.total_excess_minutes, [244, 63, 94] as [number, number, number]],
+      ["Hesaplanamayan", preview.summary.missing_data_count, [148, 163, 184] as [number, number, number]],
+      ["Öneri", preview.summary.recommendation_count, [16, 185, 129] as [number, number, number]],
+    ];
+    const cardW = (contentWidth - 40) / 5;
+    cards.forEach(([label, value, color], index) => {
+      const x = margin + index * (cardW + 10);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.roundedRect(x, y, cardW, 52, 8, 8, "FD");
+      const rgb = color as [number, number, number];
+      doc.setFillColor(rgb[0], rgb[1], rgb[2]);
+      doc.circle(x + 12, y + 14, 4, "F");
+      setText(7, [100, 116, 139], "bold");
+      doc.text(String(label).toLocaleUpperCase("tr-TR"), x + 22, y + 17);
+      setText(16, [15, 23, 42], "bold");
+      doc.text(String(value), x + 10, y + 40);
+    });
+    y += 72;
+
+    if (preview.rows.length === 0) {
+      doc.setFillColor(236, 253, 245);
+      doc.setDrawColor(167, 243, 208);
+      doc.roundedRect(margin, y, contentWidth, 58, 8, 8, "FD");
+      setText(10, [6, 95, 70], "bold");
+      doc.text("Fazla süre adayı bulunmadı", margin + 12, y + 20);
+      setText(8, [6, 78, 59]);
+      doc.text(
+        doc.splitTextToSize("Analiz edilen firmalarda atanmış dakika, gerekli dakikanın üzerinde görünmüyor. Bu nedenle gerçek İSG-KATİP güncellemesi için seçilecek kayıt yoktur.", contentWidth - 24),
+        margin + 12,
+        y + 36,
+      );
+      y += 76;
+    } else {
+      const headers = ["Firma", "SGK", "Tehlike", "Çalışan", "Atanmış", "Gerekli", "Fazla", "Önerilen", "Not"];
+      const widths = [150, 90, 76, 48, 58, 58, 54, 64, contentWidth - 598];
+      doc.setFillColor(5, 150, 105);
+      doc.rect(margin, y, contentWidth, 22, "F");
+      let x = margin;
+      setText(7, [255, 255, 255], "bold");
+      headers.forEach((header, index) => {
+        doc.text(header, x + 5, y + 14);
+        x += widths[index];
+      });
+      y += 22;
+
+      preview.rows.forEach((row, index) => {
+        addPageIfNeeded(38);
+        doc.setFillColor(index % 2 === 0 ? 248 : 241, index % 2 === 0 ? 250 : 245, index % 2 === 0 ? 252 : 249);
+        doc.rect(margin, y, contentWidth, 36, "F");
+        doc.setDrawColor(226, 232, 240);
+        doc.rect(margin, y, contentWidth, 36);
+        x = margin;
+        const cells = [
+          row.companyName,
+          row.sgkNo,
+          row.hazardClass,
+          String(row.employeeCount),
+          `${row.assignedMinutes} dk`,
+          `${row.requiredMinutes} dk`,
+          `${row.excessMinutes} dk`,
+          `${row.suggestedMinutes} dk`,
+          row.impactNote,
+        ];
+        cells.forEach((cell, cellIndex) => {
+          setText(6.4, cellIndex === 6 ? [190, 18, 60] : [30, 41, 59], cellIndex === 6 ? "bold" : "normal");
+          doc.text(doc.splitTextToSize(cell || "-", widths[cellIndex] - 8).slice(0, cellIndex === 8 ? 2 : 1), x + 5, y + 12);
+          x += widths[cellIndex];
+        });
+        y += 36;
+      });
+    }
+
+    if (preview.missingRows.length > 0) {
+      addPageIfNeeded(82);
+      y += 12;
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(203, 213, 225);
+      doc.roundedRect(margin, y, contentWidth, 58, 8, 8, "FD");
+      setText(9, [51, 65, 85], "bold");
+      doc.text("Hesaplanamayan kayıtlar", margin + 12, y + 18);
+      setText(7.5, [71, 85, 105]);
+      doc.text(
+        doc.splitTextToSize(`${preview.missingRows.length} firmada atanmış dakika, gerekli dakika veya çalışan verisi eksik olduğu için öneri üretilemedi. Bu kayıtlar İSG-KATİP/senkron verisi tamamlandıktan sonra yeniden analiz edilmelidir.`, contentWidth - 24),
+        margin + 12,
+        y + 34,
+      );
+      y += 76;
+    }
+
+    addPageIfNeeded(54);
+    doc.setFillColor(255, 251, 235);
+    doc.setDrawColor(251, 191, 36);
+    doc.roundedRect(margin, y, contentWidth, 42, 8, 8, "FD");
+    setText(8, [146, 64, 14], "bold");
+    doc.text("Analiz notu", margin + 12, y + 16);
+    setText(7, [120, 53, 15]);
+    doc.text(
+      doc.splitTextToSize("Bu çıktı resmi İSG-KATİP belgesi değildir. Fazla süre güncellemesi yalnızca kullanıcı onayı ve eklenti doğrulaması sonrası canlı işlem olarak gönderilebilir.", contentWidth - 24),
+      margin + 12,
+      y + 30,
+    );
+
+    drawFooter();
+    doc.save(`isg-katip-fazla-sure-analizi-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("Fazla süre analiz raporu oluşturuldu", { description: `${preview.summary.analyzed_company_count} firma analiz edildi.` });
+  } catch (error) {
+    console.error("Excess duration analysis PDF export failed:", error);
+    toast.error("Fazla süre analiz raporu oluşturulamadı.");
+  }
+};
+
 function BotFeatureCard({
   feature,
   onClick,
@@ -2542,6 +3056,17 @@ function ContractStatusReportPanel({ runtime, onRun, companies }: { runtime: Fea
     );
   };
 
+  const createReport = () => {
+    if (visibleRows.length === 0) {
+      toast.error("Rapor oluşturmak için filtrelere uyan firma bulunamadı.");
+      return;
+    }
+
+    drawContractStatusReportPdf(visibleRows);
+    setReportGenerated(true);
+    onRun();
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -2594,11 +3119,11 @@ function ContractStatusReportPanel({ runtime, onRun, companies }: { runtime: Fea
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button className="rounded-xl bg-amber-500 text-white hover:bg-amber-400" onClick={() => { setReportGenerated(true); onRun(); }}>
+        <Button className="rounded-xl bg-amber-500 text-white hover:bg-amber-400" onClick={createReport}>
           <ShieldCheck className="mr-2 h-4 w-4" />
-          Raporu Oluştur ve Görüntüle
+          PDF Raporu Oluştur
         </Button>
-        <Button variant="outline" className="rounded-xl border-slate-700 bg-slate-950/70 text-slate-100 hover:bg-slate-800" onClick={exportRows} disabled={!reportGenerated || visibleRows.length === 0}>
+        <Button variant="outline" className="rounded-xl border-slate-700 bg-slate-950/70 text-slate-100 hover:bg-slate-800" onClick={exportRows} disabled={visibleRows.length === 0}>
           <Download className="mr-2 h-4 w-4" />
           CSV Olarak İndir
         </Button>
@@ -2696,6 +3221,16 @@ function DurationAnalysisPanel({ runtime, onRun, companies }: { runtime: Feature
     );
   };
 
+  const createReport = () => {
+    if (rows.length === 0) {
+      toast.error("Süre analizi raporu oluşturmak için firma verisi bulunamadı.");
+      return;
+    }
+
+    drawDurationAnalysisPdf(rows);
+    onRun();
+  };
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -2714,15 +3249,23 @@ function DurationAnalysisPanel({ runtime, onRun, companies }: { runtime: Feature
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button className="rounded-xl bg-rose-500 text-white hover:bg-rose-400" onClick={onRun}>
+        <Button className="rounded-xl bg-rose-500 text-white hover:bg-rose-400" onClick={createReport}>
           <TimerReset className="mr-2 h-4 w-4" />
-          Analizi İşlem Geçmişine Kaydet
+          PDF Raporu Oluştur
         </Button>
         <Button variant="outline" className="rounded-xl border-slate-700 bg-slate-950/70 text-slate-100 hover:bg-slate-800" onClick={exportRows} disabled={rows.length === 0}>
           <Download className="mr-2 h-4 w-4" />
           CSV Olarak İndir
         </Button>
       </div>
+
+      <Alert className="border-blue-400/25 bg-blue-500/10 text-blue-50">
+        <AlertCircle className="h-4 w-4 text-blue-300" />
+        <AlertTitle>Süre analizi nasıl çalışır?</AlertTitle>
+        <AlertDescription className="text-blue-100/80">
+          Sistem, İSG-KATİP senkron verisindeki gerekli dakika ve atanmış dakika alanlarını karşılaştırır. Atanmış süre 0 dk görünüyorsa ilgili firma için aktif dakika verisi gelmemiş veya atama yapılmamış demektir.
+        </AlertDescription>
+      </Alert>
 
       {analyzableRows.length > 0 ? (
         <div className="grid gap-3">
@@ -2738,10 +3281,10 @@ function DurationAnalysisPanel({ runtime, onRun, companies }: { runtime: Feature
               <Badge variant="outline" className={cn("w-fit rounded-full", statusClass[row.status])}>
                 {row.statusLabel}
               </Badge>
-            </div>
+              </div>
               <div className="mt-3 grid gap-2 text-xs text-slate-300 sm:grid-cols-4">
-                <span>Gerekli: {row.requiredMinutes || "-"} dk</span>
-                <span>Atanmış: {row.assignedMinutes || "-"} dk</span>
+                <span>Gerekli: {row.requiredMinutes} dk</span>
+                <span>Atanmış: {row.assignedMinutes} dk</span>
                 <span>Fark: {row.status === "missing" ? "-" : `${row.diffMinutes} dk`}</span>
                 <span>Oran: {row.ratio === null ? "-" : `%${row.ratio}`}</span>
               </div>
@@ -4160,14 +4703,16 @@ function MultiAssignmentPanelV2({
       )}
 
       <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
-        <DialogContent overlayClassName="z-[65] bg-slate-950/90 backdrop-blur-md" className="z-[70] rounded-2xl border border-slate-700/70 bg-slate-950 text-slate-50 shadow-2xl shadow-black/70 sm:max-w-2xl">
+        <DialogContent overlayClassName="z-[65] bg-slate-950/90 backdrop-blur-md" className="z-[70] max-h-[92vh] overflow-y-auto rounded-2xl border border-slate-700/70 bg-slate-950 p-0 text-slate-50 shadow-2xl shadow-black/70 sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Gerçek İSG-KATİP İşlemi Onayı</DialogTitle>
-            <DialogDescription className="text-slate-300">
-              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen işlem planındaki bilgileri kontrol edin.
-            </DialogDescription>
+            <div className="border-b border-slate-800 px-5 py-4">
+              <DialogTitle>İSG-KATİP işlem onayı</DialogTitle>
+              <DialogDescription className="mt-1 text-slate-300">
+                Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapar. Başlamadan önce kayıtları, bağlantıyı ve onay kutularını kontrol edin.
+              </DialogDescription>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <MetricTile label="İşlem türü" value="Canlı Atama" tone="violet" />
               <MetricTile label="Toplam kayıt" value={plan?.planRows.length ?? 0} tone="blue" />
@@ -4177,27 +4722,27 @@ function MultiAssignmentPanelV2({
               <MetricTile label="Tahmini süre" value={`${Math.max(1, selectedPlanRows.length)} dk`} tone="rose" />
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Plan hash / işlem referansı</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İşlem referansı</p>
               <p className="mt-2 break-all text-sm font-bold text-white">{planHash || "-"}</p>
-              <p className="mt-2 text-xs text-slate-400">Canlı işlem modu: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. Güvenli işlem limiti aşılmamalıdır.</p>
+              <p className="mt-2 text-xs text-slate-400">Güvenli kullanım için ilk denemede yalnızca {ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçilmelidir. Teknik üst sınır {ISGBOT_PILOT_LIMIT} kayıttır.</p>
             </div>
             <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4 text-sm text-blue-100">
-              <p className="font-bold text-blue-50">Canlı işlem modu aktiftir.</p>
-              <p className="mt-1">İlk aşamada seçili kayıtlar üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
+              <p className="font-bold text-blue-50">Canlı işlem hazır.</p>
+              <p className="mt-1">Seçili kayıtlar eklenti üzerinden İSG-KATİP’e gönderilir. Bu nedenle firma ve personel bilgilerini son kez kontrol edin.</p>
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İSG-KATİP form doğrulaması</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İSG-KATİP ekran kontrolü</p>
                   <p className="mt-1 text-sm text-slate-300">
                     {isValidatingSurface
-                      ? "İşlem yüzeyi kontrol ediliyor."
+                      ? "İSG-KATİP ekranı kontrol ediliyor."
                       : surfaceValidation?.canApply
-                        ? "Form yüzeyi doğrulandı."
-                        : "Form yüzeyi doğrulanmadan işlem başlatılamaz."}
+                        ? "İSG-KATİP ekranı hazır görünüyor."
+                        : "İSG-KATİP ekranı hazır olmadan işlem başlatılamaz."}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -4206,7 +4751,7 @@ function MultiAssignmentPanelV2({
                     onClick={() => window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer")}
                   >
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    İSG-KATİP'i Aç
+                    İSG-KATİP’i Aç
                   </Button>
                   <Button
                     type="button"
@@ -4227,7 +4772,7 @@ function MultiAssignmentPanelV2({
                     disabled={isValidatingSurface}
                   >
                     {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Tekrar Doğrula
+                    Ekranı Doğrula
                   </Button>
                 </div>
               </div>
@@ -4235,7 +4780,7 @@ function MultiAssignmentPanelV2({
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
                   <span>Güven: {surfaceValidation.formSurface.confidence || "-"}</span>
                   <span>Bulunan alan: {surfaceValidation.formSurface.requiredFieldsFound ?? 0}</span>
-                  <span>Modül: {surfaceValidation.pageContext?.detectedModule || "-"}</span>
+                  <span>Ekran: {surfaceValidation.pageContext?.detectedModule || "-"}</span>
                 </div>
               ) : null}
               {surfaceValidation?.blockingReasons?.length ? (
@@ -4259,8 +4804,8 @@ function MultiAssignmentPanelV2({
               <div className="mt-3 space-y-2 text-sm text-slate-200">
                 <p>{extensionStatus.isgKatipReady ? "✓" : "•"} İSG-KATİP oturumu açık mı?</p>
                 <p>{extensionStatus.isgKatipOpen ? "✓" : "•"} Doğru İSG-KATİP ekranı açık mı?</p>
-                <p>{surfaceValidation?.canApply ? "✓" : "•"} Form yüzeyi doğrulandı mı?</p>
-                <p>{planHash ? "✓" : "•"} Plan hash geçerli mi?</p>
+                <p>{surfaceValidation?.canApply ? "✓" : "•"} İSG-KATİP ekranı doğrulandı mı?</p>
+                <p>{planHash ? "✓" : "•"} İşlem referansı oluşturuldu mu?</p>
                 <p>{selectedPlanRows.length === ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION ? "✓" : "•"} Seçili kayıt sayısı ilk canlı test için 1 mi?</p>
                 <p>{reviewedPlan && acceptedRealChange && typedConfirmation.trim().toLocaleUpperCase("tr-TR") === "ONAYLIYORUM" ? "✓" : "•"} Çift onay tamamlandı mı?</p>
               </div>
@@ -4277,13 +4822,13 @@ function MultiAssignmentPanelV2({
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-800 px-5 py-4">
             <Button variant="outline" className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800" onClick={() => setApplyDialogOpen(false)} disabled={isApplying}>
               Vazgeç
             </Button>
             <Button className="bg-fuchsia-600 text-white hover:bg-fuchsia-500" onClick={() => void handleApply()} disabled={!guardResult.allowed || !surfaceValidation?.canApply || isApplying || isValidatingSurface}>
               {isApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Gerçek İşlemi Başlat
+              İşlemi Başlat
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4331,6 +4876,7 @@ function ExcessDurationUpdatePanelV2({
     [preview.rows, selectedRowIds],
   );
   const applySummary = useMemo(() => summarizeApplyResults(applyResults), [applyResults]);
+  const hasApplyResults = applyResults.some((row) => row.status !== "pending");
   const guardResult = useMemo(
     () =>
       canApplyExcessDuration({
@@ -4455,14 +5001,20 @@ function ExcessDurationUpdatePanelV2({
   }, [planHash, selectedRowIds]);
 
   const handleExport = () => {
-    if (preview.rows.length === 0) {
-      toast.error("CSV için indirilebilir fazla süre analizi bulunamadı.");
+    if (!previewGenerated) {
+      toast.error("CSV indirmeden önce analizi oluşturun.");
+      return;
+    }
+
+    const csvRows = [...preview.rows, ...preview.missingRows];
+    if (csvRows.length === 0) {
+      toast.error("CSV için indirilebilir firma verisi bulunamadı.");
       return;
     }
 
     downloadCsv(
       `isgvizyon-fazla-sure-analizi-${new Date().toISOString().slice(0, 10)}.csv`,
-      preview.rows.map((row) => ({
+      csvRows.map((row) => ({
         "Rapor": "İSGVİZYON Fazla Süre Güncelleme Raporu",
         "Firma Adı": row.companyName,
         "SGK No": row.sgkNo,
@@ -4476,6 +5028,15 @@ function ExcessDurationUpdatePanelV2({
         "Durum": row.status,
       })),
     );
+  };
+
+  const handleExportAnalysisReport = () => {
+    if (!previewGenerated) {
+      toast.error("Rapor indirmeden önce analizi oluşturun.");
+      return;
+    }
+
+    drawExcessDurationAnalysisPdf(preview);
   };
 
   const handleExportApplyResults = () => {
@@ -4682,10 +5243,35 @@ function ExcessDurationUpdatePanelV2({
         <Button className="rounded-xl bg-fuchsia-600 text-white hover:bg-fuchsia-500 disabled:bg-slate-700 disabled:text-slate-300" onClick={() => void openApplyDialog()} disabled={!ISGBOT_APPLY_ENABLED || !previewGenerated || selectedRows.length === 0 || isApplying}>
           Gerçek İşlem İçin Onayla
         </Button>
-        <Button variant="outline" className="rounded-xl border-emerald-400/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20" onClick={handleExportApplyResults} disabled={applyResults.filter((row) => row.status !== "pending").length === 0}>
-          Sonuç Raporunu İndir
+        <Button
+          variant="outline"
+          className="rounded-xl border-emerald-400/20 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
+          onClick={hasApplyResults ? handleExportApplyResults : handleExportAnalysisReport}
+          disabled={!previewGenerated && !hasApplyResults}
+        >
+          {hasApplyResults ? "Sonuç Raporunu İndir" : "Analiz Raporunu İndir"}
         </Button>
       </div>
+
+      {previewGenerated && preview.rows.length === 0 && (
+        <Alert className="border-emerald-400/25 bg-emerald-500/10 text-emerald-50">
+          <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+          <AlertTitle>Güncellenecek fazla süre kaydı bulunmadı</AlertTitle>
+          <AlertDescription className="text-emerald-100/80">
+            Sistem {preview.summary.analyzed_company_count} firmayı kontrol etti. Atanmış dakika, gerekli dakikanın üzerinde görünmediği için gerçek İSG-KATİP işlemi başlatılmayacak. Analiz raporunu PDF olarak indirebilirsiniz.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {previewGenerated && preview.missingRows.length > 0 && (
+        <Alert className="border-amber-400/25 bg-amber-500/10 text-amber-50">
+          <AlertCircle className="h-4 w-4 text-amber-300" />
+          <AlertTitle>Hesaplanamayan firma var</AlertTitle>
+          <AlertDescription className="text-amber-100/80">
+            {preview.missingRows.length} firmada atanmış dakika veya gerekli dakika verisi eksik. Bu firmalar için önce senkron/veri kontrolü yapılmalı, ardından analiz tekrar çalıştırılmalıdır.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {previewGenerated && preview.rows.length > 0 && (
         <div className="max-h-[420px] space-y-3 overflow-y-auto rounded-2xl border border-slate-700/70 bg-slate-900/90 p-4 shadow-lg shadow-black/30">
@@ -4782,14 +5368,16 @@ function ExcessDurationUpdatePanelV2({
       )}
 
       <Dialog open={applyDialogOpen} onOpenChange={setApplyDialogOpen}>
-        <DialogContent overlayClassName="z-[65] bg-slate-950/90 backdrop-blur-md" className="z-[70] rounded-2xl border border-slate-700/70 bg-slate-950 text-slate-50 shadow-2xl shadow-black/70 sm:max-w-2xl">
+        <DialogContent overlayClassName="z-[65] bg-slate-950/90 backdrop-blur-md" className="z-[70] max-h-[92vh] overflow-y-auto rounded-2xl border border-slate-700/70 bg-slate-950 p-0 text-slate-50 shadow-2xl shadow-black/70 sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Gerçek İSG-KATİP İşlemi Onayı</DialogTitle>
-            <DialogDescription className="text-slate-300">
-              Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapacaktır. Lütfen işlem planındaki bilgileri kontrol edin.
-            </DialogDescription>
+            <div className="border-b border-slate-800 px-5 py-4">
+              <DialogTitle>İSG-KATİP işlem onayı</DialogTitle>
+              <DialogDescription className="mt-1 text-slate-300">
+                Bu işlem İSG-KATİP üzerinde gerçek değişiklik yapar. Başlamadan önce kayıtları, bağlantıyı ve onay kutularını kontrol edin.
+              </DialogDescription>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 px-5 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <MetricTile label="İşlem türü" value="Canlı Süre Güncelleme" tone="emerald" />
               <MetricTile label="Toplam kayıt" value={preview.rows.length} tone="blue" />
@@ -4799,27 +5387,27 @@ function ExcessDurationUpdatePanelV2({
               <MetricTile label="Tahmini süre" value={`${Math.max(1, selectedRows.length)} dk`} tone="amber" />
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Plan hash / işlem referansı</p>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İşlem referansı</p>
               <p className="mt-2 break-all text-sm font-bold text-white">{planHash || "-"}</p>
-              <p className="mt-2 text-xs text-slate-400">Canlı işlem modu: Teknik limit {ISGBOT_PILOT_LIMIT} kayıttır. Güvenli işlem limiti aşılmamalıdır.</p>
+              <p className="mt-2 text-xs text-slate-400">Güvenli kullanım için ilk denemede yalnızca {ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION} kayıt seçilmelidir. Teknik üst sınır {ISGBOT_PILOT_LIMIT} kayıttır.</p>
             </div>
             <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4 text-sm text-blue-100">
-              <p className="font-bold text-blue-50">Canlı işlem modu aktiftir.</p>
-              <p className="mt-1">İlk aşamada seçili kayıtlar üzerinde gerçek İSG-KATİP işlemi denenmelidir.</p>
+              <p className="font-bold text-blue-50">Canlı işlem hazır.</p>
+              <p className="mt-1">Seçili kayıtlar eklenti üzerinden İSG-KATİP’e gönderilir. Bu nedenle firma ve süre bilgilerini son kez kontrol edin.</p>
             </div>
             <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-4">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İSG-KATİP form doğrulaması</p>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">İSG-KATİP ekran kontrolü</p>
                   <p className="mt-1 text-sm text-slate-300">
                     {isValidatingSurface
-                      ? "İşlem yüzeyi kontrol ediliyor."
+                      ? "İSG-KATİP ekranı kontrol ediliyor."
                       : surfaceValidation?.canApply
-                        ? "Form yüzeyi doğrulandı."
-                        : "Form yüzeyi doğrulanmadan işlem başlatılamaz."}
+                        ? "İSG-KATİP ekranı hazır görünüyor."
+                        : "İSG-KATİP ekranı hazır olmadan işlem başlatılamaz."}
                   </p>
                 </div>
-                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <Button
                     type="button"
                     variant="outline"
@@ -4828,7 +5416,7 @@ function ExcessDurationUpdatePanelV2({
                     onClick={() => window.open(ISGKATIP_PERSON_CARD_URL, "_blank", "noopener,noreferrer")}
                   >
                     <ExternalLink className="mr-2 h-4 w-4" />
-                    İSG-KATİP'i Aç
+                    İSG-KATİP’i Aç
                   </Button>
                   <Button
                     type="button"
@@ -4849,7 +5437,7 @@ function ExcessDurationUpdatePanelV2({
                     disabled={isValidatingSurface}
                   >
                     {isValidatingSurface ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                    Tekrar Doğrula
+                    Ekranı Doğrula
                   </Button>
                 </div>
               </div>
@@ -4857,7 +5445,7 @@ function ExcessDurationUpdatePanelV2({
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
                   <span>Güven: {surfaceValidation.formSurface.confidence || "-"}</span>
                   <span>Bulunan alan: {surfaceValidation.formSurface.requiredFieldsFound ?? 0}</span>
-                  <span>Modül: {surfaceValidation.pageContext?.detectedModule || "-"}</span>
+                  <span>Ekran: {surfaceValidation.pageContext?.detectedModule || "-"}</span>
                 </div>
               ) : null}
               {surfaceValidation?.blockingReasons?.length ? (
@@ -4881,8 +5469,8 @@ function ExcessDurationUpdatePanelV2({
               <div className="mt-3 space-y-2 text-sm text-slate-200">
                 <p>{extensionStatus.isgKatipReady ? "✓" : "•"} İSG-KATİP oturumu açık mı?</p>
                 <p>{extensionStatus.isgKatipOpen ? "✓" : "•"} Doğru İSG-KATİP ekranı açık mı?</p>
-                <p>{surfaceValidation?.canApply ? "✓" : "•"} Form yüzeyi doğrulandı mı?</p>
-                <p>{planHash ? "✓" : "•"} Plan hash geçerli mi?</p>
+                <p>{surfaceValidation?.canApply ? "✓" : "•"} İSG-KATİP ekranı doğrulandı mı?</p>
+                <p>{planHash ? "✓" : "•"} İşlem referansı oluşturuldu mu?</p>
                 <p>{selectedRows.length === ISGBOT_LIVE_PILOT_RECOMMENDED_SELECTION ? "✓" : "•"} Seçili kayıt sayısı ilk canlı test için 1 mi?</p>
                 <p>{reviewedPlan && acceptedRealChange && typedConfirmation.trim().toLocaleUpperCase("tr-TR") === "ONAYLIYORUM" ? "✓" : "•"} Çift onay tamamlandı mı?</p>
               </div>
@@ -4899,13 +5487,13 @@ function ExcessDurationUpdatePanelV2({
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-800 px-5 py-4">
             <Button variant="outline" className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800" onClick={() => setApplyDialogOpen(false)} disabled={isApplying}>
               Vazgeç
             </Button>
             <Button className="bg-fuchsia-600 text-white hover:bg-fuchsia-500" onClick={() => void handleApply()} disabled={!guardResult.allowed || !surfaceValidation?.canApply || isApplying || isValidatingSurface}>
               {isApplying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Gerçek İşlemi Başlat
+              İşlemi Başlat
             </Button>
           </DialogFooter>
         </DialogContent>

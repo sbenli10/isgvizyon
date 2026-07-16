@@ -388,6 +388,15 @@ export function OSGBCompanyAuthorizationPanel({ refreshKey = 0 }: { refreshKey?:
     }
   };
 
+  const handleCopyLoginUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(companyLoginUrl);
+      toast.success("Firma girişi adresi kopyalandı.");
+    } catch {
+      toast.error("Firma girişi adresi kopyalanamadı.");
+    }
+  };
+
   const togglePassword = (accountId: string) => {
     setShownPasswords((current) => {
       const next = new Set(current);
@@ -411,6 +420,36 @@ export function OSGBCompanyAuthorizationPanel({ refreshKey = 0 }: { refreshKey?:
   return (
     <div className="space-y-4 text-slate-100">
       <Header />
+
+      <div className="rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4 shadow-sm shadow-blue-950/20">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-black text-blue-100">
+              <KeyRound className="h-4 w-4" />
+              Firma yetkilisi bu bilgileri nerede kullanır?
+            </div>
+            <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-300">
+              Hesap oluşturduğunuz firmaya giriş adresini, kullanıcı adını ve şifreyi verirsiniz. Firma yetkilisi
+              <span className="font-semibold text-white"> Firma Girişi</span> ekranından giriş yapar; başarılı girişten sonra kendi firma portalına yönlendirilir.
+              Portalda firma için paylaşılan evraklar, belge yükleme alanı, hizmet/ziyaret özetleri ve cari bilgiler görüntülenir.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+              <span className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1">1. Hesap oluştur</span>
+              <span className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1">2. Kopyala ikonuyla bilgileri paylaş</span>
+              <span className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1">3. Firma /firma-girisi ekranından girer</span>
+              <span className="rounded-lg border border-slate-700 bg-slate-950/60 px-2.5 py-1">4. Kendi portalına yönlenir</span>
+            </div>
+          </div>
+          <div className="shrink-0 rounded-xl border border-slate-700/70 bg-slate-950/70 p-3">
+            <div className="text-[11px] font-black uppercase tracking-wider text-slate-500">Giriş adresi</div>
+            <div className="mt-1 max-w-[360px] truncate font-mono text-xs text-slate-200">{companyLoginUrl}</div>
+            <Button type="button" variant="outline" onClick={() => void handleCopyLoginUrl()} className="mt-3 h-9 w-full rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 hover:text-white">
+              <Copy className="mr-2 h-4 w-4" />
+              Giriş adresini kopyala
+            </Button>
+          </div>
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-3 shadow-sm shadow-black/10 sm:p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center">

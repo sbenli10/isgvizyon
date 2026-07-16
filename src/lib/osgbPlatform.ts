@@ -847,7 +847,14 @@ export const authenticateOsgbCompanyPortalAccount = async (
     p_password: password,
   });
 
-  if (error) throw error;
+  if (error) {
+    const status = Number((error as { status?: number }).status || 0);
+    const message = String((error as { message?: string }).message || "");
+    if (status === 404 || message.toLocaleLowerCase("tr-TR").includes("could not find the function")) {
+      throw new Error("Firma portal girişi henüz veritabanında aktif değil. Supabase migration dosyasını uygulayın: 20260715120000_add_osgb_company_portal_account_login.sql");
+    }
+    throw error;
+  }
   if (!data?.ok || !data?.access_token || !data?.portal_path) {
     throw new Error(data?.message || "Firma giris bilgileri dogrulanamadi.");
   }
