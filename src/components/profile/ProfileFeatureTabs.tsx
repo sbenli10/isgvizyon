@@ -316,7 +316,7 @@ function safePdfText(value?: string | number | null) {
 }
 
 function getAutoTableFinalY(doc: jsPDF, fallback = 30) {
-  return (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ? fallback;
+  return (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ?? fallback;
 }
 
 function getFriendlyEmployeeError(error: unknown) {
@@ -469,7 +469,7 @@ function normalizeSpreadsheetHeader(value: string) {
 function getSpreadsheetValue(row: GenericRecord, aliases: string[]) {
   const aliasSet = new Set(aliases.map(normalizeSpreadsheetHeader));
   const entry = Object.entries(row).find(([key]) => aliasSet.has(normalizeSpreadsheetHeader(key)));
-  return entry?.[1] ? "";
+  return entry?.[1] ?? "";
 }
 
 async function safeCount(table: string, filters?: (query: any) => any) {
@@ -835,7 +835,7 @@ export function ProfileCompaniesTab() {
       branch_name: company?.branch_name || "",
       address: company?.address || "",
       sgk_number: company?.sgk_number || "",
-      employee_count: String(company?.employee_count ? 0),
+      employee_count: String(company?.employee_count ?? 0),
       hazard_class: company?.hazard_class || "Az Tehlikeli",
       visit_frequency: company?.visit_frequency || "Ayda 1 Defa",
       employer_representative_name: company?.employer_representative_name || "",
@@ -1198,8 +1198,8 @@ export function ProfileCompaniesTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3">{company.sgk_number || "-"}</td>
-                  <td className="px-4 py-3">{company.employee_count ? "-"}</td>
-                  <td className="px-4 py-3"><span className="font-bold text-violet-300">{company.used_minutes ? 0} dk.</span></td>
+                  <td className="px-4 py-3">{company.employee_count ?? "-"}</td>
+                  <td className="px-4 py-3"><span className="font-bold text-violet-300">{company.used_minutes ?? 0} dk.</span></td>
                   <td className="px-4 py-3"><Badge className="bg-emerald-500/10 text-emerald-300">{company.hazard_class || "Az Tehlikeli"}</Badge></td>
                   <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                     <div className="flex gap-2">
