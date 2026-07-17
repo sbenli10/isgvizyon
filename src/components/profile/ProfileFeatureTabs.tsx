@@ -747,7 +747,7 @@ export function ProfileCompaniesTab() {
   const [query, setQuery] = useState("");
   const [companies, setCompanies] = useState<CompanyRow[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogTab, setDialogTab] = useState<"edit" | "assignments" | "employees" | "emergency" | "reports" | "documents">("edit");
+  const [dialogTab, setDialogTab] = useState<"edit" | "assignments" | "employees" | "reports" | "documents">("edit");
   const [editingCompany, setEditingCompany] = useState<CompanyRow | null>(null);
   const [companyEmployees, setCompanyEmployees] = useState<EmployeeRow[]>([]);
   const [bulkCompanyOpen, setBulkCompanyOpen] = useState(false);
@@ -1103,7 +1103,6 @@ export function ProfileCompaniesTab() {
     { id: "edit" as const, label: "Düzenle", icon: Building2, tone: "data-[active=true]:bg-blue-600" },
     { id: "assignments" as const, label: "Atamalar", icon: Users, tone: "data-[active=true]:bg-fuchsia-600" },
     { id: "employees" as const, label: "Çalışanlar", icon: Users, tone: "data-[active=true]:bg-emerald-600" },
-    { id: "emergency" as const, label: "Acil Durum Ekipleri", icon: ShieldCheck, tone: "data-[active=true]:bg-amber-600" },
     { id: "reports" as const, label: "Raporlar", icon: FileText, tone: "data-[active=true]:bg-orange-500" },
     { id: "documents" as const, label: "Evrak Takip", icon: ClipboardList, tone: "data-[active=true]:bg-cyan-600" },
   ];
@@ -1202,11 +1201,11 @@ export function ProfileCompaniesTab() {
         </DialogContent>
       </Dialog>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[calc(100dvh-32px)] overflow-y-auto border-slate-700 bg-slate-900 text-slate-100 sm:max-w-3xl">
+        <DialogContent className="w-[calc(100vw-24px)] max-w-[860px] max-h-[calc(100dvh-32px)] overflow-y-auto border-slate-700 bg-slate-900 text-slate-100 sm:max-w-[860px]">
           <DialogHeader className="sr-only">
             <DialogTitle>{editingCompany ? "Firma Düzenle" : "Firma Ekle"}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-700 bg-slate-950/60 p-1 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-700 bg-slate-950/60 p-1 sm:grid-cols-3 lg:grid-cols-5">
             {dialogTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -1254,62 +1253,89 @@ export function ProfileCompaniesTab() {
             </div>
           ) : dialogTab === "assignments" ? (
             <div className="space-y-5">
-              <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
-                <p className="text-sm font-black text-white">Risk Değerlendirme ve ADEP Yetkilileri</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Bu bilgiler firma seçildiğinde Risk Analiz, Acil Durum Planı ve atama evraklarına otomatik aktarılır.
-                </p>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {assignmentDetailRoles.map((item) => {
-                  const nameKey = `${item.role}_name` as keyof AssignmentDetailForm;
-                  const tcKey = `${item.role}_tc_no` as keyof AssignmentDetailForm;
-                  const phoneKey = `${item.role}_phone` as keyof AssignmentDetailForm;
-                  const certificateKey = `${item.role}_certificate_no` as keyof AssignmentDetailForm;
-
-                  return (
-                    <div key={item.role} className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4 shadow-sm">
-                      <div className="mb-4 flex items-start gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-fuchsia-500/10 text-fuchsia-200">
-                          <Users className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <p className="font-black text-white">{item.title}</p>
-                          <p className="mt-1 text-xs leading-relaxed text-slate-400">{item.description}</p>
-                        </div>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="space-y-1.5 sm:col-span-2">
-                          <Label>Ad Soyad</Label>
-                          <Input value={companyForm[nameKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [nameKey]: event.target.value })} placeholder={`${item.title} ad soyad`} className="rounded-xl border-slate-700 bg-slate-800" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label>T.C. Kimlik No</Label>
-                          <Input maxLength={11} inputMode="numeric" value={companyForm[tcKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [tcKey]: event.target.value.replace(/\D/g, "").slice(0, 11) })} placeholder="11 haneli" className="rounded-xl border-slate-700 bg-slate-800" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label>Telefon</Label>
-                          <Input value={companyForm[phoneKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [phoneKey]: event.target.value })} placeholder="Telefon" className="rounded-xl border-slate-700 bg-slate-800" />
-                        </div>
-                        {item.showCertificate ? (
-                          <div className="space-y-1.5 sm:col-span-2">
-                            <Label>Sertifika No / Ek Bilgi</Label>
-                            <Input value={companyForm[certificateKey] || ""} onChange={(event) => setCompanyForm({ ...companyForm, [certificateKey]: event.target.value })} placeholder="Sertifika no veya ek bilgi" className="rounded-xl border-slate-700 bg-slate-800" />
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div>
-                <p className="border-l-4 border-emerald-500 pl-3 text-sm font-black text-white">Destek Elemanları Atamaları</p>
-                <div className="mt-4 rounded-2xl border border-slate-700 p-4 text-center text-sm font-semibold text-amber-300">
-                  Destek elemanları ataması yapmak için firma kaydedilmiş olmalıdır. Lütfen önce formun altındaki “Kaydet” butonuna tıklayarak firmayı kaydedin.
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-700 pb-2">
+                  <span className="h-5 w-1 rounded-full bg-blue-500" />
+                  <h3 className="text-sm font-black text-white">Risk Değerlendirme Ekibi</h3>
                 </div>
-              </div>
-            </div>
-          ) : dialogTab === "employees" ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400">ISveren / Vekili</Label>
+                    <Input value={companyForm.employer_representative_name} onChange={(event) => setCompanyForm({ ...companyForm, employer_representative_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400">IS G�venliGi Uzmani</Label>
+                    <Input value={companyForm.occupational_safety_specialist_name} onChange={(event) => setCompanyForm({ ...companyForm, occupational_safety_specialist_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400">ISyeri Hekimi</Label>
+                    <Input value={companyForm.workplace_doctor_name} onChange={(event) => setCompanyForm({ ...companyForm, workplace_doctor_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-slate-400">�aliSan Temsilcisi</Label>
+                    <Input value={companyForm.employee_representative_name} onChange={(event) => setCompanyForm({ ...companyForm, employee_representative_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
+                  </div>
+                  <div className="space-y-1.5 lg:col-span-2">
+                    <Label className="text-xs text-slate-400">Bilgi Sahibi �aliSan</Label>
+                    <Input value={companyForm.knowledgeable_employee_name} onChange={(event) => setCompanyForm({ ...companyForm, knowledgeable_employee_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-4">
+                <div className="flex items-center gap-2 border-b border-slate-700 pb-2">
+                  <span className="h-5 w-1 rounded-full bg-emerald-500" />
+                  <h3 className="text-sm font-black text-white">Destek Elemanları Atamaları</h3>
+                </div>
+                {companyEmployees.length === 0 ? (
+                  <div className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-200">
+                    Bu firmaya hen�z �aliSan eklenmemiS. ASaGidan manuel olarak isim yazarak da destek elemani ekleyebilirsiniz.
+                  </div>
+                ) : null}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {emergencyTeamRoles.map((role) => {
+                    const person = companyForm.emergency_team_info[role.key];
+                    const employee = companyEmployees.find((item) => item.id === person.employee_id);
+                    const selectedLabel = employee ? fullEmployeeName(employee) : person.full_name;
+
+                    return (
+                      <div key={role.key} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label className="text-xs text-slate-400">{role.label.replace(" Ekip BaSkani", " Ekibi").replace("T�m Birimlerden Bilgi Sahibi", "Acil Durum Koordinat�r�")}</Label>
+                          <span className="text-[11px] font-bold text-rose-300">Asgari 1 � Se�. {selectedLabel ? 1 : 0} � {selectedLabel ? 0 : 1} eksik</span>
+                        </div>
+                        <Select
+                          value={person.employee_id || employeeSelectManualValue}
+                          onValueChange={(employeeId) => {
+                            if (employeeId === employeeSelectManualValue) {
+                              updateEmergencyTeamPerson(role.key, { employee_id: "" });
+                              return;
+                            }
+                            const selectedEmployee = companyEmployees.find((item) => item.id === employeeId);
+                            updateEmergencyTeamPerson(role.key, {
+                              employee_id: employeeId,
+                              full_name: selectedEmployee ? fullEmployeeName(selectedEmployee) : person.full_name,
+                              tc_no: selectedEmployee?.tc_number || person.tc_no,
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="h-11 rounded-xl border-slate-600 bg-slate-800 text-slate-200">
+                            <SelectValue placeholder="�aliSan Se� veya Isim Yaz..." />
+                          </SelectTrigger>
+                          <SelectContent className="z-[140] border-slate-700 bg-slate-900 text-slate-100">
+                            <SelectItem value={employeeSelectManualValue}>Manuel isim yaz</SelectItem>
+                            {companyEmployees.map((employeeRow) => (
+                              <SelectItem key={employeeRow.id} value={employeeRow.id}>{fullEmployeeName(employeeRow)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input value={person.full_name} onChange={(event) => updateEmergencyTeamPerson(role.key, { full_name: event.target.value, employee_id: "" })} placeholder="�aliSan se� veya isim yaz..." className="h-10 rounded-xl border-slate-700 bg-slate-900 text-sm" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>          ) : dialogTab === "employees" ? (
             editingCompany ? (
               <div className="space-y-3">
                 {companyEmployees.length === 0 ? (
@@ -1346,77 +1372,6 @@ export function ProfileCompaniesTab() {
                 Çalışan listesini görmek için firma kaydedilmiş olmalıdır. Lütfen önce firmayı kaydedin.
               </div>
             )
-          ) : dialogTab === "emergency" ? (
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
-                <p className="text-sm font-black text-white">Acil Durum Ekip Başkanları</p>
-                <p className="mt-1 text-xs leading-relaxed text-amber-100/80">
-                  Çalışan seçerseniz ad soyad ve T.C. bilgisi otomatik dolar. İsterseniz alanları manuel düzenleyebilirsiniz.
-                </p>
-              </div>
-              {!editingCompany ? (
-                <div className="rounded-2xl border border-slate-700 p-4 text-sm font-semibold text-amber-300">
-                  Çalışan seçimi firma kaydedildikten sonra aktif olur. Bu aşamada alanları manuel doldurabilirsiniz.
-                </div>
-              ) : null}
-              <div className="grid gap-4 lg:grid-cols-2">
-                {emergencyTeamRoles.map((role) => {
-                  const person = companyForm.emergency_team_info[role.key];
-                  return (
-                    <div key={role.key} className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
-                      <div className="mb-4 flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-200">
-                          <ShieldCheck className="h-4 w-4" />
-                        </span>
-                        <p className="font-black text-white">{role.label}</p>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="space-y-1.5">
-                          <Label>Çalışan Seç</Label>
-                          <Select
-                            value={person.employee_id || employeeSelectManualValue}
-                            onValueChange={(employeeId) => {
-                              if (employeeId === employeeSelectManualValue) {
-                                updateEmergencyTeamPerson(role.key, { employee_id: "" });
-                                return;
-                              }
-                              const employee = companyEmployees.find((item) => item.id === employeeId);
-                              updateEmergencyTeamPerson(role.key, {
-                                employee_id: employeeId,
-                                full_name: employee ? fullEmployeeName(employee) : person.full_name,
-                                tc_no: employee?.tc_number || person.tc_no,
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="rounded-xl border-slate-700 bg-slate-800">
-                              <SelectValue placeholder="Çalışan seç" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={employeeSelectManualValue}>Çalışan seç</SelectItem>
-                              {companyEmployees.map((employee) => (
-                                <SelectItem key={employee.id} value={employee.id}>
-                                  {fullEmployeeName(employee)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="space-y-1.5">
-                            <Label>Ad Soyad</Label>
-                            <Input value={person.full_name} onChange={(event) => updateEmergencyTeamPerson(role.key, { full_name: event.target.value })} placeholder="Ad soyad" className="rounded-xl border-slate-700 bg-slate-800" />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label>T.C. Kimlik No</Label>
-                            <Input maxLength={11} inputMode="numeric" value={person.tc_no} onChange={(event) => updateEmergencyTeamPerson(role.key, { tc_no: event.target.value.replace(/\D/g, "").slice(0, 11) })} placeholder="11 haneli" className="rounded-xl border-slate-700 bg-slate-800" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           ) : dialogTab === "reports" ? (
             editingCompany ? (
               <div className="space-y-4">
@@ -1866,7 +1821,7 @@ export function ProfileEmployeesTab() {
                 <Button type="button" variant="outline" onClick={() => void downloadEmployeeTemplate()} className="h-11 rounded-lg border-dashed border-slate-600 bg-slate-800 text-slate-300 hover:bg-slate-700">
                   Şablon Excel İndir
                 </Button>
-                <Button type="button" onClick={() => employeeFileInputRef.current?.click()} className="h-11 rounded-lg border border-dashed border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100">
+                <Button type="button" onClick={() => employeeFileInputRef.current?.click()} className="h-11 rounded-lg border border-emerald-200 bg-emerald-300 font-black text-slate-950 shadow-sm shadow-emerald-950/20 hover:bg-emerald-200 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
                   <Upload className="mr-2 h-4 w-4" />
                   Excel Dosyası Seç
                 </Button>
