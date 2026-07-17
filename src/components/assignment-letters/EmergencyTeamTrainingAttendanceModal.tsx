@@ -75,8 +75,13 @@ const employeeFullName = (employee: Employee) =>
 const companyAddress = (company?: Company | null) =>
   [company?.address, company?.district, company?.city].filter(Boolean).join(", ");
 
-const namedParticipant = (fullName: string | undefined, team: string): EmergencyTeamTrainingParticipant | null =>
-  fullName?.trim() ? { fullName: fullName.trim(), tcNo: "", team } : null;
+const namedParticipants = (
+  people: Array<{ fullName: string; tcNo: string }>,
+  team: string,
+): EmergencyTeamTrainingParticipant[] =>
+  people
+    .filter((person) => person.fullName.trim())
+    .map((person) => ({ fullName: person.fullName.trim(), tcNo: person.tcNo || "", team }));
 
 export function EmergencyTeamTrainingAttendanceModal({
   open,

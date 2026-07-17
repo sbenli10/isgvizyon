@@ -35,6 +35,7 @@
   fire_support_person_name?: string;
   first_aid_support_person_name?: string;
   evacuation_support_person_name?: string;
+  emergency_team_info?: unknown;
   created_at: string;
   updated_at: string;
   is_active: boolean;

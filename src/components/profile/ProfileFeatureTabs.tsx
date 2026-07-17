@@ -153,10 +153,14 @@ const emptyText = "Henüz kayıt yok";
 
 type EmergencyTeamRoleKey = "all_units_contact" | "fire_chief" | "rescue_chief" | "protection_chief" | "first_aid_chief";
 
-type EmergencyTeamPerson = {
+type EmergencyTeamMember = {
   employee_id: string;
   full_name: string;
   tc_no: string;
+};
+
+type EmergencyTeamPerson = EmergencyTeamMember & {
+  members: EmergencyTeamMember[];
 };
 
 type EmergencyTeamInfo = Record<EmergencyTeamRoleKey, EmergencyTeamPerson>;
@@ -197,8 +201,16 @@ const defaultDocumentTrackingNames = [
 
 const employeeSelectManualValue = "__manual__";
 
-function emptyEmergencyTeamPerson(): EmergencyTeamPerson {
+function emptyEmergencyTeamMember(): EmergencyTeamMember {
   return { employee_id: "", full_name: "", tc_no: "" };
+}
+
+function emptyEmergencyTeamMembers(): EmergencyTeamMember[] {
+  return Array.from({ length: 3 }, () => emptyEmergencyTeamMember());
+}
+
+function emptyEmergencyTeamPerson(): EmergencyTeamPerson {
+  return { ...emptyEmergencyTeamMember(), members: emptyEmergencyTeamMembers() };
 }
 
 function emptyEmergencyTeamInfo(): EmergencyTeamInfo {
@@ -211,26 +223,46 @@ function emptyEmergencyTeamInfo(): EmergencyTeamInfo {
   };
 }
 
+function normalizeEmergencyTeamMember(value: unknown): EmergencyTeamMember {
+  const item = value && typeof value === "object" ? (value as Partial<EmergencyTeamMember>) : {};
+  return {
+    employee_id: typeof item.employee_id === "string" ? item.employee_id : "",
+    full_name: typeof item.full_name === "string" ? item.full_name : "",
+    tc_no: typeof item.tc_no === "string" ? item.tc_no : "",
+  };
+}
+
+function normalizeEmergencyTeamMembers(value: unknown): EmergencyTeamMember[] {
+  const rows = Array.isArray(value) ? value.slice(0, 3).map(normalizeEmergencyTeamMember) : [];
+  return [...rows, ...emptyEmergencyTeamMembers()].slice(0, 3);
+}
+
 function normalizeEmergencyTeamInfo(value: unknown): EmergencyTeamInfo {
   const source = value && typeof value === "object" ? (value as Partial<Record<EmergencyTeamRoleKey, Partial<EmergencyTeamPerson>>>) : {};
   return emergencyTeamRoles.reduce((acc, role) => {
     const item = source[role.key] || {};
     acc[role.key] = {
-      employee_id: typeof item.employee_id === "string" ? item.employee_id : "",
-      full_name: typeof item.full_name === "string" ? item.full_name : "",
-      tc_no: typeof item.tc_no === "string" ? item.tc_no : "",
+      ...normalizeEmergencyTeamMember(item),
+      members: normalizeEmergencyTeamMembers((item as Partial<EmergencyTeamPerson>).members),
     };
     return acc;
   }, emptyEmergencyTeamInfo());
 }
 
+function sanitizeEmergencyTeamMember(value: EmergencyTeamMember) {
+  return {
+    employee_id: value.employee_id.trim() || null,
+    full_name: value.full_name.trim() || null,
+    tc_no: value.tc_no.trim() || null,
+  };
+}
+
 function sanitizeEmergencyTeamInfo(value: EmergencyTeamInfo) {
-  return emergencyTeamRoles.reduce<Record<string, { employee_id: string | null; full_name: string | null; tc_no: string | null }>>((acc, role) => {
+  return emergencyTeamRoles.reduce<Record<string, { employee_id: string | null; full_name: string | null; tc_no: string | null; members: ReturnType<typeof sanitizeEmergencyTeamMember>[] }>>((acc, role) => {
     const item = value[role.key] || emptyEmergencyTeamPerson();
     acc[role.key] = {
-      employee_id: item.employee_id.trim() || null,
-      full_name: item.full_name.trim() || null,
-      tc_no: item.tc_no.trim() || null,
+      ...sanitizeEmergencyTeamMember(item),
+      members: item.members.map(sanitizeEmergencyTeamMember),
     };
     return acc;
   }, {});
@@ -284,7 +316,7 @@ function safePdfText(value?: string | number | null) {
 }
 
 function getAutoTableFinalY(doc: jsPDF, fallback = 30) {
-  return (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ?? fallback;
+  return (doc as JsPdfWithAutoTable).lastAutoTable?.finalY ? fallback;
 }
 
 function getFriendlyEmployeeError(error: unknown) {
@@ -437,7 +469,7 @@ function normalizeSpreadsheetHeader(value: string) {
 function getSpreadsheetValue(row: GenericRecord, aliases: string[]) {
   const aliasSet = new Set(aliases.map(normalizeSpreadsheetHeader));
   const entry = Object.entries(row).find(([key]) => aliasSet.has(normalizeSpreadsheetHeader(key)));
-  return entry?.[1] ?? "";
+  return entry?.[1] ? "";
 }
 
 async function safeCount(table: string, filters?: (query: any) => any) {
@@ -803,7 +835,7 @@ export function ProfileCompaniesTab() {
       branch_name: company?.branch_name || "",
       address: company?.address || "",
       sgk_number: company?.sgk_number || "",
-      employee_count: String(company?.employee_count ?? 0),
+      employee_count: String(company?.employee_count ? 0),
       hazard_class: company?.hazard_class || "Az Tehlikeli",
       visit_frequency: company?.visit_frequency || "Ayda 1 Defa",
       employer_representative_name: company?.employer_representative_name || "",
@@ -988,6 +1020,21 @@ export function ProfileCompaniesTab() {
     }));
   };
 
+  const updateEmergencyTeamMember = (role: EmergencyTeamRoleKey, index: number, patch: Partial<EmergencyTeamMember>) => {
+    setCompanyForm((current) => ({
+      ...current,
+      emergency_team_info: {
+        ...current.emergency_team_info,
+        [role]: {
+          ...current.emergency_team_info[role],
+          members: current.emergency_team_info[role].members.map((member, memberIndex) =>
+            memberIndex === index ? { ...member, ...patch } : member,
+          ),
+        },
+      },
+    }));
+  };
+
   const updateDocumentTrackingRow = (rowId: string, patch: Partial<CompanyDocumentTrackingItem>) => {
     setCompanyForm((current) => ({
       ...current,
@@ -1151,8 +1198,8 @@ export function ProfileCompaniesTab() {
                     </div>
                   </td>
                   <td className="px-4 py-3">{company.sgk_number || "-"}</td>
-                  <td className="px-4 py-3">{company.employee_count ?? "-"}</td>
-                  <td className="px-4 py-3"><span className="font-bold text-violet-300">{company.used_minutes ?? 0} dk.</span></td>
+                  <td className="px-4 py-3">{company.employee_count ? "-"}</td>
+                  <td className="px-4 py-3"><span className="font-bold text-violet-300">{company.used_minutes ? 0} dk.</span></td>
                   <td className="px-4 py-3"><Badge className="bg-emerald-500/10 text-emerald-300">{company.hazard_class || "Az Tehlikeli"}</Badge></td>
                   <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
                     <div className="flex gap-2">
@@ -1260,23 +1307,23 @@ export function ProfileCompaniesTab() {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-400">ISveren / Vekili</Label>
+                    <Label className="text-xs text-slate-400">İşveren / Vekili</Label>
                     <Input value={companyForm.employer_representative_name} onChange={(event) => setCompanyForm({ ...companyForm, employer_representative_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-400">IS G�venliGi Uzmani</Label>
+                    <Label className="text-xs text-slate-400">İş Güvenliği Uzmanı</Label>
                     <Input value={companyForm.occupational_safety_specialist_name} onChange={(event) => setCompanyForm({ ...companyForm, occupational_safety_specialist_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-400">ISyeri Hekimi</Label>
+                    <Label className="text-xs text-slate-400">İşyeri Hekimi</Label>
                     <Input value={companyForm.workplace_doctor_name} onChange={(event) => setCompanyForm({ ...companyForm, workplace_doctor_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-slate-400">�aliSan Temsilcisi</Label>
+                    <Label className="text-xs text-slate-400">Çalışan Temsilcisi</Label>
                     <Input value={companyForm.employee_representative_name} onChange={(event) => setCompanyForm({ ...companyForm, employee_representative_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
                   </div>
                   <div className="space-y-1.5 lg:col-span-2">
-                    <Label className="text-xs text-slate-400">Bilgi Sahibi �aliSan</Label>
+                    <Label className="text-xs text-slate-400">Bilgi Sahibi Çalışan</Label>
                     <Input value={companyForm.knowledgeable_employee_name} onChange={(event) => setCompanyForm({ ...companyForm, knowledgeable_employee_name: event.target.value })} className="h-10 rounded-xl border-slate-600 bg-slate-800" />
                   </div>
                 </div>
@@ -1289,50 +1336,90 @@ export function ProfileCompaniesTab() {
                 </div>
                 {companyEmployees.length === 0 ? (
                   <div className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-200">
-                    Bu firmaya hen�z �aliSan eklenmemiS. ASaGidan manuel olarak isim yazarak da destek elemani ekleyebilirsiniz.
+                    Bu firmaya henüz çalışan eklenmemiş. Aşağıdan manuel olarak isim yazarak da destek elemanı ekleyebilirsiniz.
                   </div>
                 ) : null}
                 <div className="grid gap-4 lg:grid-cols-2">
-                  {emergencyTeamRoles.map((role) => {
-                    const person = companyForm.emergency_team_info[role.key];
-                    const employee = companyEmployees.find((item) => item.id === person.employee_id);
-                    const selectedLabel = employee ? fullEmployeeName(employee) : person.full_name;
+                {emergencyTeamRoles.map((role) => {
+                  const person = companyForm.emergency_team_info[role.key];
+                  const employee = companyEmployees.find((item) => item.id === person.employee_id);
+                  const selectedLabel = employee ? fullEmployeeName(employee) : person.full_name;
+                  const roleLabel = role.label
+                    .replace(" Ekip Başkanı", " Ekibi")
+                    .replace("Tüm Birimlerden Bilgi Sahibi", "Acil Durum Koordinatörü");
+                  const showMembers = role.key !== "all_units_contact";
+                  const selectedCount = (selectedLabel ? 1 : 0) + (showMembers ? person.members.filter((member) => member.full_name.trim()).length : 0);
+                  const requiredCount = showMembers ? 4 : 1;
 
-                    return (
-                      <div key={role.key} className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label className="text-xs text-slate-400">{role.label.replace(" Ekip BaSkani", " Ekibi").replace("T�m Birimlerden Bilgi Sahibi", "Acil Durum Koordinat�r�")}</Label>
-                          <span className="text-[11px] font-bold text-rose-300">Asgari 1 � Se�. {selectedLabel ? 1 : 0} � {selectedLabel ? 0 : 1} eksik</span>
-                        </div>
-                        <Select
-                          value={person.employee_id || employeeSelectManualValue}
-                          onValueChange={(employeeId) => {
-                            if (employeeId === employeeSelectManualValue) {
-                              updateEmergencyTeamPerson(role.key, { employee_id: "" });
-                              return;
-                            }
-                            const selectedEmployee = companyEmployees.find((item) => item.id === employeeId);
-                            updateEmergencyTeamPerson(role.key, {
-                              employee_id: employeeId,
-                              full_name: selectedEmployee ? fullEmployeeName(selectedEmployee) : person.full_name,
-                              tc_no: selectedEmployee?.tc_number || person.tc_no,
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="h-11 rounded-xl border-slate-600 bg-slate-800 text-slate-200">
-                            <SelectValue placeholder="�aliSan Se� veya Isim Yaz..." />
-                          </SelectTrigger>
-                          <SelectContent className="z-[140] border-slate-700 bg-slate-900 text-slate-100">
-                            <SelectItem value={employeeSelectManualValue}>Manuel isim yaz</SelectItem>
-                            {companyEmployees.map((employeeRow) => (
-                              <SelectItem key={employeeRow.id} value={employeeRow.id}>{fullEmployeeName(employeeRow)}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Input value={person.full_name} onChange={(event) => updateEmergencyTeamPerson(role.key, { full_name: event.target.value, employee_id: "" })} placeholder="�aliSan se� veya isim yaz..." className="h-10 rounded-xl border-slate-700 bg-slate-900 text-sm" />
+                  return (
+                    <div key={role.key} className="space-y-2 rounded-xl border border-slate-800/80 bg-slate-950/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs font-bold text-slate-300">{roleLabel}</Label>
+                        <span className="text-[11px] font-bold text-rose-300">Asgari {requiredCount} · Seç. {selectedCount} · {Math.max(0, requiredCount - selectedCount)} eksik</span>
                       </div>
-                    );
-                  })}
+                      <Select
+                        value={person.employee_id || employeeSelectManualValue}
+                        onValueChange={(employeeId) => {
+                          if (employeeId === employeeSelectManualValue) {
+                            updateEmergencyTeamPerson(role.key, { employee_id: "" });
+                            return;
+                          }
+                          const selectedEmployee = companyEmployees.find((item) => item.id === employeeId);
+                          updateEmergencyTeamPerson(role.key, {
+                            employee_id: employeeId,
+                            full_name: selectedEmployee ? fullEmployeeName(selectedEmployee) : person.full_name,
+                            tc_no: selectedEmployee?.tc_number || person.tc_no,
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl border-slate-600 bg-slate-800 text-slate-200">
+                          <SelectValue placeholder="Başkan seç veya isim yaz..." />
+                        </SelectTrigger>
+                        <SelectContent className="z-[140] border-slate-700 bg-slate-900 text-slate-100">
+                          <SelectItem value={employeeSelectManualValue}>Manuel isim yaz</SelectItem>
+                          {companyEmployees.map((employeeRow) => (
+                            <SelectItem key={employeeRow.id} value={employeeRow.id}>{fullEmployeeName(employeeRow)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input value={person.full_name} onChange={(event) => updateEmergencyTeamPerson(role.key, { full_name: event.target.value, employee_id: "" })} placeholder="Başkan adı soyadı..." className="h-10 rounded-xl border-slate-700 bg-slate-900 text-sm" />
+                      {showMembers ? (
+                        <div className="grid gap-2 pt-1">
+                          {person.members.map((member, memberIndex) => (
+                            <div key={role.key + "-member-" + memberIndex} className="grid gap-2 sm:grid-cols-[1fr_1fr]">
+                              <Select
+                                value={member.employee_id || employeeSelectManualValue}
+                                onValueChange={(employeeId) => {
+                                  if (employeeId === employeeSelectManualValue) {
+                                    updateEmergencyTeamMember(role.key, memberIndex, { employee_id: "" });
+                                    return;
+                                  }
+                                  const selectedEmployee = companyEmployees.find((item) => item.id === employeeId);
+                                  updateEmergencyTeamMember(role.key, memberIndex, {
+                                    employee_id: employeeId,
+                                    full_name: selectedEmployee ? fullEmployeeName(selectedEmployee) : member.full_name,
+                                    tc_no: selectedEmployee?.tc_number || member.tc_no,
+                                  });
+                                }}
+                              >
+                                <SelectTrigger className="h-10 rounded-xl border-slate-700 bg-slate-900 text-slate-200">
+                                  <SelectValue placeholder={(memberIndex + 1) + ". ekip üyesi seç"} />
+                                </SelectTrigger>
+                                <SelectContent className="z-[140] border-slate-700 bg-slate-900 text-slate-100">
+                                  <SelectItem value={employeeSelectManualValue}>Manuel isim yaz</SelectItem>
+                                  {companyEmployees.map((employeeRow) => (
+                                    <SelectItem key={employeeRow.id} value={employeeRow.id}>{fullEmployeeName(employeeRow)}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input value={member.full_name} onChange={(event) => updateEmergencyTeamMember(role.key, memberIndex, { full_name: event.target.value, employee_id: "" })} placeholder={(memberIndex + 1) + ". ekip üyesi"} className="h-10 rounded-xl border-slate-700 bg-slate-900 text-sm" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
                 </div>
               </section>
             </div>          ) : dialogTab === "employees" ? (

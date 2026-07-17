@@ -28,7 +28,7 @@ type EmergencySupportAssignmentModalProps = {
 const teamMeta: Array<{ key: EmergencySupportTeamKey; title: string; rows: number }> = [
   { key: "rescue", title: "Kurtarma Ekibi", rows: 4 },
   { key: "fire", title: "Söndürme Ekibi", rows: 4 },
-  { key: "firstAid", title: "İlkyardım Ekibi", rows: 10 },
+  { key: "firstAid", title: "İlk Yardım Ekibi", rows: 10 },
   { key: "protection", title: "Koruma Ekibi", rows: 4 },
 ];
 
@@ -51,14 +51,15 @@ const participantKey = (participant: EmergencySupportAssignmentParticipant) =>
 const employeeKey = (employee: Employee) =>
   (employee.tc_number || employeeFullName(employee)).toLocaleLowerCase("tr-TR").replace(/\s+/g, " ").trim();
 
-const putFirst = (
+const putTeamPeople = (
   teams: TeamState,
   key: EmergencySupportTeamKey,
-  fullName?: string,
-  tcNo?: string,
+  people: Array<{ fullName: string; tcNo: string }>,
 ) => {
-  if (!fullName?.trim()) return;
-  teams[key][0] = { fullName: fullName.trim(), tcNo: tcNo || "" };
+  people.slice(0, teams[key].length).forEach((person, index) => {
+    if (!person.fullName.trim()) return;
+    teams[key][index] = { fullName: person.fullName.trim(), tcNo: person.tcNo || "" };
+  });
 };
 
 export function EmergencySupportAssignmentModal({
@@ -98,10 +99,10 @@ export function EmergencySupportAssignmentModal({
     const fields = getProfileCompanyDocumentFields(company);
     const nextTeams = emptyTeams();
 
-    putFirst(nextTeams, "rescue", fields.evacuationSupportPersonName);
-    putFirst(nextTeams, "fire", fields.fireSupportPersonName);
-    putFirst(nextTeams, "firstAid", fields.firstAidSupportPersonName);
-    putFirst(nextTeams, "protection", fields.knowledgeableEmployeeName || fields.employeeRepresentativeName);
+    putTeamPeople(nextTeams, "rescue", fields.emergencyTeams.rescue);
+    putTeamPeople(nextTeams, "fire", fields.emergencyTeams.fire);
+    putTeamPeople(nextTeams, "firstAid", fields.emergencyTeams.firstAid);
+    putTeamPeople(nextTeams, "protection", fields.emergencyTeams.protection);
 
     setWorkplaceTitle(getProfileCompanyDisplayName(company));
     setWorkplaceRegistrationNo(getProfileCompanyRegistryNo(company));
