@@ -412,6 +412,29 @@ function normalizeCompanyNameLookup(value?: string | null) {
     .trim();
 }
 
+function sanitizeStorageFileName(value: string) {
+  const fallback = "isg-formu.docx";
+  const trimmed = (value || fallback).trim();
+  const extensionMatch = trimmed.match(/\.([a-z0-9]{2,8})$/i);
+  const extension = extensionMatch ? `.${extensionMatch[1].toLowerCase()}` : "";
+  const base = extension ? trimmed.slice(0, -extension.length) : trimmed;
+  const asciiBase = base
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[ıİ]/g, "i")
+    .replace(/[ğĞ]/g, "g")
+    .replace(/[üÜ]/g, "u")
+    .replace(/[şŞ]/g, "s")
+    .replace(/[öÖ]/g, "o")
+    .replace(/[çÇ]/g, "c")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_.]+|[-_.]+$/g, "")
+    .slice(0, 120);
+
+  return `${asciiBase || "isg-formu"}${extension || ".docx"}`;
+}
+
 export default function AssignmentLetters() {
   const { user, profile } = useAuth();
   const [companies, setCompanies] = useState<CompanyRecord[]>([]);
@@ -817,7 +840,7 @@ export default function AssignmentLetters() {
     const company = resolveArchiveCompany(input.companyId, input.companyName);
     if (!company) return false;
 
-    const safeFileName = input.fileName.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_");
+    const safeFileName = sanitizeStorageFileName(input.fileName);
     const storagePath = `firma-arsivi/${company.id}/belgeler/${Date.now()}__${safeFileName}`;
     const file = new File([input.blob], safeFileName, {
       type: input.fileName.toLowerCase().endsWith(".docx")

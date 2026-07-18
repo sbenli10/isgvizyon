@@ -242,16 +242,18 @@ export async function generateEmployeeRepresentativeAppointmentWord(data: Employ
   const headerTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     layout: TableLayoutType.FIXED,
+    columnWidths: [2000, 5000, 1600, 1400],
     borders: fullBorder,
     rows: [
       new TableRow({
         children: [
-          textCell("İŞ SAĞLIĞI ve GÜVENLİĞİ\nÇALIŞAN TEMSİLCİSİ ATAMASI", 72, {
+          textCell("İŞ SAĞLIĞI ve GÜVENLİĞİ\nÇALIŞAN TEMSİLCİSİ ATAMASI", 70, {
             bold: true,
+            colSpan: 2,
             align: AlignmentType.CENTER,
             size: 26,
           }),
-          textCell("", 28, { minLines: 2 }),
+          textCell("", 30, { colSpan: 2, minLines: 2 }),
         ],
       }),
       new TableRow({
