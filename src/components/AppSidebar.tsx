@@ -85,7 +85,7 @@ const sectionLabel =
   "mb-1 mt-2 flex h-6 w-full items-center justify-between rounded-md px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#7890B8] transition-colors hover:bg-white/[0.03] hover:text-slate-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400/45";
 
 const menuItemBase =
-  "group relative flex min-h-8 w-full items-center gap-2 rounded-lg px-3 py-1 text-[14px] font-medium leading-tight outline-none transition-all duration-150 focus-visible:ring-1 focus-visible:ring-indigo-400/45";
+  "group relative flex min-h-10 w-full items-center gap-2 rounded-lg px-3 py-1.5 text-[13.5px] font-medium leading-tight outline-none transition-all duration-150 focus-visible:ring-1 focus-visible:ring-indigo-400/45";
 
 const menuItemIdle =
   "text-[#E5EDF9] hover:bg-white/[0.04] hover:text-white active:bg-white/[0.06]";
@@ -96,7 +96,10 @@ const menuItemActive = cn(
 );
 
 const submenuItemBase =
-  "group relative flex min-h-8 w-full items-center gap-2 rounded-md px-2.5 py-1 text-[13px] font-medium leading-tight outline-none transition-all duration-150 focus-visible:ring-1 focus-visible:ring-indigo-400/45";
+  "group relative flex min-h-10 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px] font-medium leading-tight outline-none transition-all duration-150 focus-visible:ring-1 focus-visible:ring-indigo-400/45";
+
+const menuTitleClass =
+  "min-w-0 flex-1 overflow-hidden text-left leading-[1.15] line-clamp-2 break-normal";
 
 const subtleLine =
   "absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-violet-400 opacity-0 transition-opacity duration-150";
@@ -577,7 +580,7 @@ export function AppSidebar() {
       desktopSpacer={false}
       style={
         {
-          "--sidebar-width": "15rem",
+          "--sidebar-width": "17rem",
           "--sidebar-width-icon": "4.25rem",
         } as React.CSSProperties
       }
@@ -763,7 +766,7 @@ export function AppSidebar() {
 
                                 {!collapsed && (
                                   <>
-                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                    <span className={menuTitleClass}>
                                       {item.title}
                                     </span>
 
@@ -825,7 +828,7 @@ export function AppSidebar() {
                                           />
                                           <SubMenuIcon item={child} active={childActive} />
 
-                                          <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                          <span className={menuTitleClass}>
                                             {child.title}
                                           </span>
 
@@ -886,7 +889,7 @@ export function AppSidebar() {
 
                                 {!collapsed && (
                                   <>
-                                    <span className="min-w-0 flex-1 whitespace-normal break-words text-left leading-[1.15]">
+                                    <span className={menuTitleClass}>
                                       {item.title}
                                     </span>
 
