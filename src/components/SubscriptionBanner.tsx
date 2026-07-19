@@ -186,7 +186,15 @@ export function SubscriptionBanner() {
     currentPeriodEnd,
   } = useSubscription();
 
-  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      return localStorage.getItem(DISMISS_KEY);
+    } catch {
+      return null;
+    }
+  });
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const premiumPlan = plans.find((entry) => entry.planCode === "premium");
@@ -199,7 +207,7 @@ export function SubscriptionBanner() {
     if (status === "trial" && isTrialExpired) return "trial_expired";
     if (status === "trial") return "trial";
     if (isPaidPlan && cancelAtPeriodEnd) return "premium_canceling";
-    if (isPaidPlan) return "premium";
+    if (isPaidPlan) return null;
     return "free";
   }, [cancelAtPeriodEnd, isPaidPlan, isTrialExpired, loading, status]);
 
@@ -207,11 +215,6 @@ export function SubscriptionBanner() {
     if (!variant) return null;
     return [variant, premiumPrice, daysLeftInTrial, formatDate(currentPeriodEnd)].join(":");
   }, [variant, premiumPrice, daysLeftInTrial, currentPeriodEnd]);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(DISMISS_KEY);
-    setDismissedKey(stored);
-  }, []);
 
   useEffect(() => {
     if (!bannerKey) return;

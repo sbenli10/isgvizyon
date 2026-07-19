@@ -34,8 +34,8 @@ const routeMeta = [
   { match: "/profile", label: "Profil", section: "Hesap" },
 ];
 
-const DESKTOP_SIDEBAR_WIDTH = "18rem";
-const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = "5.5rem";
+const DESKTOP_SIDEBAR_WIDTH = "15rem";
+const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = "4.25rem";
 const NAVBAR_HEIGHT = "5.25rem";
 
 function AppLayoutShell({ children }: { children: React.ReactNode }) {

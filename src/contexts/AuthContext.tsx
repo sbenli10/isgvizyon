@@ -21,6 +21,12 @@ interface AuthContextType {
   profile: AuthProfile | null;
   refreshProfile: () => Promise<void>;
   loading: boolean;
+  authInitialized: boolean;
+  profileInitialized: boolean;
+  profileLoading: boolean;
+  isAuthLoading: boolean;
+  isAuthenticated: boolean;
+  authStatus: "initializing" | "authenticated" | "unauthenticated";
   signOut: () => Promise<void>;
 }
 
@@ -39,6 +45,12 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   refreshProfile: async () => {},
   loading: true,
+  authInitialized: false,
+  profileInitialized: false,
+  profileLoading: false,
+  isAuthLoading: true,
+  isAuthenticated: false,
+  authStatus: "initializing",
   signOut: async () => {},
 });
 
@@ -189,8 +201,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  const [profileInitialized, setProfileInitialized] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const extensionAuthSentRef = useRef(false);
   const signOutInProgressRef = useRef(false);
+  const profileRef = useRef<AuthProfile | null>(null);
 
   useEffect(() => {
     console.log("AuthProvider MOUNTED");
@@ -201,23 +217,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = useCallback(async (userId: string | null) => {
     if (!userId) {
+      profileRef.current = null;
       setProfile(null);
-      return;
+      setProfileInitialized(true);
+      setProfileLoading(false);
+      return null;
     }
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .maybeSingle();
+    setProfileInitialized(false);
+    setProfileLoading(true);
 
-    if (error) {
-      console.error("Failed to get profile:", error);
-      setProfile(null);
-      return;
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Failed to get profile:", error);
+        profileRef.current = null;
+        setProfile(null);
+        return null;
+      }
+
+      profileRef.current = data ?? null;
+      setProfile(data ?? null);
+      return data ?? null;
+    } finally {
+      setProfileInitialized(true);
+      setProfileLoading(false);
     }
-
-    setProfile(data ?? null);
   }, []);
 
   useEffect(() => {
@@ -284,18 +314,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           : null,
       );
 
-      // 3. Profil Güncellemesi (Sadece kullanıcı değiştiyse veya profil boşsa çek)
-      setProfile((prevProfile) => {
-        if (prevProfile?.id === nextSession?.user?.id) {
-           return prevProfile; // Profil zaten var, tekrar çekmeye gerek yok
-        }
-        
-        // Eğer profil yoksa veya kullanıcı değiştiyse, arka planda çek
-        void fetchProfile(nextSession?.user?.id ?? null);
-        return prevProfile;
-      });
+      if (nextSession?.user?.id && profileRef.current?.id === nextSession.user.id) {
+        setProfileInitialized(true);
+        setProfileLoading(false);
+      } else if (nextSession?.user?.id) {
+        await fetchProfile(nextSession.user.id);
+      } else {
+        profileRef.current = null;
+        setProfile(null);
+        setProfileInitialized(true);
+        setProfileLoading(false);
+      }
 
       if (mounted && finishLoading) {
+        setAuthInitialized(true);
         setLoading(false);
       }
     };
@@ -339,49 +371,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hasAuthParams,
       });
 
-      if (hasAuthParams) {
-        for (let attempt = 0; attempt < 12; attempt += 1) {
-          const { data, error } = await supabase.auth.getSession();
+      try {
+        if (hasAuthParams) {
+          for (let attempt = 0; attempt < 12; attempt += 1) {
+            const { data, error } = await supabase.auth.getSession();
 
-          if (error) {
-            console.error("Auth initialization failed:", error);
-            break;
+            if (error) {
+              console.error("Auth initialization failed:", error);
+              break;
+            }
+
+            if (data.session) {
+              if (!mounted) return;
+
+              initialSessionResolved = true;
+              console.log("AuthProvider initializeSession:resolved-from-auth-params", {
+                userId: data.session.user?.id ?? null,
+              });
+
+              await maybeSendExtensionAuth(data.session);
+              await applySession(data.session, true);
+
+              return;
+            }
+
+            await wait(250);
           }
-
-          if (data.session) {
-            if (!mounted) return;
-
-            initialSessionResolved = true;
-            console.log("AuthProvider initializeSession:resolved-from-auth-params", {
-              userId: data.session.user?.id ?? null,
-            });
-
-            await maybeSendExtensionAuth(data.session);
-            await applySession(data.session, true);
-
-            return;
-          }
-
-          await wait(250);
         }
+
+        const { data, error } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        if (error) {
+          console.error("Failed to get session:", error);
+        }
+
+        initialSessionResolved = true;
+        console.log("AuthProvider initializeSession:resolved", {
+          hasSession: Boolean(data.session),
+          userId: data.session?.user?.id ?? null,
+        });
+
+        await maybeSendExtensionAuth(data.session);
+        await applySession(data.session, true);
+      } catch (error) {
+        console.error("Auth initialization crashed:", error);
+        initialSessionResolved = true;
+        await applySession(null, true);
       }
-
-      const { data, error } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      if (error) {
-        console.error("Failed to get session:", error);
-      }
-
-      initialSessionResolved = true;
-      console.log("AuthProvider initializeSession:resolved", {
-        hasSession: Boolean(data.session),
-        userId: data.session?.user?.id ?? null,
-      });
-
-      await maybeSendExtensionAuth(data.session);
-      await applySession(data.session, true);
     };
 
     void initializeSession();
@@ -398,6 +436,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       signOutInProgressRef.current = true;
+      profileRef.current = null;
+      setSession(null);
+      setProfile(null);
+      setProfileInitialized(true);
+      setProfileLoading(false);
+      setAuthInitialized(true);
+      setLoading(false);
+      Sentry.setUser(null);
       await supabase.auth.signOut();
     } catch (error) {
       signOutError = error;
@@ -418,11 +464,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     }
 
-    if (signOutError) {
       signOutInProgressRef.current = false;
+
+    if (signOutError) {
       throw signOutError;
     }
   };
+
+  const isAuthLoading = loading || !authInitialized || (Boolean(session) && !profileInitialized);
+  const isAuthenticated = authInitialized && Boolean(session);
+  const authStatus: AuthContextType["authStatus"] = !authInitialized
+    ? "initializing"
+    : session
+      ? "authenticated"
+      : "unauthenticated";
 
   return (
     <AuthContext.Provider
@@ -433,7 +488,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refreshProfile: async () => {
           await fetchProfile(session?.user?.id ?? null);
         },
-        loading,
+        loading: isAuthLoading,
+        authInitialized,
+        profileInitialized,
+        profileLoading,
+        isAuthLoading,
+        isAuthenticated,
+        authStatus,
         signOut,
       }}
     >
