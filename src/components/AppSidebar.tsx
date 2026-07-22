@@ -380,7 +380,7 @@ export function AppSidebar() {
               badge: draftMeetingsCount > 0 ? draftMeetingsCount : "AI",
             },
             { title: "Atama Yazıları", url: "/assignment-letters", icon: FileText, iconClassName: "text-amber-400 group-hover:text-amber-300", badge: null },
-            { title: "Eğitim Katılımı", url: "/assignment-letters?form=egitim-katilimi", icon: Award, iconClassName: "text-orange-400 group-hover:text-orange-300", badge: null },
+            { title: "Eğitim Katılımı", url: "/egitim-katilimi", icon: Award, iconClassName: "text-orange-400 group-hover:text-orange-300", badge: null },
             { title: "İşbaşı Eğitim Tutanağı", url: "/assignment-letters?form=isbasi-egitim", icon: Users, iconClassName: "text-emerald-400 group-hover:text-emerald-300", badge: null },
             { title: "Tatbikat Tutanağı", url: "/assignment-letters?form=tatbikat", icon: Flame, iconClassName: "text-orange-400 group-hover:text-orange-300", badge: null },
             { title: "Tespit ve Öneri Defteri", url: "/assignment-letters?form=tespit-oneri", icon: ClipboardCheck, iconClassName: "text-amber-400 group-hover:text-amber-300", badge: null },
