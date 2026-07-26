@@ -60,7 +60,7 @@ const DocumentAnalysis = lazyWithRetry("document-analysis", loadDocumentAnalysis
 const CAPA = lazyWithRetry("capa", loadCapaPage);
 const BulkCAPA = lazyWithRetry("bulk-capa", loadBulkCapaPage);
 const BulkCAPAHowTo = lazyWithRetry("bulk-capa-how-to", loadBulkCapaHowToPage);
-const IncidentManagement = lazyWithRetry("incident-management", () => import("./pages/IncidentManagement"));
+const IncidentManagement = lazyWithRetry("incident-management", () => import("./pages/IncidentInvestigationReport"));
 const SafetyLibrary = lazyWithRetry("safety-library", () => import("./pages/SafetyLibrary"));
 const SafetyLibraryGuide = lazyWithRetry("safety-library-guide", () => import("./pages/SafetyLibraryGuide"));
 const WorkInstructions = lazyWithRetry("work-instructions", () => import("./pages/WorkInstructions"));
@@ -71,6 +71,10 @@ const loadAssignmentLettersPage = () => import("./pages/AssignmentLetters");
 const CompanyManager = lazyWithRetry("company-manager", loadCompanyManagerPage);
 const AssignmentLetters = lazyWithRetry("assignment-letters", loadAssignmentLettersPage);
 const TrainingAttendance = lazyWithRetry("training-attendance", () => import("./pages/TrainingAttendance"));
+const OrientationTraining = lazyWithRetry("orientation-training", () => import("./pages/OrientationTraining"));
+const EmergencyDrillReport = lazyWithRetry("emergency-drill-report", () => import("./pages/EmergencyDrillReport"));
+const SuggestionLedger = lazyWithRetry("suggestion-ledger", () => import("./pages/SuggestionLedger"));
+const DisciplinaryNotice = lazyWithRetry("disciplinary-notice", () => import("./pages/DisciplinaryNotice"));
 const OSGBModule = lazyWithRetry("osgb-module", () => import("./pages/OSGBModule"));
 const OSGBDashboard = lazyWithRetry("osgb-dashboard", () => import("./pages/OSGBDashboard"));
 const OSGBPersonnel = lazyWithRetry("osgb-personnel", () => import("./pages/OSGBPersonnel"));
@@ -241,6 +245,10 @@ const ProtectedShell = () => {
             <Route path="/companies" element={<CompanyManager />} />
             <Route path="/assignment-letters" element={<AssignmentLetters />} />
             <Route path="/egitim-katilimi" element={<TrainingAttendance />} />
+            <Route path="/isbasi-oryantasyon-egitim-tutanagi" element={<OrientationTraining />} />
+            <Route path="/acil-durum-tatbikat-tutanagi" element={<EmergencyDrillReport />} />
+            <Route path="/tespit-oneri-defteri" element={<SuggestionLedger />} />
+            <Route path="/ceza-teblig-tutanagi" element={<DisciplinaryNotice />} />
             <Route path="/incidents" element={<IncidentManagement />} />
             <Route path="/osgb" element={<FeatureAccessGate featureKey="osgb.access" title="OSGB modülü OSGB paketinde açılır" description="OSGB dashboard, kapasite, finans, görev, belge ve ekip operasyonları yalnızca OSGB paketine dahildir."><OsgbAccessGate><OSGBModule /></OsgbAccessGate></FeatureAccessGate>} />
             <Route path="/osgb/dashboard" element={<OSGBDashboard />} />

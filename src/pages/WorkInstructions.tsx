@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 import jsPDF from "jspdf";
 import {
   AlignmentType,
@@ -65,6 +66,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { invokeEdgeFunction } from "@/lib/ai/invokeEdgeFunction";
 import { cn } from "@/lib/utils";
 import { addInterFontsToJsPDF } from "@/utils/fonts";
+import WorkPermitForm from "./WorkPermitForm";
 
 type InstructionCategory =
   | "İş Makineleri"
@@ -2873,6 +2875,7 @@ function loadSavedInstructions(): WorkInstructionTemplate[] {
 }
 
 export default function WorkInstructionsPage() {
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<InstructionCategory | "Tümü">("Tümü");
   const [activeTab, setActiveTab] = useState<"templates" | "saved">("templates");
@@ -2939,6 +2942,12 @@ export default function WorkInstructionsPage() {
     { label: "Kategori", value: categories.length, helper: "Risk alanı", className: "from-emerald-400/18 to-teal-500/10", icon: Filter },
     { label: "Çıktı", value: "PDF + Word", helper: "Tek tıkla indir", className: "from-amber-400/18 to-orange-500/10", icon: Download },
   ];
+
+  const formParam = new URLSearchParams(location.search).get("form");
+
+  if (formParam === "is-izin") {
+    return <WorkPermitForm />;
+  }
 
   return (
     <div className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_12%_8%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_86%_16%,rgba(124,58,237,0.24),transparent_28%),radial-gradient(circle_at_50%_100%,rgba(59,130,246,0.18),transparent_34%),linear-gradient(180deg,#06111f_0%,#081225_48%,#020617_100%)] p-4 text-slate-100 md:p-6">

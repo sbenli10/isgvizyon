@@ -33,6 +33,7 @@ import {
 } from "@/lib/healthSurveillanceOperations";
 import { useRouteOverlayCleanup } from "@/hooks/useRouteOverlayCleanup";
 import { readPageSessionCache, writePageSessionCache } from "@/lib/pageSessionCache";
+import Ek2MedicalExamForm from "@/pages/Ek2MedicalExamForm";
 
 type FormState = {
   employeeId: string;
@@ -115,7 +116,7 @@ const resultClass: Record<HealthResultStatus, string> = {
 
 const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("tr-TR") : "-");
 
-export default function HealthSurveillance() {
+function HealthSurveillanceList() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const employeeParam = searchParams.get("employeeId") || "ALL";
@@ -589,5 +590,13 @@ export default function HealthSurveillance() {
       </Dialog>
     </div>
   );
+}
+
+export default function HealthSurveillance() {
+  const [searchParams] = useSearchParams();
+  if (searchParams.get("form") === "ek2") {
+    return <Ek2MedicalExamForm />;
+  }
+  return <HealthSurveillanceList />;
 }
 
