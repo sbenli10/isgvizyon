@@ -7,6 +7,7 @@ import {
   Brain,
   Settings,
   Shield,
+  ShieldCheck,
   ShieldAlert,
   ShieldPlus,
   ChevronRight,
@@ -432,6 +433,7 @@ export function AppSidebar() {
             { title: "Yıllık Planlar", url: "/annual-plans", icon: Calendar, iconClassName: "text-teal-400 group-hover:text-teal-300", badge: null },
             { title: "Yapay Zeka Raporları", url: "/reports", icon: Brain, iconClassName: "text-fuchsia-400 group-hover:text-fuchsia-300", badge: "Beta" },
             { title: "NACE Kod Sorgulama", url: "/nace-query", icon: Shield, iconClassName: "text-cyan-400 group-hover:text-cyan-300", badge: "AI" },
+            { title: "MYK Sorgula", url: "/myk-zorunluluk-sorgula", icon: ShieldCheck, iconClassName: "text-indigo-400 group-hover:text-indigo-300", badge: "NEW" },
             {
               title: "NACE Sektör Listesi",
               url: "/nace-query/sectors",

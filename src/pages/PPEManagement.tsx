@@ -1,795 +1,742 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Boxes,
-  ExternalLink,
-  FileSpreadsheet,
+  Building2,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Download,
+  FileCheck2,
   PackageCheck,
-  RefreshCcw,
-  RotateCcw,
-  Search,
+  Plus,
+  Save,
   Shield,
-  UserRound,
+  Trash2,
+  UserPlus,
+  UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useAccessRole } from "@/hooks/useAccessRole";
-import { supabase } from "@/integrations/supabase/client";
-import { downloadCsv } from "@/lib/csvExport";
-import { readPageSessionCache, writePageSessionCache } from "@/lib/pageSessionCache";
-import {
-  buildPpeEmployeeOverview,
-  createPpeRenewalTasks,
-  deletePpeAssignment,
-  deletePpeInventory,
-  listPpeAssignments,
-  listPpeEmployeeOptions,
-  listPpeInventory,
-  listPpeAssignmentsPage,
-  listPpeInventoryOptions,
-  listPpeInventoryPage,
-  markPpeAssignmentReturned,
-  upsertPpeAssignment,
-  upsertPpeInventory,
-  type PpeAssignmentInput,
-  type PpeAssignmentRecord,
-  type PpeEmployeeOption,
-  type PpeInventoryOption,
-  type PpeInventoryInput,
-  type PpeInventoryRecord,
-} from "@/lib/ppeOperations";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { PpeDeliveryFormDialog, type PpeDeliveryFormState, type PpeDeliverySelectionItem } from "@/components/ppe/PpeDeliveryFormDialog";
-import { generatePpeDeliveryWord } from "@/lib/ppeDeliveryWordGenerator";
+import {
+  allPpeItems,
+  companyName,
+  createPpeFormNo,
+  generatePpeZimmetPdf,
+  loadPpeCompanies,
+  loadPpeEmployees,
+  ppeCategories,
+  savePpeZimmetRecord,
+  type PpeZimmetEmployee,
+} from "@/lib/ppeZimmet";
 import type { Company } from "@/types/companies";
 
-type InventoryFormState = {
-  itemName: string;
-  category: string;
-  standardCode: string;
-  defaultRenewalDays: string;
-  stockQuantity: string;
-  minStockLevel: string;
-  isActive: boolean;
-  notes: string;
+const templateStorageKey = "isgvizyon-ppe-zimmet-templates";
+
+type SavedTemplate = {
+  id: string;
+  name: string;
+  itemIds: string[];
 };
 
-type AssignmentFormState = {
-  inventoryId: string;
-  employeeId: string;
-  assignedDate: string;
-  dueDate: string;
-  status: "assigned" | "replacement_due" | "returned";
-  quantity: string;
-  sizeLabel: string;
-  notes: string;
-};
+const today = new Date().toISOString().slice(0, 10);
 
-type CompanyOption = Pick<Company, "id" | "company_name">;
+const panelClass = "rounded-2xl border border-slate-700/80 bg-slate-800/80 shadow-xl shadow-black/10";
+const panelHeaderClass = "flex items-center gap-2 rounded-t-2xl px-6 py-4 text-lg font-bold text-white";
+const inputClass =
+  "h-11 border-slate-600 bg-slate-900/60 text-white placeholder:text-slate-500 focus-visible:ring-violet-400";
 
-const emptyInventoryForm: InventoryFormState = {
-  itemName: "",
-  category: "",
-  standardCode: "",
-  defaultRenewalDays: "365",
-  stockQuantity: "0",
-  minStockLevel: "0",
-  isActive: true,
-  notes: "",
-};
+function loadTemplates(): SavedTemplate[] {
+  try {
+    const raw = localStorage.getItem(templateStorageKey);
+    return raw ? (JSON.parse(raw) as SavedTemplate[]) : [];
+  } catch {
+    return [];
+  }
+}
 
-const emptyAssignmentForm: AssignmentFormState = {
-  inventoryId: "",
-  employeeId: "",
-  assignedDate: new Date().toISOString().slice(0, 10),
-  dueDate: "",
-  status: "assigned",
-  quantity: "1",
-  sizeLabel: "",
-  notes: "",
-};
-
-const emptyDeliveryForm: PpeDeliveryFormState = {
-  companyMode: "system",
-  companyId: "",
-  manualCompanyName: "",
-  employeeMode: "system",
-  employeeId: "",
-  manualEmployeeName: "",
-  manualEmployeeTc: "",
-  manualEmployeeJobTitle: "",
-  deliveryDate: new Date().toISOString().slice(0, 10),
-  periodicControlDate: "",
-  delivererName: "",
-  delivererTc: "",
-  delivererJobTitle: "",
-  selectedItems: [],
-  manualItemName: "",
-  manualItemQuantity: "1",
-};
-
-const PPE_CACHE_TTL = 5 * 60 * 1000;
-const PPE_ASSIGNMENT_PAGE_SIZE = 10;
-const PPE_INVENTORY_PAGE_SIZE = 10;
-const PPE_EMPLOYEE_PAGE_SIZE = 8;
-
-const formatDate = (value: string | null) => (value ? new Date(value).toLocaleDateString("tr-TR") : "-");
+function saveTemplates(templates: SavedTemplate[]) {
+  localStorage.setItem(templateStorageKey, JSON.stringify(templates));
+}
 
 export default function PPEManagement() {
-  const navigate = useNavigate();
   const { user, profile } = useAuth();
-  const { canManage, isViewer } = useAccessRole();
-  const [companies, setCompanies] = useState<CompanyOption[]>([]);
-  const [inventory, setInventory] = useState<PpeInventoryRecord[]>([]);
-  const [assignments, setAssignments] = useState<PpeAssignmentRecord[]>([]);
-  const [employees, setEmployees] = useState<PpeEmployeeOption[]>([]);
-  const [inventoryOptions, setInventoryOptions] = useState<PpeInventoryOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [employees, setEmployees] = useState<PpeZimmetEmployee[]>([]);
+  const [formNo, setFormNo] = useState(() => createPpeFormNo());
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [manualEmployees, setManualEmployees] = useState<PpeZimmetEmployee[]>([]);
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>([]);
+  const [deliveryDate, setDeliveryDate] = useState(today);
+  const [periodicControlDate, setPeriodicControlDate] = useState("");
+  const [deliveredBy, setDeliveredBy] = useState("");
+  const [manualName, setManualName] = useState("");
+  const [manualTc, setManualTc] = useState("");
+  const [manualJob, setManualJob] = useState("");
+  const [sector, setSector] = useState("Genel");
+  const [openCategories, setOpenCategories] = useState<string[]>(ppeCategories.map((category) => category.id));
+  const [templates, setTemplates] = useState<SavedTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [activeStep, setActiveStep] = useState(0);
+  const [stepDirection, setStepDirection] = useState<"forward" | "backward">("forward");
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [deliverySaving, setDeliverySaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [employeeFilter, setEmployeeFilter] = useState("ALL");
-  const [inventoryDialogOpen, setInventoryDialogOpen] = useState(false);
-  const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
-  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
-  const [editingInventory, setEditingInventory] = useState<PpeInventoryRecord | null>(null);
-  const [editingAssignment, setEditingAssignment] = useState<PpeAssignmentRecord | null>(null);
-  const [inventoryForm, setInventoryForm] = useState<InventoryFormState>(emptyInventoryForm);
-  const [assignmentForm, setAssignmentForm] = useState<AssignmentFormState>(emptyAssignmentForm);
-  const [deliveryForm, setDeliveryForm] = useState<PpeDeliveryFormState>(emptyDeliveryForm);
-  const [assignmentPage, setAssignmentPage] = useState(1);
-  const [inventoryPage, setInventoryPage] = useState(1);
-  const [employeePage, setEmployeePage] = useState(1);
-  const [assignmentTotalCount, setAssignmentTotalCount] = useState(0);
-  const [inventoryTotalCount, setInventoryTotalCount] = useState(0);
-
-  const loadData = async () => {
-    if (!user?.id) return;
-
-    const cacheKey = `ppe:${user.id}`;
-    const cached = readPageSessionCache<{
-      companies: CompanyOption[];
-      inventory: PpeInventoryRecord[];
-      assignments: PpeAssignmentRecord[];
-      employees: PpeEmployeeOption[];
-      inventoryOptions: PpeInventoryOption[];
-      assignmentTotalCount: number;
-      inventoryTotalCount: number;
-    }>(cacheKey, PPE_CACHE_TTL);
-
-    if (cached) {
-      setCompanies(cached.companies);
-      setInventory(cached.inventory);
-      setAssignments(cached.assignments);
-      setEmployees(cached.employees);
-      setInventoryOptions(cached.inventoryOptions);
-      setAssignmentTotalCount(cached.assignmentTotalCount);
-      setInventoryTotalCount(cached.inventoryTotalCount);
-      setError(null);
-      setLoading(false);
-    }
-
-    setLoading(true);
-    try {
-      const [companyRows, inventoryRows, assignmentRows, employeeRows, inventoryOptionRows] = await Promise.all([
-        (supabase as any).from("companies").select("id, name").eq("is_active", true).order("name", { ascending: true }),
-        listPpeInventoryPage(user.id, {
-          page: inventoryPage,
-          pageSize: PPE_INVENTORY_PAGE_SIZE,
-          search,
-        }),
-        listPpeAssignmentsPage(user.id, {
-          page: assignmentPage,
-          pageSize: PPE_ASSIGNMENT_PAGE_SIZE,
-          employeeId: employeeFilter,
-        }),
-        listPpeEmployeeOptions(),
-        listPpeInventoryOptions(user.id),
-      ]);
-
-      if (companyRows.error) {
-        throw companyRows.error;
-      }
-
-      const mappedCompanies = (companyRows.data || []).map((row: any) => ({
-        id: String(row.id),
-        company_name: String(row.name || "Firma"),
-      }));
-
-      setCompanies(mappedCompanies);
-      setInventory(inventoryRows.rows);
-      setAssignments(assignmentRows.rows);
-      setEmployees(employeeRows);
-      setInventoryOptions(inventoryOptionRows);
-      setAssignmentTotalCount(assignmentRows.count);
-      setInventoryTotalCount(inventoryRows.count);
-      setError(null);
-      writePageSessionCache(cacheKey, {
-        companies: mappedCompanies,
-        inventory: inventoryRows.rows,
-        assignments: assignmentRows.rows,
-        employees: employeeRows,
-        inventoryOptions: inventoryOptionRows,
-        assignmentTotalCount: assignmentRows.count,
-        inventoryTotalCount: inventoryRows.count,
-      });
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "KKD verileri yüklenemedi.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    void loadData();
-  }, [user?.id, search, employeeFilter, assignmentPage, inventoryPage]);
+    setTemplates(loadTemplates());
+    loadPpeCompanies()
+      .then(setCompanies)
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Firma listesi yüklenemedi.");
+      })
+      .finally(() => setLoadingCompanies(false));
+  }, []);
 
-  const inventoryMap = useMemo(
-    () =>
-      new Map(
-        inventoryOptions.map((item) => [
-          item.id,
-          {
-            item_name: item.itemName,
-            default_renewal_days: item.defaultRenewalDays,
-            is_active: item.isActive,
-          },
-        ]),
-      ),
-    [inventoryOptions],
-  );
-  const employeeMap = useMemo(() => new Map(employees.map((item) => [item.id, item])), [employees]);
+  useEffect(() => {
+    setEmployees([]);
+    setSelectedEmployeeIds([]);
+    if (!selectedCompanyId) return;
+    setLoadingEmployees(true);
+    loadPpeEmployees(selectedCompanyId)
+      .then(setEmployees)
+      .catch((error) => {
+        toast.error(error instanceof Error ? error.message : "Firma çalışanları yüklenemedi.");
+      })
+      .finally(() => setLoadingEmployees(false));
+  }, [selectedCompanyId]);
 
-  const summary = useMemo(() => {
-    const today = new Date();
-    const nextThirtyDays = new Date();
-    nextThirtyDays.setDate(today.getDate() + 30);
-    const activeAssignments = assignments.filter((item) => item.status !== "returned");
-
-    return {
-      inventoryCount: inventory.filter((item) => item.is_active).length,
-      activeAssignments: activeAssignments.length,
-      renewalDue: activeAssignments.filter((item) => {
-        const due = new Date(item.due_date);
-        return due >= today && due <= nextThirtyDays;
-      }).length,
-      overdue: activeAssignments.filter((item) => new Date(item.due_date) < today).length,
-      lowStock: inventory.filter((item) => item.is_active && item.stock_quantity <= item.min_stock_level).length,
-    };
-  }, [assignments, inventory]);
-
-  const employeeOverview = useMemo(
-    () => buildPpeEmployeeOverview(employees, inventory, assignments),
-    [employees, inventory, assignments],
-  );
-  const filteredEmployeeOverview = useMemo(
-    () => employeeOverview.filter((item) => employeeFilter === "ALL" || item.employeeId === employeeFilter),
-    [employeeFilter, employeeOverview],
-  );
-  const assignmentTotalPages = Math.max(1, Math.ceil(assignmentTotalCount / PPE_ASSIGNMENT_PAGE_SIZE));
-  const inventoryTotalPages = Math.max(1, Math.ceil(inventoryTotalCount / PPE_INVENTORY_PAGE_SIZE));
-  const employeeTotalPages = Math.max(1, Math.ceil(filteredEmployeeOverview.length / PPE_EMPLOYEE_PAGE_SIZE));
-  const pagedEmployeeOverview = useMemo(
-    () => filteredEmployeeOverview.slice((employeePage - 1) * PPE_EMPLOYEE_PAGE_SIZE, employeePage * PPE_EMPLOYEE_PAGE_SIZE),
-    [employeePage, filteredEmployeeOverview],
+  const selectedCompany = useMemo(
+    () => companies.find((company) => company.id === selectedCompanyId) || null,
+    [companies, selectedCompanyId],
   );
 
-  useEffect(() => {
-    setAssignmentPage(1);
-    setInventoryPage(1);
-    setEmployeePage(1);
-  }, [search, employeeFilter]);
+  const selectedEmployees = useMemo(() => {
+    const systemEmployees = employees.filter((employee) => selectedEmployeeIds.includes(employee.id));
+    return [...systemEmployees, ...manualEmployees];
+  }, [employees, manualEmployees, selectedEmployeeIds]);
 
-  useEffect(() => {
-    if (assignmentPage > assignmentTotalPages) setAssignmentPage(assignmentTotalPages);
-  }, [assignmentPage, assignmentTotalPages]);
+  const selectedItems = useMemo(
+    () => allPpeItems.filter((item) => selectedItemIds.includes(item.id)),
+    [selectedItemIds],
+  );
 
-  useEffect(() => {
-    if (inventoryPage > inventoryTotalPages) setInventoryPage(inventoryTotalPages);
-  }, [inventoryPage, inventoryTotalPages]);
+  const steps = [
+    { title: "Firma", description: "Firma Bilgileri", icon: Building2 },
+    { title: "Çalışan", description: "Çalışan Seçimi", icon: UsersRound },
+    { title: "KKD", description: "KKD Seçimi", icon: Shield },
+    { title: "Teslim", description: "Teslim Bilgileri", icon: PackageCheck },
+    { title: "Onay", description: "Son Kontrol", icon: FileCheck2 },
+  ];
 
-  useEffect(() => {
-    if (employeePage > employeeTotalPages) setEmployeePage(employeeTotalPages);
-  }, [employeePage, employeeTotalPages]);
-
-  const openInventoryCreate = () => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    setEditingInventory(null);
-    setInventoryForm(emptyInventoryForm);
-    setInventoryDialogOpen(true);
+  const goToStep = (index: number) => {
+    setStepDirection(index > activeStep ? "forward" : "backward");
+    setActiveStep(index);
   };
 
-  const openInventoryEdit = (item: PpeInventoryRecord) => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    setEditingInventory(item);
-    setInventoryForm({
-      itemName: item.item_name,
-      category: item.category,
-      standardCode: item.standard_code || "",
-      defaultRenewalDays: String(item.default_renewal_days),
-      stockQuantity: String(item.stock_quantity),
-      minStockLevel: String(item.min_stock_level),
-      isActive: item.is_active,
-      notes: item.notes || "",
-    });
-    setInventoryDialogOpen(true);
+  const validateCurrentStep = () => {
+    if (activeStep === 0 && !selectedCompany) return "Devam etmek için firma seçin.";
+    if (activeStep === 1 && selectedEmployees.length === 0) return "Devam etmek için en az bir çalışan seçin veya manuel çalışan ekleyin.";
+    if (activeStep === 2 && selectedItems.length === 0) return "Devam etmek için en az bir KKD seçin.";
+    if (activeStep === 3 && !deliveryDate) return "Devam etmek için teslim tarihi girin.";
+    return "";
   };
 
-  const openAssignmentCreate = () => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    setEditingAssignment(null);
-    setAssignmentForm(emptyAssignmentForm);
-    setAssignmentDialogOpen(true);
-  };
-
-  const openDeliveryDialog = () => {
-    const nextSelectedItems: PpeDeliverySelectionItem[] = inventory
-      .filter((item) => item.is_active)
-      .map((item) => ({
-        key: item.id,
-        itemName: item.item_name,
-        category: item.category,
-        quantity: "1",
-        selected: false,
-      }));
-
-    setDeliveryForm({
-      ...emptyDeliveryForm,
-      delivererName: profile?.full_name || "",
-      delivererJobTitle: profile?.position || "İş Güvenliği Uzmanı",
-      selectedItems: nextSelectedItems,
-    });
-    setDeliveryDialogOpen(true);
-  };
-
-  const resetDeliveryDialog = () => {
-    setDeliveryDialogOpen(false);
-    setDeliveryForm(emptyDeliveryForm);
-  };
-
-  const openAssignmentEdit = (item: PpeAssignmentRecord) => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    setEditingAssignment(item);
-    setAssignmentForm({
-      inventoryId: item.inventory_id,
-      employeeId: item.employee_id,
-      assignedDate: item.assigned_date,
-      dueDate: item.due_date,
-      status: item.status,
-      quantity: String(item.quantity),
-      sizeLabel: item.size_label || "",
-      notes: item.notes || "",
-    });
-    setAssignmentDialogOpen(true);
-  };
-
-  const handleInventorySave = async () => {
-    if (!user?.id) return;
-    const defaultRenewalDays = Number(inventoryForm.defaultRenewalDays);
-    const stockQuantity = Number(inventoryForm.stockQuantity);
-    const minStockLevel = Number(inventoryForm.minStockLevel);
-
-    if (!inventoryForm.itemName.trim() || !inventoryForm.category.trim()) {
-      return toast.error("KKD adı ve kategori zorunludur.");
+  const nextStep = () => {
+    const message = validateCurrentStep();
+    if (message) {
+      toast.error(message);
+      return;
     }
-    if (defaultRenewalDays <= 0 || stockQuantity < 0 || minStockLevel < 0) {
-      return toast.error("Süre ve stok alanları geçerli olmalıdır.");
-    }
-
-    setSaving(true);
-    try {
-      const payload: PpeInventoryInput = {
-        itemName: inventoryForm.itemName,
-        category: inventoryForm.category,
-        standardCode: inventoryForm.standardCode,
-        defaultRenewalDays,
-        stockQuantity,
-        minStockLevel,
-        isActive: inventoryForm.isActive,
-        notes: inventoryForm.notes,
-      };
-      const saved = await upsertPpeInventory(user.id, payload, editingInventory?.id);
-      setInventory((prev) => (editingInventory ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]));
-      setInventoryDialogOpen(false);
-      toast.success(editingInventory ? "KKD kaydı güncellendi." : "KKD kaydı eklendi.");
-    } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "KKD kaydı kaydedilemedi.");
-    } finally {
-      setSaving(false);
-    }
+    goToStep(Math.min(steps.length - 1, activeStep + 1));
   };
 
-  const handleAssignmentSave = async () => {
-    if (!user?.id) return;
-    const quantity = Number(assignmentForm.quantity);
-    const employee = employeeMap.get(assignmentForm.employeeId);
+  const previousStep = () => goToStep(Math.max(0, activeStep - 1));
 
-    if (!assignmentForm.inventoryId || !assignmentForm.employeeId || !assignmentForm.dueDate) {
-      return toast.error("Zimmet için ekipman, çalışan ve yenileme tarihi zorunludur.");
-    }
-    if (quantity <= 0) return toast.error("Adet 1 veya daha büyük olmalıdır.");
-    if (new Date(assignmentForm.dueDate) < new Date(assignmentForm.assignedDate)) {
-      return toast.error("Yenileme tarihi zimmet tarihinden önce olamaz.");
-    }
-
-    setSaving(true);
-    try {
-      const payload: PpeAssignmentInput = {
-        inventoryId: assignmentForm.inventoryId,
-        employeeId: assignmentForm.employeeId,
-        companyId: employee?.companyId || null,
-        assignedDate: assignmentForm.assignedDate,
-        dueDate: assignmentForm.dueDate,
-        status: assignmentForm.status,
-        quantity,
-        sizeLabel: assignmentForm.sizeLabel,
-        notes: assignmentForm.notes,
-        returnDate: assignmentForm.status === "returned" ? new Date().toISOString().slice(0, 10) : null,
-      };
-      const saved = await upsertPpeAssignment(user.id, payload, editingAssignment?.id);
-      setAssignments((prev) => (editingAssignment ? prev.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...prev]));
-      setAssignmentDialogOpen(false);
-      toast.success(editingAssignment ? "Zimmet güncellendi." : "Zimmet kaydedildi.");
-    } catch (saveError) {
-      toast.error(saveError instanceof Error ? saveError.message : "Zimmet kaydedilemedi.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleInventoryDelete = async (item: PpeInventoryRecord) => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    if (!confirm(`"${item.item_name}" kaydı silinsin mi?`)) return;
-    await deletePpeInventory(item.id);
-    setInventory((prev) => prev.filter((row) => row.id !== item.id));
-    setAssignments((prev) => prev.filter((row) => row.inventory_id !== item.id));
-    toast.success("KKD kaydı silindi.");
-  };
-
-  const handleAssignmentDelete = async (item: PpeAssignmentRecord) => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    if (!confirm("Bu zimmet kaydı silinsin mi?")) return;
-    await deletePpeAssignment(item.id);
-    setAssignments((prev) => prev.filter((row) => row.id !== item.id));
-    toast.success("Zimmet kaydı silindi.");
-  };
-
-  const handleMarkReturned = async (item: PpeAssignmentRecord) => {
-    if (!canManage) return toast.error("Bu işlem için düzenleme yetkisi gerekiyor.");
-    const saved = await markPpeAssignmentReturned(item.id);
-    setAssignments((prev) => prev.map((row) => (row.id === saved.id ? saved : row)));
-    toast.success("KKD iade edildi.");
-  };
-
-  const handleExport = () => {
-    downloadCsv(
-      "kkd-zimmet.csv",
-      ["Çalışan", "Firma", "KKD", "Durum", "Yenileme Tarihi"],
-          assignments.map((item) => [
-        employeeMap.get(item.employee_id)?.fullName || "",
-        employeeMap.get(item.employee_id)?.companyName || "",
-        inventoryMap.get(item.inventory_id)?.item_name || "",
-        item.status,
-        item.due_date,
-      ]),
+  const toggleEmployee = (employeeId: string) => {
+    setSelectedEmployeeIds((current) =>
+      current.includes(employeeId) ? current.filter((id) => id !== employeeId) : [...current, employeeId],
     );
   };
 
-  const handleDeliveryFormChange = (patch: Partial<PpeDeliveryFormState>) => {
-    setDeliveryForm((prev) => {
-      const next = { ...prev, ...patch };
-
-      if (patch.companyMode === "manual") {
-        next.companyId = "";
-      }
-
-      if (patch.employeeMode === "manual") {
-        next.employeeId = "";
-      }
-
-      if (patch.employeeId) {
-        const employee = employees.find((item) => item.id === patch.employeeId);
-        if (employee) {
-          next.manualEmployeeName = employee.fullName;
-          next.manualEmployeeTc = employee.tcNumber || next.manualEmployeeTc;
-          next.manualEmployeeJobTitle = employee.jobTitle || employee.department || "";
-        }
-      }
-
-      return next;
-    });
+  const toggleItem = (itemId: string) => {
+    setSelectedItemIds((current) => (current.includes(itemId) ? current.filter((id) => id !== itemId) : [...current, itemId]));
   };
 
-  const handleToggleDeliveryItem = (key: string, checked: boolean) => {
-    setDeliveryForm((prev) => ({
-      ...prev,
-      selectedItems: prev.selectedItems.map((item) => (item.key === key ? { ...item, selected: checked } : item)),
-    }));
+  const toggleCategory = (categoryId: string) => {
+    setOpenCategories((current) =>
+      current.includes(categoryId) ? current.filter((id) => id !== categoryId) : [...current, categoryId],
+    );
   };
 
-  const handleDeliveryItemQuantityChange = (key: string, quantity: string) => {
-    setDeliveryForm((prev) => ({
-      ...prev,
-      selectedItems: prev.selectedItems.map((item) => (item.key === key ? { ...item, quantity } : item)),
-    }));
+  const addManualEmployee = () => {
+    if (!manualName.trim()) {
+      toast.error("Manuel çalışan için ad soyad girin.");
+      return;
+    }
+    setManualEmployees((current) => [
+      ...current,
+      {
+        id: `manual-${Date.now()}`,
+        fullName: manualName.trim(),
+        tcNumber: manualTc.trim(),
+        department: "",
+        jobTitle: manualJob.trim(),
+        isManual: true,
+      },
+    ]);
+    setManualName("");
+    setManualTc("");
+    setManualJob("");
   };
 
-  const handleAddManualDeliveryItem = () => {
-    const itemName = deliveryForm.manualItemName.trim();
-    const quantity = deliveryForm.manualItemQuantity.trim() || "1";
+  const selectAllItems = () => setSelectedItemIds(allPpeItems.map((item) => item.id));
 
-    if (!itemName) {
-      toast.error("Manuel KKD adı girin.");
+  const saveTemplate = () => {
+    if (selectedItemIds.length === 0) {
+      toast.error("Şablon kaydetmek için en az bir KKD seçin.");
+      return;
+    }
+    const name = window.prompt("Şablon adı");
+    if (!name?.trim()) return;
+    const nextTemplates = [
+      ...templates,
+      {
+        id: `template-${Date.now()}`,
+        name: name.trim(),
+        itemIds: selectedItemIds,
+      },
+    ];
+    setTemplates(nextTemplates);
+    saveTemplates(nextTemplates);
+    toast.success("KKD şablonu kaydedildi.");
+  };
+
+  const applyTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const template = templates.find((item) => item.id === templateId);
+    if (template) {
+      setSelectedItemIds(template.itemIds);
+      toast.success(`${template.name} şablonu uygulandı.`);
+    }
+  };
+
+  const buildRecord = () => ({
+    formNo,
+    companyId: selectedCompany?.id || "",
+    companyName: selectedCompany ? companyName(selectedCompany) : "",
+    deliveryDate,
+    periodicControlDate,
+    employees: selectedEmployees,
+    selectedItemIds,
+    selectedItems,
+    deliveredBy,
+  });
+
+  const validate = () => {
+    if (!selectedCompany) return "Firma seçin.";
+    if (selectedEmployees.length === 0) return "En az bir çalışan seçin veya manuel çalışan ekleyin.";
+    if (selectedItems.length === 0) return "En az bir KKD seçin.";
+    if (!deliveryDate) return "Teslim tarihi girin.";
+    return "";
+  };
+
+  const createPdf = async () => {
+    const validationError = validate();
+    if (validationError) {
+      toast.error(validationError);
       return;
     }
 
-    setDeliveryForm((prev) => ({
-      ...prev,
-      selectedItems: [
-        ...prev.selectedItems,
-        {
-          key: `manual-${Date.now()}`,
-          itemName,
-          category: "Manuel",
-          quantity,
-          selected: true,
-        },
-      ],
-      manualItemName: "",
-      manualItemQuantity: "1",
-    }));
-  };
-
-  const handleDeliveryExport = async () => {
-    const companyName =
-      deliveryForm.companyMode === "manual"
-        ? deliveryForm.manualCompanyName.trim()
-        : companies.find((item) => item.id === deliveryForm.companyId)?.company_name || "";
-    const selectedEmployee = employees.find((item) => item.id === deliveryForm.employeeId);
-    const employeeName =
-      deliveryForm.employeeMode === "manual"
-        ? deliveryForm.manualEmployeeName.trim()
-        : selectedEmployee?.fullName || "";
-    const employeeTc =
-      deliveryForm.employeeMode === "manual"
-        ? deliveryForm.manualEmployeeTc.trim()
-        : selectedEmployee?.tcNumber || "";
-    const employeeJobTitle =
-      deliveryForm.employeeMode === "manual"
-        ? deliveryForm.manualEmployeeJobTitle.trim()
-        : selectedEmployee?.jobTitle || selectedEmployee?.department || "";
-    const selectedItems = deliveryForm.selectedItems.filter((item) => item.selected && item.itemName.trim());
-
-    if (!companyName || !employeeName || !deliveryForm.deliveryDate || !deliveryForm.delivererName.trim()) {
-      toast.error("Firma, çalışan, teslim tarihi ve teslim eden bilgileri zorunludur.");
-      return;
-    }
-
-    if (selectedItems.length === 0) {
-      toast.error("En az bir KKD seçin.");
-      return;
-    }
-
-    setDeliverySaving(true);
+    const record = buildRecord();
+    setSaving(true);
     try {
-      await generatePpeDeliveryWord({
-        companyName,
-        employeeName,
-        employeeTc,
-        employeeJobTitle,
-        deliveryDate: deliveryForm.deliveryDate,
-        periodicControlDate: deliveryForm.periodicControlDate || undefined,
-        delivererName: deliveryForm.delivererName,
-        delivererTc: deliveryForm.delivererTc,
-        delivererJobTitle: deliveryForm.delivererJobTitle,
-        items: selectedItems.map((item) => ({
-          itemName: item.itemName,
-          quantity: item.quantity || "1",
-          deliveryDate: deliveryForm.deliveryDate,
-        })),
-      });
-
-      toast.success("KKD zimmet formu Word çıktısı hazırlandı.");
-      resetDeliveryDialog();
-    } catch (exportError) {
-      toast.error(exportError instanceof Error ? exportError.message : "KKD Word çıktısı oluşturulamadı.");
+      if (user?.id) {
+        await savePpeZimmetRecord(record, user.id, profile?.organization_id);
+      }
+      await generatePpeZimmetPdf(record, selectedCompany);
+      setFormNo(createPpeFormNo());
+      toast.success("KKD zimmet formu oluşturuldu.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "KKD zimmet formu oluşturulamadı.");
     } finally {
-      setDeliverySaving(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="theme-page-readable w-full min-w-0 space-y-6 py-6">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-500/20 bg-cyan-500/10 text-cyan-200">
-              <Shield className="h-5 w-5" />
+    <main className="min-h-screen bg-slate-950 px-5 py-6 text-slate-100">
+      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+        <section className="overflow-hidden rounded-2xl bg-gradient-to-r from-fuchsia-600 via-violet-600 to-indigo-600 p-7 shadow-2xl shadow-violet-950/30">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
+                <Shield className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-white">KKD Zimmet Formu</h1>
+                <p className="mt-1 text-sm font-medium text-violet-100">Kişisel Koruyucu Donanım Teslim Belgesi</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-white">KKD Zimmet Merkezi</h1>
-              <p className="text-sm text-slate-400">KKD envanteri, yenileme takibi ve çalışan bazlı zimmet görünümü tek ekranda yönetilir.</p>
+            <div className="flex items-center gap-3 rounded-xl bg-white/15 p-3 ring-1 ring-white/20">
+              <span className="text-sm font-bold text-white">Form No:</span>
+              <span className="rounded-lg border border-white/20 bg-slate-900/55 px-4 py-2 font-mono text-sm font-bold text-slate-200">
+                {formNo}
+              </span>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleExport}>Dışa Aktar</Button>
-          <Button variant="outline" className="gap-2" onClick={() => void loadData()}><RefreshCcw className="h-4 w-4" />Yenile</Button>
-          <Button variant="outline" className="gap-2" onClick={() => navigate("/employees")}><ExternalLink className="h-4 w-4" />Çalışan Ekranı</Button>
-          <Button variant="outline" className="gap-2" onClick={openDeliveryDialog}><FileSpreadsheet className="h-4 w-4" />KKD Formu</Button>
-          <Button className="gap-2" onClick={openInventoryCreate} disabled={!canManage}><Boxes className="h-4 w-4" />Yeni KKD</Button>
-          <Button className="gap-2" onClick={openAssignmentCreate} disabled={!canManage}><PackageCheck className="h-4 w-4" />Yeni Zimmet</Button>
-        </div>
-      </div>
+        <nav className="rounded-2xl border border-slate-700/80 bg-slate-800/80 px-4 py-4 shadow-xl shadow-black/10">
+          <div className="grid grid-cols-5 items-start gap-2">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = activeStep === index;
+              const isDone = index < activeStep;
+              return (
+                <button
+                  type="button"
+                  key={step.title}
+                  onClick={() => goToStep(index)}
+                  className="group relative flex min-w-0 flex-col items-center gap-2 rounded-xl px-2 py-1 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400"
+                >
+                  {index < steps.length - 1 && (
+                    <span className="absolute left-[58%] top-5 hidden h-px w-[84%] bg-slate-600 md:block" />
+                  )}
+                  <span
+                    className={`relative z-10 flex h-11 w-11 items-center justify-center rounded-full border transition ${
+                      isActive
+                        ? "border-cyan-300 bg-cyan-500 text-white shadow-lg shadow-cyan-500/25"
+                        : isDone
+                          ? "border-emerald-500 bg-emerald-500 text-white"
+                          : "border-slate-600 bg-slate-700 text-slate-300 group-hover:border-slate-400"
+                    }`}
+                  >
+                    {isDone ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+                  </span>
+                  <span className={`text-xs font-bold ${isActive ? "text-white" : "text-slate-300"}`}>{step.title}</span>
+                  <span className="hidden text-[11px] font-medium text-slate-500 sm:block">{step.description}</span>
+                  {isActive && <span className="absolute -bottom-4 h-1 w-16 rounded-full bg-gradient-to-r from-rose-500 to-orange-500" />}
+                </button>
+              );
+            })}
+          </div>
+        </nav>
 
-      <Card className="overflow-hidden border-slate-800 bg-slate-950/70 shadow-[0_30px_80px_rgba(15,23,42,0.35)]">
-        <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="space-y-4 p-6">
-            <Badge className="w-fit border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-200">Profesyonel KKD Teslim Akışı</Badge>
+        <div
+          key={activeStep}
+          className={`transition-all duration-300 ${
+            stepDirection === "forward" ? "animate-in slide-in-from-right-6 fade-in" : "animate-in slide-in-from-left-6 fade-in"
+          }`}
+        >
+        {activeStep === 0 && (
+        <section className={panelClass}>
+          <div className={`${panelHeaderClass} bg-slate-700/60`}>
+            <Building2 className="h-5 w-5 text-cyan-300" />
+            1. Firma Bilgileri
+          </div>
+          <div className="grid gap-4 p-6 md:grid-cols-[1.5fr_0.7fr_0.7fr]">
             <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white md:text-3xl">KKD zimmetini tek ekranda yönet, resmi formu anında üret</h2>
-              <p className="max-w-2xl text-sm leading-6 text-slate-400 md:text-base">
-                Kullanıcı ister sistemdeki firma ve çalışanlardan seçim yapabilir, ister manuel girişle hızlı bir zimmet formu hazırlayabilir. Word çıktısı kurumsal formatta, mobil uyumlu akışla hazırlanır.
+              <Label>Firma Seçin *</Label>
+              <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
+                <SelectTrigger className={inputClass}>
+                  <SelectValue placeholder={loadingCompanies ? "Firmalar yükleniyor..." : "Firma arayın veya seçin..."} />
+                </SelectTrigger>
+                <SelectContent className="z-[80] border-slate-700 bg-slate-900 text-white">
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {companyName(company)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Teslim Tarihi</Label>
+              <div className="relative">
+                <Input className={inputClass} type="date" value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} />
+                <CalendarDays className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Periyodik Kontrol Tarihi</Label>
+              <div className="relative">
+                <Input
+                  className={inputClass}
+                  type="date"
+                  value={periodicControlDate}
+                  onChange={(event) => setPeriodicControlDate(event.target.value)}
+                />
+                <CalendarDays className="pointer-events-none absolute right-3 top-3 h-4 w-4 text-slate-500" />
+              </div>
+            </div>
+          </div>
+        </section>
+        )}
+
+        {activeStep === 1 && (
+        <section className={panelClass}>
+          <div className={`${panelHeaderClass} bg-gradient-to-r from-blue-600 to-cyan-500`}>
+            <UsersRound className="h-5 w-5 text-amber-200" />
+            2. Çalışan Seçimi
+          </div>
+          <div className="space-y-4 p-6">
+            <div className="rounded-xl border border-slate-700 bg-slate-900/35 p-4">
+              <div className="mb-4 flex items-center gap-2 font-semibold text-white">
+                <UsersRound className="h-4 w-4 text-cyan-300" />
+                Firma Çalışanları
+              </div>
+              {!selectedCompanyId ? (
+                <div className="flex min-h-24 items-center justify-center text-sm text-blue-200">Çalışanları görmek için bir firma seçin.</div>
+              ) : loadingEmployees ? (
+                <div className="flex min-h-24 items-center justify-center text-sm text-blue-200">Çalışanlar yükleniyor...</div>
+              ) : employees.length === 0 ? (
+                <div className="flex min-h-24 items-center justify-center text-sm text-slate-400">Bu firmada kayıtlı çalışan bulunamadı.</div>
+              ) : (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {employees.map((employee) => {
+                    const selected = selectedEmployeeIds.includes(employee.id);
+                    return (
+                      <button
+                        type="button"
+                        key={employee.id}
+                        onClick={() => toggleEmployee(employee.id)}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-3 text-left transition ${
+                          selected
+                            ? "border-cyan-400 bg-cyan-500/15 text-white"
+                            : "border-slate-700 bg-slate-950/40 text-slate-200 hover:border-cyan-500/60"
+                        }`}
+                      >
+                        <span>
+                          <span className="block text-sm font-bold">{employee.fullName}</span>
+                          <span className="text-xs text-slate-400">{employee.jobTitle || employee.department || "Görev bilgisi yok"}</span>
+                        </span>
+                        {selected && <Check className="h-4 w-4 text-cyan-300" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-slate-700 bg-slate-700/35 p-4">
+              <div className="mb-3 flex items-center gap-2 font-semibold">
+                <UserPlus className="h-4 w-4 text-emerald-300" />
+                Manuel Çalışan Ekle
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_0.7fr]">
+                <Input className={inputClass} placeholder="Ad Soyad *" value={manualName} onChange={(event) => setManualName(event.target.value)} />
+                <Input className={inputClass} placeholder="TC Kimlik No" value={manualTc} onChange={(event) => setManualTc(event.target.value)} />
+                <Input
+                  className={inputClass}
+                  placeholder="Departman/Görev"
+                  value={manualJob}
+                  onChange={(event) => setManualJob(event.target.value)}
+                />
+                <Button type="button" className="h-11 gap-2 bg-emerald-600 hover:bg-emerald-500" onClick={addManualEmployee}>
+                  <Plus className="h-4 w-4" />
+                  Ekle
+                </Button>
+              </div>
+            </div>
+
+            {selectedEmployees.length === 0 ? (
+              <div className="flex min-h-36 flex-col items-center justify-center rounded-xl border border-slate-700 bg-slate-900/30 text-center">
+                <UsersRound className="mb-3 h-10 w-10 text-slate-600" />
+                <p className="font-semibold text-slate-400">Henüz çalışan eklenmedi</p>
+                <p className="text-sm text-blue-200">Yukarıdan firma seçerek veya manuel olarak çalışan ekleyin.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-slate-700 bg-slate-900/30 p-4">
+                <div className="mb-3 font-bold text-white">Teslim alacak çalışanlar ({selectedEmployees.length})</div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {selectedEmployees.map((employee) => (
+                    <div key={employee.id} className="flex items-center justify-between rounded-lg bg-slate-950/50 px-3 py-2">
+                      <span>
+                        <span className="block text-sm font-semibold">{employee.fullName}</span>
+                        <span className="text-xs text-slate-400">{employee.tcNumber || "TC No yok"}</span>
+                      </span>
+                      {employee.isManual && (
+                        <button
+                          type="button"
+                          aria-label="Manuel çalışanı kaldır"
+                          onClick={() => setManualEmployees((current) => current.filter((item) => item.id !== employee.id))}
+                          className="rounded-md p-2 text-rose-300 hover:bg-rose-500/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+        )}
+
+        {activeStep === 2 && (
+        <section className={panelClass}>
+          <div className={`${panelHeaderClass} bg-gradient-to-r from-purple-700 to-fuchsia-500`}>
+            <Boxes className="h-5 w-5 text-amber-200" />
+            3. KKD Seçimi
+          </div>
+          <div className="space-y-4 p-6">
+            <div className="grid gap-3 rounded-xl border border-slate-700 bg-slate-900/35 p-4 md:grid-cols-[1fr_130px]">
+              <div className="space-y-2">
+                <Label>Sektör Seçimi</Label>
+                <Select value={sector} onValueChange={setSector}>
+                  <SelectTrigger className={inputClass}>
+                    <SelectValue placeholder="Sektör seçin" />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80] border-slate-700 bg-slate-900 text-white">
+                    {["Genel", "İnşaat", "Metal", "Kimya", "Gıda", "Sağlık", "Lojistik", "Enerji"].map((item) => (
+                      <SelectItem key={item} value={item}>
+                        {item}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-950/50 p-3 text-center">
+                <p className="text-xs text-blue-200">Seçili Ürün</p>
+                <p className="text-lg font-black text-fuchsia-300">{selectedItemIds.length} KKD</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" className="bg-violet-700 hover:bg-violet-600" onClick={selectAllItems}>
+                Tümünü Seç
+              </Button>
+              <Button type="button" variant="secondary" className="bg-slate-700 text-white hover:bg-slate-600" onClick={() => setSelectedItemIds([])}>
+                Temizle
+              </Button>
+              <Button type="button" className="gap-2 bg-emerald-700 hover:bg-emerald-600" onClick={saveTemplate}>
+                <Save className="h-4 w-4" />
+                Şablonu Kaydet
+              </Button>
+              <Select value={selectedTemplateId} onValueChange={applyTemplate}>
+                <SelectTrigger className="h-10 w-44 border-slate-700 bg-blue-950/70 text-white">
+                  <SelectValue placeholder="Şablonlarım" />
+                </SelectTrigger>
+                <SelectContent className="z-[80] border-slate-700 bg-slate-900 text-white">
+                  {templates.length === 0 ? (
+                    <SelectItem value="empty" disabled>
+                      Kayıtlı şablon yok
+                    </SelectItem>
+                  ) : (
+                    templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              {ppeCategories.map((category) => {
+                const isOpen = openCategories.includes(category.id);
+                return (
+                  <div key={category.id} className="overflow-hidden rounded-xl border border-slate-700 bg-slate-900/45">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between bg-slate-700/45 px-4 py-3 text-left font-bold text-white"
+                      onClick={() => toggleCategory(category.id)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{category.icon}</span>
+                        {category.title}
+                      </span>
+                      <ChevronDown className={`h-4 w-4 transition ${isOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {isOpen && (
+                      <div className="p-4">
+                        <div className="mb-3 flex items-center justify-between text-xs">
+                          <span className="font-semibold text-fuchsia-300">Kategoriyi Seç</span>
+                          <button
+                            type="button"
+                            className="rounded-md bg-emerald-500/10 px-2 py-1 font-semibold text-emerald-300 hover:bg-emerald-500/20"
+                            onClick={() => {
+                              const ids = category.items.map((item) => item.id);
+                              setSelectedItemIds((current) => Array.from(new Set([...current, ...ids])));
+                            }}
+                          >
+                            + Ekle
+                          </button>
+                        </div>
+                        <div className="grid gap-2 md:grid-cols-3">
+                          {category.items.map((item) => {
+                            const checked = selectedItemIds.includes(item.id);
+                            return (
+                              <label
+                                key={item.id}
+                                className={`flex min-h-[58px] cursor-pointer gap-2 rounded-lg border p-3 transition ${
+                                  checked
+                                    ? "border-violet-400 bg-violet-500/15"
+                                    : "border-slate-600 bg-slate-950/30 hover:border-violet-500/60"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="mt-1 h-4 w-4 rounded border-slate-500 bg-slate-900 accent-violet-500"
+                                  checked={checked}
+                                  onChange={() => toggleItem(item.id)}
+                                />
+                                <span>
+                                  <span className="block text-sm font-semibold text-slate-100">{item.name}</span>
+                                  <span className="text-xs text-slate-400">({item.standard})</span>
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+        )}
+
+        {activeStep === 3 && (
+        <section className={panelClass}>
+          <div className={`${panelHeaderClass} bg-slate-600/80`}>
+            <PackageCheck className="h-5 w-5 text-amber-200" />
+            4. Teslim Bilgileri
+          </div>
+          <div className="space-y-5 p-6">
+            <div className="space-y-2">
+              <Label>Teslim Eden (Ad Soyad / Ünvan)</Label>
+              <Input
+                className={inputClass}
+                placeholder="İSG Uzmanı / Depo Sorumlusu vb."
+                value={deliveredBy}
+                onChange={(event) => setDeliveredBy(event.target.value)}
+              />
+            </div>
+
+            <div className="rounded-xl border border-fuchsia-500/70 bg-fuchsia-950/30 p-4">
+              <div className="mb-2 flex items-center gap-2 font-bold text-white">
+                <FileCheck2 className="h-4 w-4 text-fuchsia-300" />
+                KKD Zimmet Formu Hakkında
+              </div>
+              <p className="text-sm leading-6 text-fuchsia-50">
+                KKD Zimmet Formu, çalışanlara teslim edilen kişisel koruyucu donanımların kayıt altına alındığı yasal
+                belgedir. 6331 sayılı İş Sağlığı ve Güvenliği Kanunu gereği KKD teslimatlarının belgelenmesi zorunludur.
               </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button className="gap-2 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-cyan-600 text-white hover:opacity-95" onClick={openDeliveryDialog}>
-                <FileSpreadsheet className="h-4 w-4" />
-                KKD Zimmet Formu Oluştur
-              </Button>
-              <Button variant="outline" className="gap-2" onClick={openAssignmentCreate} disabled={!canManage}>
-                <PackageCheck className="h-4 w-4" />
-                Sisteme Zimmet Kaydı Ekle
-              </Button>
+              <p className="mt-2 text-sm font-semibold text-amber-300">Tüm ekipmanlar CE işareti ve ilgili TS EN standartlarına uygun olmalıdır.</p>
             </div>
           </div>
-          <div className="border-t border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-6 lg:border-l lg:border-t-0">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Form Akışı</p>
-                <p className="mt-2 text-lg font-semibold text-white">Sistemden seç veya manuel gir</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Çıktı</p>
-                <p className="mt-2 text-lg font-semibold text-white">Kurumsal Word zimmet formu</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Mobil Kullanım</p>
-                <p className="mt-2 text-lg font-semibold text-white">Tek kolon uyumlu veri girişi</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Esneklik</p>
-                <p className="mt-2 text-lg font-semibold text-white">Firma, çalışan ve KKD alanlarında hibrit seçim</p>
-              </div>
+        </section>
+        )}
+
+        {activeStep === 4 && (
+          <section className={panelClass}>
+            <div className={`${panelHeaderClass} bg-gradient-to-r from-emerald-600 to-teal-500`}>
+              <FileCheck2 className="h-5 w-5 text-white" />
+              5. Onay ve Son Kontrol
             </div>
-          </div>
+            <div className="space-y-5 p-6">
+              <div className="grid gap-3 md:grid-cols-4">
+                <div className="rounded-xl border border-slate-700 bg-slate-950/45 p-4">
+                  <p className="text-xs font-semibold text-slate-400">Firma</p>
+                  <p className="mt-2 text-sm font-bold text-white">{selectedCompany ? companyName(selectedCompany) : "-"}</p>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/45 p-4">
+                  <p className="text-xs font-semibold text-slate-400">Çalışan</p>
+                  <p className="mt-2 text-xl font-black text-cyan-300">{selectedEmployees.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/45 p-4">
+                  <p className="text-xs font-semibold text-slate-400">KKD</p>
+                  <p className="mt-2 text-xl font-black text-fuchsia-300">{selectedItemIds.length}</p>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-950/45 p-4">
+                  <p className="text-xs font-semibold text-slate-400">Teslim Tarihi</p>
+                  <p className="mt-2 text-sm font-bold text-white">{deliveryDate || "-"}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-xl border border-slate-700 bg-slate-900/35 p-4">
+                  <h3 className="mb-3 font-bold text-white">Teslim Alacak Çalışanlar</h3>
+                  <div className="max-h-56 space-y-2 overflow-auto pr-1">
+                    {selectedEmployees.length === 0 ? (
+                      <p className="text-sm text-slate-400">Çalışan seçilmedi.</p>
+                    ) : (
+                      selectedEmployees.map((employee) => (
+                        <div key={employee.id} className="rounded-lg bg-slate-950/45 px-3 py-2 text-sm">
+                          <p className="font-semibold text-white">{employee.fullName}</p>
+                          <p className="text-xs text-slate-400">{employee.tcNumber || "TC No yok"} • {employee.jobTitle || "Görev yok"}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-slate-900/35 p-4">
+                  <h3 className="mb-3 font-bold text-white">Seçilen KKD Listesi</h3>
+                  <div className="max-h-56 space-y-2 overflow-auto pr-1">
+                    {selectedItems.length === 0 ? (
+                      <p className="text-sm text-slate-400">KKD seçilmedi.</p>
+                    ) : (
+                      selectedItems.map((item) => (
+                        <div key={item.id} className="rounded-lg bg-slate-950/45 px-3 py-2 text-sm">
+                          <p className="font-semibold text-white">{item.name}</p>
+                          <p className="text-xs text-slate-400">{item.standard}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                disabled={saving}
+                className="h-12 w-full gap-2 rounded-xl bg-violet-700 text-base font-bold hover:bg-violet-600"
+                onClick={createPdf}
+              >
+                <Download className="h-5 w-5" />
+                PDF Oluştur ({selectedEmployees.length} Çalışan x {selectedItemIds.length} KKD)
+              </Button>
+            </div>
+          </section>
+        )}
         </div>
-      </Card>
 
-      {isViewer && <Alert className="border-slate-700 bg-slate-900/60 text-slate-100"><AlertTriangle className="h-4 w-4" /><AlertTitle>Görüntüleme yetkisi</AlertTitle><AlertDescription>Bu rolde kayıtları inceleyebilirsiniz; düzenleme işlemleri kapalıdır.</AlertDescription></Alert>}
-      {error && <Alert className="border-red-500/20 bg-red-500/10 text-red-100"><AlertTriangle className="h-4 w-4" /><AlertTitle>KKD verisi yüklenemedi</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <Card className="border-slate-800 bg-slate-950/60"><CardHeader className="pb-2"><CardDescription>Aktif envanter</CardDescription><CardTitle className="text-3xl text-white">{summary.inventoryCount}</CardTitle></CardHeader></Card>
-        <Card className="border-slate-800 bg-slate-950/60"><CardHeader className="pb-2"><CardDescription>Aktif zimmet</CardDescription><CardTitle className="text-3xl text-white">{summary.activeAssignments}</CardTitle></CardHeader></Card>
-        <Card className="border-amber-500/20 bg-amber-500/5"><CardHeader className="pb-2"><CardDescription>30 gün içinde yenileme</CardDescription><CardTitle className="text-3xl text-white">{summary.renewalDue}</CardTitle></CardHeader></Card>
-        <Card className="border-red-500/20 bg-red-500/5"><CardHeader className="pb-2"><CardDescription>Süresi geçen</CardDescription><CardTitle className="text-3xl text-white">{summary.overdue}</CardTitle></CardHeader></Card>
-        <Card className="border-orange-500/20 bg-orange-500/5"><CardHeader className="pb-2"><CardDescription>Düşük stok</CardDescription><CardTitle className="text-3xl text-white">{summary.lowStock}</CardTitle></CardHeader></Card>
+        <div className="flex items-center justify-between">
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-2 text-slate-300 hover:bg-slate-800 hover:text-white"
+            disabled={activeStep === 0}
+            onClick={previousStep}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Geri
+          </Button>
+          {activeStep < steps.length - 1 ? (
+            <Button type="button" className="gap-2 bg-orange-600 hover:bg-orange-500" onClick={nextStep}>
+              İleri
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button type="button" className="gap-2 bg-emerald-600 hover:bg-emerald-500" onClick={createPdf} disabled={saving}>
+              <Download className="h-4 w-4" />
+              Formu Oluştur
+            </Button>
+          )}
+        </div>
       </div>
-
-      <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-slate-500" /><Input value={search} onChange={(event) => setSearch(event.target.value)} className="pl-9" placeholder="KKD, çalışan veya firma ile ara" /></div>
-        <Select value={employeeFilter} onValueChange={setEmployeeFilter}><SelectTrigger><SelectValue placeholder="Çalışan filtrele" /></SelectTrigger><SelectContent><SelectItem value="ALL">Tüm çalışanlar</SelectItem>{employees.map((item) => <SelectItem key={item.id} value={item.id}>{item.fullName}</SelectItem>)}</SelectContent></Select>
-      </div>
-
-      <Tabs defaultValue="assignments" className="space-y-4">
-        <TabsList className="h-auto w-full justify-start rounded-xl bg-slate-900/70 p-1">
-          <TabsTrigger value="assignments">Zimmetler</TabsTrigger>
-          <TabsTrigger value="inventory">Envanter</TabsTrigger>
-          <TabsTrigger value="employees">Çalışan Bazlı Görünüm</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="assignments" className="mt-0">
-          <Card className="border-slate-800 bg-slate-950/60">
-            <CardHeader><CardTitle className="text-white">Aktif Zimmetler</CardTitle><CardDescription>Yenileme, gecikme ve iade akışını bu listeden yönetin.</CardDescription></CardHeader>
-            <CardContent><div className="rounded-2xl border border-slate-800"><Table><TableHeader><TableRow><TableHead>Çalışan</TableHead><TableHead>KKD</TableHead><TableHead>Durum</TableHead><TableHead>Yenileme</TableHead><TableHead className="text-right">İşlem</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableRow><TableCell colSpan={5} className="py-12 text-center text-sm text-slate-400">Zimmet kayıtları yükleniyor...</TableCell></TableRow> : assignments.length === 0 ? <TableRow><TableCell colSpan={5} className="py-12 text-center text-sm text-slate-400">Zimmet kaydı bulunamadı.</TableCell></TableRow> : assignments.map((item) => { const employee = employeeMap.get(item.employee_id); const inventoryItem = inventoryMap.get(item.inventory_id); const overdue = item.status !== "returned" && new Date(item.due_date) < new Date(); return <TableRow key={item.id}><TableCell><div><p className="font-medium text-white">{employee?.fullName || "-"}</p><p className="text-xs text-slate-400">{employee?.companyName || "Firma yok"}</p></div></TableCell><TableCell><div><p className="font-medium text-white">{inventoryItem?.item_name || "-"}</p><p className="text-xs text-slate-400">{item.size_label || "Beden yok"} • {item.quantity} adet</p></div></TableCell><TableCell><Badge className={overdue ? "border-red-500/20 bg-red-500/10 text-red-200" : "border-slate-700 bg-slate-900 text-slate-100"}>{overdue ? "Süresi geçti" : item.status === "returned" ? "İade edildi" : item.status === "replacement_due" ? "Yenileme bekliyor" : "Zimmetli"}</Badge></TableCell><TableCell>{formatDate(item.due_date)}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2">{canManage && item.status !== "returned" && <Button variant="outline" size="sm" onClick={() => void handleMarkReturned(item)}><RotateCcw className="h-4 w-4" /></Button>}<Button variant="outline" size="sm" onClick={() => openAssignmentEdit(item)} disabled={!canManage}>Düzenle</Button>{canManage && <Button variant="outline" size="sm" className="text-red-300" onClick={() => void handleAssignmentDelete(item)}>Sil</Button>}</div></TableCell></TableRow>; })}</TableBody></Table></div>{assignmentTotalCount > PPE_ASSIGNMENT_PAGE_SIZE ? <div className="mt-4 flex items-center justify-between text-sm text-slate-400"><span>Sayfa {assignmentPage} / {assignmentTotalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setAssignmentPage((page) => Math.max(1, page - 1))} disabled={assignmentPage === 1}>Önceki</Button><Button variant="outline" size="sm" onClick={() => setAssignmentPage((page) => Math.min(assignmentTotalPages, page + 1))} disabled={assignmentPage === assignmentTotalPages}>Sonraki</Button></div></div> : null}</CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="inventory" className="mt-0">
-          <Card className="border-slate-800 bg-slate-950/60">
-            <CardHeader><CardTitle className="text-white">KKD Envanteri</CardTitle><CardDescription>Stok miktarı, minimum eşik ve yenileme standardını izleyin.</CardDescription></CardHeader>
-            <CardContent><div className="rounded-2xl border border-slate-800"><Table><TableHeader><TableRow><TableHead>KKD</TableHead><TableHead>Standart</TableHead><TableHead>Stok</TableHead><TableHead>Yenileme</TableHead><TableHead className="text-right">İşlem</TableHead></TableRow></TableHeader><TableBody>{loading ? <TableRow><TableCell colSpan={5} className="py-12 text-center text-sm text-slate-400">Envanter yükleniyor...</TableCell></TableRow> : inventory.length === 0 ? <TableRow><TableCell colSpan={5} className="py-12 text-center text-sm text-slate-400">KKD envanteri boş.</TableCell></TableRow> : inventory.map((item) => <TableRow key={item.id}><TableCell><div><p className="font-medium text-white">{item.item_name}</p><p className="text-xs text-slate-400">{item.category}</p></div></TableCell><TableCell>{item.standard_code || "-"}</TableCell><TableCell><div><p className="font-medium text-white">{item.stock_quantity}</p><p className="text-xs text-slate-400">Minimum: {item.min_stock_level}</p></div></TableCell><TableCell>{item.default_renewal_days} gün</TableCell><TableCell className="text-right"><div className="flex justify-end gap-2"><Button variant="outline" size="sm" onClick={() => openInventoryEdit(item)} disabled={!canManage}>Düzenle</Button>{canManage && <Button variant="outline" size="sm" className="text-red-300" onClick={() => void handleInventoryDelete(item)}>Sil</Button>}</div></TableCell></TableRow>)}</TableBody></Table></div>{inventoryTotalCount > PPE_INVENTORY_PAGE_SIZE ? <div className="mt-4 flex items-center justify-between text-sm text-slate-400"><span>Sayfa {inventoryPage} / {inventoryTotalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setInventoryPage((page) => Math.max(1, page - 1))} disabled={inventoryPage === 1}>Önceki</Button><Button variant="outline" size="sm" onClick={() => setInventoryPage((page) => Math.min(inventoryTotalPages, page + 1))} disabled={inventoryPage === inventoryTotalPages}>Sonraki</Button></div></div> : null}</CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="employees" className="mt-0">
-          <div className="grid gap-4 lg:grid-cols-2">
-            {filteredEmployeeOverview.length === 0 ? (
-              <Card className="border-slate-800 bg-slate-950/60 lg:col-span-2"><CardContent className="py-12 text-center text-sm text-slate-400">Çalışan kaydı veya KKD zimmeti bulunamadı.</CardContent></Card>
-            ) : pagedEmployeeOverview.map((item) => (
-              <Card key={item.employeeId} className="border-slate-800 bg-slate-950/60">
-                <CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-white"><UserRound className="h-4 w-4" />{item.employeeName}</CardTitle><CardDescription>{item.companyName || "Firma yok"}{item.department ? ` • ${item.department}` : ""}</CardDescription></div><div className="flex flex-wrap gap-2"><Badge variant="outline">{item.activeAssignments} aktif zimmet</Badge>{item.overdueCount > 0 && <Badge className="border-red-500/20 bg-red-500/10 text-red-200">{item.overdueCount} gecikmiş</Badge>}{item.renewalDueCount > 0 && <Badge className="border-amber-500/20 bg-amber-500/10 text-amber-200">{item.renewalDueCount} yaklaşan</Badge>}</div></div></CardHeader>
-                <CardContent className="space-y-3">{item.items.length === 0 ? <div className="rounded-xl border border-dashed border-slate-800 px-4 py-6 text-sm text-slate-400">Aktif KKD zimmeti yok.</div> : item.items.map((ppeItem) => <div key={ppeItem.assignmentId} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3"><div><p className="font-medium text-white">{ppeItem.itemName}</p><p className="text-xs text-slate-400">{ppeItem.quantity} adet • {formatDate(ppeItem.dueDate)}</p></div><Badge className={new Date(ppeItem.dueDate) < new Date() ? "border-red-500/20 bg-red-500/10 text-red-200" : "border-slate-700 bg-slate-900 text-slate-100"}>{new Date(ppeItem.dueDate) < new Date() ? "Gecikmiş" : "Aktif"}</Badge></div>)}</CardContent>
-              </Card>
-            ))}{filteredEmployeeOverview.length > PPE_EMPLOYEE_PAGE_SIZE ? <div className="lg:col-span-2 flex items-center justify-between text-sm text-slate-400"><span>Sayfa {employeePage} / {employeeTotalPages}</span><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => setEmployeePage((page) => Math.max(1, page - 1))} disabled={employeePage === 1}>Önceki</Button><Button variant="outline" size="sm" onClick={() => setEmployeePage((page) => Math.min(employeeTotalPages, page + 1))} disabled={employeePage === employeeTotalPages}>Sonraki</Button></div></div> : null}
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      <PpeDeliveryFormDialog
-        open={deliveryDialogOpen}
-        saving={deliverySaving}
-        companies={companies}
-        employees={employees}
-        inventory={inventory}
-        value={deliveryForm}
-        onOpenChange={(open) => {
-          if (!open) {
-            resetDeliveryDialog();
-            return;
-          }
-          setDeliveryDialogOpen(true);
-        }}
-        onValueChange={handleDeliveryFormChange}
-        onToggleItem={handleToggleDeliveryItem}
-        onChangeItemQuantity={handleDeliveryItemQuantityChange}
-        onAddManualItem={handleAddManualDeliveryItem}
-        onSubmit={() => void handleDeliveryExport()}
-      />
-
-      <Dialog open={inventoryDialogOpen} onOpenChange={setInventoryDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editingInventory ? "KKD Kaydını Düzenle" : "Yeni KKD Kaydı"}</DialogTitle><DialogDescription>Envanter bilgisi, stok seviyesi ve yenileme standardını tanımlayın.</DialogDescription></DialogHeader>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label>KKD adı</Label><Input value={inventoryForm.itemName} onChange={(e) => setInventoryForm((p) => ({ ...p, itemName: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Kategori</Label><Input value={inventoryForm.category} onChange={(e) => setInventoryForm((p) => ({ ...p, category: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Standart kodu</Label><Input value={inventoryForm.standardCode} onChange={(e) => setInventoryForm((p) => ({ ...p, standardCode: e.target.value }))} placeholder="EN 397" /></div>
-            <div className="space-y-2"><Label>Varsayılan yenileme süresi (gün)</Label><Input type="number" min="1" value={inventoryForm.defaultRenewalDays} onChange={(e) => setInventoryForm((p) => ({ ...p, defaultRenewalDays: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Stok</Label><Input type="number" min="0" value={inventoryForm.stockQuantity} onChange={(e) => setInventoryForm((p) => ({ ...p, stockQuantity: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Minimum stok</Label><Input type="number" min="0" value={inventoryForm.minStockLevel} onChange={(e) => setInventoryForm((p) => ({ ...p, minStockLevel: e.target.value }))} /></div>
-            <div className="space-y-2 md:col-span-2"><Label>Notlar</Label><Textarea value={inventoryForm.notes} onChange={(e) => setInventoryForm((p) => ({ ...p, notes: e.target.value }))} className="min-h-20" /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setInventoryDialogOpen(false)}>Vazgeç</Button><Button onClick={() => void handleInventorySave()} disabled={saving}>{saving ? "Kaydediliyor..." : "Kaydet"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={assignmentDialogOpen} onOpenChange={setAssignmentDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editingAssignment ? "KKD Zimmetini Düzenle" : "Yeni KKD Zimmeti"}</DialogTitle><DialogDescription>Çalışana teslim edilen KKD kaydını oluşturun veya güncelleyin.</DialogDescription></DialogHeader>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2"><Label>KKD</Label><Select value={assignmentForm.inventoryId} onValueChange={(value) => { const item = inventoryMap.get(value); const assigned = assignmentForm.assignedDate || new Date().toISOString().slice(0, 10); const suggestedDue = item ? new Date(new Date(assigned).getTime() + item.default_renewal_days * 86400000).toISOString().slice(0, 10) : ""; setAssignmentForm((prev) => ({ ...prev, inventoryId: value, dueDate: prev.dueDate || suggestedDue })); }}><SelectTrigger><SelectValue placeholder="KKD seçin" /></SelectTrigger><SelectContent>{inventoryOptions.filter((item) => item.isActive).map((item) => <SelectItem key={item.id} value={item.id}>{item.itemName}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Çalışan</Label><Select value={assignmentForm.employeeId} onValueChange={(value) => setAssignmentForm((prev) => ({ ...prev, employeeId: value }))}><SelectTrigger><SelectValue placeholder="Çalışan seçin" /></SelectTrigger><SelectContent>{employees.filter((item) => item.isActive).map((item) => <SelectItem key={item.id} value={item.id}>{item.fullName} • {item.companyName || "Firma yok"}</SelectItem>)}</SelectContent></Select></div>
-            <div className="space-y-2"><Label>Zimmet tarihi</Label><Input type="date" value={assignmentForm.assignedDate} onChange={(e) => setAssignmentForm((p) => ({ ...p, assignedDate: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Yenileme tarihi</Label><Input type="date" value={assignmentForm.dueDate} onChange={(e) => setAssignmentForm((p) => ({ ...p, dueDate: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Durum</Label><Select value={assignmentForm.status} onValueChange={(value) => setAssignmentForm((p) => ({ ...p, status: value as AssignmentFormState["status"] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="assigned">Zimmetli</SelectItem><SelectItem value="replacement_due">Yenileme bekliyor</SelectItem><SelectItem value="returned">İade edildi</SelectItem></SelectContent></Select></div>
-            <div className="space-y-2"><Label>Adet</Label><Input type="number" min="1" value={assignmentForm.quantity} onChange={(e) => setAssignmentForm((p) => ({ ...p, quantity: e.target.value }))} /></div>
-            <div className="space-y-2"><Label>Beden / varyant</Label><Input value={assignmentForm.sizeLabel} onChange={(e) => setAssignmentForm((p) => ({ ...p, sizeLabel: e.target.value }))} /></div>
-            <div className="space-y-2 md:col-span-2"><Label>Notlar</Label><Textarea value={assignmentForm.notes} onChange={(e) => setAssignmentForm((p) => ({ ...p, notes: e.target.value }))} className="min-h-20" /></div>
-          </div>
-          <DialogFooter><Button variant="outline" onClick={() => setAssignmentDialogOpen(false)}>Vazgeç</Button><Button onClick={() => void handleAssignmentSave()} disabled={saving}>{saving ? "Kaydediliyor..." : "Kaydet"}</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </main>
   );
 }

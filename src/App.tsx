@@ -109,6 +109,7 @@ const ISGBot = lazyWithRetry("isg-bot", loadIsgBotPage);
 const loadNaceHazardQueryPage = () => import("@/components/nace/NaceHazardQuery");
 const NaceHazardQuery = lazyWithRetry("nace-hazard-query", loadNaceHazardQueryPage);
 const NaceSectorList = lazyWithRetry("nace-sector-list", () => import("@/components/nace/NaceSectorList"));
+const MykMandatoryQuery = lazyWithRetry("myk-mandatory-query", () => import("@/pages/MykMandatoryQuery"));
 
 // ============================================
 // RISK ASSESSMENT
@@ -369,6 +370,8 @@ const ProtectedShell = () => {
             <Route path="/calisma-talimatlari" element={<Navigate to="/work-instructions" replace />} />
             <Route path="nace-query" element={<NaceHazardQuery />} />
             <Route path="nace-query/sectors" element={<NaceSectorList />} />
+            <Route path="/myk-zorunluluk-sorgula" element={<MykMandatoryQuery />} />
+            <Route path="/myk-sorgula" element={<Navigate to="/myk-zorunluluk-sorgula" replace />} />
 
             {/* ============================================ */}
             {/* KVKK & PRIVACY */}

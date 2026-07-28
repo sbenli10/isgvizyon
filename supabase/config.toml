@@ -19,3 +19,8 @@ entrypoint = "./functions/analyze-hazard/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/osgb-automation-batch/index.ts"
+
+[functions.myk-sync]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/myk-sync/index.ts"

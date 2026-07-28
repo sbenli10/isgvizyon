@@ -702,6 +702,7 @@ export async function uploadCompanyArchiveFile(
   const filePath = `${getArchiveFolderPath(companyId, folder)}/${Date.now()}__${safeOriginalName}`;
   await uploadFileOptimized(COMPANY_ARCHIVE_BUCKET, filePath, rawFile);
   invalidateCompanyArchiveCache(companyId);
+  return filePath;
 }
 
 export async function deleteCompanyArchiveFile(filePath: string) {

@@ -40,7 +40,13 @@ import { Badge } from "@/components/ui/badge";
 import { ProfileMetricCard } from "./ProfileMetricCard";
 import SettingsPage from "@/pages/Settings";
 import { cn } from "@/lib/utils";
-import { parseStorageObjectRef } from "@/lib/storageObject";
+import {
+  COMPANY_ARCHIVE_BUCKET,
+  COMPANY_ARCHIVE_FOLDERS,
+  type CompanyArchiveFolderName,
+  uploadCompanyArchiveFile,
+} from "@/lib/companyArchive";
+import { buildStorageObjectRef, parseStorageObjectRef } from "@/lib/storageObject";
 import { useSubscription } from "@/hooks/useSubscription";
 
 type CompanyRow = {
@@ -2490,7 +2496,277 @@ export function ProfileCompanyFollowTab() {
 }
 
 export function ProfileArchiveTab() {
-  return <SimpleRecordsTab title="Arşiv" description="Oluşturulan ve yüklenen dosyalarınızı firma ve belge tipine göre izleyin." table="reports" addLabel="Arşiv Kaydı Ekle" fields={["title", "report_type", "company_id", "notes"]} />;
+  const { user, profile } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [rows, setRows] = useState<GenericRecord[]>([]);
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [form, setForm] = useState({
+    company_id: "",
+    folder: "Belgeler" as CompanyArchiveFolderName,
+    report_type: "Genel Evrak",
+    title: "",
+    notes: "",
+  });
+
+  const archiveTypeOptions = [
+    "Genel Evrak",
+    "Risk Değerlendirmesi",
+    "Eğitim Belgesi",
+    "Atama Yazısı",
+    "Tespit ve Öneri Defteri",
+    "Sertifika",
+    "Rapor",
+    "Sözleşme",
+    "Diğer",
+  ];
+
+  const load = async () => {
+    const [reportRows, companyRows] = await Promise.all([
+      safeRows<GenericRecord>("reports", "*", 200, (q) => {
+        let next = q.order("created_at", { ascending: false });
+        if (user?.id) next = next.eq("user_id", user.id);
+        return next;
+      }),
+      loadProfileCompanies(profile?.organization_id, user?.id, 500),
+    ]);
+    setRows(reportRows);
+    setCompanies(companyRows.sort((a, b) => (a.name || "").localeCompare(b.name || "", "tr")));
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.organization_id, user?.id]);
+
+  const companyNameById = useMemo(() => new Map(companies.map((company) => [company.id, company.name])), [companies]);
+
+  const getContent = (row: GenericRecord) =>
+    row.content && typeof row.content === "object" && !Array.isArray(row.content) ? row.content as GenericRecord : {};
+
+  const resetForm = () => {
+    setSelectedFile(null);
+    setForm({
+      company_id: "",
+      folder: "Belgeler",
+      report_type: "Genel Evrak",
+      title: "",
+      notes: "",
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const save = async () => {
+    const company = companies.find((item) => item.id === form.company_id);
+    if (!company) {
+      toast.error("Lütfen arşiv dosyasının ait olduğu firmayı seçin.");
+      return;
+    }
+    if (!selectedFile) {
+      toast.error("Lütfen arşive eklenecek dosyayı seçin.");
+      return;
+    }
+    if (!profile?.organization_id) {
+      toast.error("Organizasyon bilgisi bulunamadı. Lütfen sayfayı yenileyip tekrar deneyin.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const storagePath = await uploadCompanyArchiveFile(company.id, form.folder, selectedFile);
+      const fileRef = buildStorageObjectRef(COMPANY_ARCHIVE_BUCKET, storagePath);
+      const title = form.title.trim() || selectedFile.name;
+      const { error } = await db.from("reports").insert({
+        user_id: user?.id,
+        org_id: profile.organization_id,
+        title,
+        report_type: form.report_type,
+        export_format: selectedFile.name.split(".").pop()?.toLowerCase() || "file",
+        file_url: fileRef,
+        generated_at: new Date().toISOString(),
+        content: {
+          archiveSource: "profile_archive",
+          company_id: company.id,
+          company_name: company.name,
+          folder: form.folder,
+          storage_bucket: COMPANY_ARCHIVE_BUCKET,
+          storage_path: storagePath,
+          file_name: selectedFile.name,
+          file_size: selectedFile.size,
+          mime_type: selectedFile.type || null,
+          notes: form.notes.trim() || null,
+          tags: ["firma-arsivi", "profile-archive"],
+        },
+      });
+      if (error) throw error;
+      toast.success("Dosya firma arşivine kaydedildi.", { description: `${company.name} / ${form.folder}` });
+      setOpen(false);
+      resetForm();
+      void load();
+    } catch (error: any) {
+      toast.error("Arşiv dosyası kaydedilemedi.", { description: error?.message || "Dosya yükleme sırasında hata oluştu." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const downloadRecord = async (row: GenericRecord) => {
+    const content = getContent(row);
+    const rawUrl = row.file_url || content.file_url || content.downloadUrl || content.publicUrl;
+    const storageRef = parseStorageObjectRef(String(rawUrl || ""), COMPANY_ARCHIVE_BUCKET);
+    if (!storageRef) {
+      toast.info("Bu arşiv kaydı için indirilebilir dosya bulunamadı.");
+      return;
+    }
+    const { data, error } = await supabase.storage.from(storageRef.bucket).createSignedUrl(storageRef.path, 60 * 60);
+    if (error || !data?.signedUrl) {
+      toast.error("Dosya bağlantısı oluşturulamadı.", { description: error?.message });
+      return;
+    }
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  return (
+    <PanelShell
+      title="Arşiv"
+      description="Dosyaları firma bazlı klasörlerde saklayın ve belge tipine göre izleyin."
+      action={<Button onClick={() => setOpen(true)} className="rounded-xl bg-blue-600 text-white hover:bg-blue-500"><Plus className="mr-2 h-4 w-4" />Arşiv Kaydı Ekle</Button>}
+    >
+      {rows.length === 0 ? (
+        <EmptyState description="İlk dosyayı firma seçerek arşive ekleyin." />
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {rows.map((row) => {
+            const content = getContent(row);
+            const companyId = String(content.company_id || content.companyId || "");
+            const companyName = String(content.company_name || content.companyName || companyNameById.get(companyId) || "Firma bilgisi yok");
+            const folder = String(content.folder || "Belgeler");
+            const fileName = String(content.file_name || row.title || "Dosya");
+            return (
+              <div key={row.id} className="rounded-2xl border border-slate-800 bg-slate-900/30 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold text-white">{row.title || fileName}</p>
+                    <p className="mt-1 text-xs text-slate-400">Firma: {companyName}</p>
+                  </div>
+                  <Badge className="shrink-0 bg-cyan-500/15 text-cyan-200">{row.report_type || "Evrak"}</Badge>
+                </div>
+                <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950/50 p-3 text-xs text-slate-400">
+                  <p><span className="font-semibold text-slate-300">Klasör:</span> {folder}</p>
+                  <p className="mt-1 truncate"><span className="font-semibold text-slate-300">Dosya:</span> {fileName}</p>
+                  {content.notes ? <p className="mt-2 line-clamp-2">{String(content.notes)}</p> : null}
+                </div>
+                <Button type="button" size="sm" onClick={() => void downloadRecord(row)} className="mt-3 h-8 rounded-lg bg-slate-700 text-xs text-white hover:bg-slate-600">
+                  <Download className="mr-1.5 h-3.5 w-3.5" />İndir
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) resetForm(); }}>
+        <DialogContent className="max-w-2xl border-slate-800 bg-slate-950 text-slate-100">
+          <DialogHeader>
+            <DialogTitle>Arşiv Kaydı Ekle</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Firma seçin, dosyayı yükleyin; kayıt otomatik olarak firma bazlı arşiv klasöründe saklanır.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label>Firma *</Label>
+              <Select value={form.company_id} onValueChange={(value) => setForm((current) => ({ ...current, company_id: value }))}>
+                <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-slate-900 text-slate-100">
+                  <SelectValue placeholder="Firma seçin" />
+                </SelectTrigger>
+                <SelectContent className="border-slate-700 bg-slate-900 text-slate-100">
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Arşiv Klasörü</Label>
+                <Select value={form.folder} onValueChange={(value) => setForm((current) => ({ ...current, folder: value as CompanyArchiveFolderName }))}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-slate-900 text-slate-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-slate-900 text-slate-100">
+                    {COMPANY_ARCHIVE_FOLDERS.map((folder) => (
+                      <SelectItem key={folder} value={folder}>{folder}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Belge Türü</Label>
+                <Select value={form.report_type} onValueChange={(value) => setForm((current) => ({ ...current, report_type: value }))}>
+                  <SelectTrigger className="h-11 rounded-xl border-slate-700 bg-slate-900 text-slate-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="border-slate-700 bg-slate-900 text-slate-100">
+                    {archiveTypeOptions.map((type) => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Belge Başlığı</Label>
+              <Input
+                value={form.title}
+                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Örn. 2026 Risk Değerlendirme Raporu"
+                className="h-11 rounded-xl border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-2xl border border-dashed border-cyan-500/45 bg-cyan-500/10 p-5 text-left transition hover:border-cyan-300 hover:bg-cyan-500/15"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-200">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-white">{selectedFile ? selectedFile.name : "Dosya seç veya yükle"}</p>
+                  <p className="mt-1 text-xs text-cyan-100/70">PDF, Word, Excel, görsel ve diğer evrak dosyaları desteklenir.</p>
+                </div>
+              </div>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
+            />
+            <div className="space-y-2">
+              <Label>Not</Label>
+              <Textarea
+                value={form.notes}
+                onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+                placeholder="Bu dosya ile ilgili kısa açıklama..."
+                className="min-h-24 rounded-xl border-slate-700 bg-slate-900 text-slate-100 placeholder:text-slate-500"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">İptal</Button>
+            <Button type="button" onClick={() => void save()} disabled={saving} className="bg-blue-600 text-white hover:bg-blue-500">
+              {saving ? "Kaydediliyor..." : "Kaydet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PanelShell>
+  );
 }
 
 export function ProfileRisksTab() {
