@@ -1,5 +1,6 @@
 //src\pages\DataPrivacy.tsx
 import { useState } from "react";
+import { useFormDraft } from "@/hooks/useFormDraft";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -93,8 +94,14 @@ export default function DataPrivacy() {
   const [showDeletionDialog, setShowDeletionDialog] = useState(false);
   const [showCorrectionDialog, setShowCorrectionDialog] = useState(false);
   const [showObjectionDialog, setShowObjectionDialog] = useState(false);
-  const [correctionNote, setCorrectionNote] = useState("");
-  const [objectionNote, setObjectionNote] = useState("");
+  const [correctionNote, setCorrectionNote, clearCorrectionDraft] = useFormDraft(
+    "dataPrivacy:correctionNote",
+    "",
+  );
+  const [objectionNote, setObjectionNote, clearObjectionDraft] = useFormDraft(
+    "dataPrivacy:objectionNote",
+    "",
+  );
   const [deletionConfirmed, setDeletionConfirmed] = useState(false);
 
   const fetchUserData = async () => {
@@ -196,6 +203,7 @@ export default function DataPrivacy() {
       toast.success("Düzeltme talebiniz kaydedildi. En kısa sürede değerlendirilecektir.");
       setShowCorrectionDialog(false);
       setCorrectionNote("");
+      clearCorrectionDraft();
     } catch (error: any) {
       // Table might not exist yet
       toast.error(error.message || "Talep kaydedilirken hata oluştu");
@@ -248,6 +256,7 @@ export default function DataPrivacy() {
       toast.success("İtiraz talebiniz kaydedildi. En kısa sürede değerlendirilecektir.");
       setShowObjectionDialog(false);
       setObjectionNote("");
+      clearObjectionDraft();
     } catch (error: any) {
       toast.error(error.message || "Talep kaydedilirken hata oluştu");
     } finally {
@@ -432,7 +441,7 @@ export default function DataPrivacy() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCorrectionDialog(false)}>
+            <Button variant="outline" onClick={() => { setShowCorrectionDialog(false); clearCorrectionDraft(); }}>
               İptal
             </Button>
             <Button onClick={handleCorrection} disabled={loading === "correction"}>
@@ -518,7 +527,7 @@ export default function DataPrivacy() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowObjectionDialog(false)}>
+            <Button variant="outline" onClick={() => { setShowObjectionDialog(false); clearObjectionDraft(); }}>
               İptal
             </Button>
             <Button onClick={handleObjection} disabled={loading === "objection"}>
