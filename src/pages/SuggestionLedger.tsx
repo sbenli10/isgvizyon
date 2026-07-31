@@ -71,14 +71,14 @@ function EntryCard({
   onRemove: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-slate-700/80 bg-slate-950/40 p-3">
+    <div className="rounded-2xl border border-slate-700/70 bg-slate-950/50 p-4 shadow-lg shadow-black/10">
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <Badge className="border-blue-400/25 bg-blue-500/10 text-blue-100">{index + 1}</Badge>
           <Badge className={priorityClassName[entry.priority]}>{entry.priority}</Badge>
           <span className="truncate text-xs text-slate-400">{entry.category}</span>
         </div>
-        <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-200" onClick={onRemove}>
+        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:bg-rose-500/10 hover:text-rose-200" onClick={onRemove}>
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -260,27 +260,27 @@ export default function SuggestionLedger() {
   };
 
   return (
-    <div className="min-h-screen bg-[#101827] px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+    <div className="min-h-screen bg-[#0b1220] px-4 py-5 text-slate-100 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-5">
+        <div className="flex flex-col gap-4 rounded-3xl border border-cyan-400/15 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-5 shadow-2xl shadow-black/25 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-xl border border-amber-400/25 bg-amber-500/15 text-amber-300">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl border border-cyan-300/25 bg-gradient-to-br from-cyan-500 to-violet-600 text-white shadow-lg shadow-cyan-950/30">
                 <ClipboardCheck className="h-5 w-5" />
               </div>
               <div>
-                <h1 className="text-2xl font-black tracking-tight text-white">İSG Tespit ve Öneri Defteri</h1>
-                <p className="text-sm text-slate-400">Örnek defter kayıtlarını seçin, firmaya ait bilgilerle kaydedin ve PDF çıktısı alın.</p>
+                <h1 className="text-3xl font-black tracking-tight text-white">İSG Tespit ve Öneri Defteri</h1>
+                <p className="mt-1 max-w-2xl text-sm text-slate-300">Örnek defter kayıtlarını seçin, firmaya ait bilgilerle kaydedin ve PDF çıktısı alın.</p>
               </div>
             </div>
           </div>
-          <Button type="button" variant="outline" className="w-fit border-amber-400/30 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15">
+          <Button type="button" variant="outline" className="w-fit border-cyan-400/30 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/15">
             <HelpCircle className="mr-2 h-4 w-4" />
             Nasıl Yapılır?
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/35 p-2">
           {tabItems.map((item, index) => {
             const Icon = item.icon;
             return (
@@ -291,8 +291,8 @@ export default function SuggestionLedger() {
                 className={cn(
                   "h-9 rounded-lg text-xs font-bold",
                   index === 0
-                    ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
-                    : "border-slate-700 bg-slate-900/70 text-slate-300 hover:bg-slate-800",
+                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-950/25 hover:from-cyan-400 hover:to-blue-500"
+                    : "border-slate-700 bg-slate-900/70 text-slate-300 hover:border-cyan-400/30 hover:bg-slate-800 hover:text-white",
                 )}
               >
                 <Icon className="mr-2 h-4 w-4" />
@@ -302,9 +302,24 @@ export default function SuggestionLedger() {
           })}
         </div>
 
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 p-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">Seçili Madde</p>
+            <p className="mt-2 text-2xl font-black text-white">{record.entries.length}</p>
+          </div>
+          <div className="rounded-2xl border border-violet-400/15 bg-violet-500/10 p-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-violet-200">Katalog Sonucu</p>
+            <p className="mt-2 text-2xl font-black text-white">{filteredCatalog.length}</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200">Kayıt Geçmişi</p>
+            <p className="mt-2 text-2xl font-black text-white">{history.length}</p>
+          </div>
+        </div>
+
         <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
           <div className="space-y-4">
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardContent className="p-4">
                 <div className="grid gap-3 md:grid-cols-3">
                   <div>
@@ -353,7 +368,7 @@ export default function SuggestionLedger() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-base text-white">
@@ -374,7 +389,7 @@ export default function SuggestionLedger() {
                   <div className="rounded-lg border border-dashed border-slate-700 p-6 text-center text-sm text-slate-400">Aramanıza uygun madde bulunamadı.</div>
                 ) : (
                   filteredCatalog.map((item) => (
-                    <div key={item.id} className="rounded-lg border border-slate-700/80 bg-slate-950/35 p-3 transition hover:border-amber-400/35 hover:bg-slate-950/55">
+                    <div key={item.id} className="rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4 transition hover:border-cyan-400/40 hover:bg-slate-950/70">
                       <div className="mb-2 flex flex-wrap items-center gap-2">
                         <Badge className={priorityClassName[item.priority]}>{item.priority}</Badge>
                         <Badge className="border-slate-600 bg-slate-800 text-slate-300">{item.subCategory}</Badge>
@@ -383,7 +398,7 @@ export default function SuggestionLedger() {
                       <p className="text-sm font-semibold leading-5 text-white">{item.finding}</p>
                       <p className="mt-2 text-xs leading-5 text-slate-300">{item.suggestion}</p>
                       <div className="mt-3 flex justify-end">
-                        <Button type="button" size="sm" className="h-8 bg-amber-500 text-slate-950 hover:bg-amber-400" onClick={() => addCatalogItem(item.id)}>
+                        <Button type="button" size="sm" className="h-8 rounded-lg bg-emerald-500 text-white hover:bg-emerald-400" onClick={() => addCatalogItem(item.id)}>
                           <Plus className="mr-1.5 h-3.5 w-3.5" />
                           Ekle
                         </Button>
@@ -394,7 +409,7 @@ export default function SuggestionLedger() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-white">
                   <Plus className="h-4 w-4 text-cyan-300" />
@@ -421,7 +436,7 @@ export default function SuggestionLedger() {
                     className="mt-1 min-h-20 border-slate-700 bg-slate-950/60 text-white placeholder:text-slate-500"
                   />
                 </div>
-                <Button type="button" className="bg-cyan-400 text-slate-950 hover:bg-cyan-300" onClick={addManualEntry}>
+                <Button type="button" className="bg-sky-500 text-white hover:bg-sky-400" onClick={addManualEntry}>
                   <Plus className="mr-2 h-4 w-4" />
                   Deftere Ekle
                 </Button>
@@ -430,7 +445,7 @@ export default function SuggestionLedger() {
           </div>
 
           <div className="space-y-4">
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-white">
                   <FileText className="h-4 w-4 text-cyan-300" />
@@ -439,14 +454,14 @@ export default function SuggestionLedger() {
                 <CardDescription className="text-xs text-slate-400">Kayıt alındıktan sonra firma bilgileriyle PDF çıktısı oluşturulur.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="rounded-lg border border-amber-400/25 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100">
+                <div className="rounded-2xl border border-blue-400/25 bg-blue-500/10 p-3 text-xs leading-5 text-blue-100">
                   <AlertTriangle className="mb-2 h-4 w-4" />
                   PDF çıktısında firma ünvanı, SGK sicil no, tehlike sınıfı ve seçilen tespit/öneriler otomatik doldurulur.
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-white">
                   <Building2 className="h-4 w-4 text-amber-300" />
@@ -518,11 +533,11 @@ export default function SuggestionLedger() {
                 ) : null}
 
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <Button type="button" onClick={saveRecord} disabled={saving || loading} className="bg-amber-500 text-slate-950 hover:bg-amber-400">
+                  <Button type="button" onClick={saveRecord} disabled={saving || loading} className="bg-emerald-500 text-white hover:bg-emerald-400">
                     {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                     Defteri Kaydet
                   </Button>
-                  <Button type="button" onClick={createPdf} disabled={pdfLoading} variant="outline" className="border-amber-400/35 bg-slate-950/50 text-amber-100 hover:bg-amber-500/10">
+                  <Button type="button" onClick={createPdf} disabled={pdfLoading} variant="outline" className="border-violet-400/35 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20">
                     {pdfLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                     PDF Çıktı Al
                   </Button>
@@ -536,7 +551,7 @@ export default function SuggestionLedger() {
               </CardContent>
             </Card>
 
-            <Card className="border-slate-700/80 bg-slate-900/70 shadow-xl shadow-black/20">
+            <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base text-white">Son Kayıtlar</CardTitle>
               </CardHeader>
@@ -548,7 +563,7 @@ export default function SuggestionLedger() {
                     <button
                       key={item.id}
                       type="button"
-                      className="w-full rounded-lg border border-slate-700/80 bg-slate-950/35 p-3 text-left transition hover:border-cyan-400/30 hover:bg-slate-950/55"
+                      className="w-full rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 text-left transition hover:border-cyan-400/35 hover:bg-slate-950/65"
                       onClick={() => openHistoryRecord(item.id)}
                     >
                       <div className="flex items-center justify-between gap-2">

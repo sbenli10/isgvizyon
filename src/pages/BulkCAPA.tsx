@@ -4873,152 +4873,122 @@ const handleSaveAndExport = async () => {
 
 
   return (
-    <div className="theme-page-readable space-y-8">
-      <div className="rounded-[28px] border border-primary/20 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.2),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(2,6,23,0.94))] p-6 shadow-[0_28px_100px_rgba(15,23,42,0.45)] md:p-8">
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-6">
-            <div className="flex flex-wrap gap-2">
-              <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-200">
-                Tekli ve çoklu DÖF oluşturma
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-slate-300">
-                Önce akışı seçin, sonra kaydı doldurun
-              </span>
-              {processingSessionStatus === "processing" ? (
-                <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-amber-200">
-                  Arka planda işlem sürüyor
-                </span>
-              ) : null}
-              {processingSessionStatus === "failed" && processingError ? (
-                <span className="rounded-full border border-rose-400/20 bg-rose-400/10 px-3 py-1 text-xs font-semibold tracking-wide text-rose-200">
-                  Son işlem hata verdi
-                </span>
-              ) : null}
-            </div>
-
-            <div className="space-y-4">
-              <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">
-                Tekli veya çoklu DÖF oluşturun
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-slate-300 md:text-lg">
-                Tek bir bulgu için tekli DÖF, birden fazla bulgu için çoklu DÖF seçin. Yapay zekâ ilk taslağı hazırlasın, siz de kuruma uygun hale getirip kaydı kolayca tamamlayın.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Açik maddeler</p>
-                <p className="mt-3 text-3xl font-bold text-white">{entries.length}</p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Toplu rapor için hazirlanan bulgular</p>
+    <div className="min-h-screen bg-[#0f172a] px-4 py-8 text-slate-100 sm:px-6">
+      <div className="mx-auto max-w-[896px] space-y-8">
+        <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-indigo-600 via-fuchsia-600 to-violet-700 p-8 shadow-2xl shadow-violet-950/40">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-5">
+              <div className="grid h-[72px] w-[72px] shrink-0 place-items-center rounded-[18px] bg-white/18 text-white shadow-inner shadow-white/10">
+                <CheckCircle2 className="h-10 w-10" />
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">AI hazirlananlar</p>
-                <p className="mt-3 text-3xl font-bold text-white">{aiEntryCount}</p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Fotograf veya nottan üretilen ilk taslaklar</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Kritik öncelik</p>
-                <p className="mt-3 text-3xl font-bold text-white">{criticalEntryCount}</p>
-                <p className="mt-2 text-xs leading-relaxed text-slate-400">Yakin takip gerektiren DÖF maddeleri</p>
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-white md:text-[32px]">Düzeltici Önleyici Faaliyet</h1>
+                <p className="mt-2 text-base text-violet-100">Yapay Zeka Destekli DÖF Formu</p>
               </div>
             </div>
-          </div>
-
-          <div className="rounded-[24px] border border-white/10 bg-slate-950/50 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-200">
-              Hızlı seçim rehberi
-            </p>
-            <h2 className="mt-2 text-lg font-semibold text-white">
-              Tekli mi, çoklu mu?
-            </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-300">
-              Tek bulgu için hızlı kayıt açın, aynı saha çalışmasındaki birden fazla bulgu için çoklu akışı kullanın. İsterseniz fotoğraf veya nottan yapay zekâ ile taslak da oluşturabilirsiniz.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-white">Hazirlik durumu</span>
-                  <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-                    {completedFieldCount}/{requiredFieldChecks.length}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-6 text-slate-400">
-                  {requiredFieldChecks.find((field) => !field.ready)?.label || "Bulgu listeye eklenebilir"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <span className="text-sm font-semibold text-white">Yaklasan termin</span>
-                <p className="mt-2 text-xs leading-6 text-slate-400">
-                  {nearestDueEntry
-                    ? `${new Date(nearestDueEntry.termin_date).toLocaleDateString("tr-TR")} • ${nearestDueEntry.related_department}`
-                    : "Termin belirlenince burada öne çikarilir"}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-4">
-                <span className="text-sm font-semibold text-cyan-100">Nasıl karar verilir?</span>
-                <ul className="mt-2 space-y-2 text-xs leading-6 text-cyan-50/90">
-                  <li>• Tek bir uygunsuzluk varsa tekli DÖF seçin.</li>
-                  <li>• Birden fazla uygunsuzluk varsa çoklu DÖF seçin.</li>
-                  <li>• Fotoğraftan veya nottan başlamak isterseniz yapay zekâ ile taslak oluşturun.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card space-y-8 border border-primary/20 p-6 lg:p-8">
-        <div className="space-y-6">
-        <div className="rounded-[24px] border border-border/60 bg-background/70 p-6">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                Oluşturma tipi seçimi
-              </p>
-              <h3 className="text-lg font-bold text-foreground">
-                Önce hangi akışı kullanacağınızı seçin
-              </h3>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-                Tekli DÖF tek bir bulgu içindir. Çoklu DÖF ise aynı saha çalışmasındaki birden fazla bulguyu tek raporda toplamak içindir.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex w-full flex-col gap-3 md:w-[156px]">
               <Button
                 type="button"
-                onClick={() => handleStartCreateFlow("single")}
-                className="h-12 gap-2 gradient-primary border-0 text-foreground font-semibold"
+                variant="outline"
+                onClick={() => navigate("/bulk-capa/how-to")}
+                className="h-10 justify-center rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
               >
-                <Plus className="h-4 w-4" />
-                Tekli DÖF oluştur
+                <AlertCircle className="mr-2 h-4 w-4" />
+                Nasıl Kullanılır?
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleStartCreateFlow("bulk")}
-                className="h-12 gap-2"
+                onClick={() => toast.info("Mesajlarınız için Denetimler sayfasındaki ilgili kayıt detayını kullanabilirsiniz.")}
+                className="h-10 justify-center rounded-xl border-cyan-200/20 bg-blue-500/20 text-white hover:bg-blue-500/30 hover:text-white"
               >
-                <Sparkles className="h-4 w-4" />
-                Çoklu DÖF oluştur
+                <Cloud className="mr-2 h-4 w-4" />
+                Mesajlarım
               </Button>
             </div>
           </div>
+        </section>
 
-          <div className="mt-5 grid grid-cols-2 gap-4 xl:grid-cols-4">
-            {creationOverviewCards.map((card) => (
-              <ModuleCard
-                key={card.key}
-                eyebrow={card.eyebrow}
-                title={card.title}
-                className="min-h-[172px] bg-secondary/20"
-              >
-                <p className="text-xs leading-6 text-muted-foreground">{card.body}</p>
-              </ModuleCard>
-            ))}
-          </div>
-        </div>
+        <section className="grid gap-4 md:grid-cols-2">
+          {[
+            {
+              title: "DÖF Nedir?",
+              body: "Düzeltici Önleyici Faaliyet (DÖF), tespit edilen uygunsuzlukların giderilmesi ve tekrarının önlenmesi için planlanan faaliyetleri içeren resmi dokümandır.",
+              icon: Download,
+              color: "text-blue-300",
+              bg: "bg-blue-500/15",
+            },
+            {
+              title: "İSG'de Önemi",
+              body: "İş güvenliğinde DÖF, kazaları önleme ve sürekli iyileştirme sürecinin temel taşıdır. Yasal zorunluluk kapsamında düzenlenir.",
+              icon: Shield,
+              color: "text-emerald-300",
+              bg: "bg-emerald-500/15",
+            },
+            {
+              title: "AI Destekli",
+              body: "Yapay zeka, yazdığınız bulguyu analiz ederek uygunsuzluk tanımı ve düzeltici faaliyet önerisi oluşturur.",
+              icon: Sparkles,
+              color: "text-violet-300",
+              bg: "bg-violet-500/15",
+            },
+            {
+              title: "Nasıl Düzenlenir?",
+              body: "Bulguyu açıkça tanımlayın, öncelik belirleyin, sorumlu atayın ve termin tarihi koyarak takibini sağlayın.",
+              icon: AlertTriangle,
+              color: "text-orange-300",
+              bg: "bg-orange-500/15",
+            },
+            {
+              title: "Firmaya Gönder",
+              body: 'Hazırladığınız DÖF raporlarınızı firmalara kolayca "Firmaya Gönder" butonu ile gönderebilirsiniz.',
+              icon: ChevronRight,
+              color: "text-cyan-300",
+              bg: "bg-cyan-500/15",
+            },
+            {
+              title: "Çoklu DÖF Hazırlama",
+              body: "Aynı firmaya ait birden fazla bulguyu düzenleyin ve tümünü tek bir PDF belgesinde liste halinde oluşturup firmaya iletin.",
+              icon: Users,
+              color: "text-teal-300",
+              bg: "bg-teal-500/15",
+            },
+          ].map((card) => {
+            const Icon = card.icon;
+            return (
+              <article key={card.title} className="rounded-2xl border border-slate-700/70 bg-slate-800/70 p-6 shadow-lg shadow-black/10 transition hover:border-slate-500/80 hover:bg-slate-800">
+                <div className="flex gap-4">
+                  <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", card.bg, card.color)}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-white">{card.title}</h2>
+                    <p className="mt-2 text-[15px] leading-6 text-slate-300">{card.body}</p>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-2">
+          <Button
+            type="button"
+            onClick={() => handleStartCreateFlow("single")}
+            className="h-[68px] rounded-2xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 text-lg font-black text-white shadow-xl shadow-violet-950/30 hover:from-indigo-500 hover:to-fuchsia-500"
+          >
+            <CheckCircle2 className="mr-3 h-5 w-5" />
+            DÖF Oluştur
+          </Button>
+          <Button
+            type="button"
+            onClick={() => handleStartCreateFlow("bulk")}
+            className="h-[68px] rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 text-lg font-black text-white shadow-xl shadow-emerald-950/25 hover:from-emerald-500 hover:to-teal-500"
+          >
+            <Users className="mr-3 h-5 w-5" />
+            Çoklu DÖF Oluştur
+          </Button>
+        </section>
 
         <Dialog
           open={createDialogOpen}
@@ -5962,500 +5932,6 @@ const handleSaveAndExport = async () => {
           </DialogContent>
         </Dialog>
 
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <ModuleCard
-            eyebrow="Kural tabanlı öneri"
-            title="Karar özeti ve şirket geçmişi"
-            badge={hasMeaningfulHistoricalData ? `${historicalFindings.length} kayıt` : "Canlı taslak"}
-            className="border-primary/20 bg-[linear-gradient(180deg,rgba(59,130,246,0.08),rgba(15,23,42,0.88))] xl:col-span-7"
-          >
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-                  Bu öneri şu verilere göre üretildi
-                </p>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">{recommendationEvidenceSummary}</p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Firma geçmişi</p>
-                  <p className="mt-2 text-2xl font-bold text-foreground">{historicalFindings.length}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Aynı firma için taranan geçmiş bulgu ve DÖF kaydı</p>
-                </div>
-                <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Açık kayıtlar</p>
-                  <p className="mt-2 text-2xl font-bold text-foreground">{historicalOpenCount}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Aynı şirkette halen kapanmamış takip gerektiren kayıt</p>
-                </div>
-                <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Tekrar sinyali</p>
-                  <p className="mt-2 text-2xl font-bold text-foreground">{repeatedIssueCount}</p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Mevcut bulguya yakın içerikte bulunan geçmiş kayıt</p>
-                </div>
-              </div>
-
-              <div className="overflow-hidden rounded-2xl border border-border/60 bg-background/70">
-                <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Karar referansları</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Önce geçmiş kayıtlar kullanılır; veri yetersizse tahmini fallback devreye girer.</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-600">
-                      Kayıt tabanlı
-                    </span>
-                    {(!priorityUsesHistoricalData || !responsibleUsesHistoricalData || !dueUsesHistoricalData) ? (
-                      <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                        Kısmen tahmini
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="divide-y divide-border/60">
-                  <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Öncelik referansı</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {priorityUsesHistoricalData
-                            ? `${historicalPriorityReference?.[1] || 0} benzer kayıtta en sık görülen öncelik bu seviyede.`
-                            : "Yeterli geçmiş eşleşme olmadığı için mevcut madde metni ve sektör sinyallerine göre tahmini üretildi."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      {!priorityUsesHistoricalData ? (
-                        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                          Tahmini
-                        </span>
-                      ) : null}
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${IMPORTANCE_LEVELS.find((level) => level.value === recommendedPriorityValue)?.color}`}>
-                        {recommendedPriorityValue}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <Users className="mt-0.5 h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Sorumlu referansı</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {responsibleUsesHistoricalData
-                            ? "Benzer geçmiş kayıtlarda görülen sorumlu ataması referans olarak gösteriliyor."
-                            : "Geçmiş atama verisi yetersiz olduğu için bölüm ve risk tipine göre ilk rol önerisi üretildi."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      {!responsibleUsesHistoricalData ? (
-                        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                          Tahmini
-                        </span>
-                      ) : null}
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-foreground">{suggestedDepartment}</p>
-                        <p className="text-xs text-muted-foreground">{suggestedRole}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <Calendar className="mt-0.5 h-4 w-4 text-primary" />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">Termin referansı</p>
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {dueUsesHistoricalData
-                            ? "Benzer geçmiş kayıtlardaki ortalama kapanış süresine göre hesaplandı."
-                            : "Geçmiş termin verisi yok; öncelik seviyesine göre standart takip süresi öneriliyor."}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 sm:justify-end">
-                      {!dueUsesHistoricalData ? (
-                        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                          Tahmini
-                        </span>
-                      ) : null}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setQuickDueDate(suggestedDueDays)}
-                        className="h-9 rounded-xl"
-                      >
-                        {suggestedDueDays} gün uygula
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3">
-                <div className="flex items-center gap-2 text-cyan-100">
-                  <Building2 className="h-4 w-4" />
-                  <span className="text-sm font-semibold">Aktif firma bağlamı</span>
-                </div>
-                <p className="mt-2 text-sm font-semibold text-white">{reportCompanyName || "Firma henüz seçilmedi"}</p>
-                <p className="mt-1 text-xs leading-6 text-cyan-50/90">{companyContextSummary}</p>
-                {!reportCompanyName ? (
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={goToBulkGeneralStep}
-                      className="h-9 rounded-xl border-cyan-300/30 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15"
-                    >
-                      Genel bilgilere git
-                    </Button>
-                    <p className="text-xs text-cyan-50/80">
-                      Firma seçimi `Genel Bilgiler` adımındaki `Firma seç` alanından yapılıyor.
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          </ModuleCard>
-
-          <div className="space-y-4 xl:col-span-5">
-            <ModuleCard eyebrow="Kural tabanlı öneri" title="Geçmiş eşleşmeler" badge={`${historicalSimilarEntries.length} kayıt`}>
-              <div className="space-y-3">
-                <div className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                      Tahmini eşleşme
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{similarityEvidenceSummary}</p>
-                </div>
-
-                {historicalLoading ? (
-                  <div className="rounded-2xl border border-border/60 bg-secondary/10 p-4 text-sm text-muted-foreground">Firma geçmişi taranıyor...</div>
-                ) : historicalSimilarEntries.length > 0 ? (
-                  historicalSimilarEntries.map((entry) => (
-                    <div key={entry.id} className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{entry.location_name}</p>
-                          <p className="mt-1 text-xs leading-6 text-muted-foreground">{entry.description}</p>
-                        </div>
-                        <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600">
-                          %{Math.round(entry.similarity * 100)}
-                        </span>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                        <span className="rounded-full bg-background px-2 py-1">{entry.priority}</span>
-                        <span className="rounded-full bg-background px-2 py-1">{new Date(entry.created_at).toLocaleDateString("tr-TR")}</span>
-                        <span className="rounded-full bg-background px-2 py-1">{entry.is_resolved ? "Kapatıldı" : "Açık"}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border/70 bg-secondary/10 p-4 text-sm text-muted-foreground">
-                    Bu firmaya ait güçlü eşleşen geçmiş kayıt bulunmadı. Yeni kayıtlar oluştukça burada daha anlamlı karşılaştırmalar görünecek.
-                  </div>
-                )}
-              </div>
-            </ModuleCard>
-          </div>
-        </section>
-        {entries.length > 0 && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
-            <div className="min-w-0 rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h3 className="text-lg font-bold text-foreground">
-                    Eklenen Bulgular ({entries.length})
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {createMode === "bulk"
-                      ? "Yüklenen fotoğraflardan otomatik üretilen uygunsuzluklar burada listelenir. Gerekirse tek tek düzenleyebilir veya silebilirsiniz."
-                      : "Her maddeyi `Bulguyu Ekle` ile listeye alın. Tüm maddeler tamamlanınca önizlemeye geçin."}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
-                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                    Liste hazır
-                  </span>
-                  <Button type="button" onClick={handleOpenBulkPreview} className="h-10 rounded-2xl border-0 gradient-primary font-semibold text-slate-950">
-                    <Eye className="mr-2 h-4 w-4" />
-                    Önizlemeye Geç
-                  </Button>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3 md:hidden">
-                {entries.map((entry, idx) => {
-                  const legalBasis = getBulkCapaLegalBasis({
-                    description: entry.description,
-                    riskDefinition: entry.riskDefinition,
-                    relatedDepartment: entry.related_department,
-                  });
-
-                  return (
-                    <div key={`${entry.id}-mobile`} className="rounded-2xl border border-border/60 bg-background/90 p-4 shadow-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            Bulgu {idx + 1}
-                          </p>
-                          <p className="mt-2 text-sm font-semibold text-foreground">{entry.related_department || "Genel Alan"}</p>
-                        </div>
-                        <span
-                          className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            IMPORTANCE_LEVELS.find((level) => level.value === entry.importance_level)?.color
-                          }`}
-                        >
-                          {entry.importance_level}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 space-y-4">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Tespit Edilen Uygunsuzluk</p>
-                          <p className="mt-1 text-sm leading-6 text-foreground">{entry.description}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Risk Analizi</p>
-                          <p className="mt-1 text-sm leading-6 text-rose-600 dark:text-rose-300">{entry.riskDefinition}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Mevzuat Dayanağı</p>
-                          <p className="mt-1 text-sm leading-6 text-muted-foreground">{legalBasis}</p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Önerilen DÖF (Aksiyon)</p>
-                          <p className="mt-1 text-sm leading-6 text-foreground">{entry.correctiveAction}</p>
-                          {entry.preventiveAction ? (
-                            <p className="mt-2 text-sm leading-6 text-muted-foreground">{entry.preventiveAction}</p>
-                          ) : null}
-                        </div>
-                        <div className="grid gap-3 rounded-2xl border border-border/60 bg-muted/30 p-3">
-                          <p className="text-sm text-muted-foreground">
-                            Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">Kanıt: {entry.media_urls.length} fotoğraf</p>
-                        </div>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditExistingEntry(entry.id)}
-                            className="w-full border-slate-300 bg-background text-foreground hover:bg-muted sm:w-auto"
-                          >
-                            Düzenle
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteEntry(entry.id)}
-                            className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive sm:w-auto"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Sil
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 hidden overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 md:block">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[960px] border-collapse text-sm xl:min-w-[1120px]">
-                    <thead className="bg-slate-950 text-white dark:bg-slate-800">
-                      <tr>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">No</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Tespit Edilen Uygunsuzluk</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Risk Analizi</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Mevzuat Dayanağı</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Önerilen DÖF (Aksiyon)</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em]">Durum</th>
-                        <th className="border-b border-white/10 px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em]">İşlem</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100">
-                      {entries.map((entry, idx) => {
-                        const legalBasis = getBulkCapaLegalBasis({
-                          description: entry.description,
-                          riskDefinition: entry.riskDefinition,
-                          relatedDepartment: entry.related_department,
-                        });
-
-                        return (
-                          <tr key={entry.id} className={idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50 dark:bg-slate-800/70"}>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                              {idx + 1}
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:border-slate-700 dark:text-slate-100">
-                              {entry.description}
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-rose-700 dark:border-slate-700 dark:text-rose-300">
-                              {entry.riskDefinition}
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-700 dark:border-slate-700 dark:text-slate-300">
-                              {legalBasis}
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 text-sm leading-6 text-slate-900 dark:border-slate-700 dark:text-slate-100">
-                              <div className="text-slate-900 dark:text-slate-100">{entry.correctiveAction}</div>
-                              {entry.preventiveAction ? (
-                                <div className="mt-2 text-slate-700 dark:text-slate-300">{entry.preventiveAction}</div>
-                              ) : null}
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 dark:border-slate-700">
-                              <div className="flex flex-col gap-2">
-                                <span
-                                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                                    IMPORTANCE_LEVELS.find((level) => level.value === entry.importance_level)?.color
-                                  }`}
-                                >
-                                  {entry.importance_level}
-                                </span>
-                                <span className="text-xs text-slate-600 dark:text-slate-400">
-                                  Termin: {entry.termin_date ? new Date(entry.termin_date).toLocaleDateString("tr-TR") : "-"}
-                                </span>
-                                <span className="text-xs text-slate-600 dark:text-slate-400">
-                                  Kanıt: {entry.media_urls.length} fotoğraf
-                                </span>
-                              </div>
-                            </td>
-                            <td className="align-top border-b border-slate-200 px-3 py-3 dark:border-slate-700">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditExistingEntry(entry.id)}
-                                  className="border-slate-300 bg-white text-slate-900 hover:bg-slate-100 hover:text-slate-950 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
-                                >
-                                  Düzenle
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleDeleteEntry(entry.id)}
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="min-w-0 space-y-6">
-              <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6 space-y-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-foreground">Genel Analiz</h3>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Tüm DÖF maddeleri için tek bir yönetici özeti ve genel değerlendirme üretin.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={generateOverallAnalysis}
-                    disabled={overallAnalyzing || entries.length === 0}
-                    className="h-11 gap-2 border-0 gradient-primary font-semibold !text-slate-950"
-                  >
-                    {overallAnalyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Genel analiz hazırlanıyor...
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="h-4 w-4" />
-                        AI ile Genel Analiz Oluştur
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <Textarea
-                  placeholder="Genel analiz burada yer alır. İsterseniz düzenleyebilirsiniz."
-                  value={overallAnalysis}
-                  onChange={(e) => setOverallAnalysis(e.target.value)}
-                  className="min-h-32 resize-y border-border/50 bg-background text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 sm:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">
-                      Çıktı Merkezi
-                    </p>
-                    <h3 className="mt-2 text-lg font-bold text-foreground">
-                      Önizle, kaydet ve raporu indir
-                    </h3>
-                  </div>
-                  <span className="w-fit rounded-full border border-border/60 bg-background px-3 py-1 text-xs text-muted-foreground">
-                    Word çıktısı
-                  </span>
-                </div>
-
-                  <div className="mt-5 flex flex-col gap-3 pt-1 sm:flex-row sm:flex-wrap">
-                  <Button
-                    variant="outline"
-                    className="h-11 flex-1 gap-2 text-foreground"
-                    onClick={() => {
-                      if (!generalInfoStepReady) {
-                        toast.error("Önizleme için önce firma, rapor tarihi ve gözlem yapan bilgisini girin");
-                        setCreateStep("general");
-                        return;
-                      }
-                      setPreviewFocusEntryId(null);
-                      setPreviewOpen(true);
-                    }}
-                    disabled={entries.length === 0}
-                  >
-                    <Eye className="h-4 w-4" />
-                    Önizleme
-                  </Button>
-                  <Button
-                    onClick={handleSaveAndExport}
-                    disabled={saving || entries.length === 0 || !reportCompanyName.trim() || !generalInfoStepReady}
-                    className={`h-11 flex-1 gap-2 border-0 font-semibold ${
-                      saving || entries.length === 0 || !reportCompanyName.trim() || !generalInfoStepReady
-                        ? "cursor-not-allowed bg-gray-500 !text-slate-200 opacity-50"
-                        : "gradient-primary !text-slate-950"
-                    }`}
-                  >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        İşleniyor...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4" />
-                        Kaydet ve Word İndir
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <p className="mt-4 text-xs leading-6 text-muted-foreground">
-                  E-posta paylaşımı bu ekranda kaldırıldı. Raporu indirdikten sonra Denetimler sayfasındaki ilgili kayıt detayından paylaşabilirsiniz.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
       </div>
 
       <Suspense fallback={null}>

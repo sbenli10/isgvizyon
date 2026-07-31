@@ -51,7 +51,7 @@ interface AnalysisHistory {
   updated_at: string;
 }
 
-const MAX_PHOTOS = 3;
+const MAX_PHOTOS = 10;
 const MAX_DOCUMENTS = 3;
 const MAX_PDF_OCR_PAGES = 5;
 
@@ -792,47 +792,27 @@ Yasal Atıf: ${analysis.legalReference}`,
   };
 
   return (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-5">
       {/* HEADER */}
-      <section className="relative overflow-hidden rounded-[28px] border border-slate-700/70 bg-gradient-to-br from-slate-950 via-slate-900 to-[#08204f] p-6 shadow-2xl shadow-black/25 lg:p-8">
-        <div className="pointer-events-none absolute -right-28 -top-28 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
-        <div className="pointer-events-none absolute bottom-0 left-1/3 h-56 w-56 rounded-full bg-blue-600/20 blur-3xl" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:38px_38px] opacity-30" />
-
-        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-cyan-400/30 bg-cyan-500/15 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-cyan-100">
-                AI Destekli Fine-Kinney
-              </span>
-              <span className="rounded-full border border-blue-400/30 bg-blue-500/15 px-3 py-1 text-xs font-bold text-blue-100">
-                Saha fotoğrafı + mevzuat bağlamı
-              </span>
+      <section className="rounded-[18px] border border-slate-700/70 bg-[#1d2a3d] px-6 py-6 shadow-xl shadow-black/10">
+        <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-950/25">
+              <ImageIcon className="h-8 w-8" />
             </div>
-            <h1 className="mt-4 text-3xl font-black tracking-tight text-white lg:text-5xl">
-              Saha Risk Analizi
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 lg:text-base">
-              Fotoğraf, saha notu ve destekleyici mevzuat belgeleriyle Fine-Kinney risk puanı, aksiyon planı, yasal dayanak ve kurumsal PDF/Word çıktısı üretin.
-            </p>
+            <div>
+              <h1 className="text-3xl font-black tracking-tight text-white">AI Saha Analizi</h1>
+              <p className="mt-1 text-base text-slate-300">
+                Saha fotoğrafından eksik KKD ve tehlikeleri saniyeler içinde tespit et, tek tıkla DÖF&apos;e dönüştür
+              </p>
+              <p className="mt-4 text-sm font-bold text-blue-200">
+                Ücretsiz planda ayda 3 analiz — Uzman pakette ayda 50, OSGB pakette ayda 200.
+              </p>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 rounded-2xl border-white/15 bg-white/10 text-white hover:bg-white/15"
-              onClick={() => navigate("/reports/guide")}
-            >
-              <CircleHelp className="h-4 w-4" /> Nasıl Kullanılır?
-            </Button>
-            <Button
-              type="button"
-              className="gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 px-5 text-white shadow-lg shadow-cyan-950/30 hover:from-blue-500 hover:to-cyan-400"
-              onClick={() => imagePickerRef.current?.click()}
-            >
-              <ImageIcon className="h-4 w-4" /> Fotoğraf Ekle
-            </Button>
+          <div className="w-fit rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-fuchsia-950/25">
+            Kalan Analiz Kredisi: 3/3
           </div>
         </div>
       </section>
@@ -861,52 +841,8 @@ Yasal Atıf: ${analysis.legalReference}`,
         </div>
       ) : null}
 
-      {/* DASHBOARD TOP (Stats + Heatmap) */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <div className="grid grid-cols-2 gap-4 lg:col-span-2">
-          <div className="rounded-3xl border border-slate-700/70 bg-slate-950/80 p-5 shadow-xl shadow-black/10">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Toplam Analiz</p>
-            <p className="mt-3 text-4xl font-black text-white">{stats.total}</p>
-            <p className="mt-2 text-xs text-slate-500">Kayıtlı saha risk raporu</p>
-          </div>
-          <div className="rounded-3xl border border-rose-400/25 bg-rose-500/10 p-5 shadow-xl shadow-rose-950/10">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-rose-200">Kritik / Yüksek</p>
-            <p className="mt-3 text-4xl font-black text-rose-100">{stats.critical}</p>
-            <p className="mt-2 text-xs text-rose-200/70">Öncelikli aksiyon gerektirir</p>
-          </div>
-          <div className="rounded-3xl border border-amber-400/25 bg-amber-500/10 p-5 shadow-xl shadow-amber-950/10">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Önemli</p>
-            <p className="mt-3 text-4xl font-black text-amber-100">{stats.medium}</p>
-            <p className="mt-2 text-xs text-amber-200/70">Takip ve termin planı</p>
-          </div>
-          <div className="rounded-3xl border border-emerald-400/25 bg-emerald-500/10 p-5 shadow-xl shadow-emerald-950/10">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-200">Düşük / Kabul Edilebilir</p>
-            <p className="mt-3 text-4xl font-black text-emerald-100">{stats.low}</p>
-            <p className="mt-2 text-xs text-emerald-200/70">Kontrollü risk alanları</p>
-          </div>
-        </div>
-        
-        <div className="lg:col-span-1">
-          <RiskHeatmap history={history} />
-        </div>
-      </div>
-
       {/* AI ANALYZER SECTION */}
-      <div className="relative overflow-hidden rounded-[28px] border border-slate-700/70 bg-slate-950/80 p-5 shadow-2xl shadow-black/20 lg:p-6">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl"></div>
-
-        <div className="mb-6 rounded-2xl border border-blue-400/25 bg-blue-500/10 p-4">
-          <div className="flex items-start gap-3">
-            <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-blue-300" />
-            <div>
-              <p className="mb-2 text-sm font-black text-blue-100">Hızlı kullanım notları</p>
-              <div className="space-y-1">
-                {tips.map((tip) => <p key={tip} className="text-xs text-blue-100/80">• {tip}</p>)}
-              </div>
-            </div>
-          </div>
-        </div>
-
+      <div className="rounded-[18px] border border-slate-700/70 bg-[#1d2a3d] p-5 shadow-xl shadow-black/10">
         <div className="space-y-5">
           {restoredDraftLabel ? (
             <div className="flex flex-col gap-3 rounded-xl border border-cyan-400/20 bg-cyan-400/10 p-4 text-cyan-50 md:flex-row md:items-center md:justify-between">
@@ -928,174 +864,104 @@ Yasal Atıf: ${analysis.legalReference}`,
               </Button>
             </div>
           ) : null}
-          <div>
-            <Label className="text-sm font-semibold mb-2 flex items-center gap-2">
-              📝 Saha Gözlemi / Uygunsuzluk Açıklaması
-            </Label>
-            <Textarea
-              placeholder="Sahada gördüğünüz uygunsuzluğu detaylandırın. (Örn: Elektrik panosu açık, kablolar düzensiz ve yetkisiz erişim mümkün.)"
-              value={hazardInput}
-              onChange={(e) => setHazardInput(e.target.value)}
-              className="min-h-[100px] bg-secondary/50 border-border/50 focus:border-primary/50 transition-colors text-base"
-            />
+
+          <button
+            type="button"
+            onClick={() => imagePickerRef.current?.click()}
+            disabled={imageUrls.length >= MAX_PHOTOS}
+            className="flex h-[98px] w-[98px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-500/80 bg-transparent text-slate-300 transition hover:border-slate-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ImageIcon className="h-7 w-7" />
+            <span className="text-xs font-bold">Foto Ekle</span>
+          </button>
+          <input 
+            ref={imagePickerRef}
+            type="file" 
+            multiple 
+            accept="image/*" 
+            onChange={handleFileUpload} 
+            className="hidden"
+            disabled={imageUrls.length >= MAX_PHOTOS}
+          />
+          <input
+            ref={cameraCaptureRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleFileUpload}
+            className="hidden"
+            disabled={imageUrls.length >= MAX_PHOTOS}
+          />
+          <input 
+            ref={documentPickerRef}
+            type="file" 
+            multiple 
+            accept=".pdf,.docx" 
+            onChange={handleFileUpload} 
+            className="hidden"
+            disabled={uploadedFiles.length >= MAX_DOCUMENTS}
+          />
+
+          <p className="text-xs text-blue-200">
+            En fazla 10 fotoğraf • Foto başına 1 analiz kredisi • Yalnızca yeni eklenen fotoğraflar analiz edilir • Fotoğraflar sunucuda saklanmaz
+          </p>
+
+          <Input
+            placeholder="Opsiyonel bağlam notu — örn: inşaat sahası, kalıp katı"
+            value={hazardInput}
+            onChange={(event) => setHazardInput(event.target.value)}
+            className="h-12 rounded-xl border-slate-600 bg-[#182337] px-4 text-slate-100 placeholder:text-slate-500 focus:border-violet-400"
+          />
+
+          {imageUrls.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {imageUrls.map((url, idx) => (
+                <div key={idx} className="group relative h-20 w-20 overflow-hidden rounded-lg border border-slate-600 bg-slate-900">
+                  <img src={url} alt={`Fotoğraf ${idx + 1}`} className="h-full w-full object-cover" />
+                  <button onClick={() => removeImage(idx)} className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white transition hover:bg-rose-600">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          {uploadedFiles.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {uploadedFiles.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+                  <FileText className="h-4 w-4 text-blue-300" />
+                  <span className="max-w-[180px] truncate text-xs font-medium text-slate-200">{file.name}</span>
+                  <button onClick={() => setUploadedFiles(uploadedFiles.filter((_, i) => i !== idx))} className="text-slate-500 hover:text-rose-300">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
           </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div 
-              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all
-                ${imageUrls.length >= MAX_PHOTOS ?
-                  'border-border/30 bg-secondary/10 opacity-50 cursor-not-allowed' 
-                  : 'border-primary/30 bg-primary/5'
-                }
-              `}
-            >
-              <Upload className={`h-8 w-8 mb-3 ${imageUrls.length >= MAX_PHOTOS ? "text-muted-foreground" : "text-primary"}`} />
-              <span className="text-sm font-semibold text-foreground">
-                {imageUrls.length >= MAX_PHOTOS ? "Fotoğraf Limiti Doldu" : `Saha Fotoğrafı Ekle (Max ${MAX_PHOTOS})`}
-              </span>
-              <span className="text-xs text-muted-foreground mt-1">
-                {imageUrls.length}/{MAX_PHOTOS} fotoğraf
-              </span>
-              <span className="text-[11px] text-muted-foreground mt-1 text-center">
-                Galeriden secin veya sahada dogrudan kamera ile cekip ekleyin.
-              </span>
-              <div className="mt-4 flex w-full flex-col gap-2 sm:flex-row">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1"
-                  disabled={imageUrls.length >= MAX_PHOTOS}
-                  onClick={() => imagePickerRef.current?.click()}
-                >
-                  Galeriden Seç
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
-                  disabled={imageUrls.length >= MAX_PHOTOS}
-                  onClick={() => cameraCaptureRef.current?.click()}
-                >
-                  Kamerayla Çek
-                </Button>
-              </div>
-              <input 
-                ref={imagePickerRef}
-                type="file" 
-                multiple 
-                accept="image/*" 
-                onChange={handleFileUpload} 
-                className="hidden"
-                disabled={imageUrls.length >= MAX_PHOTOS}
-              />
-              <input
-                ref={cameraCaptureRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileUpload}
-                className="hidden"
-                disabled={imageUrls.length >= MAX_PHOTOS}
-              />
-            </div>
-
-            {/* BELGE UPLOAD (LİMİT KONTROLÜ İLE) */}
-            <div 
-              className={`flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 transition-all
-                ${uploadedFiles.length >= MAX_DOCUMENTS ?
-                  "border-border/30 bg-secondary/10 opacity-50 cursor-not-allowed"
-                  : "border-border/50 bg-secondary/20"
-                }
-              `}
-            >
-              <FileUp className={`h-8 w-8 mb-3 ${uploadedFiles.length >= MAX_DOCUMENTS ? "text-muted-foreground/50" : "text-muted-foreground"}`} />
-              <span className="text-sm font-semibold text-foreground">
-                {uploadedFiles.length >= MAX_DOCUMENTS ? "Belge Limiti Doldu" : `İSG Mevzuatı / PDF Yükle (Max ${MAX_DOCUMENTS})`}
-              </span>
-              <span className="text-xs text-muted-foreground mt-1">
-                {uploadedFiles.length}/{MAX_DOCUMENTS} belge
-              </span>
-              <span className="text-[11px] text-muted-foreground mt-1 text-center">
-                Destekleyici mevzuat bağlamı icin kullanilir, tek basina risk analizi baslatmaz.
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                className="mt-4 w-full"
-                disabled={uploadedFiles.length >= MAX_DOCUMENTS}
-                onClick={() => documentPickerRef.current?.click()}
-              >
-                Belge Seç
-              </Button>
-              <input 
-                ref={documentPickerRef}
-                type="file" 
-                multiple 
-                accept=".pdf,.docx" 
-                onChange={handleFileUpload} 
-                className="hidden"
-                disabled={uploadedFiles.length >= MAX_DOCUMENTS}
-              />
-            </div>
-          </div>
-
-          {imageUrls.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-muted-foreground">
-                  Seçilen Fotoğraflar ({imageUrls.length}/{MAX_PHOTOS})
-                </Label>
-                {imageUrls.length >= MAX_PHOTOS && (
-                  <span className="text-xs font-bold text-destructive">⚠️ Limit doldu</span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {imageUrls.map((url, idx) => (
-                  <div key={idx} className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm group">
-                    <img src={url} alt={`Fotoğraf ${idx + 1}`} className="w-full h-full object-cover transition-transform group-hover:scale-110" />
-                    <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-black/70 p-1 rounded-full text-white hover:bg-destructive transition-colors">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {uploadedFiles.length > 0 && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-muted-foreground">
-                  Referans Dökümanlar ({uploadedFiles.length}/{MAX_DOCUMENTS})
-                </Label>
-                {uploadedFiles.length >= MAX_DOCUMENTS && (
-                  <span className="text-xs font-bold text-destructive">⚠️ Limit doldu</span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {uploadedFiles.map((file, idx) => (
-                  <div key={idx} className="flex items-center gap-2 bg-secondary/50 px-3 py-2 rounded-md border border-border/50">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <span className="text-xs font-medium truncate max-w-[150px]">{file.name}</span>
-                    <button onClick={() => setUploadedFiles(uploadedFiles.filter((_, i) => i !== idx))} className="text-muted-foreground hover:text-destructive ml-2">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-       </div>
 
         <Button
           onClick={analyzeHazard}
           disabled={loading || extracting || (!hazardInput.trim() && uploadedFiles.length === 0 && imageUrls.length === 0)}
-          className="w-full gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 text-white h-14 text-lg font-bold shadow-xl shadow-blue-500/20 mt-4 rounded-xl"
+          className="mt-4 h-14 w-full gap-2 rounded-xl border-0 bg-gradient-to-r from-indigo-600 to-purple-700 text-lg font-black text-white shadow-xl shadow-purple-950/20 hover:from-indigo-500 hover:to-purple-600"
         >
           {loading || extracting ? (
             <><Loader2 className="h-6 w-6 animate-spin" /> {extracting ? "Mevzuat Taranıyor..." : "Derin Analiz Yapılıyor..."}</>
           ) : (
-            <><Brain className="h-6 w-6" /> Saha Riskini Analiz Et</>
+            <><ImageIcon className="h-5 w-5" /> Fotoğrafları AI ile Analiz Et</>
           )}
         </Button>
+      </div>
+
+      <div className="rounded-xl border border-slate-700 bg-[#172235] p-4 text-sm text-blue-200">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
+          <p>
+            Bu analiz yapay zeka destekli bir ön değerlendirmedir; saha koşullarının İSG profesyoneli tarafından doğrulanması olmadan resmi tespit, ölçüm veya uygunluk beyanı yerine geçmez. Nihai değerlendirme sorumluluğu kullanıcıya aittir.
+          </p>
+        </div>
+      </div>
 
         {/* ✅ ÇOKLU FOTOĞRAF ANALİZ SONUÇLARI */}
         {aiResults.length > 0 && (
@@ -1276,34 +1142,33 @@ Yasal Atıf: ${analysis.legalReference}`,
             )}
           </div>
         )}
-      </div>
 
       {/* HISTORY SECTION */}
-      <div className="space-y-4 rounded-[28px] border border-slate-700/70 bg-slate-950/70 p-5 shadow-2xl shadow-black/10 lg:p-6">
-        <div className="flex flex-col gap-4 border-b border-slate-800 pb-5 xl:flex-row xl:items-end xl:justify-between">
+      <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/75 p-4 shadow-xl shadow-black/10 lg:p-5">
+        <div className="flex flex-col gap-4 border-b border-slate-800 pb-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">Rapor Arşivi</p>
-            <h2 className="mt-2 flex items-center gap-2 text-2xl font-black text-white">
-              <History className="h-6 w-6 text-cyan-300" />
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">Rapor Arşivi</p>
+            <h2 className="mt-1 flex items-center gap-2 text-xl font-black text-white">
+              <History className="h-5 w-5 text-cyan-300" />
               Önceki Analiz Kayıtları
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Risk seviyesine göre filtreleyin, geçmiş bulguları inceleyin ve tekrar PDF/Word raporu alın.
+            <p className="mt-1 text-xs text-slate-500">
+              Kayıtlar minimal listelenir; satıra tıklayınca aksiyon ve çıktı seçenekleri açılır.
             </p>
           </div>
 
-          <div className="grid w-full gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] xl:max-w-3xl">
+          <div className="grid w-full gap-2 md:grid-cols-[minmax(0,1fr)_190px_auto] xl:max-w-2xl">
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
               <Input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Tehlike, aksiyon veya mevzuat ara..."
-                className="h-11 rounded-2xl border-slate-700 bg-slate-950 pl-10 text-slate-100 placeholder:text-slate-500"
+                placeholder="Kayıtlarda ara..."
+                className="h-10 rounded-xl border-slate-700 bg-slate-900 pl-10 text-slate-100 placeholder:text-slate-500"
               />
             </div>
             <Select value={filterRisk} onValueChange={setFilterRisk}>
-              <SelectTrigger className="h-11 rounded-2xl border-slate-700 bg-slate-950 text-slate-100">
+              <SelectTrigger className="h-10 rounded-xl border-slate-700 bg-slate-900 text-slate-100">
                 <SelectValue placeholder="Risk filtresi" />
               </SelectTrigger>
               <SelectContent>
@@ -1318,7 +1183,7 @@ Yasal Atıf: ${analysis.legalReference}`,
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-2xl border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800"
+              className="h-10 rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800"
               onClick={() => {
                 setSearchText("");
                 setFilterRisk("all");
@@ -1335,71 +1200,87 @@ Yasal Atıf: ${analysis.legalReference}`,
             <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-3" />
           </div>
         ) : filteredHistory.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-700 bg-slate-950/70 p-10 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-700 bg-slate-900 text-slate-300">
-              <FileText className="h-7 w-7" />
+          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/35 p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-300">
+              <FileText className="h-6 w-6" />
             </div>
-            <p className="mt-4 text-lg font-black text-white">Kayıt bulunamadı</p>
+            <p className="mt-3 text-base font-black text-white">Kayıt bulunamadı</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
               Filtreleri değiştirin veya yeni bir saha risk analizi oluşturarak arşivi doldurun.
             </p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-2">
             {filteredHistory.map((item) => {
               const aiData = item.ai_result as FineKinneyAiResult;
               const isOldFormat = !aiData?.riskScore || typeof aiData.riskScore === 'string';
+              const riskLevel = isOldFormat ? item.risk_score || "Bilinmiyor" : aiData.riskLevel;
+              const riskScore = isOldFormat ? null : aiData.riskScore;
+              const description = isOldFormat ? item.hazard_description : aiData.hazardDescription;
+              const createdAt = new Date(item.created_at).toLocaleDateString("tr-TR", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
 
               return (
-                <div key={item.id} className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/80 shadow-lg shadow-black/10 transition-all hover:border-cyan-400/35">
-                  <div className="flex cursor-pointer items-start justify-between gap-4 bg-slate-900/70 p-5" onClick={() => { setSelectedHistory(item); setDetailsOpen(selectedHistory?.id !== item.id ? true : !detailsOpen); }}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-3">
-                        {isOldFormat ? (
-                          <Badge className={riskColors[item.risk_score] || riskColors["Low"]}>{item.risk_score || "Bilinmiyor"}</Badge>
-                        ) : (
-                          <>
-                            <Badge className={`px-2.5 py-0.5 text-xs font-bold ${riskColors[aiData.riskLevel]}`}>{aiData.riskLevel}</Badge>
-                            <span className="text-xs font-black bg-secondary/80 px-2 py-1 rounded text-foreground">Skor: {aiData.riskScore}</span>
-                          </>
-                        )}
-                        <span className="flex items-center gap-1 text-xs font-medium text-slate-400">
-                          <Clock className="h-3 w-3" /> {new Date(item.created_at).toLocaleDateString("tr-TR", {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'})}
-                        </span>
-                      </div>
-                      <p className="line-clamp-2 text-base font-semibold leading-snug text-slate-100">
-                        {isOldFormat ? item.hazard_description : aiData.hazardDescription}
+                <div key={item.id} className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/45 transition hover:border-cyan-400/30 hover:bg-slate-900/70">
+                  <div className="grid cursor-pointer gap-3 p-3 md:grid-cols-[minmax(0,1fr)_160px_120px_42px] md:items-center" onClick={() => { setSelectedHistory(item); setDetailsOpen(selectedHistory?.id !== item.id ? true : !detailsOpen); }}>
+                    <div className="min-w-0">
+                      <p className="line-clamp-1 text-sm font-bold text-slate-100">{description}</p>
+                      <p className="mt-1 flex items-center gap-1 text-xs text-slate-500">
+                        <Clock className="h-3 w-3" /> {createdAt}
                       </p>
                     </div>
 
-                    <Button size="icon" variant="ghost" className="shrink-0 text-slate-500 hover:bg-rose-500/10 hover:text-rose-200" onClick={(e) => { e.stopPropagation(); deleteAnalysis(item.id); }}>
-                      <Trash2 className="h-5 w-5" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={`w-fit border px-2 py-0.5 text-[11px] font-bold ${riskColors[riskLevel] || riskColors["Low"]}`}>{riskLevel}</Badge>
+                      {riskScore ? <span className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[11px] font-black text-slate-200">Skor {riskScore}</span> : null}
+                    </div>
+
+                    <div className="flex gap-1 md:justify-end">
+                      {!isOldFormat ? (
+                        <>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:bg-cyan-500/10 hover:text-cyan-200" onClick={(e) => { e.stopPropagation(); generateRichPDF(aiData, aiData.hazardDescription); }}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:bg-blue-500/10 hover:text-blue-200" onClick={(e) => { e.stopPropagation(); generateRichWord(aiData, aiData.hazardDescription); }}>
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+
+                    <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-slate-500 hover:bg-rose-500/10 hover:text-rose-200" onClick={(e) => { e.stopPropagation(); deleteAnalysis(item.id); }}>
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
                   {selectedHistory?.id === item.id && detailsOpen && (
-                    <div className="animate-fade-in space-y-4 border-t border-slate-800 bg-slate-950 p-5 text-sm">
+                    <div className="animate-fade-in space-y-3 border-t border-slate-800 bg-slate-950/85 p-4 text-sm">
                       {!isOldFormat && (
                         <>
-                          <div className="grid md:grid-cols-2 gap-6">
+                          <div className="grid gap-3 md:grid-cols-2">
                             <div className="space-y-1">
-                              <p className="font-bold text-destructive text-xs uppercase tracking-wider flex items-center gap-1"><Hammer className="h-3 w-3"/> Anlık Müdahale</p>
-                              <p className="text-foreground/80 bg-background p-3 rounded border border-border/50">{aiData.immediateAction}</p>
+                              <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-rose-300"><Hammer className="h-3 w-3"/> Anlık Müdahale</p>
+                              <p className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-slate-300">{aiData.immediateAction}</p>
                             </div>
                             <div className="space-y-1">
-                              <p className="font-bold text-success text-xs uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="h-3 w-3"/> Kalıcı Çözüm</p>
-                              <p className="text-foreground/80 bg-background p-3 rounded border border-border/50">{aiData.preventiveAction}</p>
+                              <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-emerald-300"><ShieldCheck className="h-3 w-3"/> Kalıcı Çözüm</p>
+                              <p className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-slate-300">{aiData.preventiveAction}</p>
                             </div>
                           </div>
                           <div className="space-y-1">
-                            <p className="font-bold text-blue-500 text-xs uppercase tracking-wider flex items-center gap-1"><Gavel className="h-3 w-3"/> İlgili Mevzuat</p>
-                            <p className="text-blue-700 dark:text-blue-300 font-medium bg-blue-500/10 p-3 rounded border border-blue-500/20">{aiData.legalReference}</p>
+                            <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-blue-300"><Gavel className="h-3 w-3"/> İlgili Mevzuat</p>
+                            <p className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3 font-medium text-blue-200">{aiData.legalReference}</p>
                           </div>
-                          <div className="flex flex-wrap justify-end gap-2 pt-2">
-                            <Button size="sm" variant="outline" className="gap-2" onClick={() => generateRichPDF(aiData, aiData.hazardDescription)}>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Button size="sm" variant="outline" className="gap-2 border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800" onClick={() => generateRichPDF(aiData, aiData.hazardDescription)}>
                               <Download className="h-4 w-4" /> PDF Rapor
                             </Button>
-                            <Button size="sm" variant="outline" className="gap-2" onClick={() => generateRichWord(aiData, aiData.hazardDescription)}>
+                            <Button size="sm" variant="outline" className="gap-2 border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800" onClick={() => generateRichWord(aiData, aiData.hazardDescription)}>
                               <FileText className="h-4 w-4" /> Word Rapor
                             </Button>
                           </div>
