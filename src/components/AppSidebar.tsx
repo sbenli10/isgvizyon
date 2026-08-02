@@ -13,6 +13,7 @@ import {
   ChevronRight,
   LogOut,
   User,
+  UserCheck,
   BookOpen,
   TrendingUp,
   Flame,
@@ -44,6 +45,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
+import { hasPlatformAdminSession } from "@/lib/platformAdminSession";
 import {
   Sidebar,
   SidebarContent,
@@ -239,20 +241,19 @@ export function AppSidebar() {
   const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
 
-  const { signOut, user } = useAuth();
+  const { signOut, user, profile } = useAuth();
   const { hasAccess } = usePlanLimits();
   const canAccessOsgbModule = hasAccess("osgb_module").allowed;
   const canAccessIsgBot = hasAccess("isg_bot").allowed;
+  const canManagePlatform = Boolean((profile?.is_platform_admin || profile?.role === "platform_admin" || profile?.role === "owner") && hasPlatformAdminSession());
 
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [expandedSubmenus, setExpandedSubmenus] = useState<string[]>([
-    "Kroki Editörü",
-  ]);
-
   const [draftMeetingsCount, setDraftMeetingsCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [flyoutMenu, setFlyoutMenu] = useState<{ item: MenuItem; groupLabel: string; top: number; left: number } | null>(null);
+  const flyoutCloseTimer = React.useRef<number | null>(null);
 
   const [favoriteUrls, setFavoriteUrls] = useState<string[]>(() =>
     readStoredStringArray(SIDEBAR_FAVORITES_STORAGE_KEY),
@@ -316,6 +317,92 @@ export function AppSidebar() {
                   icon: Briefcase,
                   iconClassName: "text-indigo-400 group-hover:text-indigo-300",
                   badge: "NEW",
+                  children: [
+                    {
+                      title: "Dashboard",
+                      url: "/osgb?panel=dashboard",
+                      icon: LayoutDashboard,
+                      iconClassName: "text-blue-400 group-hover:text-blue-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Personel Havuzu",
+                      url: "/osgb?panel=personnel",
+                      icon: Users,
+                      iconClassName: "text-violet-400 group-hover:text-violet-300",
+                      badge: null,
+                    },
+                    {
+                      title: "OSGB Firmaları",
+                      url: "/osgb?panel=companies",
+                      icon: Briefcase,
+                      iconClassName: "text-emerald-400 group-hover:text-emerald-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Firma Çalışanları",
+                      url: "/osgb?panel=employees",
+                      icon: UserCheck,
+                      iconClassName: "text-cyan-400 group-hover:text-cyan-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Firma Takip",
+                      url: "/osgb?panel=tracking",
+                      icon: ShieldCheck,
+                      iconClassName: "text-lime-400 group-hover:text-lime-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Finans",
+                      url: "/osgb?panel=finance",
+                      icon: Briefcase,
+                      iconClassName: "text-amber-400 group-hover:text-amber-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Personel Görevlendirme",
+                      url: "/osgb?panel=assignments",
+                      icon: Users,
+                      iconClassName: "text-pink-400 group-hover:text-pink-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Firma Yetkilendir",
+                      url: "/osgb?panel=authorization",
+                      icon: Shield,
+                      iconClassName: "text-fuchsia-400 group-hover:text-fuchsia-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Firma Ziyaretleri",
+                      url: "/osgb?panel=visits",
+                      icon: MapPinned,
+                      iconClassName: "text-sky-400 group-hover:text-sky-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Arşiv",
+                      url: "/osgb?panel=archive",
+                      icon: FileText,
+                      iconClassName: "text-orange-400 group-hover:text-orange-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Çözüm Ortağı Ağı",
+                      url: "/osgb?panel=dashboard",
+                      icon: Users,
+                      iconClassName: "text-cyan-400 group-hover:text-cyan-300",
+                      badge: null,
+                    },
+                    {
+                      title: "İSG-KATİP Senkronize",
+                      url: "/osgb?panel=katip",
+                      icon: ClipboardCheck,
+                      iconClassName: "text-rose-400 group-hover:text-rose-300",
+                      badge: null,
+                    },
+                  ],
                 }
               : null,
           ].filter((item): item is NonNullable<typeof item> => item !== null),
@@ -447,13 +534,24 @@ export function AppSidebar() {
           label: "Genel",
           icon: LayoutDashboard,
           items: [
+            canManagePlatform
+              ? {
+                  title: "Platform Yönetimi",
+                  url: "/platform-admin",
+                  icon: ShieldCheck,
+                  iconClassName: "text-violet-400 group-hover:text-violet-300",
+                  badge: "Admin",
+                }
+              : null,
+            { title: "İş İlanları", url: "/is-ilanlari", icon: Briefcase, iconClassName: "text-emerald-400 group-hover:text-emerald-300", badge: "NEW" },
             { title: "E-posta Arşivi", url: "/email-history", icon: Mail, iconClassName: "text-blue-400 group-hover:text-blue-300", badge: null },
             { title: "Ayarlar", url: "/settings", icon: Settings, iconClassName: "text-slate-300 group-hover:text-white", badge: null },
-          ],
+          ].filter((item): item is NonNullable<typeof item> => item !== null),
         },
       ];
     },
     [
+      canManagePlatform,
       canAccessIsgBot,
       canAccessOsgbModule,
       draftMeetingsCount,
@@ -473,19 +571,6 @@ export function AppSidebar() {
     const isChildActive = item.children?.some((child) => isItemActive(child)) ?? false;
 
     return isSelfActive || isChildActive;
-  };
-
-  const toggleSubmenu = (label: string) => {
-    if (collapsed) return;
-
-    setExpandedSubmenus((prev) =>
-      prev.includes(label) ? prev.filter((it) => it !== label) : [...prev, label],
-    );
-  };
-
-  const isSubmenuOpen = (item: MenuItem) => {
-    if (!item.children?.length) return false;
-    return expandedSubmenus.includes(item.title);
   };
 
   const handleSignOut = async () => {
@@ -574,6 +659,41 @@ export function AppSidebar() {
     if (isMobile) {
       setOpenMobile(false);
     }
+  };
+
+  const cancelFlyoutClose = () => {
+    if (flyoutCloseTimer.current != null) {
+      window.clearTimeout(flyoutCloseTimer.current);
+      flyoutCloseTimer.current = null;
+    }
+  };
+
+  const scheduleFlyoutClose = () => {
+    cancelFlyoutClose();
+    flyoutCloseTimer.current = window.setTimeout(() => {
+      setFlyoutMenu(null);
+    }, 120);
+  };
+
+  const openFlyout = (event: React.MouseEvent<HTMLElement> | React.FocusEvent<HTMLElement>, item: MenuItem, groupLabel: string) => {
+    if (!item.children?.length || isMobile) return;
+
+    cancelFlyoutClose();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const panelHeight = Math.min(560, 52 + item.children.length * 42);
+    const top = Math.max(8, Math.min(rect.top - 8, window.innerHeight - panelHeight - 8));
+
+    setFlyoutMenu({
+      item,
+      groupLabel,
+      top,
+      left: rect.right + 8,
+    });
+  };
+
+  const closeFlyout = () => {
+    cancelFlyoutClose();
+    setFlyoutMenu(null);
   };
 
   return (
@@ -744,15 +864,23 @@ export function AppSidebar() {
                       {group.items.map((item) => {
                         const hasChildren = Boolean(item.children?.length);
                         const active = isItemActive(item);
-                        const submenuOpen = isSubmenuOpen(item);
+                        const flyoutOpen = flyoutMenu?.item.url === item.url;
                         const favorite = isFavorite(item.url);
 
                         if (hasChildren) {
                           return (
-                            <SidebarMenuItem key={`${group.label}-${item.title}-${item.url}`}>
+                            <SidebarMenuItem
+                              key={`${group.label}-${item.title}-${item.url}`}
+                              onMouseEnter={(event) => openFlyout(event, item, group.label)}
+                              onMouseLeave={scheduleFlyoutClose}
+                            >
                               <button
                                 type="button"
-                                onClick={() => toggleSubmenu(item.title)}
+                                onClick={() => {
+                                  navigate(item.url);
+                                  closeMobileSidebar();
+                                }}
+                                onFocus={(event) => openFlyout(event, item, group.label)}
                                 className={cn(
                                   menuItemBase,
                                   menuItemIdle,
@@ -760,7 +888,8 @@ export function AppSidebar() {
                                   collapsed && "justify-center px-0",
                                 )}
                                 aria-current={active ? "page" : undefined}
-                                aria-expanded={submenuOpen}
+                                aria-haspopup="menu"
+                                aria-expanded={flyoutOpen}
                                 aria-label={item.title}
                               >
                                 <span className={cn(subtleLine, active && subtleLineActive)} />
@@ -797,75 +926,13 @@ export function AppSidebar() {
 
                                     <ChevronDown
                                       className={cn(
-                                        "h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-500 opacity-70 transition duration-150 group-hover:text-slate-300 group-hover:opacity-100",
-                                        submenuOpen && "rotate-180 text-slate-300 opacity-100",
+                                        "hidden",
                                       )}
                                     />
+                                    <ChevronRight className="h-3.5 w-3.5 shrink-0 stroke-[1.9] text-slate-500 opacity-70 transition duration-150 group-hover:translate-x-0.5 group-hover:text-slate-300 group-hover:opacity-100" />
                                   </>
                                 )}
                               </button>
-
-                              {!collapsed && submenuOpen && (
-                                <div className="ml-5 mt-0.5 space-y-0.5 border-l border-white/[0.08] pl-2">
-                                  {item.children?.map((child) => {
-                                    const childActive = isItemActive(child);
-                                    const childFavorite = isFavorite(child.url);
-
-                                    return (
-                                      <SidebarMenuButton key={child.url} asChild tooltip={child.title}>
-                                        <NavLink
-                                          to={child.url}
-                                          onClick={closeMobileSidebar}
-                                          aria-current={childActive ? "page" : undefined}
-                                          className={cn(
-                                            submenuItemBase,
-                                            "text-slate-300 hover:bg-white/[0.04] hover:text-white",
-                                            childActive &&
-                                              "bg-indigo-500/[0.12] text-white font-semibold shadow-[inset_2px_0_0_#8B5CF6]",
-                                          )}
-                                          activeClassName=""
-                                        >
-                                          <span
-                                            className={cn(subtleLine, childActive && subtleLineActive)}
-                                          />
-                                          <SubMenuIcon item={child} active={childActive} />
-
-                                          <span className={menuTitleClass}>
-                                            {child.title}
-                                          </span>
-
-                                          <span
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={(event) => toggleFavorite(event, child)}
-                                            onKeyDown={(event) => handleFavoriteKeyDown(event, child)}
-                                            className={cn(
-                                              "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 transition",
-                                              "opacity-0 hover:text-amber-300 group-hover:opacity-100",
-                                              childFavorite &&
-                                                "opacity-100 text-amber-300",
-                                            )}
-                                            title={
-                                              childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"
-                                            }
-                                            aria-label={childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
-                                          >
-                                            <Star
-                                              className={cn(
-                                                "h-3.5 w-3.5 stroke-[1.9]",
-                                                childFavorite &&
-                                                  "fill-amber-300",
-                                              )}
-                                            />
-                                          </span>
-
-                                          {child.badge && <PillBadge value={child.badge} />}
-                                        </NavLink>
-                                      </SidebarMenuButton>
-                                    );
-                                  })}
-                                </div>
-                              )}
                             </SidebarMenuItem>
                           );
                         }
@@ -933,6 +1000,71 @@ export function AppSidebar() {
             );
           })}
         </SidebarContent>
+
+        {!isMobile && flyoutMenu && flyoutMenu.item.children?.length ? (
+          <div
+            role="menu"
+            aria-label={`${flyoutMenu.item.title} alt menüsü`}
+            onMouseEnter={cancelFlyoutClose}
+            onMouseLeave={scheduleFlyoutClose}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeFlyout();
+            }}
+            className="fixed z-[90] w-[17rem] overflow-hidden rounded-2xl border border-slate-700/70 bg-[#101A2E] py-3 shadow-2xl shadow-black/45 ring-1 ring-white/[0.04]"
+            style={{ top: flyoutMenu.top, left: flyoutMenu.left }}
+          >
+            <div className="border-b border-white/[0.06] px-4 pb-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#7890B8]">
+                {flyoutMenu.item.title}
+              </p>
+            </div>
+            <div className="max-h-[520px] overflow-y-auto px-2 py-2 [scrollbar-color:rgba(120,144,184,0.28)_transparent] [scrollbar-width:thin]">
+              {flyoutMenu.item.children.map((child) => {
+                const childActive = isItemActive(child);
+                const childFavorite = isFavorite(child.url);
+
+                return (
+                  <NavLink
+                    key={`${flyoutMenu.item.url}-${child.url}`}
+                    to={child.url}
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeMobileSidebar();
+                      closeFlyout();
+                    }}
+                    aria-current={childActive ? "page" : undefined}
+                    className={cn(
+                      "group relative flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-[13.5px] font-medium text-slate-200 transition",
+                      "hover:bg-white/[0.05] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400/45",
+                      childActive && "bg-indigo-500/[0.16] text-white shadow-[inset_2px_0_0_#8B5CF6]",
+                    )}
+                    activeClassName=""
+                  >
+                    <SubMenuIcon item={child} active={childActive} />
+                    <span className="min-w-0 flex-1 truncate text-left">{child.title}</span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(event) => toggleFavorite(event, child)}
+                      onKeyDown={(event) => handleFavoriteKeyDown(event, child)}
+                      className={cn(
+                        "flex h-5 w-5 shrink-0 items-center justify-center rounded text-slate-500 transition",
+                        "opacity-0 hover:text-amber-300 group-hover:opacity-100",
+                        childFavorite && "opacity-100 text-amber-300",
+                      )}
+                      title={childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                      aria-label={childFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                    >
+                      <Star className={cn("h-3.5 w-3.5 stroke-[1.9]", childFavorite && "fill-amber-300")} />
+                    </span>
+                    {child.badge && <PillBadge value={child.badge} />}
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         <SidebarFooter className="border-t border-white/[0.08] bg-[#0D1729] px-2 py-2">
           <div

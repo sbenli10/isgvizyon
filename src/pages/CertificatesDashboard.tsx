@@ -2,22 +2,28 @@
 import { Link, useSearchParams } from "react-router-dom";
 import {
   Award,
+  BookOpen,
   Building2,
+  CalendarDays,
+  Clock3,
   Download,
-  Eye,
   FileArchive,
   FileSpreadsheet,
+  Flame,
   Palette,
   History,
+  HelpCircle,
   ImagePlus,
   Loader2,
+  Mountain,
   Plus,
   RefreshCw,
   ShieldCheck,
   Trash2,
   Upload,
   Users,
-  CheckCircle2,
+  DoorOpen,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -39,8 +45,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 
 import {
   createCertificate,
@@ -59,7 +64,6 @@ import type {
   CertificateRecord,
 } from "@/types/certificates";
 import type { Company } from "@/types/companies";
-import CertificatePreview from "@/components/certificates/CertificatePreview";
 
 // ====================================================
 // ✅ FIX: local type for signatures (prevents TS2552)
@@ -213,114 +217,213 @@ const templateCards = [
   { value: "minimal", title: "Minimal Baskı", text: "Temiz çizgiler, sade tipografi ve hızlı baskı için dengeli görünüm" },
 ] as const;
 
-const DEFAULT_CERTIFICATE_TOPICS_TEXT = `1. GENEL KONULAR
-- Çalışma mevzuatı ile ilgili bilgiler
-- Çalışanların yasal hak ve sorumlulukları
-- İşyeri temizliği ve düzeni
-- İş kazaları ve meslek hastalıklarının hukuki sonuçları
+type CertificateCenterTabId = "isg" | "height" | "confined" | "fire";
 
-2. SAĞLIK KONULARI
-- Meslek hastalıklarının sebepleri
-- Meslek hastalıklarından korunma prensipleri
-- Biyolojik ve psikososyal risk etmenleri
-- İlk yardım
+const certificateCenterTabs = [
+  {
+    id: "isg",
+    title: "İSG Sertifikası",
+    subtitle: "Temel eğitim belgesi",
+    icon: ShieldCheck,
+    accent: "from-emerald-500 to-cyan-500",
+    iconClassName: "text-emerald-300",
+    description: "Mevcut toplu sertifika üretim formu ve katılımcı akışı bu sekmede çalışır.",
+  },
+  {
+    id: "height",
+    title: "Yüksekte Çalışma Sertifikası",
+    subtitle: "Yüksekte çalışma eğitimi",
+    icon: Mountain,
+    accent: "from-sky-500 to-indigo-500",
+    iconClassName: "text-sky-300",
+    description: "Yüksekte çalışma sertifikası için ayrı tasarım ve alanlar bu sekmede hazırlanacak.",
+  },
+  {
+    id: "confined",
+    title: "Kapalı Alanlarda Çalışma Sertifikası",
+    subtitle: "Kapalı alan eğitimi",
+    icon: DoorOpen,
+    accent: "from-violet-500 to-fuchsia-500",
+    iconClassName: "text-violet-300",
+    description: "Kapalı alanlarda çalışma sertifikasına ait özel form yapısı bu sekmede konumlandırılacak.",
+  },
+  {
+    id: "fire",
+    title: "Yangın Eğitimi Sertifikası",
+    subtitle: "Yangın ve acil durum eğitimi",
+    icon: Flame,
+    accent: "from-orange-500 to-rose-500",
+    iconClassName: "text-orange-300",
+    description: "Yangın eğitimi sertifikası için ayrı tasarım ve belge ayarları bu sekmede hazırlanacak.",
+  },
+] as const;
 
-3. TEKNİK KONULAR
-- Kimyasal, fiziksel ve ergonomik risk etmenleri
-- İş ekipmanlarının güvenli kullanımı
-- Ekranlı araçlarla çalışma
-- Elektrik, yangın ve yangından korunma
-- İş kazalarının sebepleri ve korunma prensipleri
-- Güvenlik ve sağlık işaretleri
-- Kişisel koruyucu donanım kullanımı
-- Tahliye ve kurtarma`;
+const certificateSectorOptions = [
+  "İnşaat",
+  "Metal / Demir-Çelik",
+  "Gıda Üretimi",
+  "Tekstil",
+  "Maden",
+  "Kimya / Petrokimya",
+  "Sağlık / Hastane",
+  "Eğitim",
+  "Lojistik / Depoculuk",
+  "Otomotiv",
+  "Enerji / Elektrik",
+  "Tarım / Hayvancılık",
+  "Mobilya / Ağaç İşleri",
+  "Plastik / Kauçuk",
+  "Cam / Seramik",
+  "Matbaa / Ambalaj",
+  "Otel / Turizm",
+  "Perakende / AVM",
+  "İlaç / Eczacılık",
+  "Telekomünikasyon",
+  "Temizlik Hizmetleri",
+  "Güvenlik Hizmetleri",
+  "Nakliyat / Taşımacılık",
+  "Belediye / Kamu",
+  "Havacılık",
+  "Denizcilik / Gemi",
+  "Savunma Sanayi",
+  "Boya / Vernik",
+  "Çimento / Beton",
+  "Deri / Ayakkabı",
+  "Elektronik / Bilişim",
+  "Kağıt / Selüloz",
+  "Mermer / Doğal Taş",
+  "Atık Yönetimi / Geri Dönüşüm",
+  "Su / Kanalizasyon",
+  "Doğalgaz / LPG",
+  "Hava Koşullarına Açık İşler",
+  "Banka / Finans",
+  "Call Center / Çağrı Merkezi",
+  "Ofis / Büro",
+  "Restoran / Yemek",
+  "Fırın / Pastane",
+  "Kuaför / Güzellik",
+  "Oto Tamir / Servis",
+  "Eczane",
+  "Çiçekçi / Sera",
+  "Oto Yıkama",
+  "Montaj ve Bakım-Onarım",
+  "Kreş / Anaokulu",
+  "Veteriner / Pet Shop",
+  "Spor / Fitness",
+  "İtfaiye / Kurtarma",
+] as const;
 
-// ====================================================
-// STATUS META (theme-safe tones)
-// ====================================================
+type CertificateTopicSection = {
+  title: string;
+  isOptional?: boolean;
+  topics: string[];
+};
 
-function getJobStatusMeta(job: CertificateJobRecord | null, participantCount: number) {
-  const toneBase = "rounded-2xl border px-4 py-4";
+const defaultCertificateTopicSections: CertificateTopicSection[] = [
+  {
+    title: "Genel Konular",
+    topics: [
+      "a) Çalışma mevzuatı ile ilgili bilgiler",
+      "b) Çalışanların yasal hak ve sorumlulukları",
+      "c) İşyeri temizliği ve düzeni",
+      "ç) İş kazası ve meslek hastalığından doğan hukuki sonuçlar",
+    ],
+  },
+  {
+    title: "Sağlık Konuları",
+    topics: [
+      "a) Meslek hastalıklarının sebepleri",
+      "b) Hastalıktan korunma prensipleri ve korunma teknikleri",
+      "c) Biyolojik ve psikososyal risk etmenleri",
+      "ç) İlk yardım",
+      "d) Bağımlılık yapıcı maddelerin zararları ve teknoloji bağımlılığı",
+    ],
+  },
+  {
+    title: "Teknik Konular",
+    topics: [
+      "a) Kimyasal, fiziksel ve ergonomik risk etmenleri",
+      "b) Elle kaldırma ve taşıma",
+      "c) Parlama, patlama",
+      "ç) Yangın ve yangından korunma",
+      "d) İş ekipmanlarının güvenli kullanımı",
+      "e) Ekranlı araçlarla çalışma",
+      "f) Elektrik, tehlikeleri, riskleri ve önlemleri",
+      "g) İş kazalarının sebepleri ve korunma prensipleri ile teknikleri",
+      "ğ) Sağlık ve güvenlik işaretleri",
+      "h) Kişisel koruyucu donanım kullanımı",
+      "ı) İş sağlığı ve güvenliği genel kuralları ve güvenlik kültürü",
+      "i) Acil durumlar, tahliye ve kurtarma",
+    ],
+  },
+  {
+    title: "İşyerine Özgü Riskler",
+    isOptional: true,
+    topics: [],
+  },
+];
 
-  if (!job || job.status === "draft") {
-    return {
-      label: "Taslak hazır",
-      tone: cn(
-        toneBase,
-        "border-border bg-muted/30 text-foreground",
-      ),
-      summary: "Sertifika kaydı hazır, ancak üretim henüz başlatılmadı.",
-      detail:
-        participantCount > 0
-          ? "Katılımcılar eklendi. Şimdi toplu üretimi başlatabilirsiniz."
-          : "Önce katılımcı ekleyin, ardından üretimi başlatın.",
-    };
-  }
+const heightCertificateTopicSections: CertificateTopicSection[] = [
+  {
+    title: "Yüksekte Çalışma Eğitim Konuları",
+    topics: [
+      "Düşmeye karşı koruma önlemleri ve sistemleri",
+      "İskelelerde güvenli çalışma",
+      "Yaşam hatları ve Tam vücut tipi emniyet kemeri.",
+      "Yüksekte çalışırken dikkat edilecek hususlar",
+      "Temel güvenlik kuralları, iş planı ve alanın organizasyonu",
+      "İşe uygun merdiven iskele seçimi - merdiven ve iskelelerin kurulması ve sabitlenmesi",
+      "Toplu koruma yöntemleri ve önemi (korkuluk, platform, güvenlik ağı, barikatlama, işaretleme vs.)",
+      "Kişisel koruyucu donanımlar (standart personel koruyucu ekipmanlar)",
+      "Temel emniyet ipi ile enerji tutucu sistemlerin kullanımı ve özellikleri",
+      "Çatılarda çalışma ve alınacak önlemler",
+      "Yüksek iş makinelerinde alınacak önlemler",
+      "Yüksekte yapılacak çalışmalarda tehlike ve risklerin önceden belirlenmesi ve önlenmesi",
+      "Düşme faktörü kavramı ve önlemler, düşmeden korunmanın teorisi ve uygulamaları",
+    ],
+  },
+];
 
-  if (job.status === "queued") {
-    return {
-      label: "Kuyrukta bekliyor",
-      tone: cn(toneBase, "border-amber-500/25 bg-amber-500/10 text-foreground"),
-      summary: "Üretim işi worker kuyruğuna başarıyla alındı.",
-      detail: "PDF üretimi kısa süre içinde otomatik başlayacak.",
-    };
-  }
+const confinedCertificateTopicSections: CertificateTopicSection[] = [
+  {
+    title: "Kapalı Alanlarda Çalışma Eğitim Konuları",
+    topics: [
+      "KAPALI/SINIRLI ALAN TANIMI, TÜRLERİ VE SINIFLANDIRMASI (I. II. III. SINIF)",
+      "YASAL ÇERÇEVE: 6331 SAYILI İSG KANUNU, İLGİLİ YÖNETMELİKLER VE ULUSLARARASI STANDARTLAR (OSHA 1910.146)",
+      "KAPALI ALAN KAZA İSTATİSTİKLERİ, ÖNEMİ VE RİSK DEĞERLENDİRMESİ ZORUNLULUĞU",
+      "ATMOSFERİK TEHLİKELER: OKSİJEN YETERSİZLİĞİ, PARLAYICI/PATLAYICI ORTAM VE ZEHİRLİ ORTAM",
+      "OKSİJEN DENGESİ: GÜVENLİ ARALIK, YETERSİZLİK NEDENLERİ VE OKSİJENCE ZENGİN ORTAMDA ARTAN YANMA/TUTUŞMA RİSKİ",
+      "BOĞUCU VE ZEHİRLİ GAZLAR: H2S, KARBON MONOKSİT (CO), METAN, CO2 VE TEHLİKENİN DUYULARLA ALGILANAMAMASI",
+      "PARLAYICI/PATLAYICI ATMOSFER, ALT VE ÜST PATLAMA SINIRLARI (LEL/UEL) VE ATEX ÖNLEMLERİ",
+      "FİZİKSEL VE DİĞER TEHLİKELER: GÖMÜLME/BOĞULMA, SIKIŞMA, TERMAL STRES, GÜRÜLTÜ VE BİYOLOJİK ETKENLER",
+      "ATMOSFER ÖLÇÜMÜ VE GAZ DEDEKTÖRÜ KULLANIMI: ÖLÇÜM SIRASI, KATMANLI ÖLÇÜM VE SÜREKLİ İZLEME",
+      "GAZ ÖLÇÜM CİHAZLARININ KALİBRASYONU, BUMP TEST VE ALARM SEVİYELERİ",
+      "KAPALI ALANA GÜVENLİ GİRİŞ İZNİ SİSTEMİ (PERMIT-TO-WORK), İZİN FORMU VE GİRİŞİN SONLANDIRILMASI",
+      "ENERJİ İZOLASYONU, KİLİTLEME-ETİKETLEME (LOTO), KÖRLEME, PURGE VE İNERTLEME",
+      "ZORLAMALI (CEBRİ) MEKANİK HAVALANDIRMA VE EX-PROOF EKİPMAN KULLANIMI",
+      "GÖREV VE SORUMLULUKLAR: GİREN PERSONEL, BEKÇİ/GÖZETMEN, GİRİŞ SORUMLUSU VE GAZ ÖLÇÜM YETKİLİSİ",
+      "İLETİŞİM VE HABERLEŞME SİSTEMLERİ: SESLİ, TELSİZ, HALAT İŞARETİ VE SÜREKLİ HABERLEŞME KURALI",
+      "KİŞİSEL KORUYUCU DONANIM VE SOLUNUM KORUMA: SCBA, HAVA HATLI/KAÇIŞ CİHAZLARI, TAM VÜCUT KEMERİ VE SEÇİM HİYERARŞİSİ",
+      "ACİL DURUM, KURTARMA VE TAHLİYE PLANI: KURTARMA HİYERARŞİSİ, EKİPMANLAR (TRIPOD/VİNÇ/HALAT) VE TATBİKAT",
+      "YANLIŞ KURTARMANIN ÖLÜMCÜL TEHLİKESİ ('ÖLÜ KAHRAMAN' İLKESİ), İLK YARDIM VE TEMEL YAŞAM DESTEĞİ",
+    ],
+  },
+];
 
-  if (job.status === "processing") {
-    return {
-      label: "Üretim sürüyor",
-      tone: cn(toneBase, "border-sky-500/25 bg-sky-500/10 text-foreground"),
-      summary: "Katılımcı sertifikaları şu anda üretiliyor.",
-      detail: "İlerleme oranı üretim tamamlandıkça otomatik güncellenir.",
-    };
-  }
+function getDefaultTopicSectionsForCertificateTab(tab: CertificateCenterTabId) {
+  if (tab === "height") return heightCertificateTopicSections;
+  if (tab === "confined") return confinedCertificateTopicSections;
+  return defaultCertificateTopicSections;
+}
 
-  if (job.status === "processing_with_errors") {
-    return {
-      label: "Üretim sürüyor, bazı kayıtlar hatalı",
-      tone: cn(toneBase, "border-orange-500/25 bg-orange-500/10 text-foreground"),
-      summary: "Üretim devam ediyor ancak bazı katılımcılarda veri veya üretim hatası oluştu.",
-      detail: "Detay sayfasından hatalı kayıtları inceleyip tekrar basım başlatabilirsiniz.",
-    };
-  }
-
-  if (job.status === "completed") {
-    return {
-      label: "Üretim tamamlandı",
-      tone: cn(toneBase, "border-emerald-500/25 bg-emerald-500/10 text-foreground"),
-      summary: "Tüm sertifikalar başarıyla üretildi.",
-      detail: job.zip_path
-        ? "ZIP dosyası hazır. Tekli PDF veya toplu ZIP indirebilirsiniz."
-        : "PDF üretimi tamamlandı. ZIP paketi hazırlanıyor olabilir.",
-    };
-  }
-
-  if (job.status === "completed_with_errors") {
-    return {
-      label: "Kısmen tamamlandı",
-      tone: cn(toneBase, "border-orange-500/25 bg-orange-500/10 text-foreground"),
-      summary: "Bazı sertifikalar üretildi, bazı katılımcılarda hata kaldı.",
-      detail: job.zip_path
-        ? "Hazır dosyaları ZIP olarak indirebilir, hatalı kayıtları ayrıca düzeltebilirsiniz."
-        : "Başarılı kayıtlar oluştu. ZIP paketi hazırlanırken hatalı kayıtları kontrol edin.",
-    };
-  }
-
-  if (job.status === "failed") {
-    return {
-      label: "Üretim başarısız",
-      tone: cn(toneBase, "border-destructive/25 bg-destructive/10 text-foreground"),
-      summary: "Hiçbir sertifika başarıyla üretilemedi.",
-      detail: job.error_message || "Katılımcı verilerini ve worker loglarını kontrol edin.",
-    };
-  }
-
-  return {
-    label: "İşlem başarısız",
-    tone: cn(toneBase, "border-destructive/25 bg-destructive/10 text-foreground"),
-    summary: "Üretim tamamlanamadı.",
-    detail: job.error_message || "Lütfen kayıtları kontrol edip tekrar deneyin.",
-  };
+function serializeCertificateTopicSections(sections: CertificateTopicSection[]) {
+  return sections
+    .map((section, sectionIndex) => {
+      const title = `${sectionIndex + 1}. ${section.title.toLocaleUpperCase("tr-TR")}`;
+      const topics = section.topics.map((topic) => `- ${topic}`).join("\n");
+      return [title, topics].filter(Boolean).join("\n");
+    })
+    .join("\n\n");
 }
 
 // ====================================================
@@ -620,70 +723,31 @@ export default function CertificatesDashboard() {
   const [employeeLoadState, setEmployeeLoadState] = useState<"idle" | "loaded" | "empty">("idle");
   const [employeeLoadMessage, setEmployeeLoadMessage] = useState("");
   const [trainerNamesInput, setTrainerNamesInput] = useState(defaultForm.trainer_names.join(", "));
+  const [activeCertificateCenterTab, setActiveCertificateCenterTab] =
+    useState<CertificateCenterTabId>("isg");
+  const [topicDialogOpen, setTopicDialogOpen] = useState(false);
+  const [topicSections, setTopicSections] = useState<CertificateTopicSection[]>(defaultCertificateTopicSections);
+  const [newCatalogTopic, setNewCatalogTopic] = useState("");
+  const [manualParticipant, setManualParticipant] = useState({ name: "", tc_no: "", job_title: "" });
+  const [certificateLegislationMode, setCertificateLegislationMode] = useState<"first" | "repeat">("first");
+  const [certificateTrainingType, setCertificateTrainingType] = useState<"face" | "remote" | "mixed">("face");
+  const [certificateLayoutMode, setCertificateLayoutMode] = useState<"single" | "frontBack">("single");
+  const [hideCertificateTc, setHideCertificateTc] = useState(false);
+  const [selectedCertificateSector, setSelectedCertificateSector] = useState("");
   const studioSectionRef = useRef<HTMLDivElement | null>(null);
   const companyContextAppliedRef = useRef<string | null>(null);
-  const currentTab = searchParams.get("tab") === "templates" ? "templates" : "production";
+  const rawTab = searchParams.get("tab");
+  const currentTab = rawTab === "templates" || rawTab === "history" ? rawTab : "production";
   const activeCompanyId = searchParams.get("companyId") || "";
+  const activeCertificateCenterTabMeta =
+    certificateCenterTabs.find((tab) => tab.id === activeCertificateCenterTab) || certificateCenterTabs[0];
+  const ActiveCertificateTabIcon = activeCertificateCenterTabMeta.icon;
 
   const completedItems = useMemo(
     () => jobItems.filter((item) => item.status === "completed" && item.pdf_path),
     [jobItems],
   );
-  const failedItems = useMemo(() => jobItems.filter((item) => item.status === "failed"), [jobItems]);
-  const queuedItems = useMemo(() => jobItems.filter((item) => item.status === "pending"), [jobItems]);
-  const processingItems = useMemo(() => jobItems.filter((item) => item.status === "processing"), [jobItems]);
-  const activeProductionCount = queuedItems.length + processingItems.length;
   const isJobRunning = Boolean(activeJob && ["queued", "processing", "processing_with_errors"].includes(activeJob.status));
-
-  const previewParticipant = participants[0];
-  const jobStatusMeta = useMemo(
-    () => getJobStatusMeta(activeJob, participants.length),
-    [activeJob, participants.length],
-  );
-
-  const previewForm = useMemo(
-    () => ({
-      ...form,
-      logo_url: logoPreviewUrl || form.logo_url || "",
-      design_config: normalizeDesignConfig(form.design_config, form.trainer_names, form.company_name),
-    }),
-    [form, logoPreviewUrl],
-  );
-
-
-  const previewData = useMemo(() => {
-    const designConfig = normalizeDesignConfig(
-      previewForm.design_config,
-      previewForm.trainer_names,
-      previewForm.company_name,
-    );
-
-    return {
-      participantName: previewParticipant?.name || "Örnek Katılımcı",
-      role: previewParticipant?.job_title || "Belirtilmedi",
-      trainingTitle: previewForm.training_name,
-      date: formatPreviewDate(previewForm.training_date),
-      duration: previewForm.training_duration,
-      validity: previewForm.validity_date ? formatPreviewDate(previewForm.validity_date) : "Süresiz",
-      certificateNo: activeCertificate?.id
-        ? `SERT-${activeCertificate.id.slice(0, 8).toUpperCase()}`
-        : "Önizleme",
-      companyName: previewForm.company_name,
-      address: previewForm.company_address,
-      trainers: previewForm.trainer_names,
-      trainingTopics: splitCertificateTopics(previewForm.notes),
-      verificationCode: activeCertificate?.id
-        ? activeCertificate.id.slice(0, 12).toUpperCase()
-        : "Önizleme",
-      issueDate: formatPreviewDate(new Date().toISOString()),
-      summaryText: designConfig.descriptionText || undefined,
-      signatures: designConfig.signatures,
-      logoUrl: previewForm.logo_url,
-      osgbLogoUrl: designConfig.osgb_logo_url,
-      primaryColor: designConfig.primaryColor,
-      secondaryColor: designConfig.secondaryColor,
-    };
-  }, [activeCertificate?.id, previewForm, previewParticipant]);
 
   const editableSignatures = useMemo(
     () => normalizeDesignConfig(form.design_config, form.trainer_names, form.company_name).signatures.slice(0, 3),
@@ -823,16 +887,6 @@ export default function CertificatesDashboard() {
     }
   }
 
-  async function handleRefreshStatus() {
-    if (!activeCertificate?.id) {
-      toast.error("Önce bir sertifika kaydı seçin.");
-      return;
-    }
-
-    await refreshJobStatus(activeCertificate.id);
-    toast.success("Üretim durumu güncellendi.");
-  }
-
   async function applyCompany(companyId: string) {
     const company = companies.find((item) => item.id === companyId);
     if (!company) return;
@@ -929,6 +983,96 @@ export default function CertificatesDashboard() {
 
   function addParticipant() {
     setParticipants((prev) => [...prev, { name: "", tc_no: "", job_title: "" }]);
+  }
+
+  function addManualParticipant() {
+    const name = manualParticipant.name.trim();
+    if (!name) {
+      toast.error("Katılımcı adı soyadı girin.");
+      return;
+    }
+
+    setParticipants((prev) => [
+      ...prev,
+      {
+        name,
+        tc_no: manualParticipant.tc_no.trim(),
+        job_title: manualParticipant.job_title.trim(),
+      },
+    ]);
+    setManualParticipant({ name: "", tc_no: "", job_title: "" });
+  }
+
+  function updateTopic(sectionIndex: number, topicIndex: number, value: string) {
+    setTopicSections((prev) =>
+      prev.map((section, currentSectionIndex) =>
+        currentSectionIndex === sectionIndex
+          ? {
+              ...section,
+              topics: section.topics.map((topic, currentTopicIndex) =>
+                currentTopicIndex === topicIndex ? value.slice(0, 120) : topic,
+              ),
+            }
+          : section,
+      ),
+    );
+  }
+
+  function removeTopic(sectionIndex: number, topicIndex: number) {
+    setTopicSections((prev) =>
+      prev.map((section, currentSectionIndex) =>
+        currentSectionIndex === sectionIndex
+          ? { ...section, topics: section.topics.filter((_, currentTopicIndex) => currentTopicIndex !== topicIndex) }
+          : section,
+      ),
+    );
+  }
+
+  function addTopic(sectionIndex: number) {
+    setTopicSections((prev) =>
+      prev.map((section, currentSectionIndex) =>
+        currentSectionIndex === sectionIndex && section.topics.length < 18
+          ? { ...section, topics: [...section.topics, ""] }
+          : section,
+      ),
+    );
+  }
+
+  function resetTopicSectionsForCurrentCertificateTab() {
+    setTopicSections(getDefaultTopicSectionsForCertificateTab(activeCertificateCenterTab));
+  }
+
+  function openCertificateTopicDialog() {
+    const expectedSections = getDefaultTopicSectionsForCertificateTab(activeCertificateCenterTab);
+    const expectedTitle = expectedSections[0]?.title;
+    const isSimpleTopicTab = activeCertificateCenterTab === "height" || activeCertificateCenterTab === "confined";
+    const hasHeightTopics = topicSections[0]?.title === heightCertificateTopicSections[0].title;
+    const hasConfinedTopics = topicSections[0]?.title === confinedCertificateTopicSections[0].title;
+    const hasSimpleCertificateTopics = hasHeightTopics || hasConfinedTopics;
+
+    if (isSimpleTopicTab && topicSections[0]?.title !== expectedTitle) {
+      setTopicSections(expectedSections);
+    }
+    if (!isSimpleTopicTab && hasSimpleCertificateTopics) {
+      setTopicSections(defaultCertificateTopicSections);
+    }
+    setTopicDialogOpen(true);
+  }
+
+  function addCatalogTopic() {
+    const value = newCatalogTopic.trim();
+    if (!value) return;
+
+    setTopicSections((prev) =>
+      prev.map((section, index) => (index === prev.length - 1 ? { ...section, topics: [...section.topics, value] } : section)),
+    );
+    setNewCatalogTopic("");
+  }
+
+  function saveTopicDialog() {
+    setForm((prev) => ({ ...prev, notes: serializeCertificateTopicSections(topicSections) }));
+    setTopicDialogOpen(false);
+    toast.success("Eğitim konuları güncellendi.");
   }
 
   function updateParticipant(index: number, patch: Partial<CertificateParticipantInput>) {
@@ -1049,33 +1193,11 @@ export default function CertificatesDashboard() {
     }
   }
 
-  async function handleRetryFailed() {
-    if (!activeCertificate?.id) {
-      toast.error("Hatalıları tekrar denemek için bir sertifika kaydı seçin.");
-      return;
-    }
-
-    if (failedItems.length === 0) {
-      toast.error("Tekrar denenecek hatalı sertifika bulunamadı.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const response = await generateCertificateJob(activeCertificate.id, { retryFailedOnly: true });
-      setActiveCertificate(response.certificate);
-      setActiveJob(response.job);
-      await refreshJobStatus(activeCertificate.id);
-      toast.success("Hatalı sertifikalar yeniden kuyruğa alındı.");
-    } catch (error: any) {
-      toast.error(`Hatalılar tekrar denenemedi: ${error.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   async function handleDownloadZip() {
-    if (!activeCertificate) return;
+    if (!activeCertificate) {
+      toast.error("Önce sertifika işi oluşturun.");
+      return;
+    }
     try {
       const payload = await getCertificateDownload(activeCertificate.id);
       if (!payload.downloadUrl) {
@@ -1218,29 +1340,73 @@ export default function CertificatesDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Sertifika Merkezi</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Toplu sertifika üretimi ve tasarım şablonları tek merkezden yönetilir.
-          </p>
+      <div className="overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20">
+        <div className="flex flex-col gap-5 border-b border-slate-700/70 bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/25">
+              <Award className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white md:text-3xl">Sertifika Merkezi</h1>
+              <p className="mt-1 max-w-3xl text-sm text-slate-300">
+                Eğitim sertifikalarını türlerine göre ayırın, katılımcıları ekleyin ve çıktıları tek merkezden yönetin.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Badge className="border border-emerald-400/25 bg-emerald-500/10 px-3 py-1 text-emerald-100 hover:bg-emerald-500/10">
+              Toplu üretim aktif
+            </Badge>
+            <Badge className="border border-violet-400/25 bg-violet-500/10 px-3 py-1 text-violet-100 hover:bg-violet-500/10">
+              6 premium tema
+            </Badge>
+            <Button asChild variant="outline" className="gap-2 border-slate-600 bg-slate-800/80 text-slate-100 hover:bg-slate-700">
+              <Link to="/dashboard/certificates/history">
+                <History className="h-4 w-4" /> Geçmiş İşler
+              </Link>
+            </Button>
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary" className="px-3 py-1">
-            10.000 kayıt hedefi
-          </Badge>
-          <Badge variant="secondary" className="px-3 py-1">
-            6 premium tema
-          </Badge>
-          <Badge variant="secondary" className="px-3 py-1">
-            Paralel worker
-          </Badge>
-          <Button asChild variant="outline" className="gap-2">
-            <Link to="/dashboard/certificates/history">
-              <History className="h-4 w-4" /> Geçmiş İşler
-            </Link>
-          </Button>
+        <div className="grid gap-2 bg-slate-950/35 p-3 sm:grid-cols-2 xl:grid-cols-4">
+          {certificateCenterTabs.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeCertificateCenterTab === tab.id;
+
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveCertificateCenterTab(tab.id)}
+                className={cn(
+                  "group relative overflow-hidden rounded-xl border px-3 py-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400",
+                  active
+                    ? "border-white/20 bg-slate-800 text-white shadow-lg shadow-black/20"
+                    : "border-slate-700/70 bg-slate-900/70 text-slate-300 hover:border-slate-500 hover:bg-slate-800/80 hover:text-white",
+                )}
+                aria-pressed={active}
+              >
+                {active ? (
+                  <span className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r", tab.accent)} />
+                ) : null}
+                <span className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5",
+                      active ? tab.iconClassName : "text-slate-400 group-hover:text-slate-200",
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{tab.title}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-400">{tab.subtitle}</span>
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1268,7 +1434,6 @@ export default function CertificatesDashboard() {
         </Card>
       ) : null}
 
-      {/* Tabs */}
       <div className="flex flex-wrap gap-2">
         <Button
           type="button"
@@ -1296,27 +1461,141 @@ export default function CertificatesDashboard() {
           <Palette className="h-4 w-4" />
           Tasarım Şablonları
         </Button>
+        <Button
+          type="button"
+          variant={currentTab === "history" ? "default" : "outline"}
+          className="gap-2"
+          onClick={() => {
+            const next = new URLSearchParams(searchParams);
+            next.set("tab", "history");
+            setSearchParams(next);
+          }}
+        >
+          <History className="h-4 w-4" />
+          Geçmiş İşler ve Tekrar Basım
+        </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_1.25fr]">
+      {currentTab === "production" ? (
+      <>
+      <Card className="overflow-hidden border-slate-700/70 bg-[#1d2a3d] text-slate-100 shadow-lg shadow-black/10">
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-4 border-b border-slate-700/80 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500 text-white">
+                <Award className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-black leading-tight text-white">
+                  {activeCertificateCenterTabMeta.title} Oluştur
+                </h2>
+                <p className="text-xs text-slate-400">{activeCertificateCenterTabMeta.subtitle}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="icon" className="h-8 w-8 bg-emerald-600 text-white hover:bg-emerald-500" title="Yardım">
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                className="h-8 gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-60"
+                disabled={submitting || isJobRunning}
+                onClick={() => void handleGenerate()}
+              >
+                <RefreshCw className={cn("h-4 w-4", isJobRunning && "animate-spin")} />
+                Sertifikaları Oluştur
+              </Button>
+              <Button
+                type="button"
+                className="h-8 gap-2 bg-emerald-700 text-white hover:bg-emerald-600"
+                onClick={() => void handleDownloadSinglePdf()}
+              >
+                <Download className="h-4 w-4" />
+                Sertifikayı İndir
+              </Button>
+              <Button
+                type="button"
+                className="h-8 gap-2 bg-purple-700 text-white hover:bg-purple-600"
+                onClick={() => void handleDownloadZip()}
+              >
+                <FileArchive className="h-4 w-4" />
+                ZIP İndir
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 px-4 py-3 text-[11px] font-semibold text-slate-300 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="text-blue-300">MEVZUAT</span>
+              <label className="flex items-center gap-1.5">
+                Tür:
+                <input type="radio" checked={certificateLegislationMode === "first"} onChange={() => setCertificateLegislationMode("first")} />
+                İlk Defa
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" checked={certificateLegislationMode === "repeat"} onChange={() => setCertificateLegislationMode("repeat")} />
+                Tekrar
+              </label>
+              <label className="flex items-center gap-1.5">
+                Şekil:
+                <input type="radio" checked={certificateTrainingType === "face"} onChange={() => setCertificateTrainingType("face")} />
+                Yüz Yüze
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" checked={certificateTrainingType === "remote"} onChange={() => setCertificateTrainingType("remote")} />
+                Uzaktan
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" checked={certificateTrainingType === "mixed"} onChange={() => setCertificateTrainingType("mixed")} />
+                Karma
+              </label>
+              <label className="flex items-center gap-1.5">
+                Format:
+                <input type="radio" checked={certificateLayoutMode === "single"} onChange={() => setCertificateLayoutMode("single")} />
+                Tek Sayfa
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input type="radio" checked={certificateLayoutMode === "frontBack"} onChange={() => setCertificateLayoutMode("frontBack")} />
+                Arkalı Önlü
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2">
+                Tarih:
+                <Input
+                  type="date"
+                  value={form.training_date}
+                  onChange={(event) => setForm((prev) => ({ ...prev, training_date: event.target.value }))}
+                  className="h-7 w-36 border-slate-600 bg-[#111b2d] text-xs text-slate-100"
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <Switch checked={hideCertificateTc} onCheckedChange={setHideCertificateTc} className="scale-75" />
+                T.C. No Gizle
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         {/* LEFT COLUMN */}
         <div className="space-y-6">
           {/* Form */}
-          <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5 text-primary" />
-                Eğitim ve Firma Bilgileri
+          <Card className="overflow-hidden border-slate-700/70 bg-[#1f2d40] text-slate-100 shadow-sm">
+            <CardHeader className="border-b border-slate-700/70 pb-4">
+              <CardTitle className="flex items-center gap-2 text-base text-white">
+                <Building2 className="h-5 w-5 text-emerald-400" />
+                Firma ve Eğitim Bilgileri
               </CardTitle>
-              <CardDescription>
-                Firma bilgilerini şirket yönetiminden çekebilir veya manuel düzenleyebilirsiniz.
-              </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Firma Seçimi</Label>
+            <CardContent className="space-y-5 p-5">
+              <div className="grid gap-5">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Firma Seçin *</Label>
                   <Select
                     value={form.company_id || "manual"}
                     onValueChange={(value) => {
@@ -1329,11 +1608,11 @@ export default function CertificatesDashboard() {
                       }
                     }}
                   >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Firma seçin" />
+                    <SelectTrigger className="h-10 border-slate-600 bg-[#172236] text-slate-100">
+                      <SelectValue placeholder="Firma Seçiniz" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Manuel giriş</SelectItem>
+                    <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                      <SelectItem value="manual">Firma Seçiniz</SelectItem>
                       {companies.map((company) => (
                         <SelectItem key={company.id} value={company.id}>
                           {company.company_name}
@@ -1343,400 +1622,371 @@ export default function CertificatesDashboard() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Firma Adı</Label>
-                  <Input
-                    value={form.company_name}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        company_name: e.target.value,
-                        design_config: normalizeDesignConfig(prev.design_config, prev.trainer_names, e.target.value),
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Telefon</Label>
-                  <Input
-                    value={form.company_phone}
-                    onChange={(e) => setForm((prev) => ({ ...prev, company_phone: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Adres</Label>
-                  <Textarea
-                    value={form.company_address}
-                    onChange={(e) => setForm((prev) => ({ ...prev, company_address: e.target.value }))}
-                    className="min-h-20"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Eğitim Adı</Label>
-                  <Input
-                    value={form.training_name}
-                    onChange={(e) => setForm((prev) => ({ ...prev, training_name: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Eğitim Tarihi</Label>
-                  <Input
-                    type="date"
-                    value={form.training_date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, training_date: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Eğitim Süresi</Label>
-                  <Input
-                    value={form.training_duration}
-                    onChange={(e) => setForm((prev) => ({ ...prev, training_duration: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Geçerlilik Tarihi</Label>
-                  <Input
-                    type="date"
-                    value={form.validity_date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, validity_date: e.target.value }))}
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label>Eğitmenler</Label>
-                  <Textarea
-                    value={trainerNamesInput}
-                    onChange={(e) => {
-                      const nextValue = e.target.value;
-                      const trainerNames = nextValue
-                        .split(/\r?\n|,/)
-                        .map((item) => item.trim())
-                        .filter(Boolean);
-
-                      setTrainerNamesInput(nextValue);
-
-                      setForm((prev) => {
-                        const normalized = normalizeDesignConfig(prev.design_config, trainerNames, prev.company_name);
-                        return {
-                          ...prev,
-                          trainer_names: trainerNames,
-                          design_config: {
-                            ...normalized,
-                            signatures: normalized.signatures.map((signature: any, index: number) =>
-                              index === 0
-                                ? { ...signature, name: signature.name || trainerNames[0] || "" }
-                                : index === 1
-                                  ? { ...signature, name: signature.name || trainerNames[1] || "" }
-                                  : signature,
-                            ),
-                          } as any,
-                        };
-                      });
-                    }}
-                    className="min-h-24 resize-y"
-                    placeholder="Uzman adlarını virgül veya satır satır girin"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Birden fazla eğitmeni virgül ile ayırabilir veya her eğitmeni ayrı satıra yazabilirsiniz.
-                  </p>
-                </div>
-
-                <div className="space-y-3 md:col-span-2">
-                  <div>
-                    <Label>Sertifika İmza Alanları</Label>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Firma seçtiğinizde kayıtlı İSG uzmanı, işyeri hekimi ve işveren/yetkili bilgileri otomatik dolar. Eksikse buradan manuel girebilirsiniz.
-                    </p>
+                <div className="grid gap-4 md:grid-cols-[220px_1fr_220px]">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Gün Sayısı *</Label>
+                    <Select value="1" onValueChange={() => undefined}>
+                      <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                        <SelectValue placeholder="1 Gün" />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                        <SelectItem value="1">1 Gün</SelectItem>
+                        <SelectItem value="2">2 Gün</SelectItem>
+                        <SelectItem value="3">3 Gün</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {[
-                      { label: "İş Güvenliği Uzmanı", namePlaceholder: "Uzman ad soyad", titlePlaceholder: "İş Güvenliği Uzmanı\nBelge No: ..." },
-                      { label: "İşyeri Hekimi", namePlaceholder: "Hekim ad soyad", titlePlaceholder: "İşyeri Hekimi\nBelge No: ..." },
-                      { label: "İşveren / Yetkili", namePlaceholder: "İşveren veya yetkili", titlePlaceholder: "İşveren / Yetkili\nKaşe - İmza" },
-                    ].map((item, index) => (
-                      <div key={item.label} className="rounded-2xl border border-border bg-muted/20 p-3">
-                        <p className="text-sm font-semibold text-foreground">{item.label}</p>
-                        <div className="mt-3 space-y-2">
-                          <Input
-                            value={editableSignatures[index]?.name || ""}
-                            onChange={(e) => updateCertificateSignature(index, { name: e.target.value })}
-                            placeholder={item.namePlaceholder}
-                          />
-                          <Textarea
-                            value={editableSignatures[index]?.title || ""}
-                            onChange={(e) => updateCertificateSignature(index, { title: e.target.value })}
-                            placeholder={item.titlePlaceholder}
-                            className="min-h-16 resize-none text-xs"
-                          />
-                        </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Sektör Seçimi</Label>
+                    <Select value={selectedCertificateSector} onValueChange={setSelectedCertificateSector}>
+                      <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                        <SelectValue placeholder="Sektör Seçin..." />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80 border-slate-700 bg-[#172236] text-slate-100">
+                        {certificateSectorOptions.map((sector) => (
+                          <SelectItem key={sector} value={sector}>
+                            {sector}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="button" onClick={openCertificateTopicDialog} className="h-12 w-full gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                      <BookOpen className="h-4 w-4" />
+                      Eğitim Konuları
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Tarihleri *</Label>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-lg font-black text-emerald-400">1.</span>
+                    <div className="relative w-full max-w-xs">
+                      <Input
+                        type="date"
+                        value={form.training_date}
+                        onChange={(event) => setForm((prev) => ({ ...prev, training_date: event.target.value }))}
+                        className="h-12 border-slate-600 bg-[#172236] pr-10 text-slate-100"
+                      />
+                      <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                    <span className="text-slate-400">Otomatik Geçerlilik Tarihi Ayarla:</span>
+                    <button type="button" className="rounded-md bg-emerald-600 px-2 py-1 text-white">Az Tehlikeli (+3 yıl)</button>
+                    <button type="button" className="rounded-md bg-amber-600 px-2 py-1 text-white">Tehlikeli (+2 yıl)</button>
+                    <button type="button" className="rounded-md bg-rose-600 px-2 py-1 text-white">Çok Tehlikeli (+1 yıl)</button>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Geçerlilik Tarihi *</Label>
+                    <Input
+                      type="date"
+                      value={form.validity_date}
+                      onChange={(event) => setForm((prev) => ({ ...prev, validity_date: event.target.value }))}
+                      className="h-12 border-slate-600 bg-[#172236] text-slate-100"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Süresi *</Label>
+                    <Select
+                      value={form.training_duration}
+                      onValueChange={(value) => setForm((prev) => ({ ...prev, training_duration: value }))}
+                    >
+                      <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                        <Clock3 className="mr-2 h-4 w-4 text-slate-400" />
+                        <SelectValue placeholder="8 saat" />
+                      </SelectTrigger>
+                      <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                        <SelectItem value="2 saat">2 saat</SelectItem>
+                        <SelectItem value="4 saat">4 saat</SelectItem>
+                        <SelectItem value="8 saat">8 saat</SelectItem>
+                        <SelectItem value="12 saat">12 saat</SelectItem>
+                        <SelectItem value="16 saat">16 saat</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-700/70 pt-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-400" />
+                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğiticileri Seç</Label>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-slate-300">
+                        <span>İş Güvenliği Uzmanı Eğiticisi</span>
+                        <span className="flex items-center gap-2 text-emerald-300">Açık <Switch defaultChecked className="scale-75" /></span>
                       </div>
+                      <Input
+                        value={editableSignatures[0]?.name || ""}
+                        onChange={(event) => {
+                          updateCertificateSignature(0, { name: event.target.value });
+                          setTrainerNamesInput([event.target.value, editableSignatures[1]?.name || ""].filter(Boolean).join(", "));
+                          setForm((prev) => ({ ...prev, trainer_names: [event.target.value, editableSignatures[1]?.name || ""].filter(Boolean) }));
+                        }}
+                        placeholder="Adı Soyadı"
+                        className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-slate-300">
+                        <span>İşyeri Hekimi Eğiticisi</span>
+                        <span className="flex items-center gap-2 text-emerald-300">Açık <Switch defaultChecked className="scale-75" /></span>
+                      </div>
+                      <Input
+                        value={editableSignatures[1]?.name || ""}
+                        onChange={(event) => {
+                          updateCertificateSignature(1, { name: event.target.value });
+                          setTrainerNamesInput([editableSignatures[0]?.name || "", event.target.value].filter(Boolean).join(", "));
+                          setForm((prev) => ({ ...prev, trainer_names: [editableSignatures[0]?.name || "", event.target.value].filter(Boolean) }));
+                        }}
+                        placeholder="Adı Soyadı"
+                        className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">Firma seçildiğinde bu alanlar otomatik doldurulur.</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-5 border-t border-slate-700/70 pt-4 text-xs font-semibold text-slate-300">
+                  <label className="flex items-center gap-2"><Switch /> İşveren Bilgilerini Ekle</label>
+                  <label className="flex items-center gap-2"><Switch /> Hizmet Veren Firma Ekle</label>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-700/70 pt-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label className="text-xs font-bold text-slate-200">Sertifikaya kaşe/imza ekle</Label>
+                    <label>
+                      <input type="file" accept="image/*" className="hidden" onChange={(event) => event.target.files?.[0] && void handleLogoUpload(event.target.files[0])} />
+                      <Button type="button" size="sm" variant="outline" asChild className="h-7 gap-2 border-blue-500/50 bg-blue-500/10 text-blue-200 hover:bg-blue-500/20">
+                        <span><ImagePlus className="h-3.5 w-3.5" /> Kaşe/İmza Ekle</span>
+                      </Button>
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-400">Kaşeniz yoksa butona tıklayıp yükleyin; her sayfadan eklenebilir.</p>
+                  <div className="rounded-xl border border-amber-500/50 bg-amber-500/10 p-3 text-xs font-semibold text-amber-200">
+                    Ücretsiz pakette kaşenizin üzerine çapraz “İSGPratik” filigranı eklenir.
+                    <Button type="button" size="sm" className="ml-2 h-7 bg-indigo-600 text-white hover:bg-indigo-500">
+                      Filigransız İçin Uzman/OSGB'ye Yükselt
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t border-slate-700/70 pt-4">
+                  <Label className="text-xs font-bold uppercase tracking-wide text-violet-300">Sertifika Logosu</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {["Logo Yok", "Sol", "Sağ", "Her İki Taraf"].map((label, index) => (
+                      <Button
+                        key={label}
+                        type="button"
+                        className={cn(
+                          "h-9 text-xs font-bold",
+                          index === 0 ? "bg-fuchsia-600 text-white hover:bg-fuchsia-500" : "bg-[#111b2d] text-slate-200 hover:bg-slate-700",
+                        )}
+                      >
+                        {label}
+                      </Button>
                     ))}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
 
-                <div className="space-y-2 md:col-span-2">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <Label>Eğitim Konuları</Label>
+          <Dialog open={topicDialogOpen} onOpenChange={setTopicDialogOpen}>
+            <DialogContent className="max-h-[92vh] max-w-5xl overflow-hidden border-slate-700 bg-[#111b2d] p-0 text-slate-100">
+              <DialogHeader className="border-b border-slate-700 bg-[#1d2a3d] px-5 py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="h-5 w-5 text-blue-400" />
+                    <div>
+                      <DialogTitle className="text-white">Eğitim Konuları Düzenle</DialogTitle>
+                      <DialogDescription className="text-xs text-slate-400">
+                        {activeCertificateCenterTab === "height" || activeCertificateCenterTab === "confined"
+                          ? "Madde listesini düzenleyebilir, yeni maddeler ekleyebilir veya silebilirsiniz."
+                          : "Kategorileri ve konuları düzenleyebilir, istediğiniz sıraya alabilirsiniz."}
+                      </DialogDescription>
+                    </div>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="max-h-[68vh] space-y-4 overflow-y-auto p-4">
+                {activeCertificateCenterTab === "height" || activeCertificateCenterTab === "confined" ? (
+                  <div className="rounded-xl border border-slate-700 bg-[#111b2d] p-4">
+                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <h3 className="text-sm font-black text-white">{topicSections[0]?.title || "Eğitim Konuları"}</h3>
+                        <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-300">
+                          Madde listesini düzenleyebilir, yeni madde ekleyebilir veya silebilirsiniz. En fazla 18 madde
+                          ve her maddede en fazla 120 karakter kullanabilirsiniz.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        className="h-10 shrink-0 gap-2 bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
+                        disabled={(topicSections[0]?.topics.length || 0) >= 18}
+                        onClick={() => addTopic(0)}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Madde Ekle <span className="text-xs opacity-80">(Maks. 18)</span>
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {(topicSections[0]?.topics || []).map((topic, topicIndex) => (
+                        <div key={`height-topic-${topicIndex}`} className="grid grid-cols-[24px_1fr_30px] items-center gap-3">
+                          <span className="text-xs font-black text-blue-300">{topicIndex + 1}.</span>
+                          <Input
+                            value={topic}
+                            maxLength={120}
+                            onChange={(event) => updateTopic(0, topicIndex, event.target.value)}
+                            className="h-10 border-slate-600 bg-[#1f2d40] text-sm font-semibold text-slate-100"
+                          />
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                            onClick={() => removeTopic(0, topicIndex)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                <>
+                {topicSections.map((section, sectionIndex) => (
+                  <div key={`${section.title}-${sectionIndex}`} className="rounded-lg border border-slate-700 bg-[#152238] p-4">
+                    <div className="grid grid-cols-[26px_1fr_auto_auto] items-center gap-2">
+                      <span className="text-sm font-black text-blue-300">{sectionIndex + 1}.</span>
+                      <Input
+                        value={section.title}
+                        onChange={(event) =>
+                          setTopicSections((prev) =>
+                            prev.map((item, index) => (index === sectionIndex ? { ...item, title: event.target.value } : item)),
+                          )
+                        }
+                        className="h-8 border-slate-600 bg-[#1f2d40] text-sm font-bold text-slate-100"
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                        onClick={() => setTopicSections((prev) => prev.filter((_, index) => index !== sectionIndex))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Badge className="bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/15">
+                        {section.isOptional ? "Seçilir" : "Normal"}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      {section.topics.map((topic, topicIndex) => (
+                        <div key={`${section.title}-${topicIndex}`} className="grid grid-cols-[22px_1fr_42px_92px_28px] items-center gap-2">
+                          <span className="text-slate-500">↕</span>
+                          <Input
+                            value={topic}
+                            onChange={(event) => updateTopic(sectionIndex, topicIndex, event.target.value)}
+                            className="h-8 border-slate-600 bg-[#1f2d40] text-xs font-semibold text-slate-100"
+                          />
+                          <Button type="button" size="sm" variant="outline" className="h-8 border-slate-600 bg-[#172236] text-xs text-slate-300">
+                            dk
+                          </Button>
+                          <Select defaultValue="original">
+                            <SelectTrigger className="h-8 border-slate-600 bg-[#172236] text-xs text-slate-100">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                              <SelectItem value="original">Özgün</SelectItem>
+                              <SelectItem value="common">Ortak</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300"
+                            onClick={() => removeTopic(sectionIndex, topicIndex)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="w-full gap-2 sm:w-auto"
-                      onClick={() => {
-                        setForm((prev) => ({ ...prev, notes: DEFAULT_CERTIFICATE_TOPICS_TEXT }));
-                        toast.success("Hazır eğitim konuları yüklendi.");
-                      }}
+                      className="mt-2 h-8 text-xs text-blue-300 hover:bg-blue-500/10 hover:text-blue-200"
+                      onClick={() => addTopic(sectionIndex)}
                     >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Hazır Konuları Yükle
+                      <Plus className="mr-1 h-3.5 w-3.5" />
+                      Madde Ekle
                     </Button>
                   </div>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
-                    className="min-h-24"
-                    placeholder="İstersen hazır konuları yükleyebilir veya eğitim konu başlıklarını manuel yazabilirsin."
+                ))}
+
+                <div className="flex gap-2">
+                  <Input
+                    value={newCatalogTopic}
+                    onChange={(event) => setNewCatalogTopic(event.target.value)}
+                    placeholder="Yeni katalog adı..."
+                    className="h-10 border-slate-600 bg-[#1f2d40] text-slate-100"
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Hazır konular Genel, Sağlık ve Teknik başlıklarıyla sertifikadaki üç kolona yerleşir. Dilersen metni manuel düzenleyebilirsin.
-                  </p>
+                  <Button type="button" className="h-10 shrink-0 bg-blue-600 text-white hover:bg-blue-500" onClick={addCatalogTopic}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Katalog Ekle
+                  </Button>
                 </div>
-
-                <div className="space-y-3 md:col-span-2">
-                  <Label>Logo</Label>
-
-                  <div className="flex flex-wrap items-center gap-3">
-                    <label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => e.target.files?.[0] && void handleLogoUpload(e.target.files[0])}
-                      />
-                      <Button type="button" variant="outline" className="gap-2" asChild>
-                        <span>
-                          {uploadingLogo ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <ImagePlus className="h-4 w-4" />
-                          )}
-                          Logo Yükle
-                        </span>
-                      </Button>
-                    </label>
-
-                    {logoPreviewUrl ? (
-                      <div className="flex h-16 w-40 items-center justify-center rounded-xl border border-border bg-card p-2">
-                        <img src={logoPreviewUrl} alt="Logo önizleme" className="max-h-full max-w-full object-contain" />
-                      </div>
-                    ) : (
-                      <div className="rounded-xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
-                        Henüz logo yüklenmedi
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    Yüklediğin logo önizlemede ve PDF sertifikada kullanılır. Görünmüyorsa yükleme sonrası birkaç saniye içinde otomatik yenilenir.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          
-
-          {/* Production Status */}
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" /> Üretim Durumu
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-              <div className={jobStatusMeta.tone}>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{jobStatusMeta.label}</p>
-                    <p className="mt-1 text-sm text-foreground/80">{jobStatusMeta.summary}</p>
-                  </div>
-                  <Badge variant="secondary" className="bg-background/70 text-foreground">
-                    %{Math.round(activeJob?.progress || 0)}
-                  </Badge>
-                </div>
-                <p className="mt-3 text-xs text-foreground/75">{jobStatusMeta.detail}</p>
+                </>
+                )}
               </div>
 
-                <div className="grid gap-4 md:grid-cols-5">
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Durum</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{jobStatusMeta.label}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Tamamlanan</p>
-                  <p className="mt-1 text-lg font-semibold text-foreground">
-                    {activeJob?.completed_files || 0} / {activeJob?.total_files || participants.length}
-                  </p>
+              <div className="flex items-center justify-between gap-3 border-t border-slate-700 bg-[#1d2a3d] px-5 py-4">
+                <div className="flex gap-4 text-xs font-semibold text-slate-400">
+                  <button type="button" className="hover:text-slate-100" onClick={resetTopicSectionsForCurrentCertificateTab}>
+                    Varsayılana Sıfırla
+                  </button>
+                  <button type="button" className="hover:text-slate-100">Şablonları Sil</button>
+                  <button type="button" className="hover:text-slate-100">Şablon Kaydet</button>
                 </div>
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs text-muted-foreground">İlerleme</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">%{Math.round(activeJob?.progress || 0)}</p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Kuyruk / Üretim</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">
-                      {queuedItems.length} / {processingItems.length}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-border bg-card p-4">
-                    <p className="text-xs text-muted-foreground">Hatalı</p>
-                    <p className="mt-1 text-lg font-semibold text-foreground">{failedItems.length}</p>
-                  </div>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" className="border-slate-600 bg-[#172236] text-slate-100 hover:bg-slate-700" onClick={() => setTopicDialogOpen(false)}>
+                    İptal
+                  </Button>
+                  <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-500" onClick={saveTopicDialog}>
+                    Kaydet
+                  </Button>
                 </div>
-
-              <Progress value={activeJob?.progress || 0} className="h-3" />
-
-              <div className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-foreground">
-                {activeJob?.total_files
-                  ? `${activeJob.total_files} sertifikadan ${activeJob.completed_files || 0} tanesi üretildi, ${failedItems.length} hata var, ${activeProductionCount} kayıt sırada veya işleniyor.`
-                  : "Henüz üretim başlatılmadı."}
               </div>
+            </DialogContent>
+          </Dialog>
 
-              {activeJob?.error_message && (
-                <div className="rounded-xl border border-orange-500/25 bg-orange-500/10 px-4 py-3 text-sm text-foreground">
-                  <p className="font-medium">Son hata özeti</p>
-                  <p className="mt-1 break-words text-xs text-foreground/80">{activeJob.error_message}</p>
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => void handleCreate()} disabled={submitting || isJobRunning} variant="outline" className="gap-2">
-                  <Plus className="h-4 w-4" /> İşi Kaydet
-                </Button>
-
-                <Button onClick={() => void handleGenerate()} disabled={submitting || isJobRunning} className="gap-2">
-                  <RefreshCw className="h-4 w-4" /> Sertifikaları Oluştur
-                </Button>
-
-                <Button onClick={() => void handleRefreshStatus()} disabled={submitting || !activeCertificate} variant="outline" className="gap-2">
-                  <RefreshCw className="h-4 w-4" /> Durumu Yenile
-                </Button>
-
-                <Button
-                  onClick={() => void handleRetryFailed()}
-                  disabled={submitting || isJobRunning || failedItems.length === 0}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" /> Hatalıları Tekrar Dene
-                </Button>
-
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="gap-2">
-                      <Eye className="h-4 w-4" /> Önizleme
-                    </Button>
-                  </DialogTrigger>
-
-                  <DialogContent className="max-w-6xl border-border bg-background/95 backdrop-blur">
-                    <DialogHeader>
-                      <DialogTitle>Sertifika Önizleme</DialogTitle>
-                      <DialogDescription>
-                        Seçilen tema, firma bilgileri ve ilk katılımcı ile oluşturulan örnek sertifika görünümü.
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
-                      <CertificatePreview data={previewData} scale={0.55} />
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                <Button
-                  onClick={() => void handleDownloadSinglePdf()}
-                  disabled={completedItems.length === 0}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <Download className="h-4 w-4" /> Seçili PDF İndir
-                </Button>
-
-                <Button
-                  onClick={() => void handleDownloadZip()}
-                  disabled={!activeJob?.zip_path}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  <FileArchive className="h-4 w-4" /> ZIP İndir
-                </Button>
-              </div>
-
-              {completedItems.length > 0 && (
-                <div className="space-y-2 rounded-xl border border-border bg-card p-4">
-                  <Label>İndirilecek katılımcı PDF'i</Label>
-                  <Select value={selectedPdfParticipantId} onValueChange={setSelectedPdfParticipantId}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Katılımcı seçin" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {completedItems.map((item) => (
-                        <SelectItem key={item.id} value={item.participant_id}>
-                          {toDisplayText((item as any).participant_name) || item.participant_id}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <p className="text-xs text-muted-foreground">
-                    Tüm katılımcılar üretildi. Bu alan tekil PDF açar, toplu indirme için ZIP kullanılmalıdır.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="space-y-6">
-          {/* Live Preview (theme-safe premium surface) */}
-          <Card
-            className={cn(
-              "overflow-hidden border border-border",
-              "bg-[radial-gradient(circle_at_top_left,_hsl(var(--primary)/0.14),_transparent_42%),linear-gradient(180deg,hsl(var(--card)),hsl(var(--card)))]",
-            )}
-          >
-            <CardHeader className="border-b border-border">
-              <CardTitle className="text-foreground">Canlı Önizleme</CardTitle>
-              <CardDescription className="text-muted-foreground">
-                Seçilen tema ve firma bilgileriyle gerçek baskı hissine yakın önizleme.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="rounded-3xl border border-slate-200 bg-slate-100/90 p-4 shadow-inner dark:border-slate-800 dark:bg-slate-950/80">
-                <CertificatePreview data={previewData} scale={0.55} />
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Participants */}
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" /> Katılımcı Listesi
+          <Card className="overflow-hidden border-slate-700/70 bg-[#1f2d40] text-slate-100">
+            <CardHeader className="border-b border-slate-700/70 pb-4">
+              <CardTitle className="flex items-center gap-2 text-base text-white">
+                <Users className="h-5 w-5 text-emerald-400" /> Katılımcı Listesi ({participants.length})
               </CardTitle>
-              <CardDescription>
-                Excel ile yükleyin veya manuel ekleyin. Worker kuyruğu her katılımcı için ayrı PDF üretir.
-              </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-5">
               {employeeLoadState !== "idle" && (
                 <div
                   className={cn(
@@ -1750,139 +2000,247 @@ export default function CertificatesDashboard() {
                 </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" className="gap-2" onClick={() => createCertificateExcelTemplate()}>
-                  <FileSpreadsheet className="h-4 w-4" /> Excel Şablonu
-                </Button>
+              <div className="rounded-xl border border-blue-500/70 bg-blue-950/25 p-4">
+                <div className="flex items-center gap-2 text-sm font-bold text-white">
+                  <Users className="h-4 w-4 text-blue-300" />
+                  Firma Çalışanları
+                </div>
+                <div className="mt-8 text-center text-xs text-slate-400">
+                  {form.company_id ? "Firma çalışanları katılımcı listesine aktarıldı." : "Çalışanları görmek için bir firma seçin."}
+                </div>
+              </div>
 
-                <label>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && void handleExcelUpload(e.target.files[0])}
+              <div className="rounded-xl border border-slate-700 bg-[#172236] p-3">
+                <div className="grid gap-2">
+                  <Input
+                    value={manualParticipant.name}
+                    onChange={(event) => setManualParticipant((prev) => ({ ...prev, name: event.target.value }))}
+                    placeholder="Katılımcının Adı Soyadı"
+                    className="h-10 border-slate-600 bg-[#1f2d40] text-slate-100"
                   />
-                  <Button type="button" variant="outline" className="gap-2" asChild>
-                    <span>
-                      <Upload className="h-4 w-4" /> Excel Yükle
-                    </span>
+                  <Input
+                    value={manualParticipant.tc_no}
+                    onChange={(event) => setManualParticipant((prev) => ({ ...prev, tc_no: event.target.value }))}
+                    placeholder="Katılımcının T.C. No (opsiyonel)"
+                    className="h-10 border-slate-600 bg-[#1f2d40] text-slate-100"
+                  />
+                  <Input
+                    value={manualParticipant.job_title}
+                    onChange={(event) => setManualParticipant((prev) => ({ ...prev, job_title: event.target.value }))}
+                    placeholder="Katılımcının Görev Unvanı"
+                    className="h-10 border-slate-600 bg-[#1f2d40] text-slate-100"
+                  />
+                  <Button type="button" className="h-10 gap-2 bg-emerald-600 text-white hover:bg-emerald-500" onClick={addManualParticipant}>
+                    <Plus className="h-4 w-4" />
+                    Listeye Ekle
                   </Button>
-                </label>
+                </div>
 
-                <Button type="button" variant="outline" className="gap-2" onClick={addParticipant}>
-                  <Plus className="h-4 w-4" /> Katılımcı Ekle
-                </Button>
+                <div className="my-3 flex items-center gap-3 text-[11px] text-slate-500">
+                  <span className="h-px flex-1 bg-slate-700" />
+                  veya Excel ile toplu yükle
+                  <span className="h-px flex-1 bg-slate-700" />
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button type="button" className="h-9 gap-2 bg-blue-600 text-white hover:bg-blue-500" onClick={() => createCertificateExcelTemplate()}>
+                    <FileSpreadsheet className="h-4 w-4" /> Şablon İndir
+                  </Button>
+                  <label>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={(event) => event.target.files?.[0] && void handleExcelUpload(event.target.files[0])}
+                    />
+                    <Button type="button" className="h-9 w-full gap-2 bg-emerald-700 text-white hover:bg-emerald-600" asChild>
+                      <span>
+                        <Upload className="h-4 w-4" /> Excel Yükle
+                      </span>
+                    </Button>
+                  </label>
+                </div>
               </div>
 
-              <div className="max-h-[520px] overflow-auto rounded-xl border border-border bg-card">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border">
-                      <TableHead className="text-muted-foreground">Ad Soyad</TableHead>
-                      <TableHead className="text-muted-foreground">T.C. No</TableHead>
-                      <TableHead className="text-muted-foreground">Görev</TableHead>
-                      <TableHead className="w-[90px] text-muted-foreground">İşlem</TableHead>
-                    </TableRow>
-                  </TableHeader>
-
-                  <TableBody>
-                    {participants.length === 0 ? (
-                      <TableRow className="border-border">
-                        <TableCell colSpan={4} className="py-10 text-center text-muted-foreground">
-                          Henüz katılımcı eklenmedi.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      participants.map((participant, index) => (
-                        <TableRow key={(participant as any).id || `participant-${index}`} className="border-border">
-                          <TableCell>
-                            <Input
-                              value={participant.name}
-                              onChange={(e) => updateParticipant(index, { name: e.target.value })}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={participant.tc_no || ""}
-                              onChange={(e) => updateParticipant(index, { tc_no: e.target.value })}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={participant.job_title || ""}
-                              onChange={(e) => updateParticipant(index, { job_title: e.target.value })}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button type="button" variant="ghost" size="sm" onClick={() => removeParticipant(index)}>
-                              Sil
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Recent */}
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle>Geçmiş İşler ve Tekrar Basım</CardTitle>
-              <CardDescription>Önceki sertifika kayıtlarını seçip yeniden üretim başlatabilirsiniz.</CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-3">
-              {recentCertificates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Henüz sertifika işi bulunmuyor.</p>
-              ) : (
-                recentCertificates.map((certificate) => (
-                  <div
-                    key={certificate.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 lg:flex-row lg:items-center lg:justify-between"
-                  >
-                    <div>
-                      <p className="font-semibold text-foreground">{certificate.training_name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {certificate.company_name || "Firma yok"} • {certificate.training_date}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" size="sm" onClick={() => void loadCertificate(certificate)}>
-                        Yükle
-                      </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/dashboard/certificates/${certificate.id}`}>Detay</Link>
-                      </Button>
-                      <Button size="sm" onClick={() => void handleGenerate(certificate)}>
-                        Tekrar Bas
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
-                        disabled={deletingCertificateId === certificate.id}
-                        onClick={() => void handleDeleteCertificate(certificate)}
-                      >
-                        {deletingCertificateId === certificate.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                        Sil
-                      </Button>
-                    </div>
+              <div className="min-h-[280px] rounded-xl bg-[#1f2d40]">
+                {participants.length === 0 ? (
+                  <div className="flex min-h-[260px] flex-col items-center justify-center text-center text-slate-500">
+                    <Users className="mb-3 h-12 w-12 opacity-60" />
+                    <p className="text-xs font-black uppercase tracking-wider">Henüz katılımcı yok</p>
                   </div>
-                ))
-              )}
+                ) : (
+                  <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
+                    {participants.map((participant, index) => (
+                      <div key={(participant as any).id || `participant-${index}`} className="grid gap-2 rounded-xl border border-slate-700 bg-[#172236] p-3 md:grid-cols-[1fr_150px_1fr_42px]">
+                        <Input
+                          value={participant.name}
+                          onChange={(event) => updateParticipant(index, { name: event.target.value })}
+                          className="h-9 border-slate-600 bg-[#1f2d40] text-slate-100"
+                        />
+                        <Input
+                          value={participant.tc_no || ""}
+                          onChange={(event) => updateParticipant(index, { tc_no: event.target.value })}
+                          className="h-9 border-slate-600 bg-[#1f2d40] text-slate-100"
+                        />
+                        <Input
+                          value={participant.job_title || ""}
+                          onChange={(event) => updateParticipant(index, { job_title: event.target.value })}
+                          className="h-9 border-slate-600 bg-[#1f2d40] text-slate-100"
+                        />
+                        <Button type="button" size="icon" className="h-9 w-9 bg-rose-500/15 text-rose-300 hover:bg-rose-500/25" onClick={() => removeParticipant(index)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
       </div>
+      </>
+      ) : currentTab === "history" ? (
+        <Card className="overflow-hidden border-slate-700/70 bg-[#1f2d40] text-slate-100 shadow-lg shadow-black/10">
+          <CardHeader className="border-b border-slate-700/70">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-xl text-white">
+                  <History className="h-5 w-5 text-purple-300" />
+                  Geçmiş İşler ve Tekrar Basım
+                </CardTitle>
+                <CardDescription className="mt-1 text-slate-400">
+                  Önceki sertifika kayıtlarını seçip yeniden üretim başlatabilirsiniz.
+                </CardDescription>
+              </div>
+              <div className="rounded-full border border-purple-500/30 bg-purple-500/10 px-4 py-2 text-sm font-semibold text-purple-100">
+                {recentCertificates.length} kayıt
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-3 p-5">
+            {recentCertificates.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-600/80 bg-[#172236] p-8 text-center">
+                <History className="mx-auto mb-3 h-10 w-10 text-slate-500" />
+                <p className="font-semibold text-white">Henüz sertifika işi bulunmuyor.</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  Sertifika üretimi yaptığınızda geçmiş işler burada listelenecek.
+                </p>
+              </div>
+            ) : (
+              recentCertificates.map((certificate) => (
+                <div
+                  key={certificate.id}
+                  className="flex flex-col gap-4 rounded-2xl border border-slate-700 bg-[#172236] p-4 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold text-white">{certificate.training_name}</p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {certificate.company_name || "Firma yok"} • {certificate.training_date}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-500/40 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20"
+                      onClick={() => void loadCertificate(certificate)}
+                    >
+                      Yükle
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-slate-600 bg-slate-900/40 text-slate-100 hover:bg-slate-800"
+                      asChild
+                    >
+                      <Link to={`/dashboard/certificates/${certificate.id}`}>Detay</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 text-white hover:bg-emerald-500"
+                      onClick={() => void handleGenerate(certificate)}
+                    >
+                      Tekrar Bas
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20"
+                      disabled={deletingCertificateId === certificate.id}
+                      onClick={() => void handleDeleteCertificate(certificate)}
+                    >
+                      {deletingCertificateId === certificate.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
+                      )}
+                      Sil
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="overflow-hidden border-slate-700/70 bg-slate-900/80 shadow-xl shadow-black/10">
+          <CardContent className="p-0">
+            <div className={cn("h-1.5 bg-gradient-to-r", activeCertificateCenterTabMeta.accent)} />
+            <div className="grid gap-6 p-6 lg:grid-cols-[1fr_340px] lg:p-8">
+              <div className="space-y-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5">
+                    <ActiveCertificateTabIcon
+                      className={cn("h-7 w-7", activeCertificateCenterTabMeta.iconClassName)}
+                    />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Sertifika sekmesi</p>
+                    <h2 className="mt-1 text-2xl font-bold text-white">{activeCertificateCenterTabMeta.title}</h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                      {activeCertificateCenterTabMeta.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-dashed border-slate-600/80 bg-slate-950/40 p-5">
+                  <p className="font-semibold text-slate-100">Bu sekme hazır.</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-400">
+                    Bu alanı daha sonra özel form, katılımcı listesi, süre, geçerlilik ve PDF/ZIP çıktı kontrolleriyle
+                    genişletebiliriz. Şimdilik kullanıcı sertifika türleri arasında net şekilde geçiş yapabilir.
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-700 bg-slate-950/50 p-5">
+                <p className="text-sm font-semibold text-white">Planlanan yapı</p>
+                <div className="mt-4 space-y-3 text-sm text-slate-300">
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-900 px-3 py-2">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    Firma ve eğitim bilgileri
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-900 px-3 py-2">
+                    <span className="h-2 w-2 rounded-full bg-sky-400" />
+                    Katılımcı seçimi
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-900 px-3 py-2">
+                    <span className="h-2 w-2 rounded-full bg-violet-400" />
+                    Sertifika tasarımı
+                  </div>
+                  <div className="flex items-center gap-3 rounded-xl bg-slate-900 px-3 py-2">
+                    <span className="h-2 w-2 rounded-full bg-orange-400" />
+                    PDF ve ZIP çıktısı
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

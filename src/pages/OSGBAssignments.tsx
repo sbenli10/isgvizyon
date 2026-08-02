@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   Briefcase,
@@ -147,6 +148,9 @@ const roleMinutes = (
 ) => Number(minutesByRole?.[role] || 0);
 
 export default function OSGBAssignments() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedPersonnelId = searchParams.get("personnelId");
+  const requestedCompanyId = searchParams.get("companyId");
   const { user, profile } = useAuth();
   const organizationId = profile?.organization_id || null;
   const osgbAccess = useOsgbAccess();
@@ -333,6 +337,35 @@ export default function OSGBAssignments() {
     }
     setPendingRestoredEditingId(null);
   }, [clearAssignmentDraft, pendingRestoredEditingId, records]);
+
+  useEffect(() => {
+    if (!requestedPersonnelId && !requestedCompanyId) return;
+    const selectedPersonnel = requestedPersonnelId
+      ? personnel.find((item) => item.id === requestedPersonnelId)
+      : null;
+    const selectedCompany = requestedCompanyId
+      ? companies.find((item) => item.id === requestedCompanyId)
+      : null;
+
+    if ((requestedPersonnelId && !selectedPersonnel) || (requestedCompanyId && !selectedCompany)) {
+      return;
+    }
+
+    setEditing(null);
+    setForm((prev) => ({
+      ...buildFreshAssignmentForm(),
+      companyId: selectedCompany?.id || prev.companyId || "",
+      personnelId: selectedPersonnel?.id || prev.personnelId || "",
+      assignedRole: selectedPersonnel?.role || prev.assignedRole || "igu",
+    }));
+    setDialogOpen(true);
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("personnelId");
+      next.delete("companyId");
+      return next;
+    }, { replace: true });
+  }, [companies, personnel, requestedCompanyId, requestedPersonnelId, setSearchParams]);
 
   const ensurePersonnelOptions = async () => {
     if (!organizationId || personnel.length > 0 || personnelLoading) return;
@@ -883,26 +916,27 @@ export default function OSGBAssignments() {
       >
         <DialogContent
           overlayClassName="z-[140] bg-slate-950/80"
-          className="z-[150] border-slate-700 bg-slate-950 text-slate-50 sm:max-w-2xl"
+          className="z-[150] max-h-[86vh] overflow-hidden border-slate-700 bg-slate-950 p-0 text-slate-50 sm:max-w-xl"
         >
-          <DialogHeader>
-            <DialogTitle>{editing ? "Görevlendirme düzenle" : "Yeni görevlendirme oluştur"}</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="border-b border-slate-800 px-5 py-4">
+            <DialogTitle className="text-base">{editing ? "Görevlendirme düzenle" : "Yeni görevlendirme oluştur"}</DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed">
               Firma ve personeli seçin. Personelin rolü otomatik atanır; önerilen dakika ile mevzuat açığını hızlıca kapatabilirsiniz.
             </DialogDescription>
           </DialogHeader>
-          <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-3 text-sm text-cyan-100">
-            {selectedCompany ? (
-              <span>
-                {selectedCompany.companyName}: {roleLabel[form.assignedRole]} ihtiyacı {roleMinutes(selectedCompany.requiredMinutesByRole, form.assignedRole)} dk,
-                mevcut aktif atama {roleMinutes(selectedCompany.assignedMinutesByRole, form.assignedRole)} dk.
-              </span>
-            ) : (
-              <span>Atama oluşturmak için önce firma ve personel seçin.</span>
-            )}
-          </div>
-          <div className="grid gap-4 py-2 md:grid-cols-2">
-            <div className="space-y-2">
+          <div className="max-h-[calc(86vh-142px)] space-y-3 overflow-y-auto px-5 py-4">
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/10 p-3 text-xs leading-relaxed text-cyan-100">
+              {selectedCompany ? (
+                <span>
+                  {selectedCompany.companyName}: {roleLabel[form.assignedRole]} ihtiyacı {roleMinutes(selectedCompany.requiredMinutesByRole, form.assignedRole)} dk,
+                  mevcut aktif atama {roleMinutes(selectedCompany.assignedMinutesByRole, form.assignedRole)} dk.
+                </span>
+              ) : (
+                <span>Atama oluşturmak için önce firma ve personel seçin.</span>
+              )}
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-1.5">
               <Label>Firma</Label>
               <Select value={form.companyId} onValueChange={(value) => setForm((prev) => ({ ...prev, companyId: value }))}>
                 <SelectTrigger><SelectValue placeholder="Firma seçin" /></SelectTrigger>
@@ -917,7 +951,7 @@ export default function OSGBAssignments() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Personel</Label>
               <Select
                 value={form.personnelId}
@@ -950,7 +984,7 @@ export default function OSGBAssignments() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Görevlendirme rolü</Label>
               <Select value={form.assignedRole} onValueChange={(value) => setForm((prev) => ({ ...prev, assignedRole: value as AssignmentFormState["assignedRole"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -961,7 +995,7 @@ export default function OSGBAssignments() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Atanan süre (dk)</Label>
               <div className="flex gap-2">
                 <Input type="number" min="0" value={form.assignedMinutes} onChange={(e) => setForm((prev) => ({ ...prev, assignedMinutes: e.target.value }))} />
@@ -986,7 +1020,7 @@ export default function OSGBAssignments() {
               </div>
             </div>
             {regulationRecommendation ? (
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-1.5 md:col-span-2">
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Mevzuat öneri motoru</AlertTitle>
@@ -1020,7 +1054,7 @@ export default function OSGBAssignments() {
               </div>
             ) : null}
             {liveCompanyRequirement ? (
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-1.5 md:col-span-2">
                 <Alert variant={liveCompanyRequirement.stillInsufficient ? "destructive" : "default"}>
                   <Gauge className="h-4 w-4" />
                   <AlertTitle>{liveCompanyRequirement.selected.companyName} için gerekli süre karşılaştırması</AlertTitle>
@@ -1031,7 +1065,7 @@ export default function OSGBAssignments() {
               </div>
             ) : null}
             {livePersonnelCapacity ? (
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-1.5 md:col-span-2">
                 <Alert variant={livePersonnelCapacity.exceeded ? "destructive" : "default"}>
                   <Gauge className="h-4 w-4" />
                   <AlertTitle>{livePersonnelCapacity.selected.full_name} için canlı kapasite görünümü</AlertTitle>
@@ -1041,15 +1075,15 @@ export default function OSGBAssignments() {
                 </Alert>
               </div>
             ) : null}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Başlangıç tarihi</Label>
               <Input type="date" value={form.startDate} onChange={(e) => setForm((prev) => ({ ...prev, startDate: e.target.value }))} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Bitiş tarihi</Label>
               <Input type="date" value={form.endDate} onChange={(e) => setForm((prev) => ({ ...prev, endDate: e.target.value }))} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label>Durum</Label>
               <Select value={form.status} onValueChange={(value) => setForm((prev) => ({ ...prev, status: value as AssignmentFormState["status"] }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1061,12 +1095,13 @@ export default function OSGBAssignments() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-1.5 md:col-span-2">
               <Label>Notlar</Label>
-              <Textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} rows={4} />
+              <Textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} rows={2} />
+            </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-800 bg-slate-950 px-5 py-3">
             <Button
               variant="outline"
               onClick={() => {

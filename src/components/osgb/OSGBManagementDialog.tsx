@@ -41,9 +41,10 @@ const OsgbKatipSyncCenter = lazy(() => import("@/pages/OsgbKatipSyncCenter"));
 interface OSGBManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialTab?: OsgbManagementTab;
 }
 
-type OsgbManagementTab =
+export type OsgbManagementTab =
   | "dashboard"
   | "personnel"
   | "companies"
@@ -312,9 +313,15 @@ function renderTab(tab: OsgbManagementTab, refreshKey: number) {
   }
 }
 
-export function OSGBManagementDialog({ open, onOpenChange }: OSGBManagementDialogProps) {
+export function OSGBManagementDialog({ open, onOpenChange, initialTab }: OSGBManagementDialogProps) {
   const [activeTab, setActiveTab] = useState<OsgbManagementTab>("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowRight,
@@ -35,6 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { fetchDashboardSnapshot, writeDashboardSnapshot } from "@/lib/dashboardCache";
 import { resolvePostAuthRoute } from "@/lib/navigationPersistence";
 import { startNamedFlow } from "@/lib/perfTiming";
+import { clearPlatformAdminSession, markPlatformAdminSession } from "@/lib/platformAdminSession";
 import { getUserFacingError, getUserFacingErrorDescription } from "@/lib/userFacingError";
 import { isDeviceTrusted, trustCurrentDevice } from "@/utils/deviceFingerprint";
 import { toast } from "sonner";
@@ -55,6 +56,8 @@ interface FormData {
 }
 
 type FieldErrors = Partial<Record<keyof FormData | "mfaCode" | "forgotEmail", string>>;
+
+type LoginTarget = "app" | "platform-admin";
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -223,6 +226,7 @@ function GoogleIcon() {
 
 export default function Auth() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -256,10 +260,55 @@ export default function Auth() {
   });
 
   const isExtension = useMemo(() => new URLSearchParams(window.location.search).get("ext") === "true", []);
+  const isAdminEntry = location.pathname === "/admin-login" || new URLSearchParams(location.search).get("admin") === "true";
+  const loginTarget: LoginTarget = isAdminEntry ? "platform-admin" : "app";
   const callbackUrl = useMemo(() => (isExtension ? "/auth/callback?ext=true" : "/auth/callback"), [isExtension]);
   const appOrigin = useMemo(() => getAppOrigin(), []);
   const authCallbackRedirect = useMemo(() => `${appOrigin}${isExtension ? "/auth/callback?ext=true" : "/auth/callback"}`, [appOrigin, isExtension]);
   const isBusy = loading || googleLoading;
+
+  const verifyPlatformAdminAccess = async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, role, is_active, is_platform_admin")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const isAdmin =
+      data?.is_platform_admin === true ||
+      data?.role === "platform_admin" ||
+      data?.role === "owner";
+
+    return Boolean(isAdmin && data?.is_active !== false);
+  };
+
+  const completeSuccessfulLogin = async (userId: string) => {
+    await supabase.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", userId);
+    await prefetchInitialData(userId);
+
+    if (loginTarget === "platform-admin") {
+      const allowed = await verifyPlatformAdminAccess(userId);
+
+      if (!allowed) {
+        clearPlatformAdminSession();
+        await supabase.auth.signOut();
+        throw new Error("Bu hesap platform yönetim paneline giriş yetkisine sahip değil.");
+      }
+
+      markPlatformAdminSession();
+      toast.success("Platform sahibi girişi başarılı!");
+      setNotice({ type: "success", title: "Platform girişi başarılı", description: "Yönetim paneline yönlendiriliyorsunuz..." });
+      navigate("/platform-admin", { replace: true });
+      return;
+    }
+
+    clearPlatformAdminSession();
+    toast.success("Giriş başarılı!");
+    setNotice({ type: "success", title: "Giriş başarılı", description: "Yönlendiriliyorsunuz..." });
+    navigate(callbackUrl);
+  };
 
   useEffect(() => {
     const previousBodyBackground = document.body.style.background;
@@ -293,12 +342,41 @@ export default function Auth() {
     const checkUser = async () => {
       const { data } = await supabase.auth.getSession();
       if (data?.session?.user) {
+        if (loginTarget === "platform-admin") {
+          const allowed = await verifyPlatformAdminAccess(data.session.user.id);
+
+          if (allowed) {
+            markPlatformAdminSession();
+            navigate("/platform-admin", { replace: true });
+            return;
+          }
+
+          clearPlatformAdminSession();
+          await supabase.auth.signOut();
+          setNotice({
+            type: "error",
+            title: "Platform yetkisi yok",
+            description: "Bu hesap platform yönetim paneline giriş yetkisine sahip değil.",
+          });
+          return;
+        }
+
         const targetRoute = resolvePostAuthRoute(callbackUrl);
         navigate(targetRoute, { replace: true });
       }
     };
     void checkUser();
-  }, [navigate, callbackUrl]);
+  }, [navigate, callbackUrl, loginTarget]);
+
+  useEffect(() => {
+    if (!isAdminEntry) return;
+    setMode("login");
+    setNotice({
+      type: "info",
+      title: "Platform sahibi girişi",
+      description: "Bu ekran yalnızca yayın, ilan ve platform yönetimi yetkisi olan hesaplar içindir.",
+    });
+  }, [isAdminEntry]);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -447,10 +525,7 @@ export default function Auth() {
         const deviceTrusted = await isDeviceTrusted(authData.user.id);
 
         if (deviceTrusted) {
-          toast.success("Giriş başarılı!", { description: "Güvenilir cihaz" });
-          await supabase.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", authData.user.id);
-          await prefetchInitialData(authData.user.id);
-          navigate(callbackUrl);
+          await completeSuccessfulLogin(authData.user.id);
           return;
         }
 
@@ -468,11 +543,7 @@ export default function Auth() {
         return;
       }
 
-      await supabase.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", authData.user.id);
-      await prefetchInitialData(authData.user.id);
-      toast.success("Giriş başarılı!");
-      setNotice({ type: "success", title: "Giriş başarılı", description: "Yönlendiriliyorsunuz..." });
-      navigate(callbackUrl);
+      await completeSuccessfulLogin(authData.user.id);
     } catch (error: unknown) {
       const details = getUserFacingError(error);
       toast.error(details.title, { description: getUserFacingErrorDescription(error) });
@@ -512,13 +583,9 @@ export default function Auth() {
       }
 
       if (data.user) {
-        await supabase.from("profiles").update({ last_login_at: new Date().toISOString() }).eq("id", data.user.id);
-        await prefetchInitialData(data.user.id);
+        await completeSuccessfulLogin(data.user.id);
+        return;
       }
-
-      toast.success("Giriş başarılı!");
-      setNotice({ type: "success", title: "Giriş başarılı", description: "Yönlendiriliyorsunuz..." });
-      navigate(callbackUrl);
     } catch (error: unknown) {
       const details = getUserFacingError(error);
       const description = getUserFacingErrorDescription(error);
@@ -630,19 +697,35 @@ export default function Auth() {
   };
 
   const switchMode = (next: AuthMode) => {
+    if (isAdminEntry && next === "register") return;
+
     setMode(next);
     clearAllErrors();
     setForgotOpen(false);
 
     if (next === "login") {
-      setNotice({ type: "info", title: "Güvenli giriş", description: "Hesabınıza güvenli şekilde erişin. Şüpheli cihazlarda ek doğrulama otomatik devreye girer." });
+      setNotice(
+        isAdminEntry
+          ? {
+              type: "info",
+              title: "Platform sahibi girişi",
+              description: "Bu ekran yalnızca yayın, ilan ve platform yönetimi yetkisi olan hesaplar içindir.",
+            }
+          : {
+              type: "info",
+              title: "Güvenli giriş",
+              description: "Hesabınıza güvenli şekilde erişin. Şüpheli cihazlarda ek doğrulama otomatik devreye girer.",
+            },
+      );
     } else if (next === "register") {
       setNotice({ type: "info", title: "Yeni hesap oluştur", description: "Hesabınızı oluşturun ve İSG süreçlerinizi dakikalar içinde yönetmeye başlayın." });
     }
   };
 
   const activeHeading =
-    mode === "register"
+    isAdminEntry
+      ? "Platform Sahibi Girişi"
+      : mode === "register"
       ? "ISGVizyon'a başlayın"
       : mode === "mfa"
         ? "Ek doğrulama"
@@ -650,7 +733,7 @@ export default function Auth() {
           ? "E-postanızı kontrol edin"
           : "Tekrar Hoş Geldiniz!";
 
-  const activeEyebrow = mode === "register" ? "Yeni hesabınızı oluşturun" : "Hesabınıza giriş yapın";
+  const activeEyebrow = isAdminEntry ? "Yönetim paneli" : mode === "register" ? "Yeni hesabınızı oluşturun" : "Hesabınıza giriş yapın";
 
   return (
     <div
@@ -767,15 +850,19 @@ export default function Auth() {
                       <Shield className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <p className="text-2xl font-black leading-none !text-slate-950">ISGVizyon</p>
-                      <p className="mt-1 text-xs font-medium !text-slate-500">İSG yönetim platformu</p>
+                    <p className="text-2xl font-black leading-none !text-slate-950">ISGVizyon</p>
+                      <p className="mt-1 text-xs font-medium !text-slate-500">{isAdminEntry ? "Platform yönetimi" : "İSG yönetim platformu"}</p>
                     </div>
                   </div>
 
                   <div>
                     <p className="text-sm font-bold uppercase tracking-[0.18em] !text-blue-600">{activeEyebrow}</p>
                     <h1 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">{activeHeading}</h1>
-                    <p className="mt-2 text-sm leading-6 !text-slate-500">Hesabınıza giriş yaparak İSGVizyon panelinize devam edin.</p>
+                    <p className="mt-2 text-sm leading-6 !text-slate-500">
+                      {isAdminEntry
+                        ? "Platform sahibi hesabınızla giriş yaparak ilan, yorum ve yayın yönetimi paneline devam edin."
+                        : "Hesabınıza giriş yaparak İSGVizyon panelinize devam edin."}
+                    </p>
                   </div>
                 </div>
 
@@ -914,38 +1001,64 @@ export default function Auth() {
                         <Button
                           type="submit"
                           disabled={isBusy}
-                          className="auth-minimal-primary h-12 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 font-black text-white shadow-[0_20px_45px_rgba(37,99,235,0.25)] transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-60"
+                          className={cn(
+                            "auth-minimal-primary h-12 w-full rounded-2xl font-black text-white shadow-[0_20px_45px_rgba(37,99,235,0.25)] transition hover:-translate-y-0.5 disabled:opacity-60",
+                            isAdminEntry
+                              ? "bg-gradient-to-r from-slate-950 via-violet-700 to-blue-700 hover:from-slate-900 hover:via-violet-800 hover:to-blue-800"
+                              : "bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600",
+                          )}
                         >
                           {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+                          {loading ? "Giriş yapılıyor..." : isAdminEntry ? "Platform Paneline Gir" : "Giriş Yap"}
                         </Button>
 
-                        <div className="relative py-1">
-                          <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-slate-200" />
+                        {isAdminEntry ? (
+                          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-900">
+                            Bu alan yalnızca platform sahibine açıktır. Yetkisi olmayan hesaplar giriş yaptıktan sonra otomatik olarak reddedilir.
                           </div>
-                          <div className="relative flex justify-center text-xs text-slate-500">
-                            <span className="bg-white px-3">veya</span>
-                          </div>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="relative py-1">
+                              <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-slate-200" />
+                              </div>
+                              <div className="relative flex justify-center text-xs text-slate-500">
+                                <span className="bg-white px-3">veya</span>
+                              </div>
+                            </div>
 
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={isBusy}
-                          onClick={() => void handleGoogleLogin()}
-                          className="h-12 w-full rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-50"
-                        >
-                          {googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
-                          {googleLoading ? "Yönlendiriliyor..." : "Google ile giriş yap"}
-                        </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={isBusy}
+                              onClick={() => void handleGoogleLogin()}
+                              className="h-12 w-full rounded-lg border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-50"
+                            >
+                              {googleLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GoogleIcon />}
+                              {googleLoading ? "Yönlendiriliyor..." : "Google ile giriş yap"}
+                            </Button>
 
-                        <p className="text-sm text-slate-500">
-                          Hesabınız yok mu?{" "}
-                          <button type="button" onClick={() => switchMode("register")} disabled={isBusy} className="font-bold text-slate-950 hover:text-slate-600">
-                            Kayıt Ol
-                          </button>
-                        </p>
+                            <p className="text-sm text-slate-500">
+                              Hesabınız yok mu?{" "}
+                              <button type="button" onClick={() => switchMode("register")} disabled={isBusy} className="font-bold text-slate-950 hover:text-slate-600">
+                                Kayıt Ol
+                              </button>
+                            </p>
+
+                          </>
+                        )}
+
+                        {isAdminEntry ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={isBusy}
+                            onClick={() => navigate("/auth")}
+                            className="h-11 w-full rounded-xl text-slate-700 hover:bg-slate-100 hover:text-slate-950"
+                          >
+                            Normal kullanıcı girişine dön
+                          </Button>
+                        ) : null}
                       </form>
                     </AnimatedPanel>
                   )}

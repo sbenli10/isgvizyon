@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Briefcase,
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { OSGBManagementDialog } from "@/components/osgb/OSGBManagementDialog";
+import { OSGBManagementDialog, type OsgbManagementTab } from "@/components/osgb/OSGBManagementDialog";
 
 const features = [
   {
@@ -94,9 +95,43 @@ const steps = [
   },
 ];
 
+const osgbDialogTabs = new Set<OsgbManagementTab>([
+  "dashboard",
+  "personnel",
+  "companies",
+  "employees",
+  "tracking",
+  "finance",
+  "assignments",
+  "authorization",
+  "visits",
+  "archive",
+  "katip",
+]);
+
 export default function OSGBModule() {
-  const [managementOpen, setManagementOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [manualManagementOpen, setManualManagementOpen] = useState(false);
   const howToRef = useRef<HTMLElement | null>(null);
+
+  const requestedPanel = useMemo(() => {
+    const panel = new URLSearchParams(location.search).get("panel");
+    return panel && osgbDialogTabs.has(panel as OsgbManagementTab) ? (panel as OsgbManagementTab) : undefined;
+  }, [location.search]);
+
+  const managementOpen = manualManagementOpen || Boolean(requestedPanel);
+
+  const handleManagementOpenChange = (open: boolean) => {
+    setManualManagementOpen(open);
+
+    if (!open && location.search.includes("panel=")) {
+      const params = new URLSearchParams(location.search);
+      params.delete("panel");
+      const search = params.toString();
+      navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace: true });
+    }
+  };
 
   const scrollToHowTo = () => {
     howToRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -144,11 +179,11 @@ export default function OSGBModule() {
                   <p className="text-sm text-slate-400">Tüm OSGB operasyonlarını tablar üzerinden açın.</p>
                 </div>
               </div>
-              <Button type="button" size="lg" className="w-full justify-between bg-cyan-500 text-slate-950 hover:bg-cyan-400" onClick={() => setManagementOpen(true)}>
+              <Button type="button" size="lg" className="w-full justify-between bg-cyan-500 text-slate-950 hover:bg-cyan-400" onClick={() => setManualManagementOpen(true)}>
                 OSGB Modülünü Aç
                 <ArrowRight className="h-5 w-5" />
               </Button>
-              <Button type="button" size="lg" variant="outline" className="w-full border-slate-600 bg-slate-950/40 text-slate-100 hover:bg-slate-900 hover:text-white" onClick={() => setManagementOpen(true)}>
+              <Button type="button" size="lg" variant="outline" className="w-full border-slate-600 bg-slate-950/40 text-slate-100 hover:bg-slate-900 hover:text-white" onClick={() => setManualManagementOpen(true)}>
                 Hemen Başla
               </Button>
             </div>
@@ -219,13 +254,13 @@ export default function OSGBModule() {
               <p className="mt-1 text-sm text-slate-300">Dashboard, personel, firma, finans, arşiv ve İSG-KATİP senkronizasyonunu tek dialog içinde yönetin.</p>
             </div>
           </div>
-          <Button type="button" onClick={() => setManagementOpen(true)}>
+          <Button type="button" onClick={() => setManualManagementOpen(true)}>
             Hemen Başla
           </Button>
         </div>
       </section>
 
-      <OSGBManagementDialog open={managementOpen} onOpenChange={setManagementOpen} />
+      <OSGBManagementDialog open={managementOpen} onOpenChange={handleManagementOpenChange} initialTab={requestedPanel} />
     </div>
   );
 }

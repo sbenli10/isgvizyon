@@ -110,6 +110,8 @@ const loadNaceHazardQueryPage = () => import("@/components/nace/NaceHazardQuery"
 const NaceHazardQuery = lazyWithRetry("nace-hazard-query", loadNaceHazardQueryPage);
 const NaceSectorList = lazyWithRetry("nace-sector-list", () => import("@/components/nace/NaceSectorList"));
 const MykMandatoryQuery = lazyWithRetry("myk-mandatory-query", () => import("@/pages/MykMandatoryQuery"));
+const ISGJobBoard = lazyWithRetry("isg-job-board", () => import("@/pages/ISGJobBoard"));
+const PlatformAdmin = lazyWithRetry("platform-admin", () => import("@/pages/PlatformAdmin"));
 
 // ============================================
 // RISK ASSESSMENT
@@ -226,6 +228,21 @@ const ProtectedShell = () => {
       });
     };
   }, []);
+
+  if (location.pathname.startsWith("/platform-admin")) {
+    return (
+      <ProtectedRoute>
+        <RouteErrorBoundary routeKey={location.pathname}>
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/platform-admin" element={<PlatformAdmin />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
+        </RouteErrorBoundary>
+      </ProtectedRoute>
+    );
+  }
 
   return (
     <ProtectedRoute>
@@ -372,6 +389,8 @@ const ProtectedShell = () => {
             <Route path="nace-query/sectors" element={<NaceSectorList />} />
             <Route path="/myk-zorunluluk-sorgula" element={<MykMandatoryQuery />} />
             <Route path="/myk-sorgula" element={<Navigate to="/myk-zorunluluk-sorgula" replace />} />
+            <Route path="/is-ilanlari" element={<ISGJobBoard />} />
+            <Route path="/platform-admin" element={<PlatformAdmin />} />
 
             {/* ============================================ */}
             {/* KVKK & PRIVACY */}
@@ -468,6 +487,7 @@ const App = () => {
                 <CookieConsent />
                 <Routes>
               <Route path="/auth" element={<Auth />} />
+              <Route path="/admin-login" element={<Auth />} />
               <Route path="/landing" element={<Index />} />
               <Route path="/landing/product" element={<LandingProduct />} />
               <Route path="/landing/features" element={<LandingFeatures />} />

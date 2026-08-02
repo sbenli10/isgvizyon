@@ -3,6 +3,8 @@ import {
   AlertTriangle,
   BookOpenCheck,
   Building2,
+  Calendar,
+  ChevronDown,
   CheckCircle2,
   ClipboardCheck,
   Download,
@@ -49,10 +51,12 @@ import { cn } from "@/lib/utils";
 import type { Company } from "@/types/companies";
 
 const tabItems = [
-  { id: "ledger", label: "Öneri / Defter Oluştur", icon: ClipboardCheck },
-  { id: "risk", label: "Risk Değerlendirmesinden", icon: Sparkles },
-  { id: "law", label: "Yasal Dayanaklar", icon: BookOpenCheck },
+  { id: "ledger", label: "Öneriler / Defter Oluştur", icon: ClipboardCheck },
+  { id: "risk", label: "Risk Değerlendirmenizden", icon: Sparkles },
+  { id: "history", label: "Yazılanlar", icon: BookOpenCheck },
 ] as const;
+
+type SuggestionLedgerTab = (typeof tabItems)[number]["id"];
 
 const priorityClassName: Record<SuggestionPriority, string> = {
   "Yüksek Öncelik": "border-rose-400/30 bg-rose-500/10 text-rose-100",
@@ -60,6 +64,19 @@ const priorityClassName: Record<SuggestionPriority, string> = {
   Bilgilendirme: "border-cyan-400/30 bg-cyan-500/10 text-cyan-100",
   Genel: "border-slate-500/30 bg-slate-500/10 text-slate-200",
 };
+
+function formatHistoryDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("tr-TR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
 
 function EntryCard({
   entry,
@@ -92,8 +109,12 @@ function EntryCard({
 export default function SuggestionLedger() {
   const { user, profile } = useAuth();
   const [record, setRecord] = useState<SuggestionLedgerRecord>(() => createEmptySuggestionLedgerRecord(profile?.organization_id || null));
+  const [activeTab, setActiveTab] = useState<SuggestionLedgerTab>("ledger");
   const [companies, setCompanies] = useState<Company[]>([]);
   const [history, setHistory] = useState<SuggestionLedgerHistoryItem[]>([]);
+  const [expandedHistoryCompany, setExpandedHistoryCompany] = useState<string | null>(null);
+  const [historyDetails, setHistoryDetails] = useState<Record<string, SuggestionLedgerRecord>>({});
+  const [historyLoadingCompany, setHistoryLoadingCompany] = useState<string | null>(null);
   const [category, setCategory] = useState("Tüm konular");
   const [priority, setPriority] = useState<(typeof suggestionPriorities)[number]>("Tüm öncelikler");
   const [search, setSearch] = useState("");
@@ -117,6 +138,18 @@ export default function SuggestionLedger() {
       return matchesCategory && matchesPriority && (!term || haystack.includes(term));
     });
   }, [category, priority, search]);
+
+  const groupedHistory = useMemo(() => {
+    const groups = new Map<string, { companyName: string; items: SuggestionLedgerHistoryItem[]; entryCount: number }>();
+    history.forEach((item) => {
+      const key = item.companyName || "Firma belirtilmemiş";
+      const group = groups.get(key) || { companyName: key, items: [], entryCount: 0 };
+      group.items.push(item);
+      group.entryCount += item.entryCount;
+      groups.set(key, group);
+    });
+    return Array.from(groups.values());
+  }, [history]);
 
   const patchRecord = (patch: Partial<SuggestionLedgerRecord>) => {
     setRecord((current) => ({ ...current, ...patch }));
@@ -242,6 +275,34 @@ export default function SuggestionLedger() {
     }
   };
 
+  const toggleHistoryCompany = async (companyName: string) => {
+    if (expandedHistoryCompany === companyName) {
+      setExpandedHistoryCompany(null);
+      return;
+    }
+
+    setExpandedHistoryCompany(companyName);
+    const companyRecords = history.filter((item) => (item.companyName || "Firma belirtilmemiş") === companyName);
+    const missingRecords = companyRecords.filter((item) => !historyDetails[item.id]);
+    if (!missingRecords.length) return;
+
+    setHistoryLoadingCompany(companyName);
+    try {
+      const loadedRecords = await Promise.all(missingRecords.map((item) => loadSuggestionLedgerRecord(item.id)));
+      setHistoryDetails((current) => {
+        const next = { ...current };
+        loadedRecords.forEach((item) => {
+          if (item.id) next[item.id] = item;
+        });
+        return next;
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Defter ayrıntıları yüklenemedi.");
+    } finally {
+      setHistoryLoadingCompany(null);
+    }
+  };
+
   const deleteRecord = async (id?: string) => {
     if (!id) return;
     const confirmed = window.confirm("Bu tespit ve öneri defteri kaydını silmek istediğinize emin misiniz?");
@@ -280,19 +341,21 @@ export default function SuggestionLedger() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/35 p-2">
-          {tabItems.map((item, index) => {
+        <div className="flex flex-wrap gap-2">
+          {tabItems.map((item) => {
             const Icon = item.icon;
+            const active = activeTab === item.id;
             return (
               <Button
                 key={item.id}
                 type="button"
-                variant={index === 0 ? "default" : "outline"}
+                variant="outline"
+                onClick={() => setActiveTab(item.id)}
                 className={cn(
-                  "h-9 rounded-lg text-xs font-bold",
-                  index === 0
-                    ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-950/25 hover:from-cyan-400 hover:to-blue-500"
-                    : "border-slate-700 bg-slate-900/70 text-slate-300 hover:border-cyan-400/30 hover:bg-slate-800 hover:text-white",
+                  "h-11 rounded-xl border px-5 text-sm font-black transition",
+                  active
+                    ? "border-orange-400 bg-orange-500 text-white shadow-lg shadow-orange-950/25 hover:bg-orange-400 hover:text-white"
+                    : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600 hover:bg-slate-800 hover:text-white",
                 )}
               >
                 <Icon className="mr-2 h-4 w-4" />
@@ -302,6 +365,159 @@ export default function SuggestionLedger() {
           })}
         </div>
 
+        {activeTab === "risk" ? (
+          <Card className="border-slate-600/70 bg-slate-900/85 shadow-2xl shadow-black/20">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-violet-300" />
+                <div>
+                  <h2 className="text-lg font-black text-white">Risk Değerlendirmenizden Öneriler</h2>
+                  <p className="mt-2 max-w-4xl text-sm leading-6 text-blue-100/90">
+                    Daha önce firmalar için aldığınız risk değerlendirmelerindeki önemli (skoru yüksek) risklerden türetilen tespit-öneri maddeleri. Her
+                    madde, riskin alındığı firma ile etiketlenir.
+                  </p>
+                  <p className="mt-4 max-w-5xl text-base leading-7 text-slate-300">
+                    Önemli risk bulunamadı. Risk Değerlendirmesi modülünde firma için rapor oluşturup kaydettikçe (skoru yüksek riskler) burada firma firma
+                    listelenir.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : activeTab === "history" ? (
+          <div className="space-y-3">
+            {history.length === 0 ? (
+              <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
+                <CardContent className="p-5">
+                  <p className="rounded-lg border border-dashed border-slate-700 p-4 text-center text-xs text-slate-500">Henüz defter kaydı yok.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              groupedHistory.map((group) => {
+                const expanded = expandedHistoryCompany === group.companyName;
+                const firstLoadedRecord = group.items.map((item) => historyDetails[item.id]).find(Boolean);
+                return (
+                  <Card key={group.companyName} className="overflow-hidden border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex w-full items-center gap-4 border-b px-5 py-5 text-left transition",
+                        expanded ? "border-slate-200/60 bg-slate-900" : "border-transparent hover:bg-slate-900/90",
+                      )}
+                      onClick={() => void toggleHistoryCompany(group.companyName)}
+                    >
+                      <ChevronDown className={cn("h-5 w-5 shrink-0 text-slate-300 transition-transform", expanded && "rotate-180")} />
+                      <Building2 className="h-6 w-6 shrink-0 text-amber-400" />
+                      <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-lg font-black text-white">{group.companyName}</h2>
+                        <p className="mt-1 text-sm text-blue-200">{group.items.length} kayıt</p>
+                      </div>
+                      <Badge className="border-emerald-400/25 bg-emerald-500/15 px-4 py-1.5 text-sm font-bold text-emerald-100">
+                        Tehlike Sınıfı: {firstLoadedRecord?.hazardClass || "Belirtilmedi"}
+                      </Badge>
+                    </button>
+
+                    {expanded ? (
+                      <CardContent className="space-y-3 p-4">
+                        {historyLoadingCompany === group.companyName ? (
+                          <div className="flex h-24 items-center justify-center text-sm text-slate-400">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Defter ayrıntıları yükleniyor...
+                          </div>
+                        ) : (
+                          group.items.map((item) => {
+                            const detail = historyDetails[item.id];
+                            return (
+                              <div key={item.id} className="rounded-2xl border border-slate-700/80 bg-slate-950/35 p-4">
+                                <div className="mb-4 flex items-start justify-between gap-3">
+                                  <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                                    <Calendar className="h-4 w-4 text-slate-400" />
+                                    <span className="font-black text-white">{formatHistoryDate(item.updatedAt || item.recordDate)}</span>
+                                    <span className="text-slate-500">·</span>
+                                    <span className="text-slate-300">{item.entryCount} madde</span>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0 rounded-lg text-rose-300 hover:bg-rose-500/10 hover:text-rose-100"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void deleteRecord(item.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    <span className="sr-only">Kaydı sil</span>
+                                  </Button>
+                                </div>
+
+                                {detail ? (
+                                  <div className="space-y-4">
+                                    {detail.entries.map((entry, index) => (
+                                      <div key={entry.id} className="grid gap-2 text-sm leading-6 md:grid-cols-[auto_1fr]">
+                                        <span className="font-black text-blue-200">{index + 1}.</span>
+                                        <div>
+                                          <p>
+                                            <span className="font-black text-amber-300">Tespit:</span>{" "}
+                                            <span className="text-white">{entry.finding}</span>
+                                          </p>
+                                          <p>
+                                            <span className="font-black text-cyan-300">Öneri:</span>{" "}
+                                            <span className="text-slate-100">{entry.suggestion}</span>
+                                          </p>
+                                          <Badge className="mt-2 border-slate-600 bg-slate-800 text-slate-200">
+                                            {entry.catalogId ? "Katalog" : "Manuel"}
+                                          </Badge>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="rounded-lg border border-dashed border-slate-700 p-4 text-center text-xs text-slate-500">Ayrıntı bulunamadı.</p>
+                                )}
+                              </div>
+                            );
+                          })
+                        )}
+                      </CardContent>
+                    ) : null}
+                  </Card>
+                );
+              })
+            )}
+          </div>
+        ) : false ? (
+          <Card className="border-slate-700/70 bg-slate-900/80 shadow-2xl shadow-black/20 backdrop-blur">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-white">Yazılan Defter Kayıtları</CardTitle>
+              <CardDescription className="text-xs text-slate-400">Daha önce kaydedilen tespit ve öneri defteri kayıtları.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {history.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-700 p-4 text-center text-xs text-slate-500">Henüz defter kaydı yok.</p>
+              ) : (
+                history.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="w-full rounded-2xl border border-slate-700/70 bg-slate-950/45 p-3 text-left transition hover:border-orange-400/35 hover:bg-slate-950/65"
+                    onClick={() => {
+                      setActiveTab("ledger");
+                      void openHistoryRecord(item.id);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-white">{item.companyName}</span>
+                      <Badge className="border-slate-600 bg-slate-800 text-slate-200">{item.entryCount} madde</Badge>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{item.recordDate} • {item.status}</p>
+                  </button>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <>
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 p-4">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200">Seçili Madde</p>
@@ -578,6 +794,8 @@ export default function SuggestionLedger() {
             </Card>
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ interface AssignmentTypeCardsProps {
   onOpenIsgEntranceExam: () => void;
   onOpenIsgTrainingAttendance: () => void;
   onOpenEmergencyTeamTrainingAttendance: () => void;
+  onOpenRiskAssessmentTeamTrainingAttendance: () => void;
   onOpenWorkAccidentReport: () => void;
   onOpenReturnToWorkTraining: () => void;
   onOpenRootCauseInvestigation: () => void;
@@ -95,6 +96,7 @@ export function AssignmentTypeCards({
   onOpenIsgEntranceExam,
   onOpenIsgTrainingAttendance,
   onOpenEmergencyTeamTrainingAttendance,
+  onOpenRiskAssessmentTeamTrainingAttendance,
   onOpenWorkAccidentReport,
   onOpenReturnToWorkTraining,
   onOpenRootCauseInvestigation,
@@ -182,6 +184,15 @@ export function AssignmentTypeCards({
         action: onOpenEmergencyTeamTrainingAttendance,
       },
       {
+        id: "risk_assessment_team_training_attendance",
+        title: "Risk Değerlendirme Ekipleri Eğitim Katılım Formu",
+        description: "Risk değerlendirme ekibi eğitimi için katılımcı, konu ve imza listesini şablona doldurun.",
+        category: "training",
+        icon: ShieldCheck,
+        colorClass: "bg-violet-500/10 text-violet-700 dark:text-violet-200",
+        action: onOpenRiskAssessmentTeamTrainingAttendance,
+      },
+      {
         id: "orientation_onboarding",
         title: "Oryantasyon ve İşbaşı Eğitim Formu",
         description: "Yeni çalışan için oryantasyon ve işbaşı eğitim kaydı oluşturun.",
@@ -267,6 +278,7 @@ export function AssignmentTypeCards({
       onOpenNearMissReport,
       onOpenOrientationOnboardingTraining,
       onOpenRiskAssessmentTeamAssignment,
+      onOpenRiskAssessmentTeamTrainingAttendance,
       onOpenReturnToWorkTraining,
       onOpenRootCauseInvestigation,
       onOpenWorkAccidentReport,

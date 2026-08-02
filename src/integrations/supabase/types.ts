@@ -2527,6 +2527,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean | null
+          is_platform_admin: boolean
           last_login_at: string | null
           organization_id: string | null
           phone: string | null
@@ -2550,6 +2551,7 @@ export type Database = {
           full_name?: string | null
           id: string
           is_active?: boolean | null
+          is_platform_admin?: boolean
           last_login_at?: string | null
           organization_id?: string | null
           phone?: string | null
@@ -2573,6 +2575,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean | null
+          is_platform_admin?: boolean
           last_login_at?: string | null
           organization_id?: string | null
           phone?: string | null

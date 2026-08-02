@@ -37,6 +37,7 @@ import {
 import { IsgEntranceExamModal } from "@/components/assignment-letters/IsgEntranceExamModal";
 import { IsgTrainingAttendanceModal } from "@/components/assignment-letters/IsgTrainingAttendanceModal";
 import { EmergencyTeamTrainingAttendanceModal } from "@/components/assignment-letters/EmergencyTeamTrainingAttendanceModal";
+import { RiskAssessmentTeamTrainingAttendanceModal } from "@/components/assignment-letters/RiskAssessmentTeamTrainingAttendanceModal";
 import { RiskAssessmentTeamAssignmentModal } from "@/components/assignment-letters/RiskAssessmentTeamAssignmentModal";
 import { EmergencySupportAssignmentModal } from "@/components/assignment-letters/EmergencySupportAssignmentModal";
 import {
@@ -466,6 +467,7 @@ export default function AssignmentLetters() {
   const [isgEntranceExamOpen, setIsgEntranceExamOpen] = useState(false);
   const [isgTrainingAttendanceOpen, setIsgTrainingAttendanceOpen] = useState(false);
   const [emergencyTeamTrainingAttendanceOpen, setEmergencyTeamTrainingAttendanceOpen] = useState(false);
+  const [riskAssessmentTeamTrainingAttendanceOpen, setRiskAssessmentTeamTrainingAttendanceOpen] = useState(false);
   const [riskAssessmentTeamAssignmentOpen, setRiskAssessmentTeamAssignmentOpen] = useState(false);
   const [emergencySupportAssignmentOpen, setEmergencySupportAssignmentOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -710,6 +712,10 @@ export default function AssignmentLetters() {
 
   function openEmergencyTeamTrainingAttendanceModal() {
     setEmergencyTeamTrainingAttendanceOpen(true);
+  }
+
+  function openRiskAssessmentTeamTrainingAttendanceModal() {
+    setRiskAssessmentTeamTrainingAttendanceOpen(true);
   }
 
   const historyItems = useMemo<AssignmentHistoryItem[]>(() => {
@@ -1525,6 +1531,7 @@ export default function AssignmentLetters() {
         onOpenIsgEntranceExam={openIsgEntranceExamModal}
         onOpenIsgTrainingAttendance={openIsgTrainingAttendanceModal}
         onOpenEmergencyTeamTrainingAttendance={openEmergencyTeamTrainingAttendanceModal}
+        onOpenRiskAssessmentTeamTrainingAttendance={openRiskAssessmentTeamTrainingAttendanceModal}
         onOpenWorkAccidentReport={openWorkAccidentModal}
         onOpenReturnToWorkTraining={openReturnTrainingModal}
         onOpenRootCauseInvestigation={openRootCauseModal}
@@ -2232,6 +2239,13 @@ export default function AssignmentLetters() {
         companies={companies}
         employees={employees}
         onOpenChange={setEmergencyTeamTrainingAttendanceOpen}
+      />
+
+      <RiskAssessmentTeamTrainingAttendanceModal
+        open={riskAssessmentTeamTrainingAttendanceOpen}
+        companies={companies}
+        employees={employees}
+        onOpenChange={setRiskAssessmentTeamTrainingAttendanceOpen}
       />
 
       <RiskAssessmentTeamAssignmentModal

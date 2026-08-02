@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Sentry } from "@/lib/sentry";
 import { clearUserDrafts } from "@/hooks/usePersistentDraft";
+import { clearPlatformAdminSession } from "@/lib/platformAdminSession";
 
 type AuthProfile = Database["public"]["Tables"]["profiles"]["Row"];
 
@@ -436,6 +437,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       signOutInProgressRef.current = true;
+      clearPlatformAdminSession();
       profileRef.current = null;
       setSession(null);
       setProfile(null);
