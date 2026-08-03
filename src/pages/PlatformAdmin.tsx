@@ -11,11 +11,13 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock,
+  CreditCard,
   Eye,
   LayoutDashboard,
   Loader2,
   MessageCircle,
   RefreshCw,
+  Save,
   Search,
   Send,
   ShieldCheck,
@@ -37,7 +39,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type JobStatus = "pending" | "approved" | "rejected" | "archived";
-type AdminView = "overview" | "users" | "activity" | "modules" | "moderation" | "announcements";
+type AdminView = "overview" | "users" | "activity" | "modules" | "pricing" | "moderation" | "announcements";
 
 type JobPost = {
   id: string;
@@ -116,6 +118,30 @@ type PlatformOverview = {
   alerts: Array<{ label: string; value: number }>;
 };
 
+type PlatformPlanPrice = {
+  plan_code: string;
+  code: string | null;
+  plan_name: string | null;
+  name: string | null;
+  description: string | null;
+  price: number | null;
+  currency: string | null;
+  billing_period: string | null;
+  is_active: boolean | null;
+  updated_at: string | null;
+};
+
+type PlanPriceFormState = Record<
+  string,
+  {
+    price: string;
+    currency: string;
+    billing_period: string;
+    is_active: boolean;
+    description: string;
+  }
+>;
+
 const emptyOverview: PlatformOverview = {
   users: { total: 0, today_signups: 0, today_logins: 0, active: 0, platform_admins: 0 },
   jobs: { pending_posts: 0, approved_posts: 0, pending_comments: 0 },
@@ -150,6 +176,7 @@ const adminViews: Array<{
   { id: "users", label: "Üyeler", description: "Kayıt ve son giriş listesi", icon: Users },
   { id: "activity", label: "Üye Hareketleri", description: "Seçili kullanıcının kayıtları", icon: Activity },
   { id: "modules", label: "Modüller", description: "Ürün kullanım metrikleri", icon: BarChart3 },
+  { id: "pricing", label: "Fiyatlar", description: "Paket tutarlarını yönet", icon: CreditCard },
   { id: "moderation", label: "İlan Yönetimi", description: "Onay, ret ve yorumlar", icon: BriefcaseBusiness },
   { id: "announcements", label: "Duyuru", description: "Platform bildirimi yayınla", icon: Bell },
 ];
@@ -172,6 +199,41 @@ function formatDate(value?: string | null) {
 function userName(user?: PlatformUser | null) {
   if (!user) return "Kullanıcı seçilmedi";
   return user.full_name || user.email || "İsimsiz kullanıcı";
+}
+
+function normalizePlanPrices(payload: unknown): PlatformPlanPrice[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item) => item as Partial<PlatformPlanPrice>)
+    .filter((item) => Boolean(item.plan_code || item.code))
+    .map((item) => ({
+      plan_code: String(item.plan_code || item.code),
+      code: item.code ?? null,
+      plan_name: item.plan_name ?? null,
+      name: item.name ?? null,
+      description: item.description ?? null,
+      price: typeof item.price === "number" ? item.price : Number(item.price ?? 0),
+      currency: item.currency ?? "TRY",
+      billing_period: item.billing_period ?? "monthly",
+      is_active: item.is_active ?? true,
+      updated_at: item.updated_at ?? null,
+    }));
+}
+
+function planDisplayName(plan: PlatformPlanPrice) {
+  const code = (plan.plan_code || plan.code || "").toLocaleLowerCase("tr-TR");
+  if (code === "free") return "Free";
+  if (code === "premium") return "Premium";
+  if (code === "osgb") return "OSGB";
+  return plan.name || plan.plan_name || plan.plan_code;
+}
+
+function formatMoney(value: number | null | undefined, currency = "TRY") {
+  return new Intl.NumberFormat("tr-TR", {
+    style: "currency",
+    currency: currency || "TRY",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 }
 
 function StatCard({
@@ -251,6 +313,10 @@ export default function PlatformAdmin() {
   const [busy, setBusy] = useState(true);
   const [activityBusy, setActivityBusy] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [pricingBusy, setPricingBusy] = useState(false);
+  const [pricingActionId, setPricingActionId] = useState<string | null>(null);
+  const [planPrices, setPlanPrices] = useState<PlatformPlanPrice[]>([]);
+  const [planPriceForms, setPlanPriceForms] = useState<PlanPriceFormState>({});
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [adminSession] = useState(() => hasPlatformAdminSession());
@@ -304,6 +370,37 @@ export default function PlatformAdmin() {
     }
   };
 
+  const loadPricingData = async () => {
+    if (!canManage) return;
+    setPricingBusy(true);
+
+    try {
+      const { data, error } = await (supabase as any).rpc("get_platform_admin_plan_prices");
+      if (error) throw error;
+
+      const rows = normalizePlanPrices(data);
+      setPlanPrices(rows);
+      setPlanPriceForms(
+        rows.reduce<PlanPriceFormState>((acc, plan) => {
+          const code = plan.plan_code || plan.code || "";
+          acc[code] = {
+            price: String(plan.price ?? 0),
+            currency: plan.currency || "TRY",
+            billing_period: plan.billing_period || "monthly",
+            is_active: plan.is_active !== false,
+            description: plan.description || "",
+          };
+          return acc;
+        }, {}),
+      );
+    } catch (error) {
+      console.error("Platform plan prices could not be loaded:", error);
+      toast.error("Paket fiyatları yüklenemedi.");
+    } finally {
+      setPricingBusy(false);
+    }
+  };
+
   const loadPlatformData = async () => {
     if (!canManage) return;
     setBusy(true);
@@ -330,6 +427,7 @@ export default function PlatformAdmin() {
       setPosts((postsData || []) as JobPost[]);
       setComments((commentsData || []) as JobComment[]);
       setSelectedUser((current) => current || nextOverview.latest_users[0] || null);
+      await loadPricingData();
     } catch (error) {
       console.error("Platform admin data could not be loaded:", error);
       toast.error("Platform yönetim verileri yüklenemedi.");
@@ -433,6 +531,53 @@ export default function PlatformAdmin() {
       toast.error("Duyuru yayınlanamadı.");
     } finally {
       setActionId(null);
+    }
+  };
+
+  const updatePlanPriceForm = (planCode: string, patch: Partial<PlanPriceFormState[string]>) => {
+    setPlanPriceForms((current) => ({
+      ...current,
+      [planCode]: {
+        price: current[planCode]?.price ?? "0",
+        currency: current[planCode]?.currency ?? "TRY",
+        billing_period: current[planCode]?.billing_period ?? "monthly",
+        is_active: current[planCode]?.is_active ?? true,
+        description: current[planCode]?.description ?? "",
+        ...patch,
+      },
+    }));
+  };
+
+  const savePlanPrice = async (planCode: string) => {
+    const form = planPriceForms[planCode];
+    const price = Number(String(form?.price || "0").replace(",", "."));
+
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error("Geçerli bir fiyat girin.");
+      return;
+    }
+
+    setPricingActionId(planCode);
+
+    try {
+      const { error } = await (supabase as any).rpc("update_platform_admin_plan_price", {
+        p_plan_code: planCode,
+        p_price: price,
+        p_currency: form?.currency || "TRY",
+        p_billing_period: form?.billing_period || "monthly",
+        p_is_active: form?.is_active ?? true,
+        p_description: form?.description || null,
+      });
+
+      if (error) throw error;
+
+      toast.success(`${planCode.toUpperCase()} fiyatı güncellendi.`);
+      await loadPricingData();
+    } catch (error) {
+      console.error("Platform plan price update failed:", error);
+      toast.error("Paket fiyatı güncellenemedi.");
+    } finally {
+      setPricingActionId(null);
     }
   };
 
@@ -789,6 +934,123 @@ export default function PlatformAdmin() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {activeView === "pricing" && (
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300">Paket Fiyatları</p>
+                      <h2 className="mt-1 text-2xl font-black text-white">Kullanıcıya Gösterilen Fiyatları Yönet</h2>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+                        Bu alan `subscription_plans` katalog fiyatlarını günceller. Ayarlar ve fiyatlandırma ekranları aynı katalogdan beslendiği için değişiklikler kullanıcı tarafına yansır.
+                      </p>
+                    </div>
+                    <Button onClick={() => void loadPricingData()} disabled={pricingBusy} className="bg-cyan-600 hover:bg-cyan-500">
+                      {pricingBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      Fiyatları Yenile
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-3">
+                  {planPrices.map((plan) => {
+                    const planCode = plan.plan_code || plan.code || "";
+                    const form = planPriceForms[planCode];
+                    const numericPrice = Number(String(form?.price || plan.price || 0).replace(",", "."));
+                    const annualEstimate = planCode === "premium" ? numericPrice * 10 : null;
+
+                    return (
+                      <article key={planCode} className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5 shadow-xl shadow-black/10">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <Badge className="border border-violet-400/25 bg-violet-500/12 text-violet-100">{planCode.toUpperCase()}</Badge>
+                            <h3 className="mt-3 text-2xl font-black text-white">{planDisplayName(plan)}</h3>
+                            <p className="mt-1 text-sm text-slate-400">Güncel fiyat: {formatMoney(plan.price, plan.currency || "TRY")}</p>
+                          </div>
+                          <div className={cn("rounded-full px-3 py-1 text-xs font-black", form?.is_active !== false ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-700 text-slate-300")}>
+                            {form?.is_active !== false ? "Aktif" : "Pasif"}
+                          </div>
+                        </div>
+
+                        <div className="mt-5 grid gap-4">
+                          <div className="space-y-2">
+                            <Label className="text-slate-300">Fiyat</Label>
+                            <Input
+                              value={form?.price ?? ""}
+                              onChange={(event) => updatePlanPriceForm(planCode, { price: event.target.value })}
+                              inputMode="decimal"
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                              placeholder="Örn: 150"
+                            />
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label className="text-slate-300">Para Birimi</Label>
+                              <Input
+                                value={form?.currency ?? "TRY"}
+                                onChange={(event) => updatePlanPriceForm(planCode, { currency: event.target.value.toUpperCase() })}
+                                className="border-slate-700 bg-slate-950/70 text-white"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-slate-300">Periyot</Label>
+                              <select
+                                value={form?.billing_period ?? "monthly"}
+                                onChange={(event) => updatePlanPriceForm(planCode, { billing_period: event.target.value })}
+                                className="h-10 w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm text-white outline-none focus:border-cyan-400"
+                              >
+                                <option value="monthly">Aylık</option>
+                                <option value="yearly">Yıllık</option>
+                                <option value="custom">Özel</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-slate-300">Açıklama</Label>
+                            <Textarea
+                              value={form?.description ?? ""}
+                              onChange={(event) => updatePlanPriceForm(planCode, { description: event.target.value })}
+                              className="min-h-24 border-slate-700 bg-slate-950/70 text-white"
+                              placeholder="Plan açıklaması..."
+                            />
+                          </div>
+
+                          <label className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-700 bg-slate-950/45 px-4 py-3 text-sm text-slate-200">
+                            <span>Katalogda aktif göster</span>
+                            <input
+                              type="checkbox"
+                              checked={form?.is_active !== false}
+                              onChange={(event) => updatePlanPriceForm(planCode, { is_active: event.target.checked })}
+                              className="h-4 w-4 accent-cyan-500"
+                            />
+                          </label>
+
+                          {annualEstimate !== null ? (
+                            <div className="rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-100">
+                              Ayarlar ekranındaki yıllık Premium kartı şu an aylık fiyatın 10 katı olarak hesaplanır: <strong>{formatMoney(annualEstimate, form?.currency || "TRY")}</strong>.
+                            </div>
+                          ) : null}
+
+                          <Button onClick={() => void savePlanPrice(planCode)} disabled={pricingActionId === planCode} className="bg-emerald-600 hover:bg-emerald-500">
+                            {pricingActionId === planCode ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                            Kaydet
+                          </Button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {!pricingBusy && planPrices.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-700/70 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
+                    Paket fiyatı bulunamadı. Supabase migration çalıştırıldıktan sonra bu alan Free, Premium ve OSGB kayıtlarını gösterecek.
+                  </div>
+                ) : null}
               </div>
             )}
 

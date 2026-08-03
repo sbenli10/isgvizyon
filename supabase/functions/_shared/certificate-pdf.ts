@@ -634,16 +634,29 @@ function drawCertificateSeal(page: any, fonts: { bodyFont: PdfFont; titleFont: P
   const seal = CERT_LAYOUT.header.seal;
   const centerX = seal.x + seal.size / 2;
   const centerY = seal.y + seal.size / 2;
+  const sealLines = ["GÜVENLİ", "ÇALIŞMA", "GÜVENCELİ", "GELECEK"];
+  const sealFontSize = 6.35;
+  const sealLineHeight = 7.25;
+  const sealMaxTextWidth = seal.size - 44;
+  const firstLineY = centerY + ((sealLines.length - 1) * sealLineHeight) / 2 - sealFontSize * 0.9;
+
   page.drawCircle({ x: centerX, y: centerY, size: seal.size / 2, color: rgb(0.78, 0.58, 0.18) });
   page.drawCircle({ x: centerX, y: centerY, size: seal.size / 2 - 8, color: rgb(0.03, 0.13, 0.32) });
   page.drawCircle({ x: centerX, y: centerY, size: seal.size / 2 - 16, borderColor: rgb(1, 1, 1), borderWidth: 1 });
-  drawCenteredLines(page, fonts.titleFont, ["GÜVENLİ", "ÇALIŞMA", "GÜVENCELİ", "GELECEK"], {
-    centerX,
-    topY: centerY + 18,
-    fontSize: 7.8,
-    lineHeight: 9.2,
-    color: rgb(1, 1, 1),
-    maxWidth: seal.size - 28,
+
+  sealLines.forEach((line, index) => {
+    let lineFontSize = sealFontSize;
+    while (lineFontSize > 4.8 && fonts.titleFont.widthOfTextAtSize(line, lineFontSize) > sealMaxTextWidth) {
+      lineFontSize -= 0.2;
+    }
+    const lineWidth = fonts.titleFont.widthOfTextAtSize(line, lineFontSize);
+    page.drawText(line, {
+      x: centerX - lineWidth / 2,
+      y: firstLineY - index * sealLineHeight,
+      size: lineFontSize,
+      font: fonts.titleFont,
+      color: rgb(1, 1, 1),
+    });
   });
 }
 

@@ -14,6 +14,7 @@ import {
   History,
   HelpCircle,
   ImagePlus,
+  Info,
   Loader2,
   Mountain,
   Plus,
@@ -410,6 +411,9 @@ const confinedCertificateTopicSections: CertificateTopicSection[] = [
   },
 ];
 
+const defaultFireTrainingTopics =
+  "Yanma ve Yangın nedir, Yangına sebep olan faktörler, Yangın türleri, Yangın yerindeki tehlikeler, Söndürme maddeleri, Yangın söndürme cihazları ve kullanımı, Yangın dolapları ve itfaiye hortumları, Katı-Sıvı-Gaz yangınlarının söndürülmesi, Başlangıç aşamasındaki yangınları söndürme, Yangın türüne uygun söndürme cihazı seçimi ve kullanımı, Yangın esnasında yapılması gerekenler, İş yerlerinde yangına neden olan sebepler, Yangın anında acil durumda yapılması gerekenler, Yangın acil durum ekipleri ve görevleri";
+
 function getDefaultTopicSectionsForCertificateTab(tab: CertificateCenterTabId) {
   if (tab === "height") return heightCertificateTopicSections;
   if (tab === "confined") return confinedCertificateTopicSections;
@@ -734,6 +738,11 @@ export default function CertificatesDashboard() {
   const [certificateLayoutMode, setCertificateLayoutMode] = useState<"single" | "frontBack">("single");
   const [hideCertificateTc, setHideCertificateTc] = useState(false);
   const [selectedCertificateSector, setSelectedCertificateSector] = useState("");
+  const [fireTrainerName, setFireTrainerName] = useState("");
+  const [fireTrainerTitle, setFireTrainerTitle] = useState("Yangın Eğitmeni");
+  const [fireTrainingLocation, setFireTrainingLocation] = useState("");
+  const [fireCertificateNo, setFireCertificateNo] = useState("");
+  const [fireTrainingTopics, setFireTrainingTopics] = useState(defaultFireTrainingTopics);
   const studioSectionRef = useRef<HTMLDivElement | null>(null);
   const companyContextAppliedRef = useRef<string | null>(null);
   const rawTab = searchParams.get("tab");
@@ -832,6 +841,16 @@ export default function CertificatesDashboard() {
     companyContextAppliedRef.current = activeCompanyId;
     void applyCompany(activeCompanyId);
   }, [activeCompanyId, companies]);
+
+  useEffect(() => {
+    if (activeCertificateCenterTab !== "fire") return;
+    setForm((prev) => ({
+      ...prev,
+      training_name: "Yangın Eğitimi ve Tatbikat Katılım Belgesi",
+      notes: fireTrainingTopics,
+      trainer_names: fireTrainerName ? [fireTrainerName] : prev.trainer_names,
+    }));
+  }, [activeCertificateCenterTab, fireTrainerName, fireTrainingTopics]);
 
   async function bootstrap() {
     setLoading(true);
@@ -1622,8 +1641,8 @@ export default function CertificatesDashboard() {
                   </Select>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-[220px_1fr_220px]">
-                  <div className="space-y-2">
+                {activeCertificateCenterTab === "fire" ? (
+                  <div className="max-w-xs space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Gün Sayısı *</Label>
                     <Select value="1" onValueChange={() => undefined}>
                       <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
@@ -1636,28 +1655,44 @@ export default function CertificatesDashboard() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Sektör Seçimi</Label>
-                    <Select value={selectedCertificateSector} onValueChange={setSelectedCertificateSector}>
-                      <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
-                        <SelectValue placeholder="Sektör Seçin..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-80 border-slate-700 bg-[#172236] text-slate-100">
-                        {certificateSectorOptions.map((sector) => (
-                          <SelectItem key={sector} value={sector}>
-                            {sector}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-[220px_1fr_220px]">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Gün Sayısı *</Label>
+                      <Select value="1" onValueChange={() => undefined}>
+                        <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                          <SelectValue placeholder="1 Gün" />
+                        </SelectTrigger>
+                        <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                          <SelectItem value="1">1 Gün</SelectItem>
+                          <SelectItem value="2">2 Gün</SelectItem>
+                          <SelectItem value="3">3 Gün</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Sektör Seçimi</Label>
+                      <Select value={selectedCertificateSector} onValueChange={setSelectedCertificateSector}>
+                        <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                          <SelectValue placeholder="Sektör Seçin..." />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-80 border-slate-700 bg-[#172236] text-slate-100">
+                          {certificateSectorOptions.map((sector) => (
+                            <SelectItem key={sector} value={sector}>
+                              {sector}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button type="button" onClick={openCertificateTopicDialog} className="h-12 w-full gap-2 bg-blue-600 text-white hover:bg-blue-500">
+                        <BookOpen className="h-4 w-4" />
+                        Eğitim Konuları
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-end">
-                    <Button type="button" onClick={openCertificateTopicDialog} className="h-12 w-full gap-2 bg-blue-600 text-white hover:bg-blue-500">
-                      <BookOpen className="h-4 w-4" />
-                      Eğitim Konuları
-                    </Button>
-                  </div>
-                </div>
+                )}
 
                 <div className="space-y-3">
                   <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Tarihleri *</Label>
@@ -1673,15 +1708,17 @@ export default function CertificatesDashboard() {
                       <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                     </div>
                   </div>
+                  {activeCertificateCenterTab !== "fire" ? (
                   <div className="flex flex-wrap gap-2 text-[11px] font-bold">
                     <span className="text-slate-400">Otomatik Geçerlilik Tarihi Ayarla:</span>
                     <button type="button" className="rounded-md bg-emerald-600 px-2 py-1 text-white">Az Tehlikeli (+3 yıl)</button>
                     <button type="button" className="rounded-md bg-amber-600 px-2 py-1 text-white">Tehlikeli (+2 yıl)</button>
                     <button type="button" className="rounded-md bg-rose-600 px-2 py-1 text-white">Çok Tehlikeli (+1 yıl)</button>
                   </div>
+                  ) : null}
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                <div className={cn("grid gap-4", activeCertificateCenterTab === "fire" ? "max-w-xs" : "md:grid-cols-[1fr_1fr]")}>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Geçerlilik Tarihi *</Label>
                     <Input
@@ -1691,27 +1728,93 @@ export default function CertificatesDashboard() {
                       className="h-12 border-slate-600 bg-[#172236] text-slate-100"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Süresi *</Label>
-                    <Select
-                      value={form.training_duration}
-                      onValueChange={(value) => setForm((prev) => ({ ...prev, training_duration: value }))}
-                    >
-                      <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
-                        <Clock3 className="mr-2 h-4 w-4 text-slate-400" />
-                        <SelectValue placeholder="8 saat" />
-                      </SelectTrigger>
-                      <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
-                        <SelectItem value="2 saat">2 saat</SelectItem>
-                        <SelectItem value="4 saat">4 saat</SelectItem>
-                        <SelectItem value="8 saat">8 saat</SelectItem>
-                        <SelectItem value="12 saat">12 saat</SelectItem>
-                        <SelectItem value="16 saat">16 saat</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {activeCertificateCenterTab !== "fire" ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">Eğitim Süresi *</Label>
+                      <Select
+                        value={form.training_duration}
+                        onValueChange={(value) => setForm((prev) => ({ ...prev, training_duration: value }))}
+                      >
+                        <SelectTrigger className="h-12 border-slate-600 bg-[#172236] text-slate-100">
+                          <Clock3 className="mr-2 h-4 w-4 text-slate-400" />
+                          <SelectValue placeholder="8 saat" />
+                        </SelectTrigger>
+                        <SelectContent className="border-slate-700 bg-[#172236] text-slate-100">
+                          <SelectItem value="2 saat">2 saat</SelectItem>
+                          <SelectItem value="4 saat">4 saat</SelectItem>
+                          <SelectItem value="8 saat">8 saat</SelectItem>
+                          <SelectItem value="12 saat">12 saat</SelectItem>
+                          <SelectItem value="16 saat">16 saat</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                 </div>
 
+                {activeCertificateCenterTab === "fire" ? (
+                  <div className="space-y-4 border-t border-slate-700/70 pt-4">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-amber-400" />
+                      <Label className="text-xs font-bold uppercase tracking-wide text-slate-300">
+                        Yangın Eğitmeni & Belge Bilgileri
+                      </Label>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Yangın Eğitmeni Adı Soyadı</Label>
+                        <Input
+                          value={fireTrainerName}
+                          onChange={(event) => {
+                            setFireTrainerName(event.target.value);
+                            setForm((prev) => ({ ...prev, trainer_names: event.target.value ? [event.target.value] : [] }));
+                            updateCertificateSignature(0, { name: event.target.value, title: fireTrainerTitle });
+                          }}
+                          className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Eğitmen Ünvanı</Label>
+                        <Input
+                          value={fireTrainerTitle}
+                          onChange={(event) => {
+                            setFireTrainerTitle(event.target.value);
+                            updateCertificateSignature(0, { title: event.target.value });
+                          }}
+                          className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Eğitim Yeri (opsiyonel)</Label>
+                        <Input
+                          value={fireTrainingLocation}
+                          onChange={(event) => setFireTrainingLocation(event.target.value)}
+                          className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-slate-300">Barkod / Belge No (opsiyonel)</Label>
+                        <Input
+                          value={fireCertificateNo}
+                          onChange={(event) => setFireCertificateNo(event.target.value)}
+                          className="h-11 border-slate-600 bg-[#172236] text-slate-100"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs text-slate-300">Eğitimin Konuları</Label>
+                      <textarea
+                        value={fireTrainingTopics}
+                        onChange={(event) => {
+                          setFireTrainingTopics(event.target.value);
+                          setForm((prev) => ({ ...prev, notes: event.target.value }));
+                        }}
+                        className="min-h-[104px] w-full rounded-lg border border-slate-600 bg-[#172236] p-3 text-xs font-semibold leading-5 text-slate-100 outline-none transition focus:border-blue-500"
+                      />
+                      <p className="text-[11px] text-slate-500">Belgede “Eğitimin ...” bölümünde görünür, düzenleyebilirsiniz.</p>
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div className="space-y-3 border-t border-slate-700/70 pt-4">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-blue-400" />
@@ -1758,6 +1861,8 @@ export default function CertificatesDashboard() {
                   <label className="flex items-center gap-2"><Switch /> İşveren Bilgilerini Ekle</label>
                   <label className="flex items-center gap-2"><Switch /> Hizmet Veren Firma Ekle</label>
                 </div>
+                </>
+                )}
 
                 <div className="space-y-3 border-t border-slate-700/70 pt-4">
                   <div className="flex flex-wrap items-center gap-2">
@@ -2095,6 +2200,15 @@ export default function CertificatesDashboard() {
                   </div>
                 )}
               </div>
+              {activeCertificateCenterTab === "fire" ? (
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-xs leading-5 text-emerald-200">
+                  <div className="mb-1 flex items-center gap-2 font-black uppercase tracking-wide">
+                    <Info className="h-4 w-4" />
+                    Bilgi
+                  </div>
+                  Her katılımcı için ayrı bir sertifika sayfası oluşturulacaktır. Toplu seçim ve işveren imza alanları boş bırakılmıştır.
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         </div>

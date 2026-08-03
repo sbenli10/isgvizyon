@@ -399,11 +399,19 @@ export default function CertificatePreview({ data: rawData, qrNode, qrImageUrl, 
           flex-direction: column;
           align-items: center;
           justify-content: center;
+          gap: 1px;
           text-align: center;
-          font-size: 10px;
-          line-height: 1.08;
+          font-size: 8.8px;
+          line-height: 1;
           font-weight: 900;
           box-shadow: 0 8px 18px rgba(8, 38, 90, 0.18);
+        }
+
+        .cert-seal span {
+          display: block;
+          max-width: 58px;
+          white-space: nowrap;
+          transform: translateY(3px);
         }
 
         .cert-main-grid {
