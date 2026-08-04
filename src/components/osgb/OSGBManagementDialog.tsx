@@ -3,24 +3,39 @@ import {
   Archive,
   BarChart3,
   Building2,
+  CheckCircle2,
+  Download,
   Expand,
   FileCheck,
+  FileText,
+  Inbox,
   KeyRound,
   Link,
   Loader2,
   MapPin,
   RefreshCcw,
+  Search,
   ShieldCheck,
   UserPlus,
   UserRound,
   Users,
   Wallet,
   X,
+  XCircle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import {
+  getOsgbClientPortalUploadSignedUrl,
+  listOsgbClientPortalUploads,
+  reviewOsgbClientPortalUpload,
+  type OsgbClientPortalUploadRecord,
+} from "@/lib/osgbOrchestration";
 import {
   getOsgbPlatformDashboard,
   listOsgbRequiredDocumentsWorkspace,
@@ -54,6 +69,7 @@ export type OsgbManagementTab =
   | "assignments"
   | "authorization"
   | "visits"
+  | "portalUploads"
   | "archive"
   | "katip";
 
@@ -71,12 +87,31 @@ const tabs: Array<{
   { id: "assignments", label: "Personel Görevlendirme", icon: UserPlus },
   { id: "authorization", label: "Firma Yetkilendir", icon: KeyRound },
   { id: "visits", label: "Firma Ziyaretleri", icon: MapPin },
+  { id: "portalUploads", label: "Müşteri Gönderimleri", icon: Inbox },
   { id: "archive", label: "Arşiv", icon: Archive },
   { id: "katip", label: "İSG-KATİP Senkronize", icon: Link },
 ];
 
 const formatNumber = (value: number) => new Intl.NumberFormat("tr-TR").format(Math.round(value || 0));
 const formatCurrency = (value: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(value || 0);
+const formatBytes = (value: number) => {
+  if (!value) return "-";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+};
+const formatDateTime = (value: string | null) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("tr-TR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
 
 function LoadingTab() {
   return (
@@ -284,6 +319,269 @@ function OSGBDialogDashboard({ refreshKey }: { refreshKey: number }) {
   );
 }
 
+type PortalUploadFilter = "all" | "pending" | "approved" | "rejected";
+
+const portalUploadStatusLabels: Record<OsgbClientPortalUploadRecord["reviewStatus"], string> = {
+  pending: "İncelemede",
+  approved: "Onaylandı",
+  rejected: "Reddedildi",
+};
+
+const portalUploadStatusClasses: Record<OsgbClientPortalUploadRecord["reviewStatus"], string> = {
+  pending: "border-amber-400/25 bg-amber-500/15 text-amber-100",
+  approved: "border-emerald-400/25 bg-emerald-500/15 text-emerald-100",
+  rejected: "border-rose-400/25 bg-rose-500/15 text-rose-100",
+};
+
+function OSGBPortalUploadsPanel({ refreshKey }: { refreshKey: number }) {
+  const { user, profile } = useAuth();
+  const organizationId = profile?.organization_id || null;
+  const [uploads, setUploads] = useState<OsgbClientPortalUploadRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<PortalUploadFilter>("all");
+  const [search, setSearch] = useState("");
+
+  const loadUploads = useCallback(async () => {
+    if (!organizationId) {
+      setUploads([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const rows = await listOsgbClientPortalUploads(organizationId);
+      setUploads(rows);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Müşteri gönderimleri yüklenemedi.");
+      setUploads([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
+
+  useEffect(() => {
+    void loadUploads();
+  }, [loadUploads, refreshKey]);
+
+  const filteredUploads = useMemo(() => {
+    const normalizedSearch = search.trim().toLocaleLowerCase("tr-TR");
+    return uploads.filter((upload) => {
+      const matchesStatus = statusFilter === "all" || upload.reviewStatus === statusFilter;
+      const matchesSearch = !normalizedSearch || [
+        upload.fileName,
+        upload.companyName,
+        upload.documentType,
+        upload.submittedByName,
+        upload.submittedByEmail,
+        upload.note,
+      ].filter(Boolean).some((value) => String(value).toLocaleLowerCase("tr-TR").includes(normalizedSearch));
+      return matchesStatus && matchesSearch;
+    });
+  }, [search, statusFilter, uploads]);
+
+  const groupedUploads = useMemo(() => {
+    const groups = new Map<string, OsgbClientPortalUploadRecord[]>();
+    filteredUploads.forEach((upload) => {
+      const key = upload.companyName || "Firma";
+      groups.set(key, [...(groups.get(key) || []), upload]);
+    });
+    return Array.from(groups.entries());
+  }, [filteredUploads]);
+
+  const pendingCount = uploads.filter((upload) => upload.reviewStatus === "pending").length;
+  const approvedCount = uploads.filter((upload) => upload.reviewStatus === "approved").length;
+  const rejectedCount = uploads.filter((upload) => upload.reviewStatus === "rejected").length;
+
+  const handleDownload = async (upload: OsgbClientPortalUploadRecord) => {
+    try {
+      const signedUrl = await getOsgbClientPortalUploadSignedUrl(upload.filePath);
+      if (!signedUrl) throw new Error("Dosya bağlantısı oluşturulamadı.");
+      window.open(signedUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Dosya açılamadı.");
+    }
+  };
+
+  const handleReview = async (uploadId: string, status: "approved" | "rejected") => {
+    if (!organizationId || !user?.id) return;
+    setReviewingId(uploadId);
+    try {
+      await reviewOsgbClientPortalUpload(organizationId, user.id, uploadId, status);
+      await loadUploads();
+      toast.success(status === "approved" ? "Müşteri dosyası onaylandı." : "Müşteri dosyası reddedildi.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Dosya durumu güncellenemedi.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  if (!organizationId) {
+    return <EmptyDashboard message="Müşteri gönderimlerini görmek için önce OSGB organizasyon çalışma alanınız olmalı." />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="overflow-hidden rounded-3xl border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_30%),linear-gradient(135deg,#111827,#10172a_60%,#09111f)] shadow-2xl shadow-black/25">
+        <div className="flex flex-col gap-4 border-b border-slate-700/70 p-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-500/12 text-cyan-100">
+              <Inbox className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">Müşteri Portalı</p>
+              <h2 className="mt-1 text-2xl font-black text-white">Müşteri Gönderimleri</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-300">
+                Firma portalından yüklenen dosyaları firma bazında inceleyin, indirin, onaylayın veya reddedin.
+              </p>
+            </div>
+          </div>
+          <Button type="button" onClick={() => void loadUploads()} disabled={loading} className="bg-cyan-600 text-white hover:bg-cyan-500">
+            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+            Gönderimleri Yenile
+          </Button>
+        </div>
+
+        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-700/70 bg-slate-950/45 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Toplam Dosya</p>
+            <p className="mt-2 text-3xl font-black text-white">{uploads.length}</p>
+          </div>
+          <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-amber-200">İncelemede</p>
+            <p className="mt-2 text-3xl font-black text-amber-100">{pendingCount}</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-emerald-200">Onaylanan</p>
+            <p className="mt-2 text-3xl font-black text-emerald-100">{approvedCount}</p>
+          </div>
+          <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.12em] text-rose-200">Reddedilen</p>
+            <p className="mt-2 text-3xl font-black text-rose-100">{rejectedCount}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="relative w-full xl:max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Firma, dosya adı, gönderen veya not ara..."
+              className="border-slate-700 bg-slate-950/70 pl-9 text-white placeholder:text-slate-500"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ["all", "Tümü"],
+              ["pending", "İncelemede"],
+              ["approved", "Onaylanan"],
+              ["rejected", "Reddedilen"],
+            ] as Array<[PortalUploadFilter, string]>).map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                variant="outline"
+                onClick={() => setStatusFilter(value)}
+                className={cn(
+                  "border-slate-700 bg-slate-950/50 text-slate-300 hover:bg-slate-800 hover:text-white",
+                  statusFilter === value && "border-cyan-400 bg-cyan-500/15 text-cyan-100",
+                )}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <div className="rounded-2xl border border-rose-400/25 bg-rose-500/10 p-5 text-sm text-rose-100">{error}</div>
+      ) : null}
+
+      {loading ? (
+        <LoadingTab />
+      ) : groupedUploads.length ? (
+        <div className="space-y-4">
+          {groupedUploads.map(([companyName, companyUploads]) => (
+            <section key={companyName} className="overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-900/70">
+              <div className="flex flex-col gap-2 border-b border-slate-700/70 bg-slate-950/45 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-white">{companyName}</h3>
+                    <p className="text-xs text-slate-400">{companyUploads.length} gönderim</p>
+                  </div>
+                </div>
+                <Badge className="w-fit border border-amber-400/20 bg-amber-500/10 text-amber-100">
+                  {companyUploads.filter((upload) => upload.reviewStatus === "pending").length} incelemede
+                </Badge>
+              </div>
+              <div className="divide-y divide-slate-800">
+                {companyUploads.map((upload) => (
+                  <article key={upload.id} className="grid gap-4 px-5 py-4 xl:grid-cols-[1fr_auto] xl:items-center">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="break-words text-base font-black text-white">{upload.fileName}</h4>
+                        <Badge className={cn("border", portalUploadStatusClasses[upload.reviewStatus])}>
+                          {portalUploadStatusLabels[upload.reviewStatus]}
+                        </Badge>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                        <span>{upload.documentType || "Genel dosya"}</span>
+                        <span>{formatBytes(upload.fileSize)}</span>
+                        <span>{formatDateTime(upload.createdAt)}</span>
+                        {upload.submittedByName || upload.submittedByEmail ? (
+                          <span>{upload.submittedByName || "İsim yok"}{upload.submittedByEmail ? ` • ${upload.submittedByEmail}` : ""}</span>
+                        ) : null}
+                      </div>
+                      {upload.note ? <p className="mt-3 rounded-xl border border-slate-800 bg-slate-950/40 px-3 py-2 text-sm leading-6 text-slate-300">{upload.note}</p> : null}
+                      {upload.reviewNote ? <p className="mt-2 text-xs text-slate-500">İnceleme notu: {upload.reviewNote}</p> : null}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 xl:justify-end">
+                      <Button size="sm" variant="outline" onClick={() => void handleDownload(upload)} className="border-cyan-400/30 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20">
+                        <Download className="mr-2 h-4 w-4" />
+                        Dosyayı Aç
+                      </Button>
+                      {upload.reviewStatus === "pending" ? (
+                        <>
+                          <Button size="sm" onClick={() => void handleReview(upload.id, "approved")} disabled={reviewingId === upload.id} className="bg-emerald-600 hover:bg-emerald-500">
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Onayla
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => void handleReview(upload.id, "rejected")} disabled={reviewingId === upload.id} className="border-rose-400/30 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20">
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Reddet
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/50 p-10 text-center">
+          <Inbox className="mx-auto h-10 w-10 text-slate-600" />
+          <p className="mt-3 text-lg font-black text-white">Müşteri gönderimi bulunamadı</p>
+          <p className="mt-1 text-sm text-slate-400">Portal üzerinden dosya yüklendiğinde burada firma bazında listelenecek.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function renderTab(tab: OsgbManagementTab, refreshKey: number) {
   switch (tab) {
     case "dashboard":
@@ -304,6 +602,8 @@ function renderTab(tab: OsgbManagementTab, refreshKey: number) {
       return <OSGBCompanyAuthorizationPanel refreshKey={refreshKey} />;
     case "visits":
       return <OSGBFieldVisits />;
+    case "portalUploads":
+      return <OSGBPortalUploadsPanel refreshKey={refreshKey} />;
     case "archive":
       return <OSGBArchivePanel refreshKey={refreshKey} />;
     case "katip":

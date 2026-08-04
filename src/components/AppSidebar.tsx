@@ -35,6 +35,7 @@ import {
   Star,
   Sparkles,
   Headphones,
+  Inbox,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -379,6 +380,13 @@ export function AppSidebar() {
                       url: "/osgb?panel=visits",
                       icon: MapPinned,
                       iconClassName: "text-sky-400 group-hover:text-sky-300",
+                      badge: null,
+                    },
+                    {
+                      title: "Müşteri Gönderimleri",
+                      url: "/osgb?panel=portalUploads",
+                      icon: Inbox,
+                      iconClassName: "text-cyan-400 group-hover:text-cyan-300",
                       badge: null,
                     },
                     {

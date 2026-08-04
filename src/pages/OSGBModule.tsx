@@ -105,6 +105,7 @@ const osgbDialogTabs = new Set<OsgbManagementTab>([
   "assignments",
   "authorization",
   "visits",
+  "portalUploads",
   "archive",
   "katip",
 ]);
