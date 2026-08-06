@@ -15,6 +15,7 @@ begin
     jsonb_agg((to_jsonb(plan_row) - 'sort_order') order by plan_row.sort_order),
     '[]'::jsonb
   )
+  
   into v_result
   from (
     select
