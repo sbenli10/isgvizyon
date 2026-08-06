@@ -2,6 +2,7 @@ const AUTH_BRIDGE_SOURCE = "denetron-web-app";
 const STATUS_BRIDGE_SOURCE = "isgvizyon-web-app";
 const STATUS_RESPONSE_SOURCE = "isgvizyon-extension-bridge";
 const AUTH_SESSION_MESSAGE = "AUTH_SESSION_UPDATED";
+const AUTH_SESSION_RESPONSE = "ISGVIZYON_EXTENSION_AUTH_RESPONSE";
 const EXTENSION_STATUS_MESSAGE = "ISGVIZYON_EXTENSION_STATUS";
 const EXTENSION_STATUS_RESPONSE = "ISGVIZYON_EXTENSION_STATUS_RESPONSE";
 const MULTI_ASSIGNMENT_APPLY = "ISGVIZYON_MULTI_ASSIGNMENT_APPLY";
@@ -23,23 +24,11 @@ const debugAuthListener = (...args) => {
 
 const isAllowedOrigin = (origin) => ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin));
 
-const postStatusResponse = (requestId, payload) => {
+const postBridgeResponse = (type, requestId, payload) => {
   window.postMessage(
     {
       source: STATUS_RESPONSE_SOURCE,
-      type: EXTENSION_STATUS_RESPONSE,
-      requestId,
-      payload,
-    },
-    window.location.origin,
-  );
-};
-
-const postApplyResponse = (requestId, payload) => {
-  window.postMessage(
-    {
-      source: STATUS_RESPONSE_SOURCE,
-      type: EXTENSION_APPLY_RESPONSE,
+      type,
       requestId,
       payload,
     },
@@ -65,9 +54,13 @@ window.addEventListener("message", async (event) => {
         source: "web_bridge",
       });
       debugAuthListener("[Bridge] status response forwarded");
-      postStatusResponse(payload.requestId || null, response || { success: false, error: "EMPTY_EXTENSION_RESPONSE" });
+      postBridgeResponse(
+        EXTENSION_STATUS_RESPONSE,
+        payload.requestId || null,
+        response || { success: false, error: "EMPTY_EXTENSION_RESPONSE" },
+      );
     } catch (error) {
-      postStatusResponse(payload.requestId || null, {
+      postBridgeResponse(EXTENSION_STATUS_RESPONSE, payload.requestId || null, {
         success: false,
         error: error?.message || "Eklenti durum bilgisi alınamadı.",
       });
@@ -93,9 +86,13 @@ window.addEventListener("message", async (event) => {
         data: payload.payload || null,
       });
       debugAuthListener("[Bridge] apply response forwarded", { type: payload.type });
-      postApplyResponse(payload.requestId || null, response || { success: false, error: "EMPTY_EXTENSION_RESPONSE" });
+      postBridgeResponse(
+        EXTENSION_APPLY_RESPONSE,
+        payload.requestId || null,
+        response || { success: false, error: "EMPTY_EXTENSION_RESPONSE" },
+      );
     } catch (error) {
-      postApplyResponse(payload.requestId || null, {
+      postBridgeResponse(EXTENSION_APPLY_RESPONSE, payload.requestId || null, {
         success: false,
         error: error?.message || "Gerçek işlem yanıtı alınamadı.",
       });
@@ -106,12 +103,17 @@ window.addEventListener("message", async (event) => {
   if (payload.source !== AUTH_BRIDGE_SOURCE || payload.type !== "DENETRON_AUTH_UPDATED") return;
 
   try {
-    await chrome.runtime.sendMessage({
+    const response = await chrome.runtime.sendMessage({
       type: AUTH_SESSION_MESSAGE,
       data: payload.data || null,
     });
     debugAuthListener("[ISGVizyon Auth Listener] oturum güncellemesi iletildi");
+    postBridgeResponse(AUTH_SESSION_RESPONSE, payload.requestId || null, response || { success: true });
   } catch (error) {
     console.error("[ISGVizyon Auth Listener] iletim başarısız:", error);
+    postBridgeResponse(AUTH_SESSION_RESPONSE, payload.requestId || null, {
+      success: false,
+      error: error?.message || "Oturum uzantıya aktarılamadı.",
+    });
   }
 });

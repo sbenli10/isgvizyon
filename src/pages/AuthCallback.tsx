@@ -8,9 +8,139 @@ import {
 } from "@/lib/dashboardCache";
 import { completeNamedFlow } from "@/lib/perfTiming";
 import { resolvePostAuthRoute } from "@/lib/navigationPersistence";
+import { ISGVIZYON_CHROME_EXTENSION_ID } from "@/lib/constants/extension";
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const OAUTH_INTENT_STORAGE_KEY = "denetron-oauth-intent";
+const EXTENSION_AUTH_STORAGE_KEY = "denetron_extension_auth";
+
+type ExtensionAuthResult = {
+  success: boolean;
+  channel: "external-message" | "page-bridge" | "fallback-storage";
+  error?: string;
+};
+
+function buildExtensionAuthPayload(session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>) {
+  return {
+    session,
+    user: session.user,
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_at: session.expires_at,
+    expires_in: session.expires_in,
+  };
+}
+
+function saveExtensionAuthFallback(authPayload: ReturnType<typeof buildExtensionAuthPayload>) {
+  window.localStorage.setItem(EXTENSION_AUTH_STORAGE_KEY, JSON.stringify(authPayload));
+}
+
+function sendExtensionAuthExternal(authPayload: ReturnType<typeof buildExtensionAuthPayload>): Promise<ExtensionAuthResult> {
+  return new Promise((resolve) => {
+    const chromeRuntime = (window as any).chrome?.runtime;
+
+    if (!chromeRuntime?.sendMessage) {
+      resolve({
+        success: false,
+        channel: "external-message",
+        error: "CHROME_RUNTIME_NOT_AVAILABLE",
+      });
+      return;
+    }
+
+    chromeRuntime.sendMessage(
+      ISGVIZYON_CHROME_EXTENSION_ID,
+      {
+        type: "DENETRON_AUTH_SUCCESS",
+        authData: authPayload,
+      },
+      (response: { ok?: boolean; success?: boolean; saved?: boolean; error?: string } | undefined) => {
+        const lastError = chromeRuntime.lastError;
+
+        if (lastError) {
+          resolve({
+            success: false,
+            channel: "external-message",
+            error: lastError.message,
+          });
+          return;
+        }
+
+        resolve({
+          success: Boolean(response?.ok || response?.success || response?.saved),
+          channel: "external-message",
+          error: response?.error,
+        });
+      },
+    );
+  });
+}
+
+function sendExtensionAuthViaPageBridge(authPayload: ReturnType<typeof buildExtensionAuthPayload>): Promise<ExtensionAuthResult> {
+  return new Promise((resolve) => {
+    const requestId = `extension-auth-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let settled = false;
+
+    const finish = (result: ExtensionAuthResult) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", handleResponse);
+      resolve(result);
+    };
+
+    const handleResponse = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (data?.source !== "isgvizyon-extension-bridge") return;
+      if (data?.type !== "ISGVIZYON_EXTENSION_AUTH_RESPONSE") return;
+      if (data?.requestId !== requestId) return;
+
+      finish({
+        success: Boolean(data?.payload?.success || data?.payload?.ok || data?.payload?.saved),
+        channel: "page-bridge",
+        error: data?.payload?.error,
+      });
+    };
+
+    window.addEventListener("message", handleResponse);
+
+    window.postMessage(
+      {
+        source: "denetron-web-app",
+        type: "DENETRON_AUTH_UPDATED",
+        requestId,
+        data: authPayload,
+      },
+      window.location.origin,
+    );
+
+    window.setTimeout(() => {
+      finish({
+        success: false,
+        channel: "page-bridge",
+        error: "PAGE_BRIDGE_TIMEOUT",
+      });
+    }, 2500);
+  });
+}
+
+async function sendAuthToExtension(session: NonNullable<Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]>) {
+  const authPayload = buildExtensionAuthPayload(session);
+  saveExtensionAuthFallback(authPayload);
+
+  const bridgeResult = await sendExtensionAuthViaPageBridge(authPayload);
+  if (bridgeResult.success) return bridgeResult;
+
+  const externalResult = await sendExtensionAuthExternal(authPayload);
+  if (externalResult.success) return externalResult;
+
+  return {
+    success: false,
+    channel: "fallback-storage" as const,
+    error: externalResult.error || bridgeResult.error,
+  };
+}
 
 async function ensureOAuthProfile(user: any) {
   const metadata = user?.user_metadata ?? {};
@@ -108,15 +238,17 @@ export default function AuthCallback() {
               method: "extension",
               target: "extension",
             });
-            localStorage.setItem(
-              "denetron_extension_auth",
-              JSON.stringify({
-                access_token: data.session.access_token,
-                refresh_token: data.session.refresh_token,
-                expires_in: data.session.expires_in,
-                user: data.session.user,
-              })
-            );
+
+            setStatus("Giriş başarılı. Uzantıya aktarılıyor...");
+            const extensionResult = await sendAuthToExtension(data.session);
+
+            if (!extensionResult.success) {
+              setStatus("Giriş başarılı. Uzantıyı tekrar açın.");
+              setErrorMessage(
+                "Oturum web tarafında hazırlandı ancak uzantıya otomatik aktarılamadı. Bu sekmeyi kapatmadan uzantıyı tekrar açın; eklenti oturumu buradan alacaktır.",
+              );
+              return;
+            }
 
             setStatus("Giriş başarılı. Uzantı bağlantısı tamamlandı.");
 

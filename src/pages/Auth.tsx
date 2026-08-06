@@ -361,12 +361,17 @@ export default function Auth() {
           return;
         }
 
+        if (isExtension) {
+          navigate(callbackUrl, { replace: true });
+          return;
+        }
+
         const targetRoute = resolvePostAuthRoute(callbackUrl);
         navigate(targetRoute, { replace: true });
       }
     };
     void checkUser();
-  }, [navigate, callbackUrl, loginTarget]);
+  }, [navigate, callbackUrl, loginTarget, isExtension]);
 
   useEffect(() => {
     if (!isAdminEntry) return;

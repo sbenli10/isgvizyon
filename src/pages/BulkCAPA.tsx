@@ -205,6 +205,14 @@ interface BulkCAPABootstrapCache {
   profileContext: ProfileContext | null;
 }
 
+type PreparedBulkCapaReport = {
+  blob: Blob;
+  fileName: string;
+  createdAt: string;
+  entriesCount: number;
+  signature: string;
+};
+
 interface BulkCapaProcessingSessionRow {
   id: string;
   status: string | null;
@@ -2036,6 +2044,7 @@ export function BulkCAPAContent() {
     () => initialDraftSnapshotRef.current?.bulkSourceImages || [],
   );
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [preparedBulkReport, setPreparedBulkReport] = useState<PreparedBulkCapaReport | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [overallAnalysis, setOverallAnalysis] = useState(() => initialDraftSnapshotRef.current?.overallAnalysis || "");
@@ -2819,6 +2828,32 @@ export function BulkCAPAContent() {
     generalInfo.area_region || reportCompanyName,
     [generalInfo.area_region, reportCompanyName]
   );
+
+  const bulkReportSignature = useMemo(
+    () =>
+      JSON.stringify({
+        companyInputMode,
+        selectedCompanyId,
+        manualCompanyName,
+        reportCompanyName,
+        generalInfo,
+        overallAnalysis,
+        entries,
+      }),
+    [
+      companyInputMode,
+      selectedCompanyId,
+      manualCompanyName,
+      reportCompanyName,
+      generalInfo,
+      overallAnalysis,
+      entries,
+    ],
+  );
+
+  const activePreparedBulkReport =
+    preparedBulkReport?.signature === bulkReportSignature ? preparedBulkReport : null;
+
   const filteredCompanies = useMemo(() => {
     const query = companySearch.trim().toLocaleLowerCase("tr-TR");
     if (!query) return companies;
@@ -4469,7 +4504,7 @@ ${entries
   };
 
 
-const handleSaveAndExport = async () => {
+const handleSaveAndExport = async (options?: { keepDialogOpen?: boolean }) => {
   if (!reportCompanyName.trim()) {
     toast.error("Lütfen firma seçin veya manuel firma adi girin");
     return;
@@ -4777,8 +4812,26 @@ const handleSaveAndExport = async () => {
       toast.info("Kullanıcı kaydı olmadan arşiv bağlantısı oluşturulamadı, Word dosyası indiriliyor.");
     }
 
+    setPreparedBulkReport({
+      blob: wordBlob,
+      fileName: reportFileName,
+      createdAt: today.toISOString(),
+      entriesCount: entries.length,
+      signature: bulkReportSignature,
+    });
+
     await downloadBlob(wordBlob, reportFileName);
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
+
+    if (options?.keepDialogOpen) {
+      setPreviewOpen(false);
+      setCreateDialogOpen(true);
+      setCreateMode("bulk");
+      setCreateStep("items");
+      toast.success("DÖF raporu hazırlandı. İndir butonundan tekrar indirebilirsiniz.");
+      return;
+    }
+
     await markSubmitted();
 
     debugDraftReset(
@@ -4855,6 +4908,16 @@ const handleSaveAndExport = async () => {
   } finally {
     setSaving(false);
   }
+};
+
+const handleDownloadPreparedBulkReport = async () => {
+  if (activePreparedBulkReport) {
+    await downloadBlob(activePreparedBulkReport.blob, activePreparedBulkReport.fileName);
+    toast.success("Hazır DÖF raporu indirildi.");
+    return;
+  }
+
+  await handleSaveAndExport({ keepDialogOpen: true });
 };
 
   if (loading || !draftLoaded) { // EKLENDI: Taslak yüklenmeden formu ekrana çizmesini engelliyoruz
@@ -5821,6 +5884,19 @@ const handleSaveAndExport = async () => {
                           ))}
                         </div>
                       ) : null}
+                      {createMode === "bulk" && activePreparedBulkReport ? (
+                        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                          <span>
+                            Hazır DÖF raporu: {activePreparedBulkReport.entriesCount} madde,
+                            {" "}
+                            {new Date(activePreparedBulkReport.createdAt).toLocaleTimeString("tr-TR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
@@ -5833,6 +5909,31 @@ const handleSaveAndExport = async () => {
                       <Button type="button" variant="outline" onClick={handleOpenBulkPreview} className="h-12 rounded-2xl border-primary/30 bg-primary/10 text-primary hover:bg-primary/15">
                         <Eye className="mr-2 h-5 w-5" />
                         Önizlemeye Geç
+                      </Button>
+                    ) : null}
+                    {createMode === "bulk" && entries.length > 0 ? (
+                      <Button
+                        type="button"
+                        onClick={() => void handleDownloadPreparedBulkReport()}
+                        disabled={saving || !generalInfoStepReady}
+                        className={cn(
+                          "h-12 rounded-2xl border-0 font-semibold text-white shadow-[0_18px_40px_rgba(16,185,129,0.22)]",
+                          activePreparedBulkReport
+                            ? "bg-emerald-500 hover:bg-emerald-400"
+                            : "bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400",
+                        )}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            Hazırlanıyor...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="mr-2 h-5 w-5" />
+                            {activePreparedBulkReport ? "Hazır DÖF'ü İndir" : "DÖF'ü Hazırla ve İndir"}
+                          </>
+                        )}
                       </Button>
                     ) : null}
                     {createMode === "single" || editingEntryId ? (
