@@ -343,14 +343,15 @@ export const readStoredBulkCapaDraft = () => {
 
 export const sanitizeBulkCapaDraftForLocalStorage = (
   snapshot: BulkCAPADraftSnapshot,
+  options: { preserveLogoDataUrls?: boolean } = {},
 ): BulkCAPADraftSnapshot => ({
   ...snapshot,
   generalInfo: {
     ...snapshot.generalInfo,
-    company_logo_url: snapshot.generalInfo.company_logo_url?.startsWith("data:")
+    company_logo_url: !options.preserveLogoDataUrls && snapshot.generalInfo.company_logo_url?.startsWith("data:")
       ? null
       : snapshot.generalInfo.company_logo_url,
-    provider_logo_url: snapshot.generalInfo.provider_logo_url?.startsWith("data:")
+    provider_logo_url: !options.preserveLogoDataUrls && snapshot.generalInfo.provider_logo_url?.startsWith("data:")
       ? null
       : snapshot.generalInfo.provider_logo_url,
   },
@@ -2044,6 +2045,7 @@ export function BulkCAPAContent() {
     () => initialDraftSnapshotRef.current?.bulkSourceImages || [],
   );
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkPhotoAnalysisMode, setBulkPhotoAnalysisMode] = useState<"individual" | "grouped">("individual");
   const [preparedBulkReport, setPreparedBulkReport] = useState<PreparedBulkCapaReport | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -2275,6 +2277,8 @@ export function BulkCAPAContent() {
       setGeneralInfo((prev) => ({
         ...prev,
         ...parsedDraft.generalInfo,
+        company_logo_url: parsedDraft.generalInfo?.company_logo_url ?? prev.company_logo_url,
+        provider_logo_url: parsedDraft.generalInfo?.provider_logo_url ?? prev.provider_logo_url,
       }));
     }
     if (parsedDraft.newEntry) {
@@ -3677,12 +3681,14 @@ Kurallar:
 - Düz metin üret.
 
 Maddeler:
-${bulkSourceImages
-  .map(
-    (_entry, index) =>
-      `${index + 1}. Fotoğraf ${index + 1} için saha uygunsuzluklarını, risk tanımlarını ve aksiyonları tekil DÖF maddelerine dönüştür.`,
-  )
-  .join("\n\n")}`;
+${bulkPhotoAnalysisMode === "grouped"
+  ? `1. ${bulkSourceImages.length} fotoğraf aynı uygunsuzluğun farklı açıları olarak tek DÖF maddesine dönüştürüldü.`
+  : bulkSourceImages
+      .map(
+        (_entry, index) =>
+          `${index + 1}. Fotoğraf ${index + 1} için saha uygunsuzluklarını, risk tanımlarını ve aksiyonları tekil DÖF maddelerine dönüştür.`,
+      )
+      .join("\n\n")}`;
       const sessionId = await upsertProcessingSession("bulk_generation", {
         createDialogOpen: true,
         createMode: "bulk",
@@ -3702,6 +3708,7 @@ ${bulkSourceImages
           employerRepresentativeName: generalInfo.employer_representative_name,
           observerName: generalInfo.observer_name,
           observerTitle: profileContext?.position || "İş Güvenliği Uzmanı",
+          bulkAnalysisMode: bulkPhotoAnalysisMode,
         },
         draftPayload: buildSessionDraftPayload({
           sessionId,
@@ -5475,12 +5482,55 @@ const handleDownloadPreparedBulkReport = async () => {
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-300">Yeni toplu DÖF akışı</p>
                         <h4 className="mt-2 text-lg font-bold text-white">Fotoğraf yükle, sistem analiz etsin, resmi DÖF dosyan hazır olsun</h4>
                         <p className="mt-2 text-sm leading-6 text-slate-300">
-                          Toplu modda artık maddeleri tek tek yazmanız gerekmiyor. Fotoğrafları yükleyin; sistem her görseli ayrı bulguya çevirsin, toplu DÖF taslağını ve resmi Word çıktısını otomatik hazırlasın.
+                          Toplu modda artık maddeleri tek tek yazmanız gerekmiyor. Fotoğrafları yükleyin; isterseniz her görseli ayrı bulguya, isterseniz aynı ekipman/alan için tek DÖF maddesine dönüştürün.
                         </p>
                       </div>
                       <span className="rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">
                         {bulkSourceImages.length}/{BULK_SOURCE_IMAGE_LIMIT} fotoğraf
                       </span>
+                    </div>
+
+                    <div className="rounded-[22px] border border-white/10 bg-slate-950/35 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-300">Analiz yöntemi</p>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {[
+                          {
+                            value: "individual" as const,
+                            title: "Her fotoğraf ayrı bulgu",
+                            description: "Her görsel için ayrı DÖF satırı oluşturur.",
+                            count: bulkSourceImages.length,
+                          },
+                          {
+                            value: "grouped" as const,
+                            title: "Fotoğrafları tek bulguda grupla",
+                            description: "Aynı eşya/alan farklı açılardan çekildiyse tek DÖF maddesi üretir.",
+                            count: bulkSourceImages.length > 0 ? 1 : 0,
+                          },
+                        ].map((option) => {
+                          const active = bulkPhotoAnalysisMode === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setBulkPhotoAnalysisMode(option.value)}
+                              className={cn(
+                                "rounded-2xl border p-4 text-left transition",
+                                active
+                                  ? "border-emerald-300/60 bg-emerald-500/15 text-white shadow-[0_16px_36px_rgba(16,185,129,0.16)]"
+                                  : "border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:bg-white/10",
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="text-sm font-bold">{option.title}</span>
+                                <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold", active ? "bg-emerald-400/20 text-emerald-100" : "bg-white/10 text-slate-300")}>
+                                  {option.count} madde
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs leading-5 text-slate-300">{option.description}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div
@@ -5499,7 +5549,7 @@ const handleDownloadPreparedBulkReport = async () => {
                       </div>
                       <p className="mt-4 text-base font-semibold text-white">Toplu DÖF için fotoğraf yükle</p>
                       <p className="mt-2 text-sm text-slate-300">
-                        Aynı saha turuna ait görselleri bırakın veya seçin. Sistem her fotoğrafı ayrı uygunsuzluk maddesi olarak analiz edecektir.
+                        Aynı saha turuna ait görselleri bırakın veya seçin. Analiz yöntemi seçiminize göre fotoğraflar ayrı ya da gruplu değerlendirilecektir.
                       </p>
                       <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
                         <Button type="button" variant="outline" onClick={() => bulkFileInputRef.current?.click()} className="border-white/15 bg-white/5 text-slate-100 hover:bg-white/10">

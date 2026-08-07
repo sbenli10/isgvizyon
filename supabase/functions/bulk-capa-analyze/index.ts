@@ -49,6 +49,7 @@ interface SessionJobContext {
   employerRepresentativeName?: string | null;
   observerName?: string | null;
   observerTitle?: string | null;
+  bulkAnalysisMode?: "individual" | "grouped";
 }
 
 interface SessionJobDraftPayload {
@@ -82,6 +83,29 @@ JSON formatı tam olarak böyle:
   "preventiveAction": "- madde 1\\n- madde 2",
   "importance_level": "Orta"
 }`;
+
+function buildGroupedBulkPrompt(imageCount: number) {
+  return `Lutfen bir is sagligi ve guvenligi uzmani gibi davran ve gonderilen ${imageCount} GORSELİN TAMAMINI tek tek incele.
+Bu gorseller ayni saha turuna veya ayni uygunsuzluk grubuna ait olabilir. Fotograflari ayri ayri DOF maddelerine bolme; tum gorsellerdeki tespitleri tek ve birlesik DOF maddesinde topla.
+
+Kurallar:
+- Analiz ciktisi SADECE gecerli ve tek bir JSON nesnesinden olusmali, ciktinin ilk karakteri { olmali.
+- ASLA herhangi bir aciklama, aciklayici cumle veya markdown etiketi ekleme.
+- Her gorselin onunde "GORSEL 1/4" gibi etiket bulunacak. Bu etiketleri takip et ve hicbir gorseli atlama.
+- description alaninda tum gorsellerden gelen tespitleri birlestir. En azindan "Gorsel 1", "Gorsel 2" seklinde tum gorsellere temas et.
+- riskDefinition alaninda tum gorsellerin ortak ve farkli risklerini birlikte degerlendir.
+- correctiveAction alaninda tum gorsellerdeki uygunsuzluklari kapatacak uygulanabilir aksiyonlari yaz.
+- Cevabin tamami saf JSON olacak ve basinda ya da sonunda fazladan karakter bulunmayacak.
+
+JSON formati tam olarak boyle:
+{
+  "description": "birlesik bulgu ozeti",
+  "riskDefinition": "birlesik risk ozeti",
+  "correctiveAction": "- madde 1\\n- madde 2",
+  "preventiveAction": "- madde 1\\n- madde 2",
+  "importance_level": "Orta"
+}`;
+}
 
 function getApproxPayloadSize(images: string[], prompt: string) {
   return images.reduce((total, image) => total + image.length, prompt.length);
@@ -137,9 +161,14 @@ async function runBulkCapaAnalysis(images: string[], prompt?: string, forceJson 
   const modelCandidates = [model, ...getGoogleModelChain("lite")].filter((m, i, l) => m && l.indexOf(m) === i);
   const effectivePrompt = prompt?.trim() || DEFAULT_PROMPT;
 
+  const imageParts = images.flatMap((img, index) => [
+    { text: `GORSEL ${index + 1}/${images.length}` },
+    toInlineDataPart(parseImageInput(img)),
+  ]);
+
   const parts = [
     { text: effectivePrompt },
-    ...images.map((img) => toInlineDataPart(parseImageInput(img))),
+    ...imageParts,
   ];
 
   const generationConfig: Record<string, any> = {
@@ -180,13 +209,19 @@ function getSuggestedTerminDate(importanceLevel: string) {
 }
 function buildBulkEntryFromAnalysis(
   analysis: BulkCapaAnalysis,
-  imageUrl: string,
+  imageUrls: string[],
   index: number,
   context: SessionJobContext,
 ): BulkCapaGeneratedEntry {
+  const description = coerceText(analysis.description).trim();
+  const groupedEvidenceNote =
+    imageUrls.length > 1
+      ? `\n\nFotoğraf kanıtı: Bu DÖF maddesi ${imageUrls.length} görselin birlikte değerlendirilmesiyle oluşturulmuştur.`
+      : "";
+
   return {
     id: `bulk-ai-${Date.now()}-${index}`,
-    description: coerceText(analysis.description).trim(),
+    description: `${description}${groupedEvidenceNote}`.trim(),
     riskDefinition: coerceText(analysis.riskDefinition).trim(),
     correctiveAction: coerceText(analysis.correctiveAction).trim(),
     preventiveAction: coerceText(analysis.preventiveAction).trim(),
@@ -207,7 +242,7 @@ function buildBulkEntryFromAnalysis(
     approver_name: context.observerName?.trim() || "",
     approver_title: context.observerTitle?.trim() || "İş Güvenliği Uzmanı",
     include_stamp: true,
-    media_urls: [imageUrl],
+    media_urls: imageUrls,
     ai_analyzed: true,
   };
 }
@@ -364,11 +399,20 @@ Deno.serve(async (req) => {
       if (jobType === "bulk_generation") {
         const context = body.context || {};
         const generatedEntries: BulkCapaGeneratedEntry[] = [];
-        for (let index = 0; index < images.length; index += 1) {
-          const imageUrl = images[index];
-          const { analysis } = await runBulkCapaAnalysis([imageUrl]);
-          if (!analysis) continue;
-          generatedEntries.push(buildBulkEntryFromAnalysis(analysis, imageUrl, index, context));
+        const analysisMode = context.bulkAnalysisMode === "grouped" ? "grouped" : "individual";
+
+        if (analysisMode === "grouped") {
+          const { analysis } = await runBulkCapaAnalysis(images, buildGroupedBulkPrompt(images.length));
+          if (analysis) {
+            generatedEntries.push(buildBulkEntryFromAnalysis(analysis, images, 0, context));
+          }
+        } else {
+          for (let index = 0; index < images.length; index += 1) {
+            const imageUrl = images[index];
+            const { analysis } = await runBulkCapaAnalysis([imageUrl]);
+            if (!analysis) continue;
+            generatedEntries.push(buildBulkEntryFromAnalysis(analysis, [imageUrl], index, context));
+          }
         }
 
         if (generatedEntries.length === 0) {
@@ -428,7 +472,7 @@ ${generatedEntries
           approver_name: entry.approver_name || null,
           approver_title: entry.approver_title || null,
           include_stamp: entry.include_stamp,
-          media_urls: [],
+          media_urls: entry.media_urls || [],
           ai_analyzed: entry.ai_analyzed,
         }));
         const { error: entriesError } = await serviceSupabase.from("bulk_capa_entries").insert(entriesPayload);

@@ -115,8 +115,25 @@ const inferDocxImageType = (value?: string | null): DocxImageKind => {
   return "png";
 };
 
+const decodeDataUrl = (value: string) => {
+  const match = value.match(/^data:[^;]+;base64,(.+)$/);
+  if (!match) return null;
+  const binary = atob(match[1]);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+};
+
 const fetchImageBytes = async (url: string) => {
   try {
+    if (url.startsWith("data:")) {
+      const decoded = decodeDataUrl(url);
+      if (!decoded) throw new Error("Invalid data URL image");
+      return decoded;
+    }
+
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
     return new Uint8Array(await response.arrayBuffer());
@@ -466,9 +483,80 @@ export async function generateBulkCapaOfficialDocx(input: BulkCapaOfficialDocxIn
     ],
   });
 
+  const buildCoverLogoTable = () =>
+    new Table({
+      width: FULL_WIDTH,
+      layout: TableLayoutType.FIXED,
+      borders: {
+        top: { color: "FFFFFF", style: "none", size: 0 },
+        bottom: { color: "FFFFFF", style: "none", size: 0 },
+        left: { color: "FFFFFF", style: "none", size: 0 },
+        right: { color: "FFFFFF", style: "none", size: 0 },
+        insideHorizontal: { color: "FFFFFF", style: "none", size: 0 },
+        insideVertical: { color: "FFFFFF", style: "none", size: 0 },
+      },
+      rows: [
+        new TableRow({
+          children: [
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              margins: createCellMargins(60),
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.LEFT,
+                  children: [new TextRun({ text: "Hizmet Alan Firma", color: MUTED, size: 13 })],
+                }),
+                ...(companyLogoBytes
+                  ? [
+                      new Paragraph({
+                        alignment: AlignmentType.LEFT,
+                        spacing: { before: 40 },
+                        children: [
+                          new ImageRun({
+                            data: companyLogoBytes,
+                            type: inferDocxImageType(companyLogoSource),
+                            transformation: { width: 90, height: 56 },
+                          }),
+                        ],
+                      }),
+                    ]
+                  : [new Paragraph({ children: [new TextRun({ text: effectiveCompanyName, bold: true, color: HEADER_BLUE, size: 16 })] })]),
+              ],
+            }),
+            new TableCell({
+              width: { size: 50, type: WidthType.PERCENTAGE },
+              margins: createCellMargins(60),
+              children: [
+                new Paragraph({
+                  alignment: AlignmentType.RIGHT,
+                  children: [new TextRun({ text: "Hizmet Veren Firma", color: MUTED, size: 13 })],
+                }),
+                ...(providerLogoBytes
+                  ? [
+                      new Paragraph({
+                        alignment: AlignmentType.RIGHT,
+                        spacing: { before: 40 },
+                        children: [
+                          new ImageRun({
+                            data: providerLogoBytes,
+                            type: inferDocxImageType(generalInfo.providerLogoUrl || orgData?.logo_url),
+                            transformation: { width: 90, height: 56 },
+                          }),
+                        ],
+                      }),
+                    ]
+                  : [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: safeText(orgData?.name, ""), bold: true, color: HEADER_BLUE, size: 16 })] })]),
+              ],
+            }),
+          ],
+        }),
+      ],
+    });
+
   const reportChildren: any[] = [];
 
   reportChildren.push(
+    buildCoverLogoTable(),
     new Paragraph({ spacing: { after: 120 }, children: [new TextRun("")] }),
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -485,6 +573,7 @@ export async function generateBulkCapaOfficialDocx(input: BulkCapaOfficialDocxIn
       children: [new TextRun("")],
     }),
     metaTable,
+    new Paragraph({ children: [new PageBreak()] }),
   );
 
   entries.forEach((entry, index) => {
@@ -493,8 +582,6 @@ export async function generateBulkCapaOfficialDocx(input: BulkCapaOfficialDocxIn
 
     if (index > 0) {
       reportChildren.push(new Paragraph({ children: [new PageBreak()] }));
-    } else {
-      reportChildren.push(new Paragraph({ spacing: { after: 140 }, children: [new TextRun("")] }));
     }
 
     if (relatedPhotos.length > 0) {

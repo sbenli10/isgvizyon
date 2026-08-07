@@ -24,6 +24,7 @@ export interface BulkCapaSessionJobContext {
   employerRepresentativeName?: string | null;
   observerName?: string | null;
   observerTitle?: string | null;
+  bulkAnalysisMode?: "individual" | "grouped";
 }
 
 interface BulkCapaSessionJobResponse {

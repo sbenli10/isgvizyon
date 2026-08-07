@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   Archive,
@@ -35,6 +35,7 @@ import { ProfileSettingsTab } from "@/components/profile/ProfileSettingsTab";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import { startOsgbDemoSubscription } from "@/lib/demoSubscription";
+import { supabase } from "@/integrations/supabase/client";
 
 const PROFILE_TABS: ProfileTabConfig[] = [
   { id: "overview", label: "Genel Bakış", icon: LayoutGrid },
@@ -59,6 +60,7 @@ export default function Profile() {
   const { loading: subscriptionLoading, demoState, isPaidSubscriptionActive, refetch: refetchSubscription } = useSubscription();
   const [confirmDemoOpen, setConfirmDemoOpen] = useState(false);
   const [startingDemo, setStartingDemo] = useState(false);
+  const [demoDurationDays, setDemoDurationDays] = useState(30);
   const activeTab = useMemo<ProfileTab>(() => {
     const tab = searchParams.get("tab") as ProfileTab | null;
     return tab && tabIds.has(tab) ? tab : "overview";
@@ -77,8 +79,33 @@ export default function Profile() {
       return "Demo Süresi Doldu";
     }
 
-    return "30 Günlük Demo Üyelik Başlat";
-  }, [demoState.daysLeft, demoState.hasDemo, demoState.hasExpired, demoState.isActive, startingDemo]);
+    return `${demoDurationDays} Günlük Demo Üyelik Başlat`;
+  }, [demoDurationDays, demoState.daysLeft, demoState.hasDemo, demoState.hasExpired, demoState.isActive, startingDemo]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadDemoDuration() {
+      const { data, error } = await (supabase as any)
+        .from("platform_runtime_settings")
+        .select("setting_value")
+        .eq("setting_key", "osgb_demo")
+        .maybeSingle();
+
+      if (error || !isMounted) return;
+
+      const value = (data?.setting_value && typeof data.setting_value === "object" ? data.setting_value : {}) as Record<string, unknown>;
+      const duration = Number(value.duration_days ?? 30);
+      if (Number.isFinite(duration) && duration > 0) {
+        setDemoDurationDays(Math.round(duration));
+      }
+    }
+
+    void loadDemoDuration();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const showDemoStartButton = !subscriptionLoading && !isPaidSubscriptionActive && !demoState.hasDemo;
   const showDemoStatusBadge = !subscriptionLoading && !isPaidSubscriptionActive && demoState.hasDemo;
@@ -100,7 +127,7 @@ export default function Profile() {
     try {
       await startOsgbDemoSubscription(user.id, profile?.organization_id ?? null);
       await refetchSubscription();
-      toast.success("Demo üyeliğiniz başlatıldı. 30 gün boyunca tüm özellikleri kullanabilirsiniz.");
+      toast.success(`Demo üyeliğiniz başlatıldı. ${demoDurationDays} gün boyunca tüm özellikleri kullanabilirsiniz.`);
       setConfirmDemoOpen(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Demo üyelik başlatılamadı.";
@@ -234,9 +261,9 @@ export default function Profile() {
       <Dialog open={confirmDemoOpen} onOpenChange={setConfirmDemoOpen}>
         <DialogContent className="border-slate-800 bg-slate-950 text-white sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>30 Günlük OSGB Demo Üyeliği Başlatılsın mı?</DialogTitle>
+            <DialogTitle>{demoDurationDays} Günlük OSGB Demo Üyeliği Başlatılsın mı?</DialogTitle>
             <DialogDescription className="text-slate-300">
-              Demo süresince OSGB modülü ve platform özelliklerini 30 gün boyunca kullanabilirsiniz. Bu hak yalnızca bir kez kullanılabilir.
+              Demo süresince OSGB modülü ve platform özelliklerini {demoDurationDays} gün boyunca kullanabilirsiniz. Bu hak yalnızca bir kez kullanılabilir.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

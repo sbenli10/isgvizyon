@@ -24,6 +24,15 @@ type PlanPriceRow = {
 
 type PlanPriceMap = Record<string, { price: number; currency: string; billingPeriod: string }>;
 
+type PlanComparisonRowRecord = {
+  feature_key?: string | null;
+  feature_label?: string | null;
+  free_value?: string | null;
+  premium_value?: string | null;
+  osgb_value?: string | null;
+  sort_order?: number | null;
+};
+
 const planAccent = {
   Ücretsiz: {
     icon: ShieldCheck,
@@ -158,8 +167,22 @@ function ComparisonPill({ value }: { value: PricingComparisonValue }) {
   );
 }
 
-function getPlanValues(planTitle: PricingPlan["title"]) {
-  return pricingComparisonRows.map((row) => ({
+function normalizePlanComparisonRows(payload: unknown): typeof pricingComparisonRows {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item) => item as PlanComparisonRowRecord)
+    .filter((item) => Boolean(item.feature_label))
+    .sort((a, b) => Number(a.sort_order ?? 0) - Number(b.sort_order ?? 0))
+    .map((item) => ({
+      feature: String(item.feature_label || ""),
+      free: String(item.free_value || "Yok"),
+      premium: String(item.premium_value || "Yok"),
+      osgb: String(item.osgb_value || "Yok"),
+    }));
+}
+
+function getPlanValues(planTitle: PricingPlan["title"], rows: typeof pricingComparisonRows) {
+  return rows.map((row) => ({
     label: row.feature,
     value: planTitle === "Ücretsiz" ? row.free : planTitle === "Premium" ? row.premium : row.osgb,
   }));
@@ -168,35 +191,50 @@ function getPlanValues(planTitle: PricingPlan["title"]) {
 export default function LandingPricing() {
   const navigate = useNavigate();
   const [planPrices, setPlanPrices] = useState<PlanPriceMap>({});
+  const [comparisonRows, setComparisonRows] = useState<typeof pricingComparisonRows>(pricingComparisonRows);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadPublicPlanPrices() {
-      const { data, error } = await (supabase as any)
-        .from("subscription_plans")
-        .select("plan_code, code, price, currency, billing_period")
-        .eq("is_active", true)
-        .in("plan_code", ["free", "premium", "osgb"]);
+    async function loadPublicPlanData() {
+      const [{ data: pricesData, error: pricesError }, { data: rowsData, error: rowsError }] = await Promise.all([
+        (supabase as any)
+          .from("subscription_plans")
+          .select("plan_code, code, price, currency, billing_period")
+          .eq("is_active", true)
+          .in("plan_code", ["free", "premium", "osgb"]),
+        (supabase as any)
+          .from("platform_plan_comparison_rows")
+          .select("feature_key,feature_label,free_value,premium_value,osgb_value,sort_order")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+      ]);
 
-      if (error || !isMounted) return;
+      if (!isMounted) return;
 
       const nextPrices: PlanPriceMap = {};
-      for (const row of (data ?? []) as PlanPriceRow[]) {
-        const code = row.plan_code ?? row.code;
-        const numericPrice = typeof row.price === "string" ? Number(row.price) : row.price;
-        if (!code || numericPrice === null || Number.isNaN(numericPrice)) continue;
-        nextPrices[code] = {
-          price: numericPrice,
-          currency: row.currency ?? "TRY",
-          billingPeriod: row.billing_period ?? "monthly",
-        };
+      if (!pricesError) {
+        for (const row of (pricesData ?? []) as PlanPriceRow[]) {
+          const code = row.plan_code ?? row.code;
+          const numericPrice = typeof row.price === "string" ? Number(row.price) : row.price;
+          if (!code || numericPrice === null || Number.isNaN(numericPrice)) continue;
+          nextPrices[code] = {
+            price: numericPrice,
+            currency: row.currency ?? "TRY",
+            billingPeriod: row.billing_period ?? "monthly",
+          };
+        }
       }
 
       setPlanPrices(nextPrices);
+
+      if (!rowsError) {
+        const nextRows = normalizePlanComparisonRows(rowsData);
+        if (nextRows.length) setComparisonRows(nextRows);
+      }
     }
 
-    void loadPublicPlanPrices();
+    void loadPublicPlanData();
     return () => {
       isMounted = false;
     };
@@ -237,7 +275,7 @@ export default function LandingPricing() {
           const featured = plan.title === "OSGB";
           const accent = planAccent[plan.title];
           const Icon = accent.icon;
-          const featureValues = getPlanValues(plan.title).slice(0, 8);
+          const featureValues = getPlanValues(plan.title, comparisonRows).slice(0, 8);
 
           return (
             <article
@@ -359,7 +397,7 @@ export default function LandingPricing() {
           </div>
 
           <div className="divide-y divide-slate-200">
-            {pricingComparisonRows.map((row) => (
+            {comparisonRows.map((row) => (
               <div key={row.feature} className="grid gap-4 bg-white px-5 py-5 md:grid-cols-[1.5fr_1fr_1fr_1fr] md:items-center">
                 <div className="text-sm font-bold text-slate-950">{row.feature}</div>
                 <div className="flex items-center justify-between gap-3 md:block">

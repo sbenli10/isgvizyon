@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   Loader2,
   MessageCircle,
+  Plus,
   RefreshCw,
   Save,
   Search,
@@ -142,6 +143,23 @@ type PlanPriceFormState = Record<
   }
 >;
 
+type DemoSettingsForm = {
+  duration_days: string;
+  title: string;
+  description: string;
+};
+
+type PlatformPlanComparisonFormRow = {
+  id?: string | null;
+  feature_key: string;
+  feature_label: string;
+  free_value: string;
+  premium_value: string;
+  osgb_value: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
 const emptyOverview: PlatformOverview = {
   users: { total: 0, today_signups: 0, today_logins: 0, active: 0, platform_admins: 0 },
   jobs: { pending_posts: 0, approved_posts: 0, pending_comments: 0 },
@@ -218,6 +236,35 @@ function normalizePlanPrices(payload: unknown): PlatformPlanPrice[] {
       is_active: item.is_active ?? true,
       updated_at: item.updated_at ?? null,
     }));
+}
+
+function normalizeDemoSettings(payload: unknown): DemoSettingsForm {
+  const source = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  return {
+    duration_days: String(Number(source.duration_days ?? 30) || 30),
+    title: String(source.title || "OSGB Demo Üyelik"),
+    description: String(source.description || "Demo süresince OSGB modülü ve platform özellikleri kullanılabilir."),
+  };
+}
+
+function normalizePlanComparisonRows(payload: unknown): PlatformPlanComparisonFormRow[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item, index) => {
+      const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+      const featureKey = String(row.feature_key || row.featureKey || `custom.${index + 1}`);
+      return {
+        id: row.id ? String(row.id) : null,
+        feature_key: featureKey,
+        feature_label: String(row.feature_label || row.featureLabel || featureKey),
+        free_value: String(row.free_value || row.freeValue || "Yok"),
+        premium_value: String(row.premium_value || row.premiumValue || "Yok"),
+        osgb_value: String(row.osgb_value || row.osgbValue || "Yok"),
+        sort_order: Number(row.sort_order ?? row.sortOrder ?? (index + 1) * 10),
+        is_active: row.is_active !== false,
+      };
+    })
+    .sort((a, b) => a.sort_order - b.sort_order);
 }
 
 function planDisplayName(plan: PlatformPlanPrice) {
@@ -317,6 +364,12 @@ export default function PlatformAdmin() {
   const [pricingActionId, setPricingActionId] = useState<string | null>(null);
   const [planPrices, setPlanPrices] = useState<PlatformPlanPrice[]>([]);
   const [planPriceForms, setPlanPriceForms] = useState<PlanPriceFormState>({});
+  const [demoSettings, setDemoSettings] = useState<DemoSettingsForm>({
+    duration_days: "30",
+    title: "OSGB Demo Üyelik",
+    description: "Demo süresince OSGB modülü ve platform özellikleri kullanılabilir.",
+  });
+  const [planComparisonRows, setPlanComparisonRows] = useState<PlatformPlanComparisonFormRow[]>([]);
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [adminSession] = useState(() => hasPlatformAdminSession());
@@ -375,7 +428,10 @@ export default function PlatformAdmin() {
     setPricingBusy(true);
 
     try {
-      const { data, error } = await (supabase as any).rpc("get_platform_admin_plan_prices");
+      const [{ data, error }, { data: configData, error: configError }] = await Promise.all([
+        (supabase as any).rpc("get_platform_admin_plan_prices"),
+        (supabase as any).rpc("get_platform_admin_plan_configuration"),
+      ]);
       if (error) throw error;
 
       const rows = normalizePlanPrices(data);
@@ -393,6 +449,14 @@ export default function PlatformAdmin() {
           return acc;
         }, {}),
       );
+
+      if (!configError) {
+        const config = (configData && typeof configData === "object" ? configData : {}) as Record<string, unknown>;
+        setDemoSettings(normalizeDemoSettings(config.demo));
+        setPlanComparisonRows(normalizePlanComparisonRows(config.comparisonRows));
+      } else {
+        console.warn("Platform plan configuration could not be loaded:", configError);
+      }
     } catch (error) {
       console.error("Platform plan prices could not be loaded:", error);
       toast.error("Paket fiyatları yüklenemedi.");
@@ -576,6 +640,86 @@ export default function PlatformAdmin() {
     } catch (error) {
       console.error("Platform plan price update failed:", error);
       toast.error("Paket fiyatı güncellenemedi.");
+    } finally {
+      setPricingActionId(null);
+    }
+  };
+
+  const updatePlanComparisonRow = (index: number, patch: Partial<PlatformPlanComparisonFormRow>) => {
+    setPlanComparisonRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  };
+
+  const addPlanComparisonRow = () => {
+    const lastRow = planComparisonRows[planComparisonRows.length - 1];
+    const nextOrder = (lastRow?.sort_order ?? planComparisonRows.length * 10) + 10;
+    setPlanComparisonRows((current) => [
+      ...current,
+      {
+        feature_key: `custom.${Date.now()}`,
+        feature_label: "Yeni özellik",
+        free_value: "Yok",
+        premium_value: "Yok",
+        osgb_value: "Var",
+        sort_order: nextOrder,
+        is_active: true,
+      },
+    ]);
+  };
+
+  const saveDemoSettings = async () => {
+    const durationDays = Number(demoSettings.duration_days);
+
+    if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 365) {
+      toast.error("Demo süresi 1 ile 365 gün arasında olmalıdır.");
+      return;
+    }
+
+    setPricingActionId("demo-settings");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("update_platform_admin_demo_settings", {
+        p_duration_days: durationDays,
+        p_title: demoSettings.title,
+        p_description: demoSettings.description,
+      });
+
+      if (error) throw error;
+
+      setDemoSettings(normalizeDemoSettings(data));
+      toast.success("Demo plan ayarları güncellendi.");
+    } catch (error) {
+      console.error("Demo settings update failed:", error);
+      toast.error("Demo plan ayarları güncellenemedi.");
+    } finally {
+      setPricingActionId(null);
+    }
+  };
+
+  const savePlanComparisonRows = async () => {
+    const normalizedRows = planComparisonRows.map((row, index) => ({
+      ...row,
+      feature_key: row.feature_key.trim() || `custom.${index + 1}`,
+      feature_label: row.feature_label.trim() || "Yeni özellik",
+      free_value: row.free_value.trim() || "Yok",
+      premium_value: row.premium_value.trim() || "Yok",
+      osgb_value: row.osgb_value.trim() || "Yok",
+      sort_order: (index + 1) * 10,
+    }));
+
+    setPricingActionId("comparison-rows");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("upsert_platform_admin_plan_comparison_rows", {
+        p_rows: normalizedRows,
+      });
+
+      if (error) throw error;
+
+      setPlanComparisonRows(normalizePlanComparisonRows(data));
+      toast.success("Plan karşılaştırma tablosu güncellendi.");
+    } catch (error) {
+      console.error("Plan comparison update failed:", error);
+      toast.error("Plan karşılaştırma tablosu güncellenemedi.");
     } finally {
       setPricingActionId(null);
     }
@@ -1044,6 +1188,121 @@ export default function PlatformAdmin() {
                       </article>
                     );
                   })}
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-[380px_1fr]">
+                  <section className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Demo Planı</p>
+                        <h3 className="mt-1 text-xl font-black text-white">Demo Süresi ve Metni</h3>
+                        <p className="mt-1 text-sm leading-6 text-amber-100/80">
+                          Kullanıcı demo başlattığında bitiş tarihi bu gün sayısına göre hesaplanır.
+                        </p>
+                      </div>
+                      <Clock className="h-5 w-5 text-amber-200" />
+                    </div>
+
+                    <div className="mt-5 grid gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-amber-50">Demo süresi (gün)</Label>
+                        <Input
+                          value={demoSettings.duration_days}
+                          onChange={(event) => setDemoSettings((current) => ({ ...current, duration_days: event.target.value }))}
+                          inputMode="numeric"
+                          className="border-amber-300/25 bg-slate-950/70 text-white"
+                          placeholder="Örn: 30"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-amber-50">Demo başlığı</Label>
+                        <Input
+                          value={demoSettings.title}
+                          onChange={(event) => setDemoSettings((current) => ({ ...current, title: event.target.value }))}
+                          className="border-amber-300/25 bg-slate-950/70 text-white"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-amber-50">Açıklama</Label>
+                        <Textarea
+                          value={demoSettings.description}
+                          onChange={(event) => setDemoSettings((current) => ({ ...current, description: event.target.value }))}
+                          className="min-h-24 border-amber-300/25 bg-slate-950/70 text-white"
+                        />
+                      </div>
+                      <Button onClick={() => void saveDemoSettings()} disabled={pricingActionId === "demo-settings"} className="bg-amber-500 font-black text-slate-950 hover:bg-amber-400">
+                        {pricingActionId === "demo-settings" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Demo Ayarlarını Kaydet
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300">Plan Karşılaştırması</p>
+                        <h3 className="mt-1 text-xl font-black text-white">Limit ve Özellik Tablosu</h3>
+                        <p className="mt-1 text-sm leading-6 text-slate-400">
+                          Bu satırlar fiyatlandırma sayfasındaki plan karşılaştırma tablosunu besler.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" onClick={addPlanComparisonRow} className="bg-cyan-600 hover:bg-cyan-500">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Satır Ekle
+                        </Button>
+                        <Button type="button" onClick={() => void savePlanComparisonRows()} disabled={pricingActionId === "comparison-rows"} className="bg-emerald-600 hover:bg-emerald-500">
+                          {pricingActionId === "comparison-rows" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                          Tabloyu Kaydet
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 max-h-[620px] overflow-auto rounded-2xl border border-slate-800">
+                      <div className="grid min-w-[940px] grid-cols-[1.45fr_1fr_1fr_1fr_110px] gap-0 border-b border-slate-800 bg-slate-950/80 px-3 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                        <div>Özellik</div>
+                        <div>Ücretsiz</div>
+                        <div>Premium</div>
+                        <div>OSGB</div>
+                        <div>Durum</div>
+                      </div>
+                      <div className="min-w-[940px] divide-y divide-slate-800">
+                        {planComparisonRows.map((row, index) => (
+                          <div key={row.feature_key} className="grid grid-cols-[1.45fr_1fr_1fr_1fr_110px] gap-3 bg-slate-950/35 p-3">
+                            <Input
+                              value={row.feature_label}
+                              onChange={(event) => updatePlanComparisonRow(index, { feature_label: event.target.value })}
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                            />
+                            <Input
+                              value={row.free_value}
+                              onChange={(event) => updatePlanComparisonRow(index, { free_value: event.target.value })}
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                            />
+                            <Input
+                              value={row.premium_value}
+                              onChange={(event) => updatePlanComparisonRow(index, { premium_value: event.target.value })}
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                            />
+                            <Input
+                              value={row.osgb_value}
+                              onChange={(event) => updatePlanComparisonRow(index, { osgb_value: event.target.value })}
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                            />
+                            <label className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-xs font-bold text-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={row.is_active}
+                                onChange={(event) => updatePlanComparisonRow(index, { is_active: event.target.checked })}
+                                className="h-4 w-4 accent-emerald-500"
+                              />
+                              Aktif
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
                 </div>
 
                 {!pricingBusy && planPrices.length === 0 ? (
