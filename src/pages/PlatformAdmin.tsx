@@ -15,12 +15,15 @@ import {
   Eye,
   LayoutDashboard,
   Loader2,
+  KeyRound,
   MessageCircle,
   Plus,
   RefreshCw,
   Save,
+  ScrollText,
   Search,
   Send,
+  Settings,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -40,7 +43,7 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type JobStatus = "pending" | "approved" | "rejected" | "archived";
-type AdminView = "overview" | "users" | "activity" | "modules" | "pricing" | "moderation" | "announcements";
+type AdminView = "overview" | "users" | "activity" | "modules" | "pricing" | "security" | "system" | "audit" | "moderation" | "announcements";
 
 type JobPost = {
   id: string;
@@ -160,6 +163,29 @@ type PlatformPlanComparisonFormRow = {
   is_active: boolean;
 };
 
+type PlatformAdminSecuritySettings = {
+  guard_enabled: boolean;
+  guard_configured: boolean;
+  session_ttl_minutes: string;
+  maintenance_mode: boolean;
+  registration_enabled: boolean;
+  job_moderation_required: boolean;
+  readonly_mode: boolean;
+  support_email: string;
+  platform_notice: string;
+  notice_enabled: boolean;
+};
+
+type PlatformAdminAuditLog = {
+  id: string;
+  admin_email: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string | null;
+};
+
 const emptyOverview: PlatformOverview = {
   users: { total: 0, today_signups: 0, today_logins: 0, active: 0, platform_admins: 0 },
   jobs: { pending_posts: 0, approved_posts: 0, pending_comments: 0 },
@@ -168,6 +194,19 @@ const emptyOverview: PlatformOverview = {
   daily_logins: [],
   latest_users: [],
   alerts: [],
+};
+
+const defaultSecuritySettings: PlatformAdminSecuritySettings = {
+  guard_enabled: false,
+  guard_configured: false,
+  session_ttl_minutes: "45",
+  maintenance_mode: false,
+  registration_enabled: true,
+  job_moderation_required: true,
+  readonly_mode: false,
+  support_email: "",
+  platform_notice: "",
+  notice_enabled: false,
 };
 
 const statusLabels: Record<JobStatus, string> = {
@@ -195,6 +234,9 @@ const adminViews: Array<{
   { id: "activity", label: "Üye Hareketleri", description: "Seçili kullanıcının kayıtları", icon: Activity },
   { id: "modules", label: "Modüller", description: "Ürün kullanım metrikleri", icon: BarChart3 },
   { id: "pricing", label: "Fiyatlar", description: "Paket tutarlarını yönet", icon: CreditCard },
+  { id: "security", label: "Güvenlik", description: "Gizli koruma ve erişim", icon: KeyRound },
+  { id: "system", label: "Sistem Ayarları", description: "Bakım, duyuru ve kayıt", icon: Settings },
+  { id: "audit", label: "Denetim Kaydı", description: "Admin işlem izi", icon: ScrollText },
   { id: "moderation", label: "İlan Yönetimi", description: "Onay, ret ve yorumlar", icon: BriefcaseBusiness },
   { id: "announcements", label: "Duyuru", description: "Platform bildirimi yayınla", icon: Bell },
 ];
@@ -265,6 +307,38 @@ function normalizePlanComparisonRows(payload: unknown): PlatformPlanComparisonFo
       };
     })
     .sort((a, b) => a.sort_order - b.sort_order);
+}
+
+function normalizeSecuritySettings(payload: unknown): PlatformAdminSecuritySettings {
+  const source = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
+  return {
+    guard_enabled: source.guard_enabled === true,
+    guard_configured: source.guard_configured === true,
+    session_ttl_minutes: String(Number(source.session_ttl_minutes ?? 45) || 45),
+    maintenance_mode: source.maintenance_mode === true,
+    registration_enabled: source.registration_enabled !== false,
+    job_moderation_required: source.job_moderation_required !== false,
+    readonly_mode: source.readonly_mode === true,
+    support_email: String(source.support_email || ""),
+    platform_notice: String(source.platform_notice || ""),
+    notice_enabled: source.notice_enabled === true,
+  };
+}
+
+function normalizeAuditLogs(payload: unknown): PlatformAdminAuditLog[] {
+  if (!Array.isArray(payload)) return [];
+  return payload.map((item) => {
+    const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    return {
+      id: String(row.id || crypto.randomUUID()),
+      admin_email: row.admin_email ? String(row.admin_email) : null,
+      action: String(row.action || "admin_action"),
+      target_type: row.target_type ? String(row.target_type) : null,
+      target_id: row.target_id ? String(row.target_id) : null,
+      metadata: row.metadata && typeof row.metadata === "object" ? (row.metadata as Record<string, unknown>) : null,
+      created_at: row.created_at ? String(row.created_at) : null,
+    };
+  });
 }
 
 function planDisplayName(plan: PlatformPlanPrice) {
@@ -370,11 +444,17 @@ export default function PlatformAdmin() {
     description: "Demo süresince OSGB modülü ve platform özellikleri kullanılabilir.",
   });
   const [planComparisonRows, setPlanComparisonRows] = useState<PlatformPlanComparisonFormRow[]>([]);
+  const [securitySettings, setSecuritySettings] = useState<PlatformAdminSecuritySettings>(defaultSecuritySettings);
+  const [auditLogs, setAuditLogs] = useState<PlatformAdminAuditLog[]>([]);
+  const [guardPhrase, setGuardPhrase] = useState("");
+  const [newGuardPhrase, setNewGuardPhrase] = useState("");
+  const [guardVerified, setGuardVerified] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem("isgvizyon-admin-guard-verified") === "true");
   const [announcementTitle, setAnnouncementTitle] = useState("");
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [adminSession] = useState(() => hasPlatformAdminSession());
 
   const canManage = isPlatformAdmin(profile) && adminSession;
+  const guardRequired = securitySettings.guard_enabled && !guardVerified;
 
   const counts = useMemo(() => {
     return posts.reduce(
@@ -423,8 +503,27 @@ export default function PlatformAdmin() {
     }
   };
 
+  const loadSecurityData = async () => {
+    if (!canManage) return defaultSecuritySettings;
+
+    try {
+      const { data, error } = await (supabase as any).rpc("get_platform_admin_security_state");
+      if (error) throw error;
+
+      const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+      const nextSettings = normalizeSecuritySettings(payload.settings);
+      setSecuritySettings(nextSettings);
+      setAuditLogs(normalizeAuditLogs(payload.auditLogs));
+      return nextSettings;
+    } catch (error) {
+      console.error("Platform admin security state could not be loaded:", error);
+      toast.error("Admin güvenlik ayarları yüklenemedi.");
+      return defaultSecuritySettings;
+    }
+  };
+
   const loadPricingData = async () => {
-    if (!canManage) return;
+    if (!canManage || guardRequired) return;
     setPricingBusy(true);
 
     try {
@@ -470,6 +569,12 @@ export default function PlatformAdmin() {
     setBusy(true);
 
     try {
+      const security = await loadSecurityData();
+      if (security.guard_enabled && !guardVerified) {
+        setBusy(false);
+        return;
+      }
+
       const [{ data: overviewData, error: overviewError }, { data: postsData, error: postsError }, { data: commentsData, error: commentsError }] = await Promise.all([
         (supabase as any).rpc("get_platform_admin_overview"),
         (supabase as any)
@@ -725,6 +830,81 @@ export default function PlatformAdmin() {
     }
   };
 
+  const verifyAdminGuard = async () => {
+    if (!guardPhrase.trim()) {
+      toast.error("Gizli yönetim anahtarını yazın.");
+      return;
+    }
+
+    setActionId("verify-admin-guard");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("verify_platform_admin_guard", {
+        p_guard_phrase: guardPhrase,
+      });
+
+      if (error) throw error;
+
+      const verified = Boolean((data as { verified?: boolean } | null)?.verified);
+      if (!verified) {
+        toast.error("Gizli yönetim anahtarı doğrulanamadı.");
+        return;
+      }
+
+      setGuardPhrase("");
+      setGuardVerified(true);
+      window.sessionStorage.setItem("isgvizyon-admin-guard-verified", "true");
+      toast.success("Gizli koruma doğrulandı.");
+      await loadPlatformData();
+    } catch (error) {
+      console.error("Admin guard verification failed:", error);
+      toast.error("Gizli yönetim anahtarı doğrulanamadı.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const saveSecuritySettings = async () => {
+    const ttl = Number(securitySettings.session_ttl_minutes);
+    if (!Number.isFinite(ttl) || ttl < 10 || ttl > 480) {
+      toast.error("Oturum süresi 10 ile 480 dakika arasında olmalıdır.");
+      return;
+    }
+
+    if (securitySettings.guard_enabled && !securitySettings.guard_configured && !newGuardPhrase.trim()) {
+      toast.error("Gizli korumayı etkinleştirmek için önce anahtar belirleyin.");
+      return;
+    }
+
+    setActionId("save-security-settings");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("update_platform_admin_security_settings", {
+        p_settings: {
+          ...securitySettings,
+          session_ttl_minutes: ttl,
+        },
+        p_new_guard_phrase: newGuardPhrase.trim() || null,
+      });
+
+      if (error) throw error;
+
+      setSecuritySettings(normalizeSecuritySettings(data));
+      setNewGuardPhrase("");
+      if (!securitySettings.guard_enabled) {
+        setGuardVerified(false);
+        window.sessionStorage.removeItem("isgvizyon-admin-guard-verified");
+      }
+      toast.success("Admin güvenlik ve sistem ayarları kaydedildi.");
+      await loadSecurityData();
+    } catch (error) {
+      console.error("Admin security settings update failed:", error);
+      toast.error("Admin ayarları kaydedilemedi.");
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const renderPosts = (status: JobStatus) => {
     const filtered = posts.filter((post) => post.status === status);
 
@@ -893,6 +1073,42 @@ export default function PlatformAdmin() {
               </div>
             </section>
 
+            {guardRequired ? (
+              <section className="rounded-[28px] border border-amber-400/30 bg-amber-500/10 p-6 shadow-2xl shadow-black/20">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-200 ring-1 ring-amber-300/20">
+                      <KeyRound className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-200">Gizli Koruma Aktif</p>
+                      <h2 className="mt-1 text-2xl font-black text-white">Platform yönetimi için ek anahtar gerekli</h2>
+                      <p className="mt-2 max-w-2xl text-sm leading-6 text-amber-100/80">
+                        Bu panelde üyeler, fiyatlar, sistem ayarları ve operasyon kayıtları yönetildiği için ikinci bir koruma katmanı etkinleştirilmiş.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="w-full max-w-md rounded-2xl border border-amber-300/20 bg-slate-950/60 p-4">
+                    <Label className="text-amber-50">Gizli yönetim anahtarı</Label>
+                    <Input
+                      type="password"
+                      value={guardPhrase}
+                      onChange={(event) => setGuardPhrase(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") void verifyAdminGuard();
+                      }}
+                      className="mt-2 border-amber-300/25 bg-slate-950 text-white"
+                      placeholder="Anahtarı girin"
+                    />
+                    <Button onClick={() => void verifyAdminGuard()} disabled={actionId === "verify-admin-guard"} className="mt-3 w-full bg-amber-500 font-black text-slate-950 hover:bg-amber-400">
+                      {actionId === "verify-admin-guard" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                      Paneli Aç
+                    </Button>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <StatCard title="Toplam Üye" value={overview.users.total} detail={`${overview.users.today_signups} bugün yeni üye`} icon={Users} tone="cyan" />
               <StatCard title="Bugün Giriş" value={overview.users.today_logins} detail="Günlük aktif kullanıcı sinyali" icon={UserCheck} tone="emerald" />
@@ -1313,6 +1529,198 @@ export default function PlatformAdmin() {
               </div>
             )}
 
+            {activeView === "security" && (
+              <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
+                <section className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-300">Gizli Koruma</p>
+                      <h2 className="mt-1 text-2xl font-black text-white">Platform Admin Erişimini Sertleştir</h2>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+                        Admin paneli zaten platform yetkisi ister. Bu alan, ikinci kapı olarak gizli anahtar ve oturum kurallarını yönetir.
+                      </p>
+                    </div>
+                    <KeyRound className="h-6 w-6 text-amber-200" />
+                  </div>
+
+                  <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                    <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-700 bg-slate-950/45 p-4">
+                      <div>
+                        <p className="font-black text-white">Gizli yönetim anahtarı</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Açık olduğunda panel içeriği ek anahtar doğrulanmadan yüklenmez.</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={securitySettings.guard_enabled}
+                        onChange={(event) => setSecuritySettings((current) => ({ ...current, guard_enabled: event.target.checked }))}
+                        className="h-5 w-5 accent-amber-500"
+                      />
+                    </label>
+
+                    <div className="rounded-2xl border border-slate-700 bg-slate-950/45 p-4">
+                      <Label className="text-slate-300">Yeni gizli anahtar</Label>
+                      <Input
+                        type="password"
+                        value={newGuardPhrase}
+                        onChange={(event) => setNewGuardPhrase(event.target.value)}
+                        className="mt-2 border-slate-700 bg-slate-950/70 text-white"
+                        placeholder={securitySettings.guard_configured ? "Değiştirmeyecekseniz boş bırakın" : "İlk anahtarı belirleyin"}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">{securitySettings.guard_configured ? "Anahtar sunucuda hash olarak tutuluyor." : "Henüz gizli anahtar tanımlı değil."}</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-700 bg-slate-950/45 p-4">
+                      <Label className="text-slate-300">Admin oturum süresi (dk)</Label>
+                      <Input
+                        value={securitySettings.session_ttl_minutes}
+                        onChange={(event) => setSecuritySettings((current) => ({ ...current, session_ttl_minutes: event.target.value }))}
+                        inputMode="numeric"
+                        className="mt-2 border-slate-700 bg-slate-950/70 text-white"
+                        placeholder="45"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">Sunucu ayarı 10-480 dakika aralığında saklanır.</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+                      <p className="font-black text-emerald-100">Yetki kapısı</p>
+                      <p className="mt-2 text-sm leading-6 text-emerald-100/75">
+                        Admin ekranına erişim için `profiles.is_platform_admin = true` ve `/admin-login` oturumu birlikte gerekir. Normal kullanıcı girişi bu panele geçemez.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button onClick={() => void saveSecuritySettings()} disabled={actionId === "save-security-settings"} className="mt-6 bg-amber-500 font-black text-slate-950 hover:bg-amber-400">
+                    {actionId === "save-security-settings" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Güvenliği Kaydet
+                  </Button>
+                </section>
+
+                <aside className="space-y-4">
+                  <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Koruma Durumu</p>
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-3 py-2 text-sm">
+                        <span className="text-slate-400">Gizli koruma</span>
+                        <Badge className={securitySettings.guard_enabled ? "bg-amber-500/15 text-amber-200" : "bg-slate-700 text-slate-200"}>{securitySettings.guard_enabled ? "Açık" : "Kapalı"}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-3 py-2 text-sm">
+                        <span className="text-slate-400">Anahtar</span>
+                        <Badge className={securitySettings.guard_configured ? "bg-emerald-500/15 text-emerald-200" : "bg-rose-500/15 text-rose-200"}>{securitySettings.guard_configured ? "Tanımlı" : "Eksik"}</Badge>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-slate-950/50 px-3 py-2 text-sm">
+                        <span className="text-slate-400">Platform admin</span>
+                        <Badge className="bg-cyan-500/15 text-cyan-200">{overview.users.platform_admins}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-5">
+                    <p className="font-black text-rose-100">Güvenlik notu</p>
+                    <p className="mt-2 text-sm leading-6 text-rose-100/75">
+                      Platform sahibi yetkisi doğrudan SQL ile rastgele verilmemeli. Yetki verme işlemini yalnızca Supabase service role veya güvenli yönetim prosedürüyle yapın.
+                    </p>
+                  </div>
+                </aside>
+              </div>
+            )}
+
+            {activeView === "system" && (
+              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                <div className="flex items-center gap-3">
+                  <Settings className="h-5 w-5 text-cyan-300" />
+                  <div>
+                    <h2 className="text-lg font-black text-white">Platform Sistem Ayarları</h2>
+                    <p className="text-sm text-slate-400">Bakım modu, kayıt alımı, ilan onayı ve platform duyuru bandını buradan yönetin.</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {[
+                    ["maintenance_mode", "Bakım modu", "Açıkken kullanıcı tarafında bakım uyarısı göstermek için merkezi ayar."],
+                    ["registration_enabled", "Yeni üyelik açık", "Kapalı olduğunda yeni kayıt akışı durdurulabilir."],
+                    ["job_moderation_required", "İlan admin onayı", "Kullanıcı ilanları yayınlanmadan önce admin onayına düşsün."],
+                    ["readonly_mode", "Salt okunur mod", "Kritik bakımda yeni kayıt/oluşturma işlemlerini durdurmak için."],
+                    ["notice_enabled", "Platform duyuru bandı", "Kullanıcı arayüzünde merkezi bilgilendirme metni göster."],
+                  ].map(([key, title, detail]) => (
+                    <label key={key} className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-700 bg-slate-950/45 p-4">
+                      <div>
+                        <p className="font-black text-white">{title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{detail}</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(securitySettings[key as keyof PlatformAdminSecuritySettings])}
+                        onChange={(event) => setSecuritySettings((current) => ({ ...current, [key]: event.target.checked }))}
+                        className="h-5 w-5 accent-cyan-500"
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[360px_1fr]">
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">Destek e-posta adresi</Label>
+                    <Input
+                      value={securitySettings.support_email}
+                      onChange={(event) => setSecuritySettings((current) => ({ ...current, support_email: event.target.value }))}
+                      className="border-slate-700 bg-slate-950/70 text-white"
+                      placeholder="destek@isgvizyon.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">Platform duyuru metni</Label>
+                    <Textarea
+                      value={securitySettings.platform_notice}
+                      onChange={(event) => setSecuritySettings((current) => ({ ...current, platform_notice: event.target.value }))}
+                      className="min-h-24 border-slate-700 bg-slate-950/70 text-white"
+                      placeholder="Kullanıcılara gösterilecek kısa sistem mesajı..."
+                    />
+                  </div>
+                </div>
+
+                <Button onClick={() => void saveSecuritySettings()} disabled={actionId === "save-security-settings"} className="mt-6 bg-cyan-600 hover:bg-cyan-500">
+                  {actionId === "save-security-settings" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  Sistem Ayarlarını Kaydet
+                </Button>
+              </div>
+            )}
+
+            {activeView === "audit" && (
+              <div className="rounded-2xl border border-slate-700/70 bg-slate-900/55">
+                <div className="flex flex-col gap-3 border-b border-slate-700/70 p-5 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300">Denetim Kaydı</p>
+                    <h2 className="mt-1 text-2xl font-black text-white">Admin İşlem Geçmişi</h2>
+                    <p className="mt-1 text-sm text-slate-400">Güvenlik anahtarı denemeleri, ayar değişiklikleri ve yönetim aksiyonları burada izlenir.</p>
+                  </div>
+                  <Button onClick={() => void loadSecurityData()} className="bg-slate-800 text-slate-100 hover:bg-slate-700">
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Kayıtları Yenile
+                  </Button>
+                </div>
+                <div className="divide-y divide-slate-800">
+                  {auditLogs.length ? (
+                    auditLogs.map((log) => (
+                      <div key={log.id} className="grid gap-3 p-4 text-sm lg:grid-cols-[220px_1fr_220px] lg:items-center">
+                        <div>
+                          <p className="font-bold text-white">{log.admin_email || "Bilinmeyen admin"}</p>
+                          <p className="text-xs text-slate-500">{formatDate(log.created_at)}</p>
+                        </div>
+                        <div>
+                          <Badge className="border border-cyan-400/20 bg-cyan-500/10 text-cyan-200">{log.action}</Badge>
+                          <p className="mt-2 text-xs text-slate-500">{log.target_type || "platform"} {log.target_id ? `• ${log.target_id}` : ""}</p>
+                        </div>
+                        <pre className="max-h-24 overflow-auto rounded-xl bg-slate-950/70 p-3 text-[11px] leading-5 text-slate-400">
+                          {JSON.stringify(log.metadata || {}, null, 2)}
+                        </pre>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-10 text-center text-sm text-slate-400">Henüz admin işlem kaydı bulunmuyor.</div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {activeView === "moderation" && (
               <div className="space-y-5">
                 <div className="grid gap-4 md:grid-cols-4">
@@ -1376,6 +1784,8 @@ export default function PlatformAdmin() {
                   </Button>
                 </div>
               </div>
+            )}
+              </>
             )}
           </div>
         </section>
