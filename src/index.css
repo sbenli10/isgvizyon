@@ -1189,34 +1189,63 @@
   color: #ffffff !important;
 }
 
-/* Final auth theme isolation: /auth is intentionally independent from ThemeToggle. */
+/* Dark-only app shell: marketing and auth surfaces no longer expose a light theme. */
+.isgvizyon-landing-dark :is(.bg-white, .bg-slate-50, .bg-slate-100) {
+  background-color: #111c31 !important;
+}
+
+.isgvizyon-landing-dark :is(.bg-white\/80, .bg-white\/85, .bg-white\/90, .bg-white\/95, .bg-white\/75) {
+  background-color: rgba(17, 28, 49, 0.88) !important;
+}
+
+.isgvizyon-landing-dark [class*="bg-[linear-gradient(180deg,#ffffff"] {
+  background: linear-gradient(180deg, #111c31 0%, #0d1729 100%) !important;
+}
+
+.isgvizyon-landing-dark :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700) {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark :is(.text-slate-600, .text-slate-500) {
+  color: #cbd5e1 !important;
+}
+
+.isgvizyon-landing-dark :is(.border-slate-200, .border-slate-100, .border-blue-100, .border-blue-200, .border-sky-100, .border-sky-200, .border-cyan-100, .border-cyan-200, .border-violet-100) {
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
+.isgvizyon-landing-dark :is(.ring-white, .border-white\/80) {
+  --tw-ring-color: rgba(148, 163, 184, 0.16) !important;
+  border-color: rgba(148, 163, 184, 0.2) !important;
+}
+
 .auth-minimal-surface,
 .light .auth-minimal-surface,
 .dark .auth-minimal-surface,
 html.dark .auth-minimal-surface,
 body.dark .auth-minimal-surface {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
+  --background: 222 47% 8%;
+  --foreground: 210 40% 98%;
+  --card: 218 36% 15%;
+  --card-foreground: 210 40% 98%;
+  --popover: 218 36% 15%;
+  --popover-foreground: 210 40% 98%;
   --primary: 221.2 83.2% 53.3%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
+  --border: 215 25% 27%;
+  --input: 215 25% 27%;
   --ring: 221.2 83.2% 53.3%;
-  background: #ffffff !important;
-  color: #0f172a !important;
-  color-scheme: light !important;
+  background: #08111f !important;
+  color: #f8fafc !important;
+  color-scheme: dark !important;
 }
 
 .auth-minimal-surface *,
@@ -1224,7 +1253,7 @@ body.dark .auth-minimal-surface {
 .dark .auth-minimal-surface *,
 html.dark .auth-minimal-surface *,
 body.dark .auth-minimal-surface * {
-  color-scheme: light !important;
+  color-scheme: dark !important;
 }
 
 .auth-minimal-surface :is(input, textarea, select),
@@ -1232,10 +1261,10 @@ body.dark .auth-minimal-surface * {
 .dark .auth-minimal-surface :is(input, textarea, select),
 html.dark .auth-minimal-surface :is(input, textarea, select),
 body.dark .auth-minimal-surface :is(input, textarea, select) {
-  background-color: transparent !important;
-  color: #0f172a !important;
-  -webkit-text-fill-color: #0f172a !important;
-  caret-color: #2563eb !important;
+  background-color: #111c31 !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #38bdf8 !important;
 }
 
 .auth-minimal-surface :is(input, textarea, select)::placeholder,
@@ -1262,13 +1291,13 @@ body.dark .auth-minimal-surface .auth-minimal-primary * {
   -webkit-text-fill-color: #ffffff !important;
 }
 
-/* Minimal white auth screen. Isolated from the older dark auth overrides above. */
+/* Minimal auth screen, locked to the app's dark base theme. */
 .auth-minimal-surface,
 .light .auth-minimal-surface,
 .dark .auth-minimal-surface {
-  background: #ffffff !important;
-  color: #111827 !important;
-  color-scheme: light;
+  background: #08111f !important;
+  color: #f8fafc !important;
+  color-scheme: dark;
 }
 
 .auth-minimal-surface input,
@@ -1280,9 +1309,10 @@ body.dark .auth-minimal-surface .auth-minimal-primary * {
 .dark .auth-minimal-surface input,
 .dark .auth-minimal-surface textarea,
 .dark .auth-minimal-surface select {
-  color: #111827 !important;
-  -webkit-text-fill-color: #111827 !important;
-  caret-color: #111827 !important;
+  background-color: #111c31 !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #38bdf8 !important;
 }
 
 .auth-minimal-surface input::placeholder,
@@ -1548,21 +1578,21 @@ body.dark .auth-minimal-surface .auth-minimal-primary * {
   sınıflarını tek tek sökmeden okunabilir hale getirir.
 */
 .auth-landing-surface {
-  color: #0f172a !important;
-  color-scheme: light;
+  color: #f8fafc !important;
+  color-scheme: dark;
 }
 
 .auth-landing-surface [data-auth-card="true"],
 .light .auth-landing-surface [data-auth-card="true"],
 .dark .auth-landing-surface [data-auth-card="true"] {
-  background: rgba(255, 255, 255, 0.92) !important;
-  color: #0f172a !important;
+  background: rgba(17, 28, 49, 0.92) !important;
+  color: #f8fafc !important;
 }
 
 .auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
 .light .auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a),
 .dark .auth-landing-surface :is(h1, h2, h3, h4, h5, h6, label, strong, small, li, td, th, a) {
-  color: #0f172a !important;
+  color: #f8fafc !important;
 }
 
 .auth-landing-surface :is(p, div, span)[class*="text-white"],

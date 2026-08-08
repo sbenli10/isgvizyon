@@ -1,6 +1,5 @@
 import { Menu, MessageCircle, Rocket, ShieldAlert, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useTheme } from "next-themes";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,9 +23,7 @@ export function LandingLayout({
 }: LandingLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const previousThemeRef = useRef<string | null>(null);
 
   const activePath = useMemo(() => location.pathname, [location.pathname]);
   const navLinks = useMemo(
@@ -41,21 +38,8 @@ export function LandingLayout({
     [],
   );
 
-  useEffect(() => {
-    const storedTheme =
-      typeof window !== "undefined" ? window.localStorage.getItem("denetron-theme") : null;
-    previousThemeRef.current = storedTheme === "light" || storedTheme === "dark" ? storedTheme : null;
-    setTheme("light");
-
-    return () => {
-      if (previousThemeRef.current && previousThemeRef.current !== "light") {
-        setTheme(previousThemeRef.current);
-      }
-    };
-  }, [setTheme]);
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white font-['Inter',sans-serif] text-slate-900">
+    <div className="isgvizyon-landing-dark min-h-screen overflow-x-hidden bg-[#08111f] font-['Inter',sans-serif] text-slate-100">
       <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 text-white">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_24%_50%,rgba(34,211,238,0.22),transparent_30%),radial-gradient(circle_at_78%_50%,rgba(59,130,246,0.22),transparent_34%)]" />
         <div className="relative mx-auto flex h-auto min-h-11 max-w-[1440px] flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 py-2 text-xs font-semibold sm:justify-between lg:px-10">
@@ -80,7 +64,7 @@ export function LandingLayout({
         </div>
       </div>
 
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-slate-800 bg-[#0b1424]/95 shadow-sm backdrop-blur-xl">
         <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-10">
           <button
             type="button"

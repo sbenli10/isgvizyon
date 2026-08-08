@@ -24,3 +24,23 @@ entrypoint = "./functions/osgb-automation-batch/index.ts"
 enabled = true
 verify_jwt = true
 entrypoint = "./functions/myk-sync/index.ts"
+
+[functions.billing-checkout]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/billing-checkout/index.ts"
+
+[functions.billing-portal]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/billing-portal/index.ts"
+
+[functions.billing-start-trial]
+enabled = true
+verify_jwt = true
+entrypoint = "./functions/billing-start-trial/index.ts"
+
+[functions.billing-webhook]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/billing-webhook/index.ts"

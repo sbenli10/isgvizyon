@@ -27,6 +27,8 @@ import {
   Copy,
   Link as LinkIcon,
   MessageCircle,
+  Building2,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,10 +42,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSubscription } from "@/hooks/useSubscription";
 import { UpgradeModal } from "@/components/UpgradeModal";
-import { backfillMyFeatureUsage } from "@/lib/billing";
+import { backfillMyFeatureUsage, openBillingPortal, startPlanCheckout } from "@/lib/billing";
 import { uploadFileOptimized } from "@/lib/storageHelper";
 import { terminateSession, recordSession } from "@/utils/sessionManager";
-import type { BillingHistory, UserSession } from "@/types/subscription";
+import type { BillingHistory, BillingPeriod, SubscriptionPlan, UserSession } from "@/types/subscription";
 import { TwoFactorSetupModal } from '@/components/TwoFactorSetupModal';
 import { untrustDevice } from '@/utils/deviceFingerprint';
 
@@ -128,6 +130,8 @@ export default function Settings() {
     currentPeriodEnd,
     features,
     isPaidPlan,
+    hasStripeCustomer,
+    hasStripeSubscription,
   } = useSubscription();
 
   const [currentTab, setCurrentTab] = useState<TabType>("general");
@@ -138,6 +142,8 @@ export default function Settings() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [syncingUsage, setSyncingUsage] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [currentFactorId, setCurrentFactorId] = useState<string | null>(null);
   const [trustedDevices, setTrustedDevices] = useState<any[]>([]);
   const [uploadingStamp, setUploadingStamp] = useState(false);
@@ -1174,6 +1180,40 @@ const handleForceReset2FA = async () => {
     }
   };
 
+  const handlePlanCheckout = async (planCode: Extract<SubscriptionPlan, "premium" | "osgb">) => {
+    if (profileData?.organization_id && !isOrganizationAdmin) {
+      toast.error("Ödeme işlemini yalnızca organizasyon yöneticisi başlatabilir.");
+      return;
+    }
+
+    if (planCode === "osgb" && !profileData?.organization_id) {
+      navigate("/profile?tab=workspace&action=create&next=/settings?tab=billing");
+      return;
+    }
+
+    setCheckoutLoading(`${planCode}-${billingPeriod}`);
+    try {
+      await startPlanCheckout(planCode, billingPeriod);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Ödeme sayfası oluşturulamadı.";
+      toast.error("Ödeme başlatılamadı", { description: message });
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
+  const handleOpenBillingPortal = async () => {
+    setCheckoutLoading("portal");
+    try {
+      await openBillingPortal();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Abonelik portalı açılamadı.";
+      toast.error("Abonelik yönetimi açılamadı", { description: message });
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
   const tabs = [
     {
       id: "general" as const,
@@ -1268,14 +1308,48 @@ const handleForceReset2FA = async () => {
 
   const enabledFeatureCount = entitlements.filter((item) => item.isEnabled).length;
   const premiumPlan = plans.find((item) => item.planCode === "premium");
+  const osgbPlan = plans.find((item) => item.planCode === "osgb");
   const activeCatalogPlan = plans.find((item) => item.planCode === plan);
-  const monthlyPlanPrice = premiumPlan?.price ?? 0;
-  const yearlyPlanPrice = Math.round(monthlyPlanPrice * 10);
-  const yearlyEquivalent = monthlyPlanPrice * 12;
-  const yearlySavingsPercent = yearlyEquivalent > 0
-    ? Math.round(((yearlyEquivalent - yearlyPlanPrice) / yearlyEquivalent) * 100)
-    : 0;
+  const premiumMonthlyPrice = premiumPlan?.price ?? 249;
+  const osgbMonthlyPrice = osgbPlan?.price ?? 499;
+  const getDisplayPrice = (monthlyPrice: number) =>
+    billingPeriod === "yearly" ? Math.round(monthlyPrice * 10) : monthlyPrice;
+  const yearlySavingsPercent = 17;
   const activeMonthlyPlanPrice = activeCatalogPlan?.price ?? null;
+  const canManageBilling = !profileData?.organization_id || isOrganizationAdmin;
+  const hasBillingPortal = hasStripeCustomer || hasStripeSubscription || isPaidPlan;
+  const planCards = [
+    {
+      code: "free" as const,
+      name: "Free",
+      badge: "Başlangıç",
+      description: "Temel İSG araçları ve kontrollü kullanım limitleri.",
+      price: 0,
+      tone: "border-slate-700/80 bg-slate-950/70",
+      icon: <CreditCard className="h-5 w-5 text-slate-300" />,
+      features: ["1 firma limiti", "Temel formlar", "Sınırlı rapor çıktısı"],
+    },
+    {
+      code: "premium" as const,
+      name: "Premium",
+      badge: "Profesyonel",
+      description: "AI destekli üretim, raporlama ve gelişmiş çıktı araçları.",
+      price: getDisplayPrice(premiumMonthlyPrice),
+      tone: "border-violet-400/30 bg-violet-500/10 shadow-[0_20px_60px_rgba(124,58,237,0.12)]",
+      icon: <Sparkles className="h-5 w-5 text-violet-200" />,
+      features: ["AI analiz kotaları", "Sertifika ve rapor araçları", "Yüksek kullanım limitleri"],
+    },
+    {
+      code: "osgb" as const,
+      name: "OSGB",
+      badge: "Kurumsal",
+      description: "Çoklu firma, personel, finans ve müşteri portalı yönetimi.",
+      price: getDisplayPrice(osgbMonthlyPrice),
+      tone: "border-cyan-400/30 bg-cyan-500/10 shadow-[0_20px_60px_rgba(6,182,212,0.1)]",
+      icon: <Building2 className="h-5 w-5 text-cyan-200" />,
+      features: ["OSGB yönetim paneli", "Sınırsız firma operasyonu", "Müşteri portalı ve finans"],
+    },
+  ];
 
   const securityScore = Math.max(
     24,
@@ -2482,152 +2556,146 @@ const handleForceReset2FA = async () => {
               {/* BILLING TAB */}
               {currentTab === "billing" && (
                 <div className="space-y-6">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-[24px] border border-fuchsia-400/15 bg-fuchsia-400/10 p-5">
-                      <p className={microCardEyebrowClassName}>Plan özeti</p>
-                      <p className={microCardTitleClassName}>
-                        {status === "trial"
-                          ? "Premium demo aktif"
-                          : plan === "premium"
-                            ? "Premium plan aktif"
-                            : plan === "osgb"
-                              ? "OSGB plan aktif"
-                              : "Free plan aktif"}
-                      </p>
-                      <p className={microCardBodyClassName}>
-                        {status === "trial"
-                          ? `${daysLeftInTrial} gün daha tüm premium modüller açık.`
-                          : status === "premium"
-                            ? cancelAtPeriodEnd
-                              ? "Aboneliğiniz dönem sonunda iptale ayarlı, ancak şu an tüm premium araçlar açık."
-                              : "Tüm premium araçlar ve yüksek limitler hesabınızda kullanılabilir durumda."
-                            : "Yalnızca temel özellikler açık. Yükseltme veya deneme ile limitleri artırabilirsiniz."}
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5">
-                      <p className={microCardEyebrowClassName}>Fatura görünümü</p>
-                      <p className={microCardTitleClassName}>{billingHistory.length} kayıt</p>
-                      <p className={microCardBodyClassName}>Geçmiş ödeme ve fatura hareketlerini tek merkezden takip edin.</p>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-                      <div className="mb-5">
-                        <p className={microCardEyebrowClassName}>Aylık / yıllık kıyas</p>
-                        <h2 className="mt-2 text-lg font-semibold text-white">Ödeme ritmine göre plan görünümü</h2>
-                        <p className="mt-1 text-sm text-slate-400">Detaylı modül ve limit karşılaştırması yükseltme ekranında gösterilir.</p>
-                      </div>
-                      <div className="grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-500/10 p-4 shadow-[0_14px_30px_rgba(217,70,239,0.1)]">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-white">Aylık plan</p>
-                            <div className="flex items-center gap-2">
-                              <Badge className="rounded-full bg-gradient-to-r from-fuchsia-600 to-rose-500 px-3 py-1 text-white">
-                                Avantajlı fiyat
-                              </Badge>
-                              <Badge className="rounded-full border border-fuchsia-400/25 bg-fuchsia-500/15 px-3 py-1 text-fuchsia-100">
-                                Esnek
-                              </Badge>
-                            </div>
-                          </div>
-                          <p className="mt-3 text-2xl font-semibold text-white">₺{monthlyPlanPrice.toLocaleString("tr-TR")}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">aylık faturalama</p>
-                          <ul className="mt-4 space-y-2 text-sm text-slate-300">
-                            <li>İstediğiniz zaman yükseltme veya iptal</li>
-                            <li>Stripe portalı üzerinden yönetim</li>
-                          </ul>
-                        </div>
-                        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4 shadow-[0_14px_30px_rgba(34,211,238,0.1)]">
-                          <div className="flex items-center justify-between gap-3">
-                            <p className="text-sm font-semibold text-white">Yıllık plan</p>
-                            <div className="flex items-center gap-2">
-                              <Badge className="rounded-full bg-gradient-to-r from-cyan-500 to-fuchsia-500 px-3 py-1 text-white">En avantajlı</Badge>
-                              <Badge className="rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-emerald-100">
-                                %{yearlySavingsPercent} tasarruf
-                              </Badge>
-                            </div>
-                          </div>
-                          <p className="mt-3 text-2xl font-semibold text-white">₺{yearlyPlanPrice.toLocaleString("tr-TR")}</p>
-                          <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">yıllık tahmini paket</p>
-                          <ul className="mt-4 space-y-2 text-sm text-slate-200">
-                            <li>Daha öngörülebilir bütçe planlaması</li>
-                            <li>Kurumsal ekipler için güçlü süreklilik</li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-                        <div className="mb-5">
-                          <p className={microCardEyebrowClassName}>Kullanım özeti</p>
-                          <h2 className="mt-2 text-lg font-semibold text-white">Hesabınız şu anda ne kullanıyor?</h2>
-                        </div>
-                        <div className="space-y-3">
-                          {usageSummary.map((item) => (
-                            <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
-                              <div className="flex items-center justify-between gap-4">
-                                <div>
-                                  <p className="text-sm font-medium text-slate-200">{item.label}</p>
-                                  <p className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</p>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-lg font-semibold text-white">{item.value}</p>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  <div className="overflow-hidden rounded-[28px] border border-cyan-400/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_32%),linear-gradient(135deg,rgba(15,23,42,0.96),rgba(2,6,23,0.98))] shadow-[0_24px_80px_rgba(8,47,73,0.28)]">
+                    <div className="flex flex-col gap-5 border-b border-white/10 p-6 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-cyan-200/80">Ödeme ve üyelik</p>
+                        <h2 className="mt-2 text-2xl font-black text-white">Paketinizi yönetin</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+                          Aylık veya yıllık paketi seçin, ödeme adımına güvenli checkout ile geçin. Üyelik aktifleştiğinde modül izinleri ve kullanım limitleri otomatik ayrışır.
+                        </p>
                       </div>
 
-                      <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
-                        <div className="mb-5">
-                          <p className={microCardEyebrowClassName}>Yükseltme notu</p>
-                          <h2 className="mt-2 text-lg font-semibold text-white">Detaylar yükseltme ekranında</h2>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex rounded-2xl border border-white/10 bg-slate-950/70 p-1">
+                          {(["monthly", "yearly"] as BillingPeriod[]).map((period) => (
+                            <button
+                              key={period}
+                              type="button"
+                              onClick={() => setBillingPeriod(period)}
+                              className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                                billingPeriod === period
+                                  ? "bg-white text-slate-950"
+                                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+                              }`}
+                            >
+                              {period === "monthly" ? "Aylık" : `Yıllık · %${yearlySavingsPercent}`}
+                            </button>
+                          ))}
                         </div>
-                        <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/10 p-4">
-                          <p className="text-sm font-semibold text-white">
-                            {isPaidPlan ? `${activePlanShortLabel} plan kullanıyorsunuz` : "Yükseltme ekranında tüm farklar listelenir"}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">
-                            Free, Premium ve OSGB paketleri arasındaki modül farkları, AI kotaları, kilitli araçlar ve tüm limitler artık Upgrade modal içinde daha net gösterilir.
-                          </p>
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
-                              {enabledFeatureCount}+ aktif avantaj
-                            </Badge>
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
-                              {billingHistory.length} fatura kaydı
-                            </Badge>
-                            <Badge className="rounded-full border border-white/10 bg-slate-950/50 px-3 py-1 text-slate-200">
-                              {isOrganizationAdmin ? "Yönetici hesabı" : "Yönetici gerekir"}
-                            </Badge>
-                          </div>
-                        </div>
+                        <Button
+                          variant="outline"
+                          onClick={() => void handleOpenBillingPortal()}
+                          disabled={!hasBillingPortal || checkoutLoading === "portal"}
+                          className={premiumOutlineButtonClassName}
+                        >
+                          {checkoutLoading === "portal" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                          Aboneliği Yönet
+                        </Button>
                       </div>
                     </div>
+
+                    <div className="grid gap-4 p-5 xl:grid-cols-3">
+                      {planCards.map((item) => {
+                        const isCurrent = item.code === plan || (item.code === "premium" && status === "trial");
+                        const paidCode = item.code === "free" ? null : item.code;
+                        const actionLabel =
+                          item.code === "free"
+                            ? "Mevcut temel plan"
+                            : isCurrent
+                              ? "Aktif plan"
+                              : item.code === "premium" && plan === "osgb"
+                                ? "OSGB paketine dahil"
+                                : item.code === "osgb" && !profileData?.organization_id
+                                  ? "Organizasyon oluştur"
+                                  : `${item.name} paketine geç`;
+
+                        return (
+                          <div key={item.code} className={`flex min-h-[360px] flex-col rounded-3xl border p-5 ${item.tone}`}>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="rounded-2xl border border-white/10 bg-white/10 p-3">{item.icon}</div>
+                                <div>
+                                  <p className="text-xl font-black text-white">{item.name}</p>
+                                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{item.badge}</p>
+                                </div>
+                              </div>
+                              {isCurrent && <Badge className="rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-100">Aktif</Badge>}
+                            </div>
+
+                            <p className="mt-4 min-h-[48px] text-sm leading-6 text-slate-300">{item.description}</p>
+                            <div className="mt-5">
+                              {item.price === 0 ? (
+                                <p className="text-3xl font-black text-white">Ücretsiz</p>
+                              ) : (
+                                <div className="flex items-end gap-1">
+                                  <span className="text-4xl font-black text-white">₺{item.price.toLocaleString("tr-TR")}</span>
+                                  <span className="pb-1 text-sm font-semibold text-slate-400">/{billingPeriod === "monthly" ? "ay" : "yıl"}</span>
+                                </div>
+                              )}
+                            </div>
+
+                            <ul className="mt-5 flex-1 space-y-3">
+                              {item.features.map((feature) => (
+                                <li key={feature} className="flex items-start gap-2 text-sm text-slate-200">
+                                  <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                                  <span>{feature}</span>
+                                </li>
+                              ))}
+                            </ul>
+
+                            <Button
+                              onClick={() => paidCode && void handlePlanCheckout(paidCode)}
+                              disabled={
+                                !paidCode ||
+                                isCurrent ||
+                                !canManageBilling ||
+                                checkoutLoading !== null ||
+                                (item.code === "premium" && plan === "osgb")
+                              }
+                              className={
+                                item.code === "premium"
+                                  ? "mt-5 h-11 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-500 font-bold text-white hover:from-violet-500 hover:to-fuchsia-400"
+                                  : item.code === "osgb"
+                                    ? "mt-5 h-11 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 font-bold text-white hover:from-cyan-400 hover:to-blue-500"
+                                    : `mt-5 h-11 rounded-2xl ${premiumOutlineButtonClassName}`
+                              }
+                            >
+                              {checkoutLoading === `${item.code}-${billingPeriod}` && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                              {actionLabel}
+                            </Button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  {/* Current Plan */}
-                  <Card className="border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),rgba(15,23,42,0.18))] shadow-[0_20px_60px_rgba(34,211,238,0.08)]">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-lg font-bold">
-                            {activePlanLabel}
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {status === 'trial'
-                              ? `Deneme sürümü · ${daysLeftInTrial} gün kaldı`
-                              : status === 'premium'
-                              ? cancelAtPeriodEnd && currentPeriodEnd
-                                ? `${activePlanShortLabel} aktif · ${new Date(currentPeriodEnd).toLocaleDateString("tr-TR")} tarihinde kapanacak`
-                                : `${activePlanShortLabel} üyelik aktif`
-                              : 'Temel özellikler'}
-                          </p>
-                          {(plan === 'premium' || plan === 'osgb') && activeMonthlyPlanPrice !== null && (
-                            <p className="text-2xl font-bold mt-2">₺{activeMonthlyPlanPrice.toLocaleString("tr-TR")}/ay</p>
-                          )}
+
+                  <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+                    <Card className="border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(34,211,238,0.12),rgba(15,23,42,0.18))] shadow-[0_20px_60px_rgba(34,211,238,0.08)]">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className={microCardEyebrowClassName}>Mevcut üyelik</p>
+                            <p className="mt-2 text-2xl font-black text-white">{activePlanLabel}</p>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">
+                              {status === "trial"
+                                ? `Deneme sürümü aktif. ${daysLeftInTrial} gün kaldı.`
+                                : isPaidPlan
+                                  ? cancelAtPeriodEnd && currentPeriodEnd
+                                    ? `${activePlanShortLabel} paketi ${new Date(currentPeriodEnd).toLocaleDateString("tr-TR")} tarihinde kapanacak.`
+                                    : `${activePlanShortLabel} üyeliğiniz aktif.`
+                                  : "Temel özellikler açık. Ücretli plana geçerek limitleri ve modülleri genişletebilirsiniz."}
+                            </p>
+                            {(plan === "premium" || plan === "osgb") && activeMonthlyPlanPrice !== null && (
+                              <p className="mt-4 text-3xl font-black text-white">₺{activeMonthlyPlanPrice.toLocaleString("tr-TR")}<span className="text-sm text-slate-400">/ay</span></p>
+                            )}
+                          </div>
+                          <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-slate-100">
+                            {hasBillingPortal ? "Portal hazır" : "Checkout bekliyor"}
+                          </Badge>
                         </div>
-                        <div className="flex flex-wrap justify-end gap-2">
+
+                        <div className="mt-6 flex flex-wrap gap-2">
                           <Button
                             variant="outline"
                             onClick={() => void handleSyncUsage()}
@@ -2637,19 +2705,31 @@ const handleForceReset2FA = async () => {
                             <RefreshCw className={`mr-2 h-4 w-4 ${syncingUsage ? "animate-spin" : ""}`} />
                             Sayaçları senkronize et
                           </Button>
-                          <Button
-                            onClick={() => setShowUpgradeModal(true)}
-                            className={premiumPrimaryButtonClassName}
-                          >
-                            <Crown className="h-4 w-4 mr-2" />
-                            {isPaidPlan ? 'Aboneliği Yönet' : 'Yükselt'}
+                          <Button onClick={() => setShowUpgradeModal(true)} className={premiumPrimaryButtonClassName}>
+                            <Crown className="mr-2 h-4 w-4" />
+                            Planları karşılaştır
                           </Button>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
 
-                  {/* Billing History */}
+                    <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
+                      <div className="mb-5">
+                        <p className={microCardEyebrowClassName}>Kullanım özeti</p>
+                        <h2 className="mt-2 text-lg font-semibold text-white">Planınızın hesabınıza etkisi</h2>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        {usageSummary.map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                            <p className="text-sm font-medium text-slate-200">{item.label}</p>
+                            <p className="mt-2 text-2xl font-black text-white">{item.value}</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-400">{item.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] md:p-6">
                     <div className="mb-5">
                       <p className="text-xs font-medium uppercase tracking-[0.22em] text-cyan-300/80">Finans geçmişi</p>

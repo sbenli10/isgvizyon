@@ -260,7 +260,7 @@ export default function Auth() {
   });
 
   const isExtension = useMemo(() => new URLSearchParams(window.location.search).get("ext") === "true", []);
-  const isAdminEntry = location.pathname === "/admin-login" || new URLSearchParams(location.search).get("admin") === "true";
+  const isAdminEntry = ["/admin-login", "/admin/login", "/admin"].includes(location.pathname) || new URLSearchParams(location.search).get("admin") === "true";
   const loginTarget: LoginTarget = isAdminEntry ? "platform-admin" : "app";
   const callbackUrl = useMemo(() => (isExtension ? "/auth/callback?ext=true" : "/auth/callback"), [isExtension]);
   const appOrigin = useMemo(() => getAppOrigin(), []);
@@ -743,9 +743,9 @@ export default function Auth() {
   return (
     <div
       data-auth-root="true"
-      data-theme="light"
-      className="auth-minimal-surface fixed inset-0 isolate h-dvh w-screen overflow-y-auto overflow-x-hidden bg-white text-slate-950 lg:overflow-hidden"
-      style={{ colorScheme: "light" }}
+      data-theme="dark"
+      className="auth-minimal-surface fixed inset-0 isolate h-dvh w-screen overflow-y-auto overflow-x-hidden bg-[#08111f] text-slate-100 lg:overflow-hidden"
+      style={{ colorScheme: "dark" }}
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.15),transparent_31%),linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)]" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-cyan-300/30 blur-3xl" />

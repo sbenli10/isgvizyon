@@ -2,7 +2,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import NotificationBell from "@/components/NotificationBell";
 import { OrganizationCreateButton } from "@/components/OrganizationCreateButton";
 import { SubscriptionBanner } from "@/components/SubscriptionBanner";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -153,7 +152,6 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                 {showOrganizationCreateCta ? <OrganizationCreateButton nextPath="/osgb" className="hidden xl:inline-flex" /> : null}
                 <div className="hidden items-center gap-2 rounded-2xl border border-border/70 bg-background/80 px-3 py-2 shadow-sm md:flex">
                   <NotificationBell />
-                  <ThemeToggle />
                 </div>
 
                 <DropdownMenu>
@@ -265,7 +263,6 @@ function AppLayoutShell({ children }: { children: React.ReactNode }) {
                 </Button>
                 {showOrganizationCreateCta ? <OrganizationCreateButton nextPath="/osgb" compact /> : null}
                 <NotificationBell />
-                <ThemeToggle />
               </div>
             </div>
           </header>

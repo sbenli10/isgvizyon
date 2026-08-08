@@ -178,6 +178,25 @@ async function upsertFromStripeSubscription(
   return orgId;
 }
 
+async function markPaymentEvent(
+  adminClient: ReturnType<typeof createAdminSupabaseClient>,
+  event: Stripe.Event,
+  status: "received" | "processed" | "failed" | "ignored",
+  errorMessage: string | null = null,
+) {
+  await adminClient
+    .from("payment_events")
+    .upsert({
+      provider_code: "stripe",
+      provider_event_id: event.id,
+      event_type: event.type,
+      status,
+      payload: event as unknown as Record<string, unknown>,
+      error_message: errorMessage,
+      processed_at: status === "processed" || status === "failed" || status === "ignored" ? new Date().toISOString() : null,
+    }, { onConflict: "provider_code,provider_event_id" });
+}
+
 async function handleInvoiceEvent(
   adminClient: ReturnType<typeof createAdminSupabaseClient>,
   invoice: Stripe.Invoice,
@@ -253,6 +272,21 @@ serve(async (req) => {
     const event = await stripe.webhooks.constructEventAsync(body, signature, webhookSecret, undefined, cryptoProvider);
     const adminClient = createAdminSupabaseClient();
 
+    const { data: existingEvent } = await adminClient
+      .from("payment_events")
+      .select("status")
+      .eq("provider_code", "stripe")
+      .eq("provider_event_id", event.id)
+      .maybeSingle();
+
+    if (existingEvent?.status === "processed") {
+      return jsonResponse(200, { success: true, duplicate: true });
+    }
+
+    await markPaymentEvent(adminClient, event, "received");
+
+    let finalEventStatus: "processed" | "ignored" = "processed";
+
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
@@ -278,8 +312,11 @@ serve(async (req) => {
         break;
       }
       default:
+        finalEventStatus = "ignored";
         break;
     }
+
+    await markPaymentEvent(adminClient, event, finalEventStatus);
 
     return jsonResponse(200, { success: true });
   } catch (error) {

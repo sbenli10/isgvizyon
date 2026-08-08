@@ -44,7 +44,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { usePlanLimits } from "@/hooks/usePlanLimits";
 import { hasPlatformAdminSession } from "@/lib/platformAdminSession";
 import {
@@ -1081,8 +1080,6 @@ export function AppSidebar() {
               collapsed ? "flex-col justify-center" : "justify-between",
             )}
           >
-            <ThemeToggle />
-
             <button className={actionButton} title="Yardım" aria-label="Yardım" type="button">
               <CircleHelp className="h-4 w-4 stroke-[1.9]" />
             </button>

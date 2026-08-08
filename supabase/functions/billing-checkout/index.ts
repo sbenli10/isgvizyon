@@ -1,10 +1,32 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
+import { buildAppUrl, createAdminSupabaseClient, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
 type CheckoutPlanCode = "premium" | "osgb";
 
-function resolvePriceId(planCode: CheckoutPlanCode, billingPeriod: "monthly" | "yearly") {
+async function resolvePriceId(
+  adminClient: ReturnType<typeof createAdminSupabaseClient>,
+  planCode: CheckoutPlanCode,
+  billingPeriod: "monthly" | "yearly",
+) {
+  const { data: planRow } = await adminClient
+    .from("subscription_plans")
+    .select("provider_monthly_price_id, provider_yearly_price_id, checkout_enabled, is_active")
+    .or(`plan_code.eq.${planCode},code.eq.${planCode}`)
+    .maybeSingle();
+
+  if (planRow && (planRow.checkout_enabled === false || planRow.is_active === false)) {
+    throw new Error(`${planCode === "osgb" ? "OSGB" : "Premium"} planı için ödeme ekranı geçici olarak kapalı.`);
+  }
+
+  const databasePriceId = billingPeriod === "yearly"
+    ? planRow?.provider_yearly_price_id
+    : planRow?.provider_monthly_price_id;
+
+  if (databasePriceId) {
+    return databasePriceId;
+  }
+
   if (planCode === "osgb") {
     return billingPeriod === "yearly"
       ? Deno.env.get("STRIPE_OSGB_YEARLY_PRICE_ID")
@@ -55,7 +77,8 @@ serve(async (req): Promise<Response> => {
 
     const successPath = typeof body?.successPath === "string" ? body.successPath : "/settings";
     const cancelPath = typeof body?.cancelPath === "string" ? body.cancelPath : "/settings";
-    const priceId = resolvePriceId(planCode, billingPeriod);
+    const adminClient = context.adminClient;
+    const priceId = await resolvePriceId(adminClient, planCode, billingPeriod);
 
     if (!priceId) {
       return jsonResponse(500, {
@@ -70,7 +93,6 @@ serve(async (req): Promise<Response> => {
     }
 
     const appUrl = getPublicAppUrl(req);
-    const adminClient = context.adminClient;
 
     const { data: existingSubscription } = context.profile.organization_id
       ? await adminClient
