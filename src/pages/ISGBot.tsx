@@ -450,7 +450,7 @@ const getIsgbotFriendlyErrorMessage = (
   }
 
   if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("err_failed")) {
-    return "Sunucuya ulaşılamadı. İnternet bağlantınızı ve Supabase/eklenti erişimini kontrol edip tekrar deneyin.";
+    return "Sunucuya ulaşılamadı. İnternet bağlantınızı ve eklenti erişimini kontrol edip tekrar deneyin.";
   }
 
   if (normalized.includes("jwt") || normalized.includes("unauthorized") || normalized.includes("auth") || normalized.includes("oturumu")) {

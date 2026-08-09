@@ -111,7 +111,7 @@ function Notice({ type, title, description }: { type: NoticeType; title: string;
   }, [type]);
 
   return (
-    <div className={cn("rounded-xl border p-4", styles.wrap)}>
+    <div data-auth-notice={type} className={cn("rounded-xl border p-4", styles.wrap)}>
       <div className="flex items-start gap-3">
         <div className="mt-0.5 shrink-0">{styles.icon}</div>
         <div className="min-w-0">
@@ -198,12 +198,13 @@ function FancyInput({ icon, error, children }: { icon: React.ReactNode; error?: 
   return (
     <div className="group">
       <div
+        data-auth-input-shell="true"
         className={cn(
           "relative rounded-2xl border bg-white transition",
           error ? "border-rose-400 shadow-[0_0_0_4px_rgba(244,63,94,0.10)]" : "border-slate-200 shadow-sm focus-within:border-blue-500 focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.12)]",
         )}
       >
-        <div className="relative rounded-2xl bg-white">
+        <div className="relative rounded-2xl bg-white" data-auth-input-inner="true">
           <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition group-focus-within:text-blue-600">{icon}</div>
           <div className="pl-10">{children}</div>
         </div>
@@ -743,32 +744,32 @@ export default function Auth() {
   return (
     <div
       data-auth-root="true"
-      data-theme="dark"
-      className="auth-minimal-surface fixed inset-0 isolate h-dvh w-screen overflow-y-auto overflow-x-hidden bg-[#08111f] text-slate-100 lg:overflow-hidden"
-      style={{ colorScheme: "dark" }}
+      data-theme="light-auth"
+      className="auth-minimal-surface fixed inset-0 isolate h-dvh w-screen overflow-y-auto overflow-x-hidden bg-[#f7fbff] text-slate-950 lg:overflow-hidden"
+      style={{ colorScheme: "light" }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.22),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.18),transparent_31%),linear-gradient(180deg,#08111f_0%,#101a2e_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.15),transparent_31%),linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)]" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-cyan-300/30 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-9rem] right-[-7rem] h-[30rem] w-[30rem] rounded-full bg-violet-400/20 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:radial-gradient(#2563eb_1px,transparent_1px)] [background-size:28px_28px]" />
 
-      <div className="relative z-10 mx-auto grid min-h-dvh w-full max-w-[1480px] grid-cols-1 items-center gap-10 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-16 lg:px-12 xl:px-16 2xl:px-20">
-        <section className="relative min-w-0 overflow-hidden py-2 lg:py-0">
+      <div className="relative z-10 mx-auto grid min-h-dvh w-full max-w-[1480px] grid-cols-1 items-center px-5 py-5 sm:py-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-16 lg:px-12 xl:px-16 2xl:px-20">
+        <section className="isgvizyon-auth-showcase relative hidden min-w-0 overflow-hidden rounded-[34px] border border-slate-700/50 bg-[linear-gradient(135deg,#0b1424_0%,#13233d_52%,#07111f_100%)] p-7 shadow-[0_28px_90px_rgba(2,6,23,0.24)] lg:block lg:p-10">
           <div aria-hidden="true" className="absolute left-[9%] top-[12%] h-40 w-40 rounded-[3rem] bg-gradient-to-br from-cyan-300/35 to-blue-500/20 blur-2xl" />
           <div aria-hidden="true" className="absolute bottom-[8%] right-[8%] h-56 w-56 rounded-full bg-gradient-to-br from-violet-400/25 to-blue-500/20 blur-3xl" />
           <div aria-hidden="true" className="absolute left-[55%] top-[10%] hidden h-24 w-24 rotate-12 rounded-[2rem] border border-blue-200/70 bg-white/40 shadow-xl shadow-blue-500/10 backdrop-blur-xl lg:block" />
 
           <div className="relative flex w-full min-w-0 flex-col gap-10 lg:gap-14">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/75 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-blue-700 shadow-sm backdrop-blur-xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-300/45 bg-cyan-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.22em] !text-cyan-100 shadow-sm backdrop-blur-xl">
                 <Sparkles className="h-4 w-4 text-cyan-500" />
                 AI destekli İSG yönetimi
               </div>
-              <h2 className="mt-6 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight text-slate-950 sm:text-5xl lg:text-7xl">
+              <h2 className="mt-6 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight !text-white sm:text-5xl lg:text-7xl">
                 İSG süreçlerini
-                <span className="block bg-gradient-to-r from-blue-600 via-cyan-500 to-violet-600 bg-clip-text text-transparent">tek ekranda yönetin</span>
+                <span className="block bg-gradient-to-r from-cyan-300 via-blue-300 to-violet-300 bg-clip-text text-transparent">tek ekranda yönetin</span>
               </h2>
-              <p className="mt-6 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+              <p className="mt-6 max-w-2xl text-base leading-7 !text-slate-200 sm:text-lg">
                 Risk analizi, çalışan yönetimi, eğitim planları, sertifikalar ve doküman süreçlerini tek merkezden yönetin.
               </p>
             </div>
@@ -848,7 +849,7 @@ export default function Auth() {
         </section>
 
         <section className="flex w-full justify-center lg:min-h-[620px] lg:items-center">
-          <div className="mx-auto w-full max-w-[400px] rounded-[32px] border border-slate-200/80 bg-white/95 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-8">
+          <div className="isgvizyon-auth-card mx-auto w-full max-w-[400px] rounded-[32px] border border-slate-200/80 bg-white/95 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-8">
                 <div className="space-y-5">
                   <div className="flex items-center gap-3">
                     <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-cyan-500 to-violet-600 shadow-lg shadow-blue-500/20">

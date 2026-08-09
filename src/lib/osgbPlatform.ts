@@ -851,7 +851,7 @@ export const authenticateOsgbCompanyPortalAccount = async (
     const status = Number((error as { status?: number }).status || 0);
     const message = String((error as { message?: string }).message || "");
     if (status === 404 || message.toLocaleLowerCase("tr-TR").includes("could not find the function")) {
-      throw new Error("Firma portal girişi henüz veritabanında aktif değil. Supabase migration dosyasını uygulayın: 20260715120000_add_osgb_company_portal_account_login.sql");
+      throw new Error("Firma portal girişi için gerekli altyapı güncellemesi henüz aktif değil. Lütfen sistem yöneticisine bildirin.");
     }
     throw error;
   }

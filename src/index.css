@@ -1189,6 +1189,234 @@
   color: #ffffff !important;
 }
 
+/* Final landing/auth readability restore: keep the original light presentation, only fix contrast. */
+.auth-minimal-surface,
+.light .auth-minimal-surface,
+.dark .auth-minimal-surface,
+html.dark .auth-minimal-surface,
+body.dark .auth-minimal-surface {
+  --background: 210 60% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --secondary: 220 16% 94%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 220 16% 94%;
+  --muted-foreground: 215 16% 46%;
+  --accent: 220 20% 92%;
+  --accent-foreground: 222 47% 11%;
+  --border: 220 14% 90%;
+  --input: 220 14% 90%;
+  background: #f7fbff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.auth-minimal-surface *,
+.light .auth-minimal-surface *,
+.dark .auth-minimal-surface *,
+html.dark .auth-minimal-surface *,
+body.dark .auth-minimal-surface * {
+  color-scheme: light !important;
+}
+
+.auth-minimal-surface [class*="bg-white"],
+.auth-minimal-surface [class*="bg-slate-50"],
+.auth-minimal-surface [class*="bg-slate-100"],
+.light .auth-minimal-surface [class*="bg-white"],
+.light .auth-minimal-surface [class*="bg-slate-50"],
+.light .auth-minimal-surface [class*="bg-slate-100"],
+.dark .auth-minimal-surface [class*="bg-white"],
+.dark .auth-minimal-surface [class*="bg-slate-50"],
+.dark .auth-minimal-surface [class*="bg-slate-100"] {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.auth-minimal-surface [class*="bg-white/"],
+.light .auth-minimal-surface [class*="bg-white/"],
+.dark .auth-minimal-surface [class*="bg-white/"] {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+}
+
+.auth-minimal-surface :is(h1, h2, h3, h4, h5, h6, p, label, strong, small, li, td, th, a, button),
+.light .auth-minimal-surface :is(h1, h2, h3, h4, h5, h6, p, label, strong, small, li, td, th, a, button),
+.dark .auth-minimal-surface :is(h1, h2, h3, h4, h5, h6, p, label, strong, small, li, td, th, a, button) {
+  color: #0f172a !important;
+}
+
+.auth-minimal-surface [class*="text-slate-400"],
+.auth-minimal-surface [class*="text-slate-500"],
+.auth-minimal-surface [class*="text-slate-600"],
+.auth-minimal-surface [class*="text-slate-700"],
+.light .auth-minimal-surface [class*="text-slate-400"],
+.light .auth-minimal-surface [class*="text-slate-500"],
+.light .auth-minimal-surface [class*="text-slate-600"],
+.light .auth-minimal-surface [class*="text-slate-700"],
+.dark .auth-minimal-surface [class*="text-slate-400"],
+.dark .auth-minimal-surface [class*="text-slate-500"],
+.dark .auth-minimal-surface [class*="text-slate-600"],
+.dark .auth-minimal-surface [class*="text-slate-700"] {
+  color: #475569 !important;
+}
+
+.auth-minimal-surface .text-transparent,
+.auth-minimal-surface [class*="text-transparent"],
+.light .auth-minimal-surface .text-transparent,
+.light .auth-minimal-surface [class*="text-transparent"],
+.dark .auth-minimal-surface .text-transparent,
+.dark .auth-minimal-surface [class*="text-transparent"] {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.auth-minimal-surface :is(input, textarea, select),
+.light .auth-minimal-surface :is(input, textarea, select),
+.dark .auth-minimal-surface :is(input, textarea, select),
+html.dark .auth-minimal-surface :is(input, textarea, select),
+body.dark .auth-minimal-surface :is(input, textarea, select) {
+  background-color: transparent !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #2563eb !important;
+}
+
+.auth-minimal-surface :is(input, textarea, select)::placeholder,
+.light .auth-minimal-surface :is(input, textarea, select)::placeholder,
+.dark .auth-minimal-surface :is(input, textarea, select)::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1 !important;
+}
+
+.auth-minimal-surface input:-webkit-autofill,
+.auth-minimal-surface input:-webkit-autofill:hover,
+.auth-minimal-surface input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.auth-minimal-surface .auth-minimal-primary,
+.auth-minimal-surface .auth-minimal-primary *,
+.auth-minimal-surface button[type="submit"],
+.auth-minimal-surface button[type="submit"] *,
+.light .auth-minimal-surface .auth-minimal-primary,
+.light .auth-minimal-surface .auth-minimal-primary *,
+.dark .auth-minimal-surface .auth-minimal-primary,
+.dark .auth-minimal-surface .auth-minimal-primary * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.isgvizyon-landing-dark,
+.light .isgvizyon-landing-dark,
+.dark .isgvizyon-landing-dark {
+  background: #f8fbff !important;
+  color: #0f172a !important;
+  color-scheme: light !important;
+}
+
+.isgvizyon-landing-dark :is(.bg-white, .bg-slate-50, .bg-slate-100),
+.light .isgvizyon-landing-dark :is(.bg-white, .bg-slate-50, .bg-slate-100),
+.dark .isgvizyon-landing-dark :is(.bg-white, .bg-slate-50, .bg-slate-100) {
+  background-color: #ffffff !important;
+}
+
+.isgvizyon-landing-dark :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700),
+.light .isgvizyon-landing-dark :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700),
+.dark .isgvizyon-landing-dark :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-slate-700) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark :is(.text-slate-600, .text-slate-500, .text-slate-400),
+.light .isgvizyon-landing-dark :is(.text-slate-600, .text-slate-500, .text-slate-400),
+.dark .isgvizyon-landing-dark :is(.text-slate-600, .text-slate-500, .text-slate-400) {
+  color: #475569 !important;
+}
+
+.isgvizyon-landing-dark .text-transparent,
+.isgvizyon-landing-dark [class*="text-transparent"],
+.light .isgvizyon-landing-dark .text-transparent,
+.light .isgvizyon-landing-dark [class*="text-transparent"],
+.dark .isgvizyon-landing-dark .text-transparent,
+.dark .isgvizyon-landing-dark [class*="text-transparent"] {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Landing final contrast map: dark bands get light text, light cards get dark text. */
+.isgvizyon-landing-dark header,
+.isgvizyon-landing-dark [class*="bg-[#0b1424"],
+.isgvizyon-landing-dark [class*="from-slate-950"],
+.isgvizyon-landing-dark [class*="via-blue-950"],
+.isgvizyon-landing-dark [class*="to-slate-900"],
+.light .isgvizyon-landing-dark header,
+.light .isgvizyon-landing-dark [class*="bg-[#0b1424"],
+.light .isgvizyon-landing-dark [class*="from-slate-950"],
+.light .isgvizyon-landing-dark [class*="via-blue-950"],
+.light .isgvizyon-landing-dark [class*="to-slate-900"],
+.dark .isgvizyon-landing-dark header,
+.dark .isgvizyon-landing-dark [class*="bg-[#0b1424"],
+.dark .isgvizyon-landing-dark [class*="from-slate-950"],
+.dark .isgvizyon-landing-dark [class*="via-blue-950"],
+.dark .isgvizyon-landing-dark [class*="to-slate-900"] {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark header :is(h1, h2, h3, h4, p, span, label, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]):not([class*="text-transparent"]),
+.isgvizyon-landing-dark [class*="from-slate-950"] :is(h1, h2, h3, h4, p, span, label, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]):not([class*="text-transparent"]),
+.isgvizyon-landing-dark [class*="via-blue-950"] :is(h1, h2, h3, h4, p, span, label, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]):not([class*="text-transparent"]),
+.isgvizyon-landing-dark [class*="to-slate-900"] :is(h1, h2, h3, h4, p, span, label, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]):not([class*="text-transparent"]),
+.isgvizyon-landing-dark [class*="bg-[#0b1424"] :is(h1, h2, h3, h4, p, span, label, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]):not([class*="text-transparent"]) {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark header :is(.text-slate-500, .text-slate-600, .text-slate-700),
+.isgvizyon-landing-dark [class*="from-slate-950"] :is(.text-slate-500, .text-slate-600, .text-slate-700),
+.isgvizyon-landing-dark [class*="via-blue-950"] :is(.text-slate-500, .text-slate-600, .text-slate-700),
+.isgvizyon-landing-dark [class*="to-slate-900"] :is(.text-slate-500, .text-slate-600, .text-slate-700) {
+  color: #cbd5e1 !important;
+}
+
+.isgvizyon-landing-dark header button[class*="bg-white"],
+.isgvizyon-landing-dark header button[class*="bg-sky-50"],
+.isgvizyon-landing-dark header [class*="bg-white"] :is(span, p),
+.isgvizyon-landing-dark header [class*="bg-sky-50"] :is(span, p),
+.isgvizyon-landing-dark [class*="from-slate-950"] button[class*="bg-white"],
+.isgvizyon-landing-dark [class*="from-slate-950"] button[class*="bg-sky-50"] {
+  color: #075985 !important;
+  -webkit-text-fill-color: #075985 !important;
+}
+
+.isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(h1, h2, h3, h4, p, span, label, li):not([class*="text-transparent"]),
+.light .isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(h1, h2, h3, h4, p, span, label, li):not([class*="text-transparent"]),
+.dark .isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(h1, h2, h3, h4, p, span, label, li):not([class*="text-transparent"]) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, li),
+.light .isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, li),
+.dark .isgvizyon-landing-dark :is(article, footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, li) {
+  color: #334155 !important;
+}
+
+.isgvizyon-landing-dark .bg-emerald-50 :is(p, span, div),
+.isgvizyon-landing-dark [class*="bg-emerald-50"] :is(p, span, div),
+.isgvizyon-landing-dark [class*="bg-green-50"] :is(p, span, div) {
+  color: #047857 !important;
+}
+
+.isgvizyon-landing-dark :is(.text-blue-700, .text-sky-700, .text-cyan-700),
+.isgvizyon-landing-dark :is([class*="bg-white"], [class*="bg-sky-50"]) :is(.text-blue-700, .text-sky-700, .text-cyan-700) {
+  color: #0369a1 !important;
+}
+
+.isgvizyon-landing-dark :is(.text-emerald-700, .text-green-700),
+.isgvizyon-landing-dark :is([class*="bg-emerald-50"], [class*="bg-green-50"]) :is(.text-emerald-700, .text-green-700) {
+  color: #047857 !important;
+}
+
 /* Single-theme auth lock: login/register screens must stay dark after theme toggle removal. */
 html,
 body {
@@ -1941,4 +2169,495 @@ body.dark .auth-minimal-surface .auth-minimal-primary * {
 .light .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"],
 .dark .auth-showcase-surface [data-auth-right-panel="true"] button[type="submit"] {
   color: #ffffff !important;
+}
+/* Landing/readability absolute final pass. Keep this block at EOF. */
+.isgvizyon-landing-dark header :is(h1, h2, h3, h4, p, span, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]),
+.isgvizyon-landing-dark [class*="from-slate-950"] :is(h1, h2, h3, h4, p, span, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]),
+.isgvizyon-landing-dark [class*="via-blue-950"] :is(h1, h2, h3, h4, p, span, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]),
+.isgvizyon-landing-dark [class*="to-slate-900"] :is(h1, h2, h3, h4, p, span, a, button):not([class*="bg-white"]):not([class*="bg-sky-50"]) {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark :is(footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(h1, h2, h3, h4, p, span, li, label):not([class*="text-transparent"]) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark :is(footer, [class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, li) {
+  color: #334155 !important;
+}
+
+.isgvizyon-landing-dark :is([class*="bg-emerald-50"], [class*="bg-green-50"]) :is(p, span, div) {
+  color: #064e3b !important;
+}
+
+.isgvizyon-landing-dark :is([class*="bg-emerald-50"], [class*="bg-green-50"]) svg,
+.isgvizyon-landing-dark :is([class*="text-emerald-700"], [class*="text-green-700"]) {
+  color: #047857 !important;
+}
+
+.isgvizyon-landing-dark :is(button, a)[class*="bg-white"],
+.isgvizyon-landing-dark :is(button, a)[class*="bg-sky-50"] {
+  color: #1d4ed8 !important;
+}
+
+.isgvizyon-landing-dark :is(button, a)[class*="from-blue"],
+.isgvizyon-landing-dark :is(button, a)[class*="from-violet"],
+.isgvizyon-landing-dark :is(button, a)[class*="from-emerald"] {
+  color: #ffffff !important;
+}
+
+/* Landing dark cards: readable text on every dark marketing surface. */
+.isgvizyon-landing-dark :is(
+  [class*="bg-[#08111f]"],
+  [class*="bg-[#0b1424]"],
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="from-slate-950"],
+  [class*="via-blue-950"],
+  [class*="to-slate-900"]
+) :is(h1, h2, h3, h4, h5, h6, p, span, li, label, strong, small):not([class*="text-transparent"]) {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark :is(
+  [class*="bg-[#08111f]"],
+  [class*="bg-[#0b1424]"],
+  [class*="bg-slate-950"],
+  [class*="bg-slate-900"],
+  [class*="bg-slate-800"],
+  [class*="from-slate-950"],
+  [class*="via-blue-950"],
+  [class*="to-slate-900"]
+) :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, .text-slate-800, .text-slate-900, .text-slate-950) {
+  color: #e2e8f0 !important;
+}
+
+.isgvizyon-landing-dark :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-sky-50"]) :is(h1, h2, h3, h4, h5, h6, p, span, li, label, strong, small):not([class*="text-transparent"]) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark :is([class*="bg-emerald-50"], [class*="bg-green-50"]) :is(p, span, li, label, strong, small) {
+  color: #064e3b !important;
+}
+
+.isgvizyon-landing-dark :is([class*="bg-white/5"], [class*="bg-white/10"], [class*="bg-slate-800"], [class*="bg-slate-900"]) :is(h1, h2, h3, h4, h5, h6, p, span, li, label, strong, small):not([class*="text-transparent"]) {
+  color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark header.bg-white\/95 :is(span, p) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark header.bg-white\/95 nav button:not([class*="from-blue"]) {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark header.bg-white\/95 nav button:not([class*="from-blue"]):hover {
+  color: #1d4ed8 !important;
+}
+
+.isgvizyon-landing-dark header.bg-white\/95 nav button[class*="after:bg-cyan-500"] {
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark header.bg-white\/95 button[class*="from-blue"] {
+  color: #ffffff !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header :is(span, p, button, a),
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header :is(span, p, button, a),
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header :is(span, p, button, a) {
+  color: #0f172a !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header nav button:hover,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header nav button:hover,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header nav button:hover {
+  color: #1d4ed8 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header button[class*="from-blue"],
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header button[class*="from-blue"],
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header button[class*="from-blue"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-brand-word,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-brand-word,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-brand-word {
+  background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 42%, #06b6d4 100%) !important;
+  background-clip: text !important;
+  -webkit-background-clip: text !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: 0 10px 24px rgba(37, 99, 235, 0.16);
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item {
+  color: #1d4ed8 !important;
+  -webkit-text-fill-color: #1d4ed8 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item:hover,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item:hover,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item:hover {
+  color: #0f5bd7 !important;
+  -webkit-text-fill-color: #0f5bd7 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item svg,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item svg,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header .isgvizyon-marketing-nav-item svg {
+  color: #3b82f6 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button {
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 46%, #dbeafe 100%) !important;
+  color: #1d4ed8 !important;
+  -webkit-text-fill-color: #1d4ed8 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button:hover,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button:hover,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-header button.isgvizyon-login-button:hover {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 48%, #cffafe 100%) !important;
+  color: #1e40af !important;
+  -webkit-text-fill-color: #1e40af !important;
+}
+
+@media (max-width: 1023px) {
+  .isgvizyon-landing-dark .isgvizyon-marketing-header > div {
+    display: flex !important;
+    justify-content: space-between !important;
+  }
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-title,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-title,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-title {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 16px 38px rgba(2, 6, 23, 0.45);
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-description,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-description,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-hero .isgvizyon-marketing-hero-description {
+  color: #dbeafe !important;
+  -webkit-text-fill-color: #dbeafe !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-marketing-hero .bg-white,
+.light .isgvizyon-landing-dark .isgvizyon-marketing-hero .bg-white,
+.dark .isgvizyon-landing-dark .isgvizyon-marketing-hero .bg-white {
+  color: #1d4ed8 !important;
+  -webkit-text-fill-color: #1d4ed8 !important;
+}
+
+.isgvizyon-hero-sidebar,
+.light .isgvizyon-hero-sidebar,
+.dark .isgvizyon-hero-sidebar {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.isgvizyon-hero-sidebar p,
+.isgvizyon-hero-sidebar div,
+.isgvizyon-hero-sidebar span,
+.light .isgvizyon-hero-sidebar p,
+.light .isgvizyon-hero-sidebar div,
+.light .isgvizyon-hero-sidebar span,
+.dark .isgvizyon-hero-sidebar p,
+.dark .isgvizyon-hero-sidebar div,
+.dark .isgvizyon-hero-sidebar span {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.isgvizyon-hero-sidebar .text-slate-400,
+.isgvizyon-hero-sidebar .text-slate-300,
+.light .isgvizyon-hero-sidebar .text-slate-400,
+.light .isgvizyon-hero-sidebar .text-slate-300,
+.dark .isgvizyon-hero-sidebar .text-slate-400,
+.dark .isgvizyon-hero-sidebar .text-slate-300 {
+  color: #cbd5e1 !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card,
+.light .auth-minimal-surface .isgvizyon-auth-card,
+.dark .auth-minimal-surface .isgvizyon-auth-card,
+html.dark .auth-minimal-surface .isgvizyon-auth-card,
+body.dark .auth-minimal-surface .isgvizyon-auth-card {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border-color: rgba(125, 211, 252, 0.24) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 32px 90px rgba(2, 6, 23, 0.32) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card :is(h1, h2, h3, p, label, span, button, div),
+.light .auth-minimal-surface .isgvizyon-auth-card :is(h1, h2, h3, p, label, span, button, div),
+.dark .auth-minimal-surface .isgvizyon-auth-card :is(h1, h2, h3, p, label, span, button, div) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-500"],
+.auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-600"],
+.auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-700"],
+.light .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-500"],
+.light .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-600"],
+.light .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-700"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-500"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-600"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [class*="text-slate-700"] {
+  color: #cbd5e1 !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-input-shell="true"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-input-shell="true"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-input-shell="true"] {
+  background: #ffffff !important;
+  border-color: rgba(226, 232, 240, 0.9) !important;
+  box-shadow: 0 14px 30px rgba(2, 6, 23, 0.16) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-input-inner="true"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-input-inner="true"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-input-inner="true"] {
+  background: #0f172a !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card input,
+.auth-minimal-surface .isgvizyon-auth-card textarea,
+.auth-minimal-surface .isgvizyon-auth-card select,
+.light .auth-minimal-surface .isgvizyon-auth-card input,
+.light .auth-minimal-surface .isgvizyon-auth-card textarea,
+.light .auth-minimal-surface .isgvizyon-auth-card select,
+.dark .auth-minimal-surface .isgvizyon-auth-card input,
+.dark .auth-minimal-surface .isgvizyon-auth-card textarea,
+.dark .auth-minimal-surface .isgvizyon-auth-card select {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #38bdf8 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card input::placeholder,
+.auth-minimal-surface .isgvizyon-auth-card textarea::placeholder,
+.light .auth-minimal-surface .isgvizyon-auth-card input::placeholder,
+.light .auth-minimal-surface .isgvizyon-auth-card textarea::placeholder,
+.dark .auth-minimal-surface .isgvizyon-auth-card input::placeholder,
+.dark .auth-minimal-surface .isgvizyon-auth-card textarea::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+  opacity: 1 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card input:-webkit-autofill,
+.auth-minimal-surface .isgvizyon-auth-card input:-webkit-autofill:hover,
+.auth-minimal-surface .isgvizyon-auth-card input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary,
+.auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary *,
+.light .auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary,
+.light .auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary *,
+.dark .auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary,
+.dark .auth-minimal-surface .isgvizyon-auth-card .auth-minimal-primary * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card :is(.bg-white, .bg-slate-50, .bg-violet-50),
+.light .auth-minimal-surface .isgvizyon-auth-card :is(.bg-white, .bg-slate-50, .bg-violet-50),
+.dark .auth-minimal-surface .isgvizyon-auth-card :is(.bg-white, .bg-slate-50, .bg-violet-50) {
+  background: #111c31 !important;
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-input-shell="true"] {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card button.bg-white,
+.light .auth-minimal-surface .isgvizyon-auth-card button.bg-white,
+.dark .auth-minimal-surface .isgvizyon-auth-card button.bg-white {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card button.bg-white *,
+.light .auth-minimal-surface .isgvizyon-auth-card button.bg-white *,
+.dark .auth-minimal-surface .isgvizyon-auth-card button.bg-white * {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice] {
+  color-scheme: light !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"] {
+  background: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"] {
+  background: #fffbeb !important;
+  border-color: #f59e0b !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="info"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="info"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="info"] {
+  background: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="error"],
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="error"],
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="error"] {
+  background: #fff1f2 !important;
+  border-color: #fb7185 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice] :is(div, p, span, strong, small),
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice] :is(div, p, span, strong, small),
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice] :is(div, p, span, strong, small) {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"] svg,
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"] svg,
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="success"] svg {
+  color: #059669 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"] svg,
+.light .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"] svg,
+.dark .auth-minimal-surface .isgvizyon-auth-card [data-auth-notice="warning"] svg {
+  color: #d97706 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase,
+.light .auth-minimal-surface .isgvizyon-auth-showcase,
+.dark .auth-minimal-surface .isgvizyon-auth-showcase {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase :is(h1, h2, h3, p, label, strong),
+.light .auth-minimal-surface .isgvizyon-auth-showcase :is(h1, h2, h3, p, label, strong),
+.dark .auth-minimal-surface .isgvizyon-auth-showcase :is(h1, h2, h3, p, label, strong) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-500"],
+.auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-600"],
+.auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-700"],
+.light .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-500"],
+.light .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-600"],
+.light .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-700"],
+.dark .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-500"],
+.dark .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-600"],
+.dark .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-slate-700"] {
+  color: #cbd5e1 !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase .text-transparent,
+.auth-minimal-surface .isgvizyon-auth-showcase [class*="text-transparent"],
+.light .auth-minimal-surface .isgvizyon-auth-showcase .text-transparent,
+.light .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-transparent"],
+.dark .auth-minimal-surface .isgvizyon-auth-showcase .text-transparent,
+.dark .auth-minimal-surface .isgvizyon-auth-showcase [class*="text-transparent"] {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-slate-100"]),
+.light .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-slate-100"]),
+.dark .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-white"], [class*="bg-slate-50"], [class*="bg-slate-100"]) {
+  background: rgba(15, 23, 42, 0.78) !important;
+  border-color: rgba(125, 211, 252, 0.24) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase :is([class*="border-white"], [class*="border-slate-100"], [class*="border-blue-100"], [class*="border-cyan-100"], [class*="border-violet-100"]),
+.light .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="border-white"], [class*="border-slate-100"], [class*="border-blue-100"], [class*="border-cyan-100"], [class*="border-violet-100"]),
+.dark .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="border-white"], [class*="border-slate-100"], [class*="border-blue-100"], [class*="border-cyan-100"], [class*="border-violet-100"]) {
+  border-color: rgba(125, 211, 252, 0.26) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-cyan-50"], [class*="bg-blue-50"], [class*="bg-violet-50"], [class*="bg-emerald-50"]),
+.light .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-cyan-50"], [class*="bg-blue-50"], [class*="bg-violet-50"], [class*="bg-emerald-50"]),
+.dark .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="bg-cyan-50"], [class*="bg-blue-50"], [class*="bg-violet-50"], [class*="bg-emerald-50"]) {
+  background: rgba(14, 165, 233, 0.14) !important;
+  border-color: rgba(125, 211, 252, 0.22) !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase :is([class*="text-slate-950"], [class*="text-slate-900"], [class*="text-slate-500"], [class*="text-cyan-700"], [class*="text-blue-600"], [class*="text-violet-600"], [class*="text-emerald-700"]),
+.light .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="text-slate-950"], [class*="text-slate-900"], [class*="text-slate-500"], [class*="text-cyan-700"], [class*="text-blue-600"], [class*="text-violet-600"], [class*="text-emerald-700"]),
+.dark .auth-minimal-surface .isgvizyon-auth-showcase :is([class*="text-slate-950"], [class*="text-slate-900"], [class*="text-slate-500"], [class*="text-cyan-700"], [class*="text-blue-600"], [class*="text-violet-600"], [class*="text-emerald-700"]) {
+  color: #e0f2fe !important;
+  -webkit-text-fill-color: #e0f2fe !important;
+}
+
+.auth-minimal-surface .isgvizyon-auth-showcase svg,
+.light .auth-minimal-surface .isgvizyon-auth-showcase svg,
+.dark .auth-minimal-surface .isgvizyon-auth-showcase svg {
+  color: #67e8f9 !important;
+}
+
+.auth-minimal-surface,
+.light .auth-minimal-surface,
+.dark .auth-minimal-surface,
+html.dark .auth-minimal-surface,
+body.dark .auth-minimal-surface {
+  background:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.18), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.15), transparent 31%),
+    linear-gradient(180deg, #ffffff 0%, #f7fbff 100%) !important;
+  color-scheme: light !important;
+}
+
+@media (max-width: 1023px) {
+  .auth-minimal-surface,
+  .light .auth-minimal-surface,
+  .dark .auth-minimal-surface,
+  html.dark .auth-minimal-surface,
+  body.dark .auth-minimal-surface {
+    background:
+      radial-gradient(circle at top left, rgba(34, 211, 238, 0.18), transparent 32%),
+      radial-gradient(circle at bottom right, rgba(124, 58, 237, 0.16), transparent 34%),
+      linear-gradient(180deg, #ffffff 0%, #f7fbff 100%) !important;
+  }
 }

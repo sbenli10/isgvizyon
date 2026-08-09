@@ -3,39 +3,66 @@ import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { buildAppUrl, createAdminSupabaseClient, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
 type CheckoutPlanCode = "premium" | "osgb";
+type BillingPeriod = "monthly" | "yearly";
+
+function safeCheckoutError(message: string, code = "checkout_not_ready") {
+  return jsonResponse(200, {
+    success: false,
+    error: { code, message },
+  });
+}
+
+function getPlanLabel(planCode: CheckoutPlanCode) {
+  return planCode === "osgb" ? "OSGB" : "Premium";
+}
+
+function getStripeSecretKey() {
+  return Deno.env.get("STRIPE_SECRET_KEY")?.trim() || "";
+}
+
+function getFallbackPriceId(planCode: CheckoutPlanCode, billingPeriod: BillingPeriod) {
+  if (planCode === "osgb") {
+    return billingPeriod === "yearly"
+      ? Deno.env.get("STRIPE_OSGB_YEARLY_PRICE_ID")?.trim()
+      : Deno.env.get("STRIPE_OSGB_MONTHLY_PRICE_ID")?.trim();
+  }
+
+  return billingPeriod === "yearly"
+    ? Deno.env.get("STRIPE_PREMIUM_YEARLY_PRICE_ID")?.trim()
+    : Deno.env.get("STRIPE_PREMIUM_MONTHLY_PRICE_ID")?.trim();
+}
 
 async function resolvePriceId(
   adminClient: ReturnType<typeof createAdminSupabaseClient>,
   planCode: CheckoutPlanCode,
-  billingPeriod: "monthly" | "yearly",
+  billingPeriod: BillingPeriod,
 ) {
-  const { data: planRow } = await adminClient
+  const fallbackPriceId = getFallbackPriceId(planCode, billingPeriod);
+
+  const { data: planRow, error: planError } = await adminClient
     .from("subscription_plans")
     .select("provider_monthly_price_id, provider_yearly_price_id, checkout_enabled, is_active")
     .or(`plan_code.eq.${planCode},code.eq.${planCode}`)
     .maybeSingle();
 
+  if (planError) {
+    console.warn("billing-checkout plan lookup failed; falling back to env price id", {
+      planCode,
+      billingPeriod,
+      message: planError.message,
+    });
+    return fallbackPriceId || null;
+  }
+
   if (planRow && (planRow.checkout_enabled === false || planRow.is_active === false)) {
-    throw new Error(`${planCode === "osgb" ? "OSGB" : "Premium"} planı için ödeme ekranı geçici olarak kapalı.`);
+    throw new Error(`${getPlanLabel(planCode)} planı için ödeme ekranı geçici olarak kapalı.`);
   }
 
   const databasePriceId = billingPeriod === "yearly"
-    ? planRow?.provider_yearly_price_id
-    : planRow?.provider_monthly_price_id;
+    ? planRow?.provider_yearly_price_id?.trim()
+    : planRow?.provider_monthly_price_id?.trim();
 
-  if (databasePriceId) {
-    return databasePriceId;
-  }
-
-  if (planCode === "osgb") {
-    return billingPeriod === "yearly"
-      ? Deno.env.get("STRIPE_OSGB_YEARLY_PRICE_ID")
-      : Deno.env.get("STRIPE_OSGB_MONTHLY_PRICE_ID");
-  }
-
-  return billingPeriod === "yearly"
-    ? Deno.env.get("STRIPE_PREMIUM_YEARLY_PRICE_ID")
-    : Deno.env.get("STRIPE_PREMIUM_MONTHLY_PRICE_ID");
+  return databasePriceId || fallbackPriceId || null;
 }
 
 serve(async (req): Promise<Response> => {
@@ -45,34 +72,43 @@ serve(async (req): Promise<Response> => {
 
   try {
     const body = await req.json().catch(() => ({}));
-    const billingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
+    const billingPeriod: BillingPeriod = body?.billingPeriod === "yearly" ? "yearly" : "monthly";
     const planCode: CheckoutPlanCode = body?.planCode === "osgb" ? "osgb" : "premium";
+
+    if (!getStripeSecretKey()) {
+      console.error("billing-checkout missing STRIPE_SECRET_KEY");
+      return safeCheckoutError(
+        "Ödeme altyapısı henüz tamamlanmamış. Lütfen daha sonra tekrar deneyin veya destek ekibine bildirin.",
+        "payment_provider_not_configured",
+      );
+    }
+
     const context = await requireBillingContext(req, { allowNoOrganization: planCode === "premium" });
     if ("errorResponse" in context) {
       return context.errorResponse as Response;
     }
 
     if (!context.stripe) {
-      return jsonResponse(500, {
-        success: false,
-        error: { message: "Stripe istemcisi baslatilamadi." },
-      });
+      return safeCheckoutError(
+        "Ödeme altyapısı şu anda başlatılamıyor. Lütfen daha sonra tekrar deneyin.",
+        "payment_provider_unavailable",
+      );
     }
 
     if (planCode === "osgb" && !context.profile.organization_id) {
-      return jsonResponse(400, {
-        success: false,
-        error: { message: "OSGB plani icin once organizasyon kaydi olusturmaniz gerekir." },
-      });
+      return safeCheckoutError(
+        "OSGB planına geçmek için önce çalışma alanı oluşturmanız gerekir.",
+        "organization_required",
+      );
     }
 
     const isPersonalPremiumCheckout = planCode === "premium" && !context.profile.organization_id;
 
     if (!isPersonalPremiumCheckout && !context.isOrgAdmin) {
-      return jsonResponse(403, {
-        success: false,
-        error: { message: "Abonelik islemlerini yalnizca organizasyon yoneticisi baslatabilir." },
-      });
+      return safeCheckoutError(
+        "Abonelik işlemlerini yalnızca organizasyon yöneticisi başlatabilir.",
+        "organization_admin_required",
+      );
     }
 
     const successPath = typeof body?.successPath === "string" ? body.successPath : "/settings";
@@ -81,38 +117,35 @@ serve(async (req): Promise<Response> => {
     const priceId = await resolvePriceId(adminClient, planCode, billingPeriod);
 
     if (!priceId) {
-      return jsonResponse(500, {
-        success: false,
-        error: {
-          message:
-            planCode === "osgb"
-              ? "Stripe OSGB fiyat tanimi eksik. STRIPE_OSGB_*_PRICE_ID secret'lerini ekleyin."
-              : "Stripe premium fiyat tanimi eksik. STRIPE_PREMIUM_*_PRICE_ID secret'lerini ekleyin.",
-        },
-      });
+      console.error("billing-checkout missing price id", { planCode, billingPeriod });
+      return safeCheckoutError(
+        `${getPlanLabel(planCode)} planı için ödeme fiyatı henüz tanımlanmamış. Lütfen destek ekibine bildirin.`,
+        "price_not_configured",
+      );
     }
 
     const appUrl = getPublicAppUrl(req);
 
-    const { data: existingSubscription } = context.profile.organization_id
+    const { data: existingSubscription, error: existingSubscriptionError } = context.profile.organization_id
       ? await adminClient
           .from("organization_subscriptions")
           .select("id, stripe_customer_id, stripe_subscription_id, plan_code, trial_ends_at")
           .eq("org_id", context.profile.organization_id)
           .maybeSingle()
-      : { data: null };
+      : { data: null, error: null };
+
+    if (existingSubscriptionError) {
+      console.warn("billing-checkout existing subscription lookup failed", existingSubscriptionError.message);
+    }
 
     if (
       planCode === "premium" &&
       (existingSubscription?.plan_code === "osgb" || context.profile.subscription_plan === "osgb")
     ) {
-      return jsonResponse(409, {
-        success: false,
-        error: {
-          message:
-            "OSGB paketinde Premium özellikleri zaten dahildir. OSGB üyeliği aktifken ayrıca Premium pakete geçiş başlatılamaz.",
-        },
-      });
+      return safeCheckoutError(
+        "OSGB paketinde Premium özellikleri zaten dahildir. OSGB üyeliği aktifken ayrıca Premium pakete geçiş başlatılamaz.",
+        "premium_included_in_osgb",
+      );
     }
 
     let stripeCustomerId = existingSubscription?.stripe_customer_id ?? null;
@@ -161,7 +194,7 @@ serve(async (req): Promise<Response> => {
     });
 
     if (context.profile.organization_id) {
-      await adminClient
+      const { error: subscriptionUpsertError } = await adminClient
         .from("organization_subscriptions")
         .upsert({
           org_id: context.profile.organization_id,
@@ -172,6 +205,10 @@ serve(async (req): Promise<Response> => {
           last_checkout_session_id: session.id,
           updated_at: new Date().toISOString(),
         }, { onConflict: "org_id" });
+
+      if (subscriptionUpsertError) {
+        console.warn("billing-checkout subscription checkout marker failed", subscriptionUpsertError.message);
+      }
     }
 
     return jsonResponse(200, {
@@ -180,10 +217,24 @@ serve(async (req): Promise<Response> => {
     });
   } catch (error) {
     console.error("billing-checkout error", error);
-    const message = error instanceof Error ? error.message : "Checkout oturumu olusturulamadi.";
-    return jsonResponse(500, {
-      success: false,
-      error: { message },
-    });
+    const rawMessage = error instanceof Error ? error.message : "";
+    const normalized = rawMessage.toLocaleLowerCase("tr-TR");
+
+    if (
+      normalized.includes("no such price") ||
+      normalized.includes("no such customer") ||
+      normalized.includes("invalid api key") ||
+      normalized.includes("price")
+    ) {
+      return safeCheckoutError(
+        "Ödeme sağlayıcısı ayarlarında eksik veya hatalı bilgi var. Lütfen destek ekibine bildirin.",
+        "payment_provider_setup_error",
+      );
+    }
+
+    return safeCheckoutError(
+      "Ödeme ekranı şu anda açılamıyor. Birkaç dakika sonra tekrar deneyin.",
+      "checkout_failed",
+    );
   }
 });

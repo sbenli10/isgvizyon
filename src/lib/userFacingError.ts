@@ -143,8 +143,8 @@ export function getUserFacingError(error: unknown): UserFacingErrorDetails {
   if (matches(text, ["row-level security", "violates row-level security policy", "rls"])) {
     return {
       title: "Bu kayıt için erişim izni yok",
-      description: "Veritabanı güvenlik kuralı bu işlemi kabul etmedi.",
-      action: "Doğru organizasyon veya firma üzerinde çalıştığınızdan emin olun. Sorun sürerse yönetici yetkileri kontrol edilmeli.",
+      description: "Güvenlik kuralları bu işlemi kabul etmedi.",
+      action: "Doğru organizasyon veya firma üzerinde çalıştığınızdan emin olun.",
       severity: "warning",
       code: "rls_policy",
     };
@@ -192,9 +192,9 @@ export function getUserFacingError(error: unknown): UserFacingErrorDetails {
 
   if (status && status >= 500) {
     return {
-      title: "Servis geçici olarak yanıt veremiyor",
-      description: "Sunucu tarafında geçici bir sorun oluştu.",
-      action: "Birkaç dakika sonra tekrar deneyin. Sorun sürerse sistem yöneticisine bildirin.",
+      title: "Sistem şu anda yanıt veremiyor",
+      description: "Kayıtlar, oturum bilgileri veya rapor ekranları geçici olarak açılamıyor.",
+      action: "Birkaç dakika sonra yeniden deneyin. Sorun devam ederse destek ekibine bildirin.",
       severity: "error",
       code: "server_error",
     };
@@ -243,8 +243,8 @@ export function getUserFacingError(error: unknown): UserFacingErrorDetails {
   if (matches(text, ["json", "syntaxerror", "expected ','", "unexpected token", "parse"])) {
     return {
       title: "Gelen veri okunamadı",
-      description: "Servisten dönen yanıt beklenen formatta değil.",
-      action: "İşlemi tekrar deneyin. AI veya entegrasyon işlemlerinde sorun sürerse teknik loglar kontrol edilmeli.",
+      description: "Sistemden dönen yanıt beklenen formatta değil.",
+      action: "İşlemi tekrar deneyin. Sorun sürerse destek ekibine bildirin.",
       severity: "error",
       code: "parse",
     };

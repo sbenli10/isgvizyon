@@ -18,6 +18,13 @@ const DEFAULT_INCIDENT: SupabaseServiceIncident = {
   updatedAt: 0,
 };
 
+const USER_FACING_SERVICE_ERROR = {
+  title: "Sistem şu anda yanıt veremiyor",
+  description:
+    "Kayıtlar, oturum bilgileri veya rapor ekranları geçici olarak açılamıyor. Bu durum genellikle kısa süre içinde düzelir.",
+  action: "Birkaç dakika sonra yeniden deneyin. Sorun devam ederse destek ekibine bildirin.",
+};
+
 let incidentState: SupabaseServiceIncident = DEFAULT_INCIDENT;
 const listeners = new Set<Listener>();
 
@@ -45,16 +52,11 @@ export function reportSupabaseIncident(input: {
   statusCode?: number;
   description?: string;
 }) {
-  const title = "Sistem geçici bakımda veya veri servisi yanıt vermiyor";
-  const description =
-    input.description ||
-    "Uygulamanın veri aldığı Supabase servisleri şu anda sağlıklı yanıt vermiyor. Bu nedenle kayıtlar, oturum yenileme ve rapor ekranları geçici olarak açılamayabilir.";
-
   emit({
     unavailable: true,
-    title,
-    description,
-    action: "Birkaç dakika sonra tekrar deneyin. Sorun sürerse Supabase proje sağlığını ve servis durumunu kontrol edin.",
+    title: USER_FACING_SERVICE_ERROR.title,
+    description: USER_FACING_SERVICE_ERROR.description,
+    action: USER_FACING_SERVICE_ERROR.action,
     statusCode: input.statusCode,
     source: input.source,
     updatedAt: Date.now(),

@@ -48,9 +48,9 @@ const planAccent = {
   },
   OSGB: {
     icon: Users,
-    labelClass: "bg-white/10 text-white",
-    dotClass: "bg-cyan-300",
-    buttonClass: "bg-gradient-to-r from-cyan-400 to-blue-500 text-white hover:from-cyan-300 hover:to-blue-400",
+    labelClass: "bg-white/20 !text-white",
+    dotClass: "bg-white",
+    buttonClass: "border border-white/30 bg-white/20 !text-white hover:bg-white/30",
   },
 } satisfies Record<PricingPlan["title"], { icon: typeof ShieldCheck; labelClass: string; dotClass: string; buttonClass: string }>;
 
@@ -89,14 +89,14 @@ function PlanFeatureItem({
   featured: boolean;
 }) {
   const status = getFeatureStatus(value);
-  const textClass = featured ? "text-white" : "text-slate-950";
-  const mutedClass = featured ? "text-slate-300" : "text-slate-600";
+  const textClass = featured ? "!text-white" : "text-slate-950";
+  const mutedClass = featured ? "!text-slate-200" : "text-slate-600";
 
   if (status === "included") {
     return (
       <li className={`flex items-start gap-3 text-sm ${textClass}`}>
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-        <span className="font-semibold">{label}</span>
+        <span className={featured ? "font-semibold !text-white" : "font-semibold"}>{label}</span>
       </li>
     );
   }
@@ -105,7 +105,7 @@ function PlanFeatureItem({
     return (
       <li className={`flex items-start gap-3 text-sm ${textClass}`}>
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
-        <span className="font-semibold">{label} ({value})</span>
+        <span className={featured ? "font-semibold !text-white" : "font-semibold"}>{label} ({value})</span>
       </li>
     );
   }
@@ -114,7 +114,7 @@ function PlanFeatureItem({
     return (
       <li className={`flex items-start gap-3 text-sm ${mutedClass}`}>
         <Minus className="mt-0.5 h-4 w-4 shrink-0" />
-        <span className="line-through decoration-slate-300">{label}</span>
+        <span className={featured ? "line-through !text-slate-300 decoration-slate-300" : "line-through decoration-slate-300"}>{label}</span>
       </li>
     );
   }
@@ -123,7 +123,7 @@ function PlanFeatureItem({
     <li className={`flex items-start gap-3 text-sm ${textClass}`}>
       <Zap className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
       <span>
-        <span className="font-semibold">{label}</span>
+        <span className={featured ? "font-semibold !text-white" : "font-semibold"}>{label}</span>
         <span className={`ml-2 ${mutedClass}`}>({value})</span>
       </span>
     </li>
@@ -283,13 +283,13 @@ export default function LandingPricing() {
               className={[
                 "relative flex min-h-[620px] flex-col overflow-hidden rounded-[30px] border p-6 transition-all duration-300 hover:-translate-y-1",
                 featured
-                  ? "border-slate-800 bg-slate-900 text-white shadow-[0_28px_90px_rgba(15,23,42,0.22)]"
+                  ? "border-orange-300 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 text-white shadow-[0_28px_90px_rgba(234,88,12,0.28)]"
                   : "border-slate-200 bg-white text-slate-950 shadow-[0_18px_55px_rgba(15,23,42,0.08)]",
               ].join(" ")}
             >
               {featured ? (
                 <div className="absolute inset-x-0 top-0 flex justify-center">
-                  <Badge className="mt-[-1px] rounded-b-2xl rounded-t-none border-0 bg-gradient-to-r from-blue-600 to-cyan-500 px-6 py-2 text-xs font-black text-white shadow-lg">
+                  <Badge className="mt-[-1px] rounded-b-2xl rounded-t-none border-0 bg-white px-6 py-2 text-xs font-black !text-orange-700 shadow-lg">
                     Öne Çıkan OSGB Paketi
                   </Badge>
                 </div>
@@ -310,46 +310,46 @@ export default function LandingPricing() {
                   <div
                     className={[
                       "flex h-11 w-11 items-center justify-center rounded-2xl border",
-                      featured ? "border-white/10 bg-white/10 text-cyan-200" : "border-slate-200 bg-white text-slate-950",
+                      featured ? "border-white/30 bg-white/15 text-white" : "border-slate-200 bg-white text-slate-950",
                     ].join(" ")}
                   >
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className={`text-sm font-bold ${featured ? "text-slate-200" : "text-slate-950"}`}>{plan.audience}</p>
-                    <p className={`mt-1 text-xs font-semibold ${featured ? "text-cyan-200" : "text-slate-700"}`}>{plan.badge}</p>
+                    <p className={`text-sm font-bold ${featured ? "!text-white" : "text-slate-950"}`}>{plan.audience}</p>
+                    <p className={`mt-1 text-xs font-semibold ${featured ? "!text-cyan-100" : "text-slate-700"}`}>{plan.badge}</p>
                   </div>
                 </div>
 
                 <div className="mt-6">
                   <div className="flex items-end gap-2">
-                    <p className={`text-5xl font-black tracking-[-0.07em] ${featured ? "text-white" : "text-slate-950"}`}>
+                    <p className={`text-5xl font-black tracking-[-0.07em] ${featured ? "!text-white" : "text-slate-950"}`}>
                       {plan.price}
                     </p>
-                    <span className={`pb-2 text-sm font-semibold ${featured ? "text-slate-300" : "text-slate-700"}`}>
+                    <span className={`pb-2 text-sm font-semibold ${featured ? "!text-slate-200" : "text-slate-700"}`}>
                       {plan.period}
                     </span>
                   </div>
-                  <p className={`mt-3 min-h-[92px] text-sm font-medium leading-7 ${featured ? "text-slate-200" : "text-slate-950"}`}>
+                  <p className={`mt-3 min-h-[92px] text-sm font-medium leading-7 ${featured ? "!text-slate-100" : "text-slate-950"}`}>
                     {plan.description}
                   </p>
                 </div>               
               </div>
 
               <div className="mt-7 flex-1">
-                <p className={`text-sm font-black underline underline-offset-4 ${featured ? "text-white" : "text-slate-950"}`}>
+                <p className={`text-sm font-black underline underline-offset-4 ${featured ? "!text-white" : "text-slate-950"}`}>
                   Paket özellikleri:
                 </p>
                 <ul className="mt-5 space-y-4">
                   {plan.bullets.map((bullet) => (
-                    <li key={bullet} className={`flex items-start gap-3 text-sm font-semibold ${featured ? "text-white" : "text-slate-950"}`}>
+                    <li key={bullet} className={`flex items-start gap-3 text-sm font-semibold ${featured ? "!text-white" : "text-slate-950"}`}>
                       <span className={`mt-2 h-2 w-2 shrink-0 rounded-full ${accent.dotClass}`} />
                       {bullet}
                     </li>
                   ))}
                 </ul>
 
-                <div className={`mt-6 rounded-[22px] border p-4 ${featured ? "border-white/10 bg-white/5" : "border-slate-200 bg-white"}`}>
+                <div className={`mt-6 rounded-[22px] border p-4 ${featured ? "border-white/25 bg-white/15 text-white" : "border-slate-200 bg-white"}`}>
                   <ul className="space-y-3">
                     {featureValues.map((feature) => (
                       <PlanFeatureItem

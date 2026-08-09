@@ -301,11 +301,26 @@ async function openBillingUrl(functionName: string, body: Record<string, unknown
   const payload = (data ?? null) as EdgeBillingResponse | null;
 
   if (error) {
-    throw new Error(error.message || "Odeme servisine baglanilamadi.");
+    let serverMessage = "";
+    const maybeContext = (error as { context?: unknown }).context;
+
+    if (maybeContext instanceof Response) {
+      try {
+        const responsePayload = (await maybeContext.clone().json()) as EdgeBillingResponse | { message?: string };
+        serverMessage =
+          ("error" in responsePayload ? responsePayload.error?.message : undefined) ||
+          ("message" in responsePayload ? responsePayload.message : undefined) ||
+          "";
+      } catch (parseError) {
+        console.warn(`${functionName} error response parse failed`, parseError);
+      }
+    }
+
+    throw new Error(serverMessage || error.message || "Ödeme servisine bağlanılamadı.");
   }
 
   if (!payload?.success || !payload.url) {
-    throw new Error(payload?.error?.message || "Yonlendirme baglantisi olusturulamadi.");
+    throw new Error(payload?.error?.message || "Yönlendirme bağlantısı oluşturulamadı.");
   }
 
   window.location.assign(payload.url);

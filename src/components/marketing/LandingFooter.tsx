@@ -10,11 +10,11 @@ export function LandingFooter() {
             <ShieldAlert className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-black tracking-[0.18em] text-slate-950">ISGVizyon</p>
-            <p className="text-xs font-semibold text-slate-500">Modern İSG operasyon platformu</p>
+            <p className="text-sm font-black tracking-[0.18em] !text-slate-950">ISGVizyon</p>
+            <p className="text-xs font-semibold !text-slate-600">Modern İSG operasyon platformu</p>
           </div>
         </div>
-        <p className="mt-5 text-sm leading-7 text-slate-600">
+        <p className="mt-5 text-sm leading-7 !text-slate-700">
           İSG süreçlerini Excel, mesajlaşma ve dağınık dosyalardan çıkarıp merkezi, izlenebilir ve raporlanabilir hale getiren operasyon yönetim platformu.
         </p>
       </div>
@@ -22,10 +22,10 @@ export function LandingFooter() {
       <div className="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
         {landingFooterGroups.map((group) => (
           <div key={group.title}>
-            <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-700">{group.title}</h3>
+            <h3 className="text-sm font-black uppercase tracking-[0.18em] !text-slate-800">{group.title}</h3>
             <ul className="mt-4 space-y-3">
               {group.links.map((link) => (
-                <li key={link} className="text-sm font-semibold text-slate-500">
+                <li key={link} className="text-sm font-semibold !text-slate-600">
                   {link}
                 </li>
               ))}
@@ -36,7 +36,7 @@ export function LandingFooter() {
 
       <div className="lg:col-span-2">
         <div className="h-px bg-slate-200" />
-        <div className="mt-5 flex flex-col gap-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 flex flex-col gap-3 text-sm !text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <p>© 2026 ISGVizyon. Tüm hakları saklıdır.</p>
           <p>Kurumsal İSG operasyonları için tasarlandı.</p>
         </div>

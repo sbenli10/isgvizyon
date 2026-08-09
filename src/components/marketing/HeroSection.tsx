@@ -145,7 +145,7 @@ function DashboardMockup() {
         </div>
 
         <div className="relative grid min-h-[440px] bg-white md:grid-cols-[235px_minmax(0,1fr)]">
-          <aside className="hidden border-r border-slate-200 bg-slate-950 p-5 text-white md:block">
+          <aside className="isgvizyon-hero-sidebar hidden border-r border-slate-200 bg-slate-950 p-5 text-white md:block">
             <div className="flex items-center gap-3">
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-cyan-500/20">
                 <ShieldCheck className="h-5 w-5" />

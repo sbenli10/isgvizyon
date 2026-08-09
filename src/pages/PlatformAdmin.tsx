@@ -1523,7 +1523,7 @@ export default function PlatformAdmin() {
 
                 {!pricingBusy && planPrices.length === 0 ? (
                   <div className="rounded-2xl border border-slate-700/70 bg-slate-900/40 p-8 text-center text-sm text-slate-400">
-                    Paket fiyatı bulunamadı. Supabase migration çalıştırıldıktan sonra bu alan Free, Premium ve OSGB kayıtlarını gösterecek.
+                    Paket fiyatı bulunamadı. Gerekli altyapı güncellemesi tamamlandıktan sonra bu alan Free, Premium ve OSGB kayıtlarını gösterecek.
                   </div>
                 ) : null}
               </div>
@@ -1616,7 +1616,7 @@ export default function PlatformAdmin() {
                   <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-5">
                     <p className="font-black text-rose-100">Güvenlik notu</p>
                     <p className="mt-2 text-sm leading-6 text-rose-100/75">
-                      Platform sahibi yetkisi doğrudan SQL ile rastgele verilmemeli. Yetki verme işlemini yalnızca Supabase service role veya güvenli yönetim prosedürüyle yapın.
+                      Platform sahibi yetkisi doğrudan veritabanından rastgele verilmemeli. Yetki verme işlemini yalnızca güvenli yönetim prosedürüyle yapın.
                     </p>
                   </div>
                 </aside>

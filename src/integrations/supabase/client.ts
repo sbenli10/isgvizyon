@@ -28,7 +28,7 @@ const instrumentedSupabaseFetch: typeof fetch = async (input, init) => {
         reportSupabaseIncident({
           source: requestUrl,
           statusCode: response.status,
-          description: `Supabase servisi ${response.status} durum kodu ile yanıt verdi.`,
+          description: `Veri servisi ${response.status} hata kodu ile yanıt verdi.`,
         });
       } else if (response.ok || response.status === 401 || response.status === 403 || response.status === 404) {
         clearSupabaseIncident();
@@ -41,7 +41,7 @@ const instrumentedSupabaseFetch: typeof fetch = async (input, init) => {
       reportSupabaseIncident({
         source: requestUrl,
         description:
-          "Supabase isteği ağ seviyesinde yanıt vermedi. Bu durum genellikle geçici servis kesintisi, auth yenileme sorunu veya backend gateway hatasında görülür.",
+          "Veri bağlantısı ağ seviyesinde yanıt vermedi. Bu durum genellikle geçici servis kesintisi, oturum yenileme sorunu veya ağ geçidi hatasında görülür.",
       });
     }
     throw error;
