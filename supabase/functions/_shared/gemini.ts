@@ -329,12 +329,15 @@ export function cleanJsonText(raw: string) {
   const firstBracket = withoutFence.indexOf("[");
   const lastBracket = withoutFence.lastIndexOf("]");
 
-  if (firstBrace !== -1 && lastBrace > firstBrace) {
-    return withoutFence.slice(firstBrace, lastBrace + 1);
+  const hasArray = firstBracket !== -1 && lastBracket > firstBracket;
+  const hasObject = firstBrace !== -1 && lastBrace > firstBrace;
+
+  if (hasArray && (!hasObject || firstBracket < firstBrace)) {
+    return withoutFence.slice(firstBracket, lastBracket + 1);
   }
 
-  if (firstBracket !== -1 && lastBracket > firstBracket) {
-    return withoutFence.slice(firstBracket, lastBracket + 1);
+  if (hasObject) {
+    return withoutFence.slice(firstBrace, lastBrace + 1);
   }
 
   return withoutFence;

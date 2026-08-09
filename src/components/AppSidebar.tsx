@@ -486,7 +486,7 @@ export function AppSidebar() {
               iconClassName: "text-teal-400 group-hover:text-teal-300",
               badge: "NEW",
             },
-            { title: "Eğitim Soruları", url: "/safety-library", icon: CircleHelp, iconClassName: "text-violet-400 group-hover:text-violet-300", badge: "AI" },
+            { title: "Eğitim Soruları", url: "/egitim-sorulari", icon: CircleHelp, iconClassName: "text-violet-400 group-hover:text-violet-300", badge: "AI" },
             { title: "KKD Formu", url: "/ppe-management?form=kkd", icon: Shield, iconClassName: "text-cyan-400 group-hover:text-cyan-300", badge: "NEW" },
             { title: "İş İzin Formu", url: "/work-instructions?form=is-izin", icon: ClipboardList, iconClassName: "text-lime-400 group-hover:text-lime-300", badge: null },
             { title: "Ceza ve Tebliğ Tutanağı", url: "/ceza-teblig-tutanagi", icon: ShieldAlert, iconClassName: "text-rose-400 group-hover:text-rose-300", badge: null },
