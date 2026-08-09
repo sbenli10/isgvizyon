@@ -1189,6 +1189,85 @@
   color: #ffffff !important;
 }
 
+/* Single-theme auth lock: login/register screens must stay dark after theme toggle removal. */
+html,
+body {
+  color-scheme: dark;
+}
+
+.auth-minimal-surface,
+.light .auth-minimal-surface,
+.dark .auth-minimal-surface {
+  background: #08111f !important;
+  color: #e5edf9 !important;
+  color-scheme: dark;
+}
+
+.auth-minimal-surface [class*="bg-white"],
+.auth-minimal-surface [class*="bg-slate-50"],
+.auth-minimal-surface [class*="bg-slate-100"],
+.light .auth-minimal-surface [class*="bg-white"],
+.light .auth-minimal-surface [class*="bg-slate-50"],
+.light .auth-minimal-surface [class*="bg-slate-100"] {
+  background-color: rgba(15, 23, 42, 0.88) !important;
+}
+
+.auth-minimal-surface [class*="border-slate-100"],
+.auth-minimal-surface [class*="border-slate-200"],
+.auth-minimal-surface [class*="border-blue-100"],
+.auth-minimal-surface [class*="border-cyan-100"],
+.auth-minimal-surface [class*="border-violet-100"],
+.light .auth-minimal-surface [class*="border-slate-100"],
+.light .auth-minimal-surface [class*="border-slate-200"],
+.light .auth-minimal-surface [class*="border-blue-100"],
+.light .auth-minimal-surface [class*="border-cyan-100"],
+.light .auth-minimal-surface [class*="border-violet-100"] {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.auth-minimal-surface :is(h1, h2, h3, h4, h5, h6, p, span, label, strong, small, li, td, th, a, button, div),
+.light .auth-minimal-surface :is(h1, h2, h3, h4, h5, h6, p, span, label, strong, small, li, td, th, a, button, div) {
+  color: #e5edf9 !important;
+}
+
+.auth-minimal-surface [class*="text-slate-400"],
+.auth-minimal-surface [class*="text-slate-500"],
+.auth-minimal-surface [class*="text-slate-600"],
+.auth-minimal-surface [class*="text-slate-700"],
+.light .auth-minimal-surface [class*="text-slate-400"],
+.light .auth-minimal-surface [class*="text-slate-500"],
+.light .auth-minimal-surface [class*="text-slate-600"],
+.light .auth-minimal-surface [class*="text-slate-700"] {
+  color: #94a3b8 !important;
+}
+
+.auth-minimal-surface :is(input, textarea, select),
+.light .auth-minimal-surface :is(input, textarea, select) {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  caret-color: #22d3ee;
+}
+
+.auth-minimal-surface :is(input, textarea, select)::placeholder,
+.light .auth-minimal-surface :is(input, textarea, select)::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+  opacity: 1 !important;
+}
+
+.auth-minimal-surface input:-webkit-autofill,
+.auth-minimal-surface input:-webkit-autofill:hover,
+.auth-minimal-surface input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc !important;
+  box-shadow: 0 0 0 1000px rgba(15, 23, 42, 0.95) inset !important;
+}
+
+.auth-minimal-primary,
+.auth-minimal-surface button[type="submit"],
+.light .auth-minimal-surface button[type="submit"] {
+  color: #ffffff !important;
+}
+
 /* Dark-only app shell: marketing and auth surfaces no longer expose a light theme. */
 .isgvizyon-landing-dark :is(.bg-white, .bg-slate-50, .bg-slate-100) {
   background-color: #111c31 !important;

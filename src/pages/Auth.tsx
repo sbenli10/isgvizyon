@@ -747,7 +747,7 @@ export default function Auth() {
       className="auth-minimal-surface fixed inset-0 isolate h-dvh w-screen overflow-y-auto overflow-x-hidden bg-[#08111f] text-slate-100 lg:overflow-hidden"
       style={{ colorScheme: "dark" }}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.15),transparent_31%),linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.22),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(124,58,237,0.18),transparent_31%),linear-gradient(180deg,#08111f_0%,#101a2e_100%)]" />
       <div className="pointer-events-none absolute left-[-8rem] top-[-8rem] h-96 w-96 rounded-full bg-cyan-300/30 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-9rem] right-[-7rem] h-[30rem] w-[30rem] rounded-full bg-violet-400/20 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:radial-gradient(#2563eb_1px,transparent_1px)] [background-size:28px_28px]" />

@@ -1,7 +1,19 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr" class="dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          localStorage.setItem("denetron-theme", "dark");
+          document.documentElement.classList.remove("light");
+          document.documentElement.classList.add("dark");
+          document.documentElement.style.colorScheme = "dark";
+        } catch (error) {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>İSGVizyon — OHS & Field Inspection Platform</title>
     
