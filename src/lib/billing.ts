@@ -328,6 +328,245 @@ async function openBillingUrl(functionName: string, body: Record<string, unknown
 
 export type CheckoutPlanCode = Extract<SubscriptionPlan, "premium" | "osgb">;
 
+export type ManualPaymentStatus = "awaiting_receipt" | "pending" | "approved" | "rejected" | "cancelled";
+
+export type ManualPaymentInvoiceInfo = {
+  invoiceType: "individual" | "corporate";
+  title: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  identityNumber?: string;
+  address: string;
+  email: string;
+  phone?: string;
+};
+
+export type BankTransferSettings = {
+  providerCode?: string;
+  providerName?: string;
+  isEnabled?: boolean;
+  mode?: string;
+  paymentType?: string;
+  accountHolder?: string;
+  iban?: string;
+  bankName?: string;
+  instructions?: string;
+  approvalSlaBusinessDays?: number;
+};
+
+export type ManualPaymentRequest = {
+  id: string;
+  referenceCode?: string;
+  reference_code?: string;
+  userId?: string;
+  userEmail?: string | null;
+  userName?: string | null;
+  organizationId?: string | null;
+  planCode?: CheckoutPlanCode;
+  plan_code?: CheckoutPlanCode;
+  billingPeriod?: BillingPeriod;
+  billing_period?: BillingPeriod;
+  amount: number;
+  currency: string;
+  status: ManualPaymentStatus;
+  bankAccountSnapshot?: BankTransferSettings;
+  bank_account_snapshot?: BankTransferSettings;
+  invoiceInfo?: ManualPaymentInvoiceInfo;
+  invoice_info?: ManualPaymentInvoiceInfo;
+  receiptFilePath?: string | null;
+  receipt_file_path?: string | null;
+  receiptFileName?: string | null;
+  receipt_file_name?: string | null;
+  receiptUploadedAt?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  createdAt?: string | null;
+  events?: Array<{
+    id: string;
+    action: string;
+    fromStatus?: string | null;
+    toStatus?: string | null;
+    note?: string | null;
+    actorRole?: string | null;
+    createdAt?: string | null;
+  }>;
+};
+
+function normalizeStorageName(fileName: string) {
+  const extension = fileName.includes(".") ? fileName.split(".").pop() : "bin";
+  const base = fileName
+    .replace(/\.[^/.]+$/, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+
+  return `${base || "dekont"}.${extension || "bin"}`;
+}
+
+export async function getBankTransferSettings(): Promise<BankTransferSettings> {
+  const { data, error } = await (supabase as any).rpc("get_public_bank_transfer_settings");
+
+  if (error) {
+    throw new Error(error.message || "Havale / EFT bilgileri alınamadı.");
+  }
+
+  return (data || {}) as BankTransferSettings;
+}
+
+export async function createManualBankTransferPaymentRequest(
+  planCode: CheckoutPlanCode,
+  period: BillingPeriod,
+  invoiceInfo: ManualPaymentInvoiceInfo,
+): Promise<{ request: ManualPaymentRequest; bank: BankTransferSettings; message: string }> {
+  const { data, error } = await (supabase as any).rpc("create_manual_bank_transfer_payment_request", {
+    p_plan_code: planCode,
+    p_billing_period: period,
+    p_invoice_info: invoiceInfo,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Havale / EFT ödeme kodu oluşturulamadı.");
+  }
+
+  const payload = (data || {}) as { request?: ManualPaymentRequest; bank?: BankTransferSettings; message?: string };
+  if (!payload.request?.id) {
+    throw new Error("Ödeme kodu oluşturuldu ancak kayıt bilgisi alınamadı.");
+  }
+
+  return {
+    request: payload.request,
+    bank: payload.bank || {},
+    message: payload.message || "Ödeme onayı 1 iş günü içinde yapılır.",
+  };
+}
+
+export async function attachManualPaymentReceipt(
+  requestId: string,
+  receiptFilePath: string,
+  receiptFileName: string,
+): Promise<{ request: ManualPaymentRequest; message: string }> {
+  const { data, error } = await (supabase as any).rpc("attach_manual_payment_receipt", {
+    p_request_id: requestId,
+    p_receipt_file_path: receiptFilePath,
+    p_receipt_file_name: receiptFileName,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dekont ödeme talebine bağlanamadı.");
+  }
+
+  const payload = (data || {}) as { request?: ManualPaymentRequest; message?: string };
+  if (!payload.request?.id) {
+    throw new Error("Dekont alındı ancak ödeme talebi güncellenemedi.");
+  }
+
+  return {
+    request: payload.request,
+    message: payload.message || "Dekont alındı. Ödeme onayı 1 iş günü içinde yapılır.",
+  };
+}
+
+export async function uploadManualPaymentReceipt(requestId: string, file: File): Promise<string> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const userId = userData.user?.id;
+
+  if (userError || !userId) {
+    throw new Error("Dekont yüklemek için oturum açmanız gerekir.");
+  }
+
+  const filePath = `${userId}/${requestId}/${Date.now()}-${normalizeStorageName(file.name)}`;
+  const { error } = await supabase.storage.from("manual-payment-receipts").upload(filePath, file, {
+    cacheControl: "3600",
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Dekont yüklenemedi.");
+  }
+
+  return filePath;
+}
+
+export async function submitManualPaymentReceipt(requestId: string, file: File) {
+  const filePath = await uploadManualPaymentReceipt(requestId, file);
+  return attachManualPaymentReceipt(requestId, filePath, file.name);
+}
+
+export async function getMyManualPaymentRequests(): Promise<ManualPaymentRequest[]> {
+  const { data, error } = await (supabase as any).rpc("get_my_manual_payment_requests");
+
+  if (error) {
+    throw new Error(error.message || "Ödeme geçmişi alınamadı.");
+  }
+
+  return Array.isArray(data) ? (data as ManualPaymentRequest[]) : [];
+}
+
+export async function getPlatformAdminManualPaymentRequests(status: ManualPaymentStatus | "all" = "pending") {
+  const { data, error } = await (supabase as any).rpc("get_platform_admin_manual_payment_requests", {
+    p_status: status,
+    p_limit: 150,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Manuel ödeme talepleri alınamadı.");
+  }
+
+  const payload = (data || {}) as { payments?: ManualPaymentRequest[]; error?: string };
+  if (payload.error) {
+    throw new Error(payload.error);
+  }
+
+  return payload.payments || [];
+}
+
+export async function reviewManualPaymentRequest(requestId: string, decision: "approved" | "rejected", note = "") {
+  const { data, error } = await (supabase as any).rpc("review_manual_payment_request", {
+    p_request_id: requestId,
+    p_decision: decision,
+    p_note: note,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Ödeme talebi sonuçlandırılamadı.");
+  }
+
+  return data as { request?: ManualPaymentRequest };
+}
+
+export async function updateBankTransferSettings(settings: {
+  accountHolder: string;
+  iban: string;
+  bankName?: string;
+  instructions?: string;
+}) {
+  const { data, error } = await (supabase as any).rpc("update_platform_admin_bank_transfer_settings", {
+    p_account_holder: settings.accountHolder,
+    p_iban: settings.iban,
+    p_bank_name: settings.bankName || "",
+    p_instructions: settings.instructions || "Ödeme onayı 1 iş günü içinde yapılır.",
+  });
+
+  if (error) {
+    throw new Error(error.message || "IBAN ayarları kaydedilemedi.");
+  }
+
+  return (data || {}) as BankTransferSettings;
+}
+
+export async function createManualPaymentReceiptSignedUrl(filePath: string) {
+  const { data, error } = await supabase.storage.from("manual-payment-receipts").createSignedUrl(filePath, 60 * 5);
+
+  if (error || !data?.signedUrl) {
+    throw new Error(error?.message || "Dekont bağlantısı oluşturulamadı.");
+  }
+
+  return data.signedUrl;
+}
+
 export async function startPlanCheckout(planCode: CheckoutPlanCode, period: BillingPeriod) {
   await openBillingUrl("billing-checkout", {
     billingPeriod: period,

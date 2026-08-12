@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  MessageCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -2047,6 +2048,7 @@ export function BulkCAPAContent() {
   const [bulkGenerating, setBulkGenerating] = useState(false);
   const [bulkPhotoAnalysisMode, setBulkPhotoAnalysisMode] = useState<"individual" | "grouped">("individual");
   const [preparedBulkReport, setPreparedBulkReport] = useState<PreparedBulkCapaReport | null>(null);
+  const [pauseDraftPersistence, setPauseDraftPersistence] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [overallAnalysis, setOverallAnalysis] = useState(() => initialDraftSnapshotRef.current?.overallAnalysis || "");
@@ -2592,8 +2594,8 @@ export function BulkCAPAContent() {
     storageAdapter,
     value: formDraftState,
     initialValue: buildDraftSnapshot(initialDraftSnapshotRef.current ?? undefined),
-    isDirty: hasMeaningfulBulkCapaDraft(formDraftState),
-    shouldPersist: (snapshot) => hasMeaningfulBulkCapaDraft(snapshot),
+    isDirty: !pauseDraftPersistence && hasMeaningfulBulkCapaDraft(formDraftState),
+    shouldPersist: (snapshot) => !pauseDraftPersistence && hasMeaningfulBulkCapaDraft(snapshot),
     onRestore: (snapshot) => {
       applyDraftSnapshot(snapshot);
       draftSnapshotRef.current = snapshot;
@@ -3039,25 +3041,42 @@ export function BulkCAPAContent() {
     setEditBaselineEntry(null);
   };
 
+  const resetBulkCreateFlow = () => {
+    setPauseDraftPersistence(false);
+    setPreparedBulkReport(null);
+    setEntries([]);
+    setBulkSourceImages([]);
+    setOverallAnalysis("");
+    setActiveSessionId(null);
+    setProcessingSessionStatus(null);
+    setProcessingJobType(null);
+    setProcessingError(null);
+    setPreviewFocusEntryId(null);
+    setEditingEntryId(null);
+    setEditBaselineEntry(null);
+    draftSnapshotRef.current = null;
+    hasRestoredDraftRef.current = false;
+    void clearPersistedBulkCapaDraft(draftStorageKey);
+    resetEntryDraft("start-fresh-bulk-flow");
+  };
+
   const handleStartCreateFlow = (mode: "single" | "bulk") => {
+    if (mode === "bulk") {
+      resetBulkCreateFlow();
+      setCreateMode("bulk");
+      setCreateStep("general");
+      setCreateDialogOpen(true);
+      return;
+    }
+
     const shouldReuseDraft = shouldReuseDraftForCreateMode(mode);
 
     if (!shouldReuseDraft) {
-      resetEntryDraft(mode === "single" ? "start-single-entry" : "start-bulk-entry");
-    }
-
-    if (mode === "bulk") {
-      setPreviewFocusEntryId(null);
+      resetEntryDraft("start-single-entry");
     }
 
     setCreateMode(mode);
-    setCreateStep(
-      shouldReuseDraft && getLatestDraftSnapshot().createStep === "items"
-        ? "items"
-        : mode === "bulk"
-        ? "general"
-        : "items",
-    );
+    setCreateStep("items");
     setCreateDialogOpen(true);
   };
 
@@ -4826,6 +4845,10 @@ const handleSaveAndExport = async (options?: { keepDialogOpen?: boolean }) => {
       entriesCount: entries.length,
       signature: bulkReportSignature,
     });
+    setPauseDraftPersistence(true);
+    draftSnapshotRef.current = null;
+    hasRestoredDraftRef.current = false;
+    await clearPersistedBulkCapaDraft(draftStorageKey);
 
     await downloadBlob(wordBlob, reportFileName);
     toast.info("E-posta için: Denetimler > Detay > E-posta Gönder");
@@ -4925,6 +4948,45 @@ const handleDownloadPreparedBulkReport = async () => {
   }
 
   await handleSaveAndExport({ keepDialogOpen: true });
+};
+
+const handleSharePreparedBulkReportOnWhatsApp = () => {
+  if (!activePreparedBulkReport) {
+    toast.info("WhatsApp paylaşımı için önce DÖF raporunu hazırlayın.");
+    return;
+  }
+
+  const reportDate = generalInfo.report_date
+    ? new Date(generalInfo.report_date).toLocaleDateString("tr-TR")
+    : new Date(activePreparedBulkReport.createdAt).toLocaleDateString("tr-TR");
+  const companyName = reportCompanyName || "Firma";
+  const location = effectiveLocation || generalInfo.area_region || "Belirtilmedi";
+  const highPriorityCount = entries.filter((entry) =>
+    ["Yüksek", "Kritik"].includes(entry.importance_level)
+  ).length;
+  const firstFindings = entries
+    .slice(0, 3)
+    .map((entry, index) => `${index + 1}. ${entry.description.trim() || "DÖF maddesi"}`)
+    .join("\n");
+
+  const shareText = [
+    `Merhaba, ${companyName} için İSGVizyon üzerinden DÖF raporu oluşturuldu.`,
+    "",
+    "Rapor Özeti",
+    `Firma: ${companyName}`,
+    `Alan/Bölüm: ${location}`,
+    `Rapor tarihi: ${reportDate}`,
+    `Madde sayısı: ${activePreparedBulkReport.entriesCount}`,
+    `Yüksek/Kritik öncelikli madde: ${highPriorityCount}`,
+    firstFindings ? `\nÖne çıkan bulgular:\n${firstFindings}` : "",
+    "",
+    "Hazır DÖF dosyası İSGVizyon panelinden indirilebilir ve ilgililerle paylaşılabilir.",
+    "İSGVizyon ile oluşturulmuştur.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank", "noopener,noreferrer");
 };
 
   if (loading || !draftLoaded) { // EKLENDI: Taslak yüklenmeden formu ekrana çizmesini engelliyoruz
@@ -5666,7 +5728,7 @@ const handleDownloadPreparedBulkReport = async () => {
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-200">Fotoğraf odaklı toplu akış</p>
                         <h4 className="mt-2 text-lg font-bold text-white">Maddeler tabloya otomatik düşer, gerekirse satır bazında düzenlenir</h4>
                         <p className="mt-2 text-sm leading-6 text-slate-200">
-                          Bu ekranda artık manuel madde girişi zorunlu değil. Fotoğrafları analiz ettikten sonra aşağıdaki resmi tablo oluşur. Herhangi bir satırı değiştirmek isterseniz listeden <span className="font-semibold text-white">Düzenle</span> butonunu kullanın.
+                           Fotoğrafları analiz ettikten sonra aşağıdaki resmi tablo oluşur. Herhangi bir satırı değiştirmek isterseniz listeden <span className="font-semibold text-white">Düzenle</span> butonunu kullanın.
                         </p>
                       </div>
                       <div className="rounded-2xl border border-cyan-300/20 bg-slate-950/30 px-4 py-3 text-sm text-cyan-100">
@@ -5984,6 +6046,16 @@ const handleDownloadPreparedBulkReport = async () => {
                             {activePreparedBulkReport ? "Hazır DÖF'ü İndir" : "DÖF'ü Hazırla ve İndir"}
                           </>
                         )}
+                      </Button>
+                    ) : null}
+                    {createMode === "bulk" && entries.length > 0 && activePreparedBulkReport ? (
+                      <Button
+                        type="button"
+                        onClick={handleSharePreparedBulkReportOnWhatsApp}
+                        className="h-12 rounded-2xl border-0 bg-[#25D366] font-semibold text-slate-950 shadow-[0_18px_40px_rgba(37,211,102,0.22)] hover:bg-[#39e27a]"
+                      >
+                        <MessageCircle className="mr-2 h-5 w-5" />
+                        WhatsApp ile Paylaş
                       </Button>
                     ) : null}
                     {createMode === "single" || editingEntryId ? (

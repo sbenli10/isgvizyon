@@ -270,12 +270,12 @@ export default function PeriodicControls() {
 
   const stats = useMemo(
     () => ({
-      total: controls.length,
+      total: controlsTotalCount,
       warning: controls.filter((item) => item.status === "warning").length,
       overdue: controls.filter((item) => item.status === "overdue").length,
       completed: controls.filter((item) => item.status === "completed").length,
     }),
-    [controls],
+    [controls, controlsTotalCount],
   );
 
   useEffect(() => {
@@ -554,100 +554,54 @@ export default function PeriodicControls() {
 
   return (
     <div className="theme-page-readable space-y-6">
-      <section className="relative overflow-hidden rounded-3xl border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.16),transparent_22%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_24%),linear-gradient(135deg,#020617_0%,#0b1220_42%,#111827_100%)] p-6 shadow-[0_24px_80px_rgba(2,6,23,0.48)]">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <section className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_24%),linear-gradient(135deg,#07111f_0%,#0b1220_48%,#111827_100%)] p-5 shadow-[0_22px_70px_rgba(2,6,23,0.42)]">
+        <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="border-cyan-400/30 bg-cyan-500/15 text-cyan-100">Periyodik Kontrol</Badge>
-              <Badge className="border-blue-400/30 bg-blue-500/15 text-blue-100">Rapor + Uyarı + Görev</Badge>
+              <Badge className="border-blue-400/30 bg-blue-500/15 text-blue-100">{controlsTotalCount} kayıt</Badge>
             </div>
-            <h1 className="text-3xl font-black tracking-tight text-slate-50 lg:text-5xl">
-              Periyodik kontrol takibini rapor ve görev akışıyla yönetin
-            </h1>
-            <p className="max-w-4xl text-sm leading-7 text-slate-300 lg:text-base">
-              Kontrol gerektiren ekipmanları, rapor arşivini ve yaklaşan terminleri tek panelde toplayın.
-              Yaklaşan veya geciken kayıtlar OSGB görev motoruna aktarılır.
-            </p>
+            <h1 className="text-3xl font-black tracking-tight text-slate-50 lg:text-4xl">Periyodik Kontroller</h1>
+            <p className="max-w-3xl text-sm leading-6 text-slate-300">Ekipman terminlerini takip edin, rapor yükleyin ve geciken kayıtları hızlıca görün.</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => navigate("/periodic-controls/guide")}>
+            <Button variant="outline" className="gap-2 border-slate-700 bg-slate-900/70 text-slate-100 hover:bg-slate-800" onClick={() => navigate("/periodic-controls/guide")}>
               <LifeBuoy className="h-4 w-4" />
               Nasıl kullanılır?
             </Button>
-            <Button variant="outline" className="gap-2" onClick={downloadPeriodicControlTemplate}>
+            <Button variant="outline" className="gap-2 border-blue-500/30 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20" onClick={downloadPeriodicControlTemplate}>
               <FileSpreadsheet className="h-4 w-4" />
               Şablon indir
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => importInputRef.current?.click()}>
+            <Button variant="outline" className="gap-2 border-emerald-500/30 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20" onClick={() => importInputRef.current?.click()}>
               <FileSpreadsheet className="h-4 w-4" />
-              Excel ile yükle
+              Excel yükle
             </Button>
-            <Button variant="outline" className="gap-2" onClick={refreshTasks} disabled={taskRefreshing}>
+            <Button variant="outline" className="gap-2 border-violet-500/30 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20" onClick={refreshTasks} disabled={taskRefreshing}>
               <Sparkles className={`h-4 w-4 ${taskRefreshing ? "animate-spin" : ""}`} />
-              Görevleri yenile
+              Görev üret
             </Button>
             <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700" onClick={openCreate}>
               <Plus className="h-4 w-4" />
-              Yeni Periyodik Kontrol
+              Yeni kayıt
             </Button>
           </div>
         </div>
       </section>
-
-
-      <Card className="border-slate-700/70 bg-slate-950/55">
-        <CardHeader>
-          <CardTitle className="text-white">Toplu Excel içe aktarma</CardTitle>
-          <CardDescription>
-            Çok sayıda periyodik kontrol kaydını tek dosya ile sisteme yükleyin. Zorunlu alanlar:
-            <span className="ml-1 font-medium text-slate-200">equipment_name, control_category, next_control_date</span>.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4 text-sm leading-7 text-slate-300">
-            <p className="font-medium text-white">Beklenen kolonlar</p>
-            <p>Opsiyonel kolonlar: company_name, location, responsible_vendor, standard_reference, last_control_date, status, result_status, notes</p>
-            <p>status alanı şu değerlerden biri olmalıdır: scheduled, warning, overdue, completed, inactive</p>
-            <p>result_status alanı şu değerlerden biri olmalıdır: not_evaluated, suitable, conditional, unsuitable</p>
-            <p>Tarih alanlarını YYYY-MM-DD formatında girin. Aynı ekipman ve kontrol türünü aynı dosyada tekrar etmeyin.</p>
-          </div>
-          <div className="flex flex-col justify-between rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
-            <div className="space-y-2">
-              <p className="text-sm font-semibold text-cyan-100">Önerilen akış</p>
-              <ol className="space-y-1 text-sm text-cyan-50/90">
-                <li>1. Şablonu indir</li>
-                <li>2. Satırları firma ve ekipman bazında doldur</li>
-                <li>3. Excel ile yükle</li>
-                <li>4. Atlanan satırlar varsa uyarıdan kontrol et</li>
-              </ol>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" className="gap-2" onClick={downloadPeriodicControlTemplate}>
-                <FileSpreadsheet className="h-4 w-4" />
-                Şablonu indir
-              </Button>
-              <Button className="gap-2 bg-cyan-600 hover:bg-cyan-700" onClick={() => importInputRef.current?.click()}>
-                <FileSpreadsheet className="h-4 w-4" />
-                Yüklemeyi başlat
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
       <section className="grid gap-4 md:grid-cols-4">
-        <Card className="border-slate-700/70 bg-slate-950/60"><CardContent className="pt-6"><p className="text-sm text-slate-400">Toplam kayıt</p><p className="mt-2 text-3xl font-bold text-white">{stats.total}</p></CardContent></Card>
-        <Card className="border-amber-500/20 bg-amber-500/10"><CardContent className="pt-6"><p className="text-sm text-amber-100/80">Yaklaşan</p><p className="mt-2 text-3xl font-bold text-white">{stats.warning}</p></CardContent></Card>
-        <Card className="border-red-500/20 bg-red-500/10"><CardContent className="pt-6"><p className="text-sm text-red-100/80">Geciken</p><p className="mt-2 text-3xl font-bold text-white">{stats.overdue}</p></CardContent></Card>
-        <Card className="border-emerald-500/20 bg-emerald-500/10"><CardContent className="pt-6"><p className="text-sm text-emerald-100/80">Tamamlanan</p><p className="mt-2 text-3xl font-bold text-white">{stats.completed}</p></CardContent></Card>
+        <Card className="border-slate-700/70 bg-slate-950/60"><CardContent className="pt-5"><p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Toplam</p><p className="mt-2 text-3xl font-black text-white">{stats.total}</p></CardContent></Card>
+        <Card className="border-amber-500/20 bg-amber-500/10"><CardContent className="pt-5"><p className="text-xs font-bold uppercase tracking-[0.18em] text-amber-100/80">Yaklaşan</p><p className="mt-2 text-3xl font-black text-white">{stats.warning}</p></CardContent></Card>
+        <Card className="border-red-500/20 bg-red-500/10"><CardContent className="pt-5"><p className="text-xs font-bold uppercase tracking-[0.18em] text-red-100/80">Geciken</p><p className="mt-2 text-3xl font-black text-white">{stats.overdue}</p></CardContent></Card>
+        <Card className="border-emerald-500/20 bg-emerald-500/10"><CardContent className="pt-5"><p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-100/80">Tamamlanan</p><p className="mt-2 text-3xl font-black text-white">{stats.completed}</p></CardContent></Card>
       </section>
 
       <Card className="border-slate-700/70 bg-slate-950/55">
         <CardHeader className="gap-4">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <CardTitle className="text-white">Kontrol listesi</CardTitle>
-              <CardDescription>Kayıtları filtreleyin, düzenleyin ve rapor yükleme akışına geçin.</CardDescription>
+              <CardTitle className="text-white">Kontrol Listesi</CardTitle>
+              <CardDescription>Termin, firma ve rapor işlemleri.</CardDescription>
             </div>
             <Button variant="outline" className="gap-2" onClick={() => void loadData(true)}>
               <RefreshCcw className="h-4 w-4" />
@@ -696,14 +650,14 @@ export default function PeriodicControls() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">Kayıtlar yükleniyor...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">Yükleniyor...</TableCell></TableRow>
               ) : controls.length > 0 ? (
                 controls.map((control) => (
                   <TableRow key={control.id}>
-                    <TableCell><div><p className="font-medium text-white">{control.equipment_name}</p><p className="text-xs text-slate-400">{control.location || "Lokasyon belirtilmedi"}</p></div></TableCell>
+                    <TableCell><div><p className="font-medium text-white">{control.equipment_name}</p><p className="text-xs text-slate-400">{control.location || "-"}</p></div></TableCell>
                     <TableCell>{control.company?.company_name || "-"}</TableCell>
                     <TableCell>{control.control_category}</TableCell>
-                    <TableCell><div><p>{formatDate(control.next_control_date)}</p><p className="text-xs text-slate-400">Son kontrol: {formatDate(control.last_control_date)}</p></div></TableCell>
+                    <TableCell><div><p>{formatDate(control.next_control_date)}</p><p className="text-xs text-slate-400">{control.last_control_date ? `Son: ${formatDate(control.last_control_date)}` : "-"}</p></div></TableCell>
                     <TableCell><Badge variant="outline" className={statusClass[control.status]}>{statusLabel[control.status]}</Badge></TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-2">
@@ -715,7 +669,7 @@ export default function PeriodicControls() {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">Eşleşen periyodik kontrol kaydı bulunamadı.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="h-32 text-center text-slate-400">Kayıt yok.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -734,7 +688,7 @@ export default function PeriodicControls() {
       <Card className="border-slate-700/70 bg-slate-950/55">
         <CardHeader>
           <CardTitle className="text-white">Rapor geçmişi</CardTitle>
-          <CardDescription>Yüklenen kontrol raporları burada kronolojik olarak görünür.</CardDescription>
+          <CardDescription>Yüklenen dosyalar.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -764,7 +718,7 @@ export default function PeriodicControls() {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={5} className="h-24 text-center text-slate-400">Henüz rapor yüklenmedi.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={5} className="h-24 text-center text-slate-400">Rapor yok.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -796,7 +750,7 @@ export default function PeriodicControls() {
         <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Periyodik Kontrolü Düzenle" : "Yeni Periyodik Kontrol"}</DialogTitle>
-            <DialogDescription>Kontrol kalemini oluşturun veya güncelleyin. Kaydedilen terminler görev üretimi için kullanılır.</DialogDescription>
+            <DialogDescription>Ekipman, termin ve sonucu girin.</DialogDescription>
           </DialogHeader>
           <div className="grid flex-1 gap-4 overflow-y-auto py-1 pr-1 md:grid-cols-2">
             <div className="space-y-2"><Label>Ekipman adı</Label><Input value={form.equipmentName} onChange={(e) => setForm((prev) => ({ ...prev, equipmentName: e.target.value }))} /></div>
@@ -854,7 +808,7 @@ export default function PeriodicControls() {
         <DialogContent className="max-h-[90vh] overflow-hidden sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Rapor Yükle ve Geçmişi Gör</DialogTitle>
-            <DialogDescription>{uploadTarget?.equipment_name || "Periyodik kontrol"} için rapor yükleyin ve önceki raporları yönetin.</DialogDescription>
+            <DialogDescription>{uploadTarget?.equipment_name || "Kontrol"} raporları.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 overflow-y-auto py-1 lg:grid-cols-[0.9fr_1.1fr]">
             <Card className="border-slate-700/70 bg-slate-950/60">
@@ -888,7 +842,7 @@ export default function PeriodicControls() {
                         </TableRow>
                       ))
                     ) : (
-                      <TableRow><TableCell colSpan={4} className="h-24 text-center text-slate-400">Bu kayıt için henüz rapor yüklenmedi.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="h-24 text-center text-slate-400">Rapor yok.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -900,8 +854,6 @@ export default function PeriodicControls() {
     </div>
   );
 }
-
-
 
 
 

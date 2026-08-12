@@ -5,9 +5,12 @@ import {
   BadgeCheck,
   Building2,
   Check,
+  ClipboardCopy,
   CreditCard,
   Crown,
+  FileUp,
   Headphones,
+  Landmark,
   LockKeyhole,
   Rocket,
   Sparkles,
@@ -16,9 +19,19 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
-import { startPlanCheckout } from "@/lib/billing";
+import {
+  createManualBankTransferPaymentRequest,
+  startPlanCheckout,
+  submitManualPaymentReceipt,
+  type BankTransferSettings,
+  type ManualPaymentInvoiceInfo,
+  type ManualPaymentRequest,
+} from "@/lib/billing";
 import { getUserFacingError, getUserFacingErrorDescription } from "@/lib/userFacingError";
 import type { BillingCatalogPlan, BillingPeriod, SubscriptionPlan } from "@/types/subscription";
 
@@ -59,6 +72,17 @@ const planToneClass: Record<PlanTone, string> = {
     "border-cyan-400/45 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.22),rgba(15,23,42,0.92)_48%)] shadow-[0_24px_70px_rgba(14,165,233,0.18)]",
 };
 
+const emptyInvoiceInfo: ManualPaymentInvoiceInfo = {
+  invoiceType: "individual",
+  title: "",
+  taxOffice: "",
+  taxNumber: "",
+  identityNumber: "",
+  address: "",
+  email: "",
+  phone: "",
+};
+
 function formatPrice(value: number | null | undefined, fallback: number) {
   const price = typeof value === "number" && value > 0 ? value : fallback;
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(price);
@@ -66,6 +90,22 @@ function formatPrice(value: number | null | undefined, fallback: number) {
 
 function getPlanPrice(plans: BillingCatalogPlan[], planCode: PaidPlan) {
   return plans.find((entry) => entry.planCode === planCode)?.price ?? null;
+}
+
+function getRequestReference(request?: ManualPaymentRequest | null) {
+  return request?.referenceCode || request?.reference_code || "";
+}
+
+function getRequestPlan(request?: ManualPaymentRequest | null) {
+  return request?.planCode || request?.plan_code || "";
+}
+
+function getRequestPeriod(request?: ManualPaymentRequest | null) {
+  return request?.billingPeriod || request?.billing_period || "monthly";
+}
+
+function getBankText(bank: BankTransferSettings, key: keyof BankTransferSettings) {
+  return String(bank[key] || "");
 }
 
 function PlanCard({
@@ -80,7 +120,10 @@ function PlanCard({
   disabled,
   loading,
   buttonLabel,
+  secondaryButtonLabel,
+  secondaryLoading,
   onClick,
+  onSecondaryClick,
 }: {
   tone: PlanTone;
   title: string;
@@ -93,7 +136,10 @@ function PlanCard({
   disabled?: boolean;
   loading?: boolean;
   buttonLabel: string;
+  secondaryButtonLabel?: string;
+  secondaryLoading?: boolean;
   onClick?: () => void;
+  onSecondaryClick?: () => void;
 }) {
   return (
     <div className={`relative flex min-h-[390px] flex-col rounded-2xl border p-5 ${planToneClass[tone]}`}>
@@ -134,6 +180,7 @@ function PlanCard({
         </div>
       )}
 
+      <div className="grid gap-2">
       <Button
         disabled={disabled || loading || current}
         onClick={onClick}
@@ -147,6 +194,19 @@ function PlanCard({
       >
         {loading ? "Ödeme hazırlanıyor..." : buttonLabel}
       </Button>
+        {secondaryButtonLabel ? (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled || secondaryLoading || current}
+            onClick={onSecondaryClick}
+            className="h-10 rounded-xl border-amber-300/30 bg-amber-500/10 font-bold text-amber-100 hover:bg-amber-500/20 hover:text-white"
+          >
+            <Landmark className="mr-2 h-4 w-4" />
+            {secondaryLoading ? "Hazırlanıyor..." : secondaryButtonLabel}
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -166,6 +226,13 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [hideAgain, setHideAgain] = useState(false);
+  const [manualPlan, setManualPlan] = useState<PaidPlan | null>(null);
+  const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
+  const [manualPaymentBusy, setManualPaymentBusy] = useState(false);
+  const [manualRequest, setManualRequest] = useState<ManualPaymentRequest | null>(null);
+  const [manualBank, setManualBank] = useState<BankTransferSettings>({});
+  const [invoiceInfo, setInvoiceInfo] = useState<ManualPaymentInvoiceInfo>(emptyInvoiceInfo);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   const hasOrganization = Boolean(profile?.organization_id);
   const canPurchase = !hasOrganization || isOrganizationAdmin;
@@ -208,7 +275,78 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     }
   };
 
+  const openManualPayment = (planCode: PaidPlan) => {
+    if (planCode === "osgb" && !hasOrganization) {
+      navigate("/profile?tab=workspace&action=create&next=/settings?tab=billing&upgrade=1");
+      handleOpenChange(false);
+      return;
+    }
+
+    setManualPlan(planCode);
+    setManualPaymentOpen(true);
+    setManualRequest(null);
+    setManualBank({});
+    setReceiptFile(null);
+    setInvoiceInfo((current) => ({
+      ...emptyInvoiceInfo,
+      title: current.title || profile?.full_name || "",
+      email: current.email || profile?.email || "",
+    }));
+  };
+
+  const updateInvoiceInfo = (patch: Partial<ManualPaymentInvoiceInfo>) => {
+    setInvoiceInfo((current) => ({ ...current, ...patch }));
+  };
+
+  const copyText = async (label: string, value: string) => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label} kopyalandı.`);
+  };
+
+  const createManualRequest = async () => {
+    if (!manualPlan) return;
+    if (!invoiceInfo.title.trim() || !invoiceInfo.address.trim() || !invoiceInfo.email.trim()) {
+      toast.error("Fatura bilgileri eksik.", { description: "Ünvan/ad soyad, e-posta ve fatura adresi zorunludur." });
+      return;
+    }
+
+    setManualPaymentBusy(true);
+    try {
+      const payload = await createManualBankTransferPaymentRequest(manualPlan, billingPeriod, invoiceInfo);
+      setManualRequest(payload.request);
+      setManualBank(payload.bank);
+      toast.success("Ödeme açıklama kodu oluşturuldu.", { description: "Havale/EFT açıklamasına bu kodu yazın." });
+    } catch (error) {
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+    } finally {
+      setManualPaymentBusy(false);
+    }
+  };
+
+  const uploadReceipt = async () => {
+    if (!manualRequest?.id) return;
+    if (!receiptFile) {
+      toast.error("Dekont yüklemek zorunludur.");
+      return;
+    }
+
+    setManualPaymentBusy(true);
+    try {
+      const payload = await submitManualPaymentReceipt(manualRequest.id, receiptFile);
+      setManualRequest(payload.request);
+      toast.success("Dekont gönderildi.", { description: "Ödeme onayı 1 iş günü içinde yapılır." });
+    } catch (error) {
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+    } finally {
+      setManualPaymentBusy(false);
+    }
+  };
+
   return (
+    <>
     <Dialog open={open && !isDemoActive} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-6xl overflow-hidden rounded-3xl border border-slate-700/80 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
         <DialogHeader className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(17,24,39,0.96))] px-6 py-6">
@@ -271,8 +409,11 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
               current={plan === "premium" || status === "trial"}
               disabled={!canPurchase || loadingAction !== null || plan === "osgb"}
               loading={loadingAction === "premium"}
+              secondaryButtonLabel={plan === "osgb" ? undefined : "Havale / EFT ile öde"}
+              secondaryLoading={manualPaymentBusy && manualPlan === "premium"}
               buttonLabel={plan === "osgb" ? "OSGB paketine dahil" : "Premium'a geç"}
               onClick={() => void runCheckout("premium")}
+              onSecondaryClick={() => openManualPayment("premium")}
             />
 
             <PlanCard
@@ -286,8 +427,11 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
               current={plan === "osgb"}
               disabled={!canPurchase || loadingAction !== null}
               loading={loadingAction === "osgb"}
+              secondaryButtonLabel={!hasOrganization ? undefined : "Havale / EFT ile öde"}
+              secondaryLoading={manualPaymentBusy && manualPlan === "osgb"}
               buttonLabel={!hasOrganization ? "Organizasyon oluştur" : "OSGB'ye geç"}
               onClick={() => void runCheckout("osgb")}
+              onSecondaryClick={() => openManualPayment("osgb")}
             />
           </div>
 
@@ -331,5 +475,145 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </div>
       </DialogContent>
     </Dialog>
+    <Dialog open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-3xl overflow-y-auto rounded-3xl border border-amber-300/25 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
+        <DialogHeader className="border-b border-amber-300/15 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/60 px-6 py-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl border border-amber-300/25 bg-amber-500/15 p-3 text-amber-100">
+              <Landmark className="h-6 w-6" />
+            </div>
+            <div>
+              <DialogTitle className="text-2xl font-black text-white">Havale / EFT ile Öde</DialogTitle>
+              <p className="mt-1 text-sm leading-6 text-amber-100/80">
+                Önce fatura bilgilerini girin, benzersiz ödeme açıklama kodunuzu alın. Dekont yüklenmeden ödeme talebi gönderilemez.
+              </p>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="space-y-5 p-6">
+          <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
+            <strong>Ödeme onayı 1 iş günü içinde yapılır.</strong> Admin onayı olmadan üyelik açılmaz. Havale/EFT açıklamasına aşağıda üretilen kodu aynen yazın.
+          </div>
+
+          <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-300">Fatura Bilgileri</p>
+                <p className="mt-1 text-sm text-slate-400">Fatura bilgileri ödeme talebinden ayrı saklanır.</p>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-black text-white">
+                {manualPlan?.toUpperCase()} / {billingPeriod === "yearly" ? "Yıllık" : "Aylık"}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label className="text-slate-200">Fatura tipi</Label>
+                <select
+                  value={invoiceInfo.invoiceType}
+                  onChange={(event) => updateInvoiceInfo({ invoiceType: event.target.value as ManualPaymentInvoiceInfo["invoiceType"] })}
+                  disabled={Boolean(manualRequest)}
+                  className="h-11 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-white outline-none focus:border-cyan-400"
+                >
+                  <option value="individual">Bireysel</option>
+                  <option value="corporate">Kurumsal</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-200">Fatura ünvanı / Ad soyad *</Label>
+                <Input value={invoiceInfo.title} onChange={(event) => updateInvoiceInfo({ title: event.target.value })} disabled={Boolean(manualRequest)} className="border-slate-700 bg-slate-950 text-white" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-200">Vergi dairesi</Label>
+                <Input value={invoiceInfo.taxOffice || ""} onChange={(event) => updateInvoiceInfo({ taxOffice: event.target.value })} disabled={Boolean(manualRequest)} className="border-slate-700 bg-slate-950 text-white" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-200">{invoiceInfo.invoiceType === "corporate" ? "Vergi no" : "T.C. kimlik no"}</Label>
+                <Input
+                  value={invoiceInfo.invoiceType === "corporate" ? invoiceInfo.taxNumber || "" : invoiceInfo.identityNumber || ""}
+                  onChange={(event) => updateInvoiceInfo(invoiceInfo.invoiceType === "corporate" ? { taxNumber: event.target.value } : { identityNumber: event.target.value })}
+                  disabled={Boolean(manualRequest)}
+                  className="border-slate-700 bg-slate-950 text-white"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-200">Fatura e-postası *</Label>
+                <Input value={invoiceInfo.email} onChange={(event) => updateInvoiceInfo({ email: event.target.value })} disabled={Boolean(manualRequest)} className="border-slate-700 bg-slate-950 text-white" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-slate-200">Telefon</Label>
+                <Input value={invoiceInfo.phone || ""} onChange={(event) => updateInvoiceInfo({ phone: event.target.value })} disabled={Boolean(manualRequest)} className="border-slate-700 bg-slate-950 text-white" />
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label className="text-slate-200">Fatura adresi *</Label>
+                <Textarea value={invoiceInfo.address} onChange={(event) => updateInvoiceInfo({ address: event.target.value })} disabled={Boolean(manualRequest)} className="min-h-20 border-slate-700 bg-slate-950 text-white" />
+              </div>
+            </div>
+
+            {!manualRequest ? (
+              <Button onClick={() => void createManualRequest()} disabled={manualPaymentBusy} className="mt-4 h-11 w-full rounded-xl bg-amber-500 font-black text-slate-950 hover:bg-amber-400">
+                {manualPaymentBusy ? "Kod oluşturuluyor..." : "Ödeme açıklama kodunu oluştur"}
+              </Button>
+            ) : null}
+          </section>
+
+          {manualRequest ? (
+            <section className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">Ödeme Bilgileri</p>
+                  <h3 className="mt-1 text-xl font-black text-white">{Number(manualRequest.amount || 0).toLocaleString("tr-TR")} {manualRequest.currency || "TRY"}</h3>
+                </div>
+                <Badge className="border border-amber-300/25 bg-amber-500/15 text-amber-100">Onay bekler</Badge>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                {[
+                  ["Alıcı", getBankText(manualBank, "accountHolder")],
+                  ["Banka", getBankText(manualBank, "bankName")],
+                  ["IBAN", getBankText(manualBank, "iban")],
+                  ["Açıklama kodu", getRequestReference(manualRequest)],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-slate-950/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">{label}</p>
+                      <p className="mt-1 break-all text-sm font-bold text-white">{value || "Admin panelinden tanımlanacak"}</p>
+                    </div>
+                    {value ? (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => void copyText(label, value)} className="text-cyan-100 hover:bg-cyan-500/10 hover:text-white">
+                        <ClipboardCopy className="mr-2 h-4 w-4" />
+                        Kopyala
+                      </Button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-4 rounded-xl border border-amber-300/20 bg-amber-500/10 p-3 text-xs leading-5 text-amber-50">
+                Açıklama alanına <strong>{getRequestReference(manualRequest)}</strong> yazılmayan ödemelerin eşleştirilmesi gecikebilir.
+              </div>
+            </section>
+          ) : null}
+
+          {manualRequest ? (
+            <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-300">Dekont</p>
+              <p className="mt-1 text-sm text-slate-400">PDF, JPG, PNG veya WEBP dekont yükleyin. Dekont zorunludur.</p>
+              <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-600 bg-slate-950/60 px-4 py-8 text-center hover:border-cyan-400/70">
+                <FileUp className="h-8 w-8 text-cyan-300" />
+                <span className="mt-2 text-sm font-bold text-white">{receiptFile ? receiptFile.name : "Dekont dosyası seç"}</span>
+                <span className="mt-1 text-xs text-slate-500">Maksimum 10 MB</span>
+                <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" className="hidden" onChange={(event) => setReceiptFile(event.target.files?.[0] || null)} />
+              </label>
+              <Button onClick={() => void uploadReceipt()} disabled={manualPaymentBusy || !receiptFile || manualRequest.status === "pending" || manualRequest.status === "approved"} className="mt-4 h-11 w-full rounded-xl bg-emerald-600 font-black text-white hover:bg-emerald-500">
+                {manualRequest.status === "pending" ? "Dekont gönderildi, onay bekliyor" : manualPaymentBusy ? "Dekont gönderiliyor..." : "Dekontu gönder ve onaya al"}
+              </Button>
+            </section>
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

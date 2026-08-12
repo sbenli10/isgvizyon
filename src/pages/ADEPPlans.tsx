@@ -149,8 +149,6 @@ type CoverMeta = {
 };
 
 const eyebrowClass = "text-[11px] uppercase tracking-[0.18em] text-slate-400";
-const cardTitleClass =
-  "text-[1.08rem] font-semibold tracking-[-0.02em] text-white";
 const ADEP_HERO_SKELETON_KEYS = ["hero-stat-1", "hero-stat-2", "hero-stat-3"] as const;
 const ADEP_CARD_SKELETON_KEYS = [
   "plan-skeleton-1",
@@ -731,7 +729,7 @@ export default function ADEPPlans() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {plans.map((plan) => {
               const hazard = getHazardTone(plan.hazard_class);
               const status = getStatusConfig(plan.status);
@@ -740,10 +738,6 @@ export default function ADEPPlans() {
               );
               const StatusIcon = status.icon;
               const CoverIcon = coverStyle.icon;
-              const logoSource =
-                companyLogos[plan.company_name.toLocaleLowerCase("tr-TR")] ||
-                organizationLogoUrl ||
-                "";
               const reviewText = plan.next_review_date
                 ? format(new Date(plan.next_review_date), "dd MMM yyyy", { locale: tr })
                 : "Planlama bekleniyor";
@@ -751,176 +745,80 @@ export default function ADEPPlans() {
               return (
                 <Card
                   key={plan.id}
-                  className="overflow-hidden rounded-[26px] border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_22px_55px_rgba(2,6,23,0.28)] transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/25 hover:shadow-[0_30px_80px_rgba(2,6,23,0.4)]"
+                  className="overflow-hidden rounded-2xl border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.98),rgba(2,6,23,0.96))] shadow-[0_14px_34px_rgba(2,6,23,0.24)] transition-colors duration-200 hover:border-cyan-400/25"
                 >
-                  <CardHeader className="border-b border-white/10 bg-white/[0.03]">
+                  <CardHeader className="border-b border-white/10 bg-white/[0.03] px-4 py-3">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={`${status.className} border`}>
-                            <StatusIcon className="mr-1 h-3.5 w-3.5" />
+                      <div className="min-w-0 space-y-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge className={`${status.className} h-6 border px-2 text-[10px]`}>
+                            <StatusIcon className="mr-1 h-3 w-3" />
                             {status.label}
                           </Badge>
-                          <Badge className={`${hazard.badge} border`}>{hazard.label}</Badge>
-                          <Badge className={`${coverStyle.className} border`}>
-                            <CoverIcon className="mr-1 h-3.5 w-3.5" />
+                          <Badge className={`${hazard.badge} h-6 border px-2 text-[10px]`}>{hazard.label}</Badge>
+                          <Badge className={`${coverStyle.className} h-6 border px-2 text-[10px]`}>
+                            <CoverIcon className="mr-1 h-3 w-3" />
                             {coverStyle.label}
                           </Badge>
                         </div>
-                        <CardTitle className={cardTitleClass}>{plan.plan_name}</CardTitle>
-                        <CardDescription className="flex items-center gap-2 text-sm text-slate-400">
-                          <Building2 className="h-4 w-4 text-cyan-300" />
+                        <CardTitle className="line-clamp-2 text-[0.98rem] font-semibold leading-5 tracking-[-0.02em] text-white">{plan.plan_name}</CardTitle>
+                        <CardDescription className="flex items-center gap-2 truncate text-xs text-slate-400">
+                          <Building2 className="h-3.5 w-3.5 shrink-0 text-cyan-300" />
                           {plan.company_name}
                         </CardDescription>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
-                        <div className={eyebrowClass}>Risk skoru</div>
-                        <div className="mt-1 text-lg font-semibold text-white">{hazard.bar}/100</div>
+                      <div className="shrink-0 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-right">
+                        <div className="text-[9px] uppercase tracking-[0.16em] text-slate-400">Risk</div>
+                        <div className="mt-0.5 text-base font-bold text-white">{hazard.bar}</div>
                       </div>
                     </div>
                   </CardHeader>
 
-                  <CardContent className="space-y-5 p-6">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                        <div className={eyebrowClass}>Çalışan</div>
-                        <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-white">
-                          <Users className="h-4 w-4 text-cyan-300" />
+                  <CardContent className="space-y-3 p-4">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Çalışan</div>
+                        <div className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-white">
+                          <Users className="h-3.5 w-3.5 text-cyan-300" />
                           {plan.employee_count} kişi
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                        <div className={eyebrowClass}>Son güncelleme</div>
-                        <div className="mt-2 flex items-center gap-2 text-sm font-semibold text-white">
-                          <Clock3 className="h-4 w-4 text-violet-300" />
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Güncelleme</div>
+                        <div className="mt-1.5 flex items-center gap-2 text-sm font-semibold text-white">
+                          <Clock3 className="h-3.5 w-3.5 text-violet-300" />
                           {format(new Date(plan.updated_at), "dd MMM yyyy", { locale: tr })}
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className={eyebrowClass}>Gözden geçirme baskısı</div>
-                        <Badge className="border-white/10 bg-white/10 text-slate-200 hover:bg-white/10">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-slate-400">Gözden geçirme</div>
+                        <Badge className="h-5 border-white/10 bg-white/10 px-2 text-[10px] text-slate-200 hover:bg-white/10">
                           {plan.next_review_date ? "Planlı" : "Bekliyor"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-sm text-slate-200">
-                        <CalendarClock className="h-4 w-4 text-amber-300" />
+                        <CalendarClock className="h-3.5 w-3.5 text-amber-300" />
                         {reviewText}
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-cyan-400/10 bg-cyan-400/6 p-4">
-                      <div className="text-[11px] uppercase tracking-[0.18em] text-cyan-200">
-                        Sonraki önerilen aksiyon
-                      </div>
-                      <div className="mt-2 text-sm leading-6 text-slate-200">
-                        {plan.pdf_url
-                          ? "Plan PDF çıktısı hazır. Şimdi inceleme veya paylaşım akışına geçmek en doğru adım."
-                          : "Planı açıp son kontrolleri tamamlayın, ardından PDF çıktısını üretin."}
-                      </div>
-                    </div>
-
-                    {plan.pdf_url && (
-                      <div className="rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] p-4">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <div>
-                            <div className={eyebrowClass}>Belge kartı</div>
-                            <div className="mt-1 text-sm font-semibold text-white">
-                              PDF hazır mini önizleme
-                            </div>
-                          </div>
-                          <Badge className="border-emerald-400/25 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/10">
-                            Hazır
-                          </Badge>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setPreviewPlan(plan)}
-                          className="group relative w-full overflow-hidden rounded-[20px] border border-white/10 bg-slate-950/80 p-4 text-left transition hover:border-cyan-400/30 hover:bg-slate-950"
-                        >
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.16),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)] opacity-90" />
-                          <div className="relative space-y-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200">
-                                  ADEP PDF Kapağı
-                                </div>
-                                <div className="mt-2 text-base font-semibold text-white">
-                                  {plan.plan_name}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-400">
-                                  {plan.company_name}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-right">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">
-                                  Stil
-                                </div>
-                                <div className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white">
-                                  <CoverIcon className="h-4 w-4 text-cyan-200" />
-                                  {coverStyle.label}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-3">
-                              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Durum</div>
-                                <div className="mt-1 text-sm font-medium text-white">{status.label}</div>
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Tehlike</div>
-                                <div className="mt-1 text-sm font-medium text-white">{hazard.label}</div>
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Gözden Geçirme</div>
-                                <div className="mt-1 text-sm font-medium text-white">{reviewText}</div>
-                              </div>
-                            </div>
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Sektör</div>
-                                <div className="mt-1 text-sm font-medium text-white">
-                                  {plan.sector || "Belirtilmedi"}
-                                </div>
-                              </div>
-                              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-                                <div className="text-[10px] uppercase tracking-[0.18em] text-slate-400">Tehlike Sınıfı</div>
-                                <div className="mt-1 text-sm font-medium text-white">{hazard.label}</div>
-                              </div>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs text-slate-400">
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">
-                                Rev. 0
-                              </span>
-                              <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1">
-                                Hazırlanma: {format(new Date(plan.created_at), "dd.MM.yyyy", { locale: tr })}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between text-xs text-slate-400">
-                              <span>Gerçek belge hissiyle hızlı kontrol</span>
-                              <span className="inline-flex items-center gap-1 text-cyan-200 transition group-hover:translate-x-0.5">
-                                Önizlemeyi aç
-                                <ArrowRight className="h-3.5 w-3.5" />
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-                    )}
                     <div className="grid gap-2 sm:grid-cols-2">
                       {plan.pdf_url && (
                         <Button
+                          size="sm"
                           variant="outline"
                           className="gap-2 border-cyan-400/20 bg-cyan-400/10 text-cyan-50 hover:bg-cyan-400/15 hover:text-cyan-50"
                           onClick={() => setPreviewPlan(plan)}
                         >
                           <Eye className="h-4 w-4" />
-                          Mini Önizleme
+                          Önizleme
                         </Button>
                       )}
                       <Button
+                        size="sm"
                         variant="outline"
                         className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
                         onClick={() => navigate(`/adep-plans/${plan.id}`)}
@@ -929,6 +827,7 @@ export default function ADEPPlans() {
                         Görüntüle
                       </Button>
                       <Button
+                        size="sm"
                         variant="outline"
                         className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
                         onClick={() => navigate(`/adep-plans/${plan.id}/edit`)}
@@ -937,6 +836,7 @@ export default function ADEPPlans() {
                         Düzenle
                       </Button>
                       <Button
+                        size="sm"
                         variant="outline"
                         className="gap-2 border-white/10 bg-white/5 text-white hover:bg-white/10 hover:text-white"
                         disabled={!plan.pdf_url}
@@ -946,6 +846,7 @@ export default function ADEPPlans() {
                         PDF Aç
                       </Button>
                       <Button
+                        size="sm"
                         variant="outline"
                         className="gap-2 border-red-400/20 bg-red-400/8 text-red-100 hover:bg-red-400/14 hover:text-red-50 sm:col-span-2"
                         onClick={() => void deletePlan(plan.id)}

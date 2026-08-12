@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -13,6 +13,8 @@ import {
   Clock,
   CreditCard,
   Eye,
+  FileText,
+  Landmark,
   LayoutDashboard,
   Loader2,
   KeyRound,
@@ -29,6 +31,7 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  WalletCards,
   XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -39,11 +42,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { clearPlatformAdminSession, hasPlatformAdminSession } from "@/lib/platformAdminSession";
+import {
+  createManualPaymentReceiptSignedUrl,
+  getBankTransferSettings,
+  getPlatformAdminManualPaymentRequests,
+  reviewManualPaymentRequest,
+  updateBankTransferSettings,
+  type BankTransferSettings,
+  type ManualPaymentRequest,
+  type ManualPaymentStatus,
+} from "@/lib/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
 type JobStatus = "pending" | "approved" | "rejected" | "archived";
-type AdminView = "overview" | "users" | "activity" | "modules" | "pricing" | "security" | "system" | "audit" | "moderation" | "announcements";
+type AdminView = "overview" | "users" | "activity" | "modules" | "pricing" | "payments" | "security" | "system" | "audit" | "moderation" | "announcements";
 
 type JobPost = {
   id: string;
@@ -186,6 +199,15 @@ type PlatformAdminAuditLog = {
   created_at: string | null;
 };
 
+type PaymentFilter = ManualPaymentStatus | "all";
+
+type BankSettingsForm = {
+  accountHolder: string;
+  iban: string;
+  bankName: string;
+  instructions: string;
+};
+
 const emptyOverview: PlatformOverview = {
   users: { total: 0, today_signups: 0, today_logins: 0, active: 0, platform_admins: 0 },
   jobs: { pending_posts: 0, approved_posts: 0, pending_comments: 0 },
@@ -207,6 +229,13 @@ const defaultSecuritySettings: PlatformAdminSecuritySettings = {
   support_email: "",
   platform_notice: "",
   notice_enabled: false,
+};
+
+const defaultBankSettings: BankSettingsForm = {
+  accountHolder: "",
+  iban: "",
+  bankName: "",
+  instructions: "Ödeme onayı 1 iş günü içinde yapılır.",
 };
 
 const statusLabels: Record<JobStatus, string> = {
@@ -234,6 +263,7 @@ const adminViews: Array<{
   { id: "activity", label: "Üye Hareketleri", description: "Seçili kullanıcının kayıtları", icon: Activity },
   { id: "modules", label: "Modüller", description: "Ürün kullanım metrikleri", icon: BarChart3 },
   { id: "pricing", label: "Fiyatlar", description: "Paket tutarlarını yönet", icon: CreditCard },
+  { id: "payments", label: "Ödemeler", description: "Havale/EFT onay kuyruğu", icon: WalletCards },
   { id: "security", label: "Güvenlik", description: "Gizli koruma ve erişim", icon: KeyRound },
   { id: "system", label: "Sistem Ayarları", description: "Bakım, duyuru ve kayıt", icon: Settings },
   { id: "audit", label: "Denetim Kaydı", description: "Admin işlem izi", icon: ScrollText },
@@ -446,6 +476,11 @@ export default function PlatformAdmin() {
   const [planComparisonRows, setPlanComparisonRows] = useState<PlatformPlanComparisonFormRow[]>([]);
   const [securitySettings, setSecuritySettings] = useState<PlatformAdminSecuritySettings>(defaultSecuritySettings);
   const [auditLogs, setAuditLogs] = useState<PlatformAdminAuditLog[]>([]);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("pending");
+  const [manualPayments, setManualPayments] = useState<ManualPaymentRequest[]>([]);
+  const [paymentsBusy, setPaymentsBusy] = useState(false);
+  const [paymentActionId, setPaymentActionId] = useState<string | null>(null);
+  const [bankSettings, setBankSettings] = useState<BankSettingsForm>(defaultBankSettings);
   const [guardPhrase, setGuardPhrase] = useState("");
   const [newGuardPhrase, setNewGuardPhrase] = useState("");
   const [guardVerified, setGuardVerified] = useState(() => typeof window !== "undefined" && window.sessionStorage.getItem("isgvizyon-admin-guard-verified") === "true");
@@ -519,6 +554,82 @@ export default function PlatformAdmin() {
       console.error("Platform admin security state could not be loaded:", error);
       toast.error("Admin güvenlik ayarları yüklenemedi.");
       return defaultSecuritySettings;
+    }
+  };
+
+  const loadManualPaymentData = async (nextFilter: PaymentFilter = paymentFilter) => {
+    if (!canManage || guardRequired) return;
+    setPaymentsBusy(true);
+
+    try {
+      const [payments, settings] = await Promise.all([
+        getPlatformAdminManualPaymentRequests(nextFilter),
+        getBankTransferSettings(),
+      ]);
+
+      setManualPayments(payments);
+      setBankSettings({
+        accountHolder: settings.accountHolder || "",
+        iban: settings.iban || "",
+        bankName: settings.bankName || "",
+        instructions: settings.instructions || "Ödeme onayı 1 iş günü içinde yapılır.",
+      });
+    } catch (error) {
+      console.error("Manual payment data could not be loaded:", error);
+      toast.error("Manuel ödeme verileri yüklenemedi.");
+    } finally {
+      setPaymentsBusy(false);
+    }
+  };
+
+  const saveBankSettings = async () => {
+    setPaymentActionId("bank-settings");
+
+    try {
+      const settings = await updateBankTransferSettings(bankSettings);
+      setBankSettings({
+        accountHolder: settings.accountHolder || "",
+        iban: settings.iban || "",
+        bankName: settings.bankName || "",
+        instructions: settings.instructions || "Ödeme onayı 1 iş günü içinde yapılır.",
+      });
+      toast.success("IBAN bilgileri kaydedildi.");
+    } catch (error) {
+      console.error("Bank transfer settings could not be saved:", error);
+      toast.error("IBAN bilgileri kaydedilemedi.");
+    } finally {
+      setPaymentActionId(null);
+    }
+  };
+
+  const openPaymentReceipt = async (filePath?: string | null) => {
+    if (!filePath) {
+      toast.error("Bu ödeme talebinde dekont bulunmuyor.");
+      return;
+    }
+
+    try {
+      const url = await createManualPaymentReceiptSignedUrl(filePath);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      console.error("Receipt signed url could not be created:", error);
+      toast.error("Dekont bağlantısı oluşturulamadı.");
+    }
+  };
+
+  const decideManualPayment = async (payment: ManualPaymentRequest, decision: "approved" | "rejected") => {
+    const note = window.prompt(decision === "approved" ? "Onay notu ekleyin (opsiyonel)" : "Red nedenini yazın") || "";
+    setPaymentActionId(payment.id);
+
+    try {
+      await reviewManualPaymentRequest(payment.id, decision, note);
+      toast.success(decision === "approved" ? "Ödeme onaylandı ve üyelik açıldı." : "Ödeme reddedildi.");
+      await loadManualPaymentData();
+    } catch (error) {
+      console.error("Manual payment review failed:", error);
+      toast.error(decision === "approved" ? "Ödeme onaylanamadı." : "Ödeme reddedilemedi.");
+    } finally {
+      setPaymentActionId(null);
     }
   };
 
@@ -616,6 +727,13 @@ export default function PlatformAdmin() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, selectedUser?.id]);
+
+  useEffect(() => {
+    if (activeView === "payments") {
+      void loadManualPaymentData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, paymentFilter]);
 
   const handleAdminExit = async () => {
     clearPlatformAdminSession();
@@ -1529,6 +1647,163 @@ export default function PlatformAdmin() {
               </div>
             )}
 
+            {activeView === "payments" && (
+              <div className="space-y-5">
+                <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-200">Manuel Ödeme Onayı</p>
+                      <h2 className="mt-1 text-2xl font-black text-white">Havale / EFT Talepleri</h2>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-amber-100/80">
+                        Dekont yüklenmeden talep onaya düşmez. Onaylanan ödeme üyeliği açar, tüm onay/red geçmişi kayıt altında tutulur.
+                      </p>
+                    </div>
+                    <Button onClick={() => void loadManualPaymentData()} disabled={paymentsBusy} className="bg-amber-500 font-black text-slate-950 hover:bg-amber-400">
+                      {paymentsBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                      Yenile
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 xl:grid-cols-[390px_1fr]">
+                  <section className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-3 text-cyan-200">
+                        <Landmark className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-white">IBAN Bilgileri</h3>
+                        <p className="text-xs text-slate-400">Kullanıcıya ödeme ekranında gösterilir.</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 grid gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-slate-300">Alıcı adı / Ünvan</Label>
+                        <Input value={bankSettings.accountHolder} onChange={(event) => setBankSettings((current) => ({ ...current, accountHolder: event.target.value }))} className="border-slate-700 bg-slate-950/70 text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-slate-300">IBAN</Label>
+                        <Input value={bankSettings.iban} onChange={(event) => setBankSettings((current) => ({ ...current, iban: event.target.value }))} className="border-slate-700 bg-slate-950/70 text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-slate-300">Banka adı</Label>
+                        <Input value={bankSettings.bankName} onChange={(event) => setBankSettings((current) => ({ ...current, bankName: event.target.value }))} className="border-slate-700 bg-slate-950/70 text-white" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-slate-300">Kullanıcı bilgilendirme metni</Label>
+                        <Textarea value={bankSettings.instructions} onChange={(event) => setBankSettings((current) => ({ ...current, instructions: event.target.value }))} className="min-h-24 border-slate-700 bg-slate-950/70 text-white" />
+                      </div>
+                      <Button onClick={() => void saveBankSettings()} disabled={paymentActionId === "bank-settings"} className="bg-cyan-600 hover:bg-cyan-500">
+                        {paymentActionId === "bank-settings" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        IBAN Ayarlarını Kaydet
+                      </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <h3 className="text-lg font-black text-white">Ödeme Kuyruğu</h3>
+                        <p className="text-xs text-slate-400">Dekontu açın, tutarı/kodu kontrol edin, ardından onaylayın veya reddedin.</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(["pending", "awaiting_receipt", "approved", "rejected", "all"] as PaymentFilter[]).map((statusKey) => (
+                          <Button
+                            key={statusKey}
+                            type="button"
+                            variant="outline"
+                            onClick={() => setPaymentFilter(statusKey)}
+                            className={cn(
+                              "h-9 rounded-xl border-slate-700 bg-slate-950/60 text-xs font-black text-slate-300 hover:bg-slate-800 hover:text-white",
+                              paymentFilter === statusKey && "border-amber-300/40 bg-amber-500/15 text-amber-100",
+                            )}
+                          >
+                            {statusKey === "pending" ? "Onay Bekleyen" : statusKey === "awaiting_receipt" ? "Dekont Bekleyen" : statusKey === "approved" ? "Onaylanan" : statusKey === "rejected" ? "Reddedilen" : "Tümü"}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-5 space-y-3">
+                      {manualPayments.map((payment) => {
+                        const invoice = (payment.invoiceInfo || payment.invoice_info || {}) as Record<string, string>;
+                        const receiptPath = payment.receiptFilePath || payment.receipt_file_path;
+                        const reference = payment.referenceCode || payment.reference_code || "-";
+                        const planCode = payment.planCode || payment.plan_code || "-";
+                        const period = payment.billingPeriod || payment.billing_period || "monthly";
+                        return (
+                          <article key={payment.id} className="rounded-2xl border border-slate-700 bg-slate-950/45 p-4">
+                            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <Badge className="border border-cyan-400/25 bg-cyan-500/10 text-cyan-100">{reference}</Badge>
+                                  <Badge className="border border-violet-400/25 bg-violet-500/10 text-violet-100">{String(planCode).toUpperCase()} / {period === "yearly" ? "Yıllık" : "Aylık"}</Badge>
+                                  <Badge className={cn(
+                                    "border",
+                                    payment.status === "approved" ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-100" :
+                                      payment.status === "rejected" ? "border-rose-400/25 bg-rose-500/10 text-rose-100" :
+                                        payment.status === "awaiting_receipt" ? "border-slate-500/25 bg-slate-500/10 text-slate-200" :
+                                          "border-amber-400/25 bg-amber-500/10 text-amber-100",
+                                  )}>
+                                    {payment.status === "approved" ? "Onaylandı" : payment.status === "rejected" ? "Reddedildi" : payment.status === "awaiting_receipt" ? "Dekont bekliyor" : "Onay bekliyor"}
+                                  </Badge>
+                                </div>
+                                <h4 className="mt-3 text-lg font-black text-white">{payment.userName || payment.userEmail || "Kullanıcı"}</h4>
+                                <p className="mt-1 text-sm text-slate-400">{payment.userEmail || "-"} • {formatDate(payment.submittedAt || payment.createdAt)}</p>
+                                <p className="mt-2 text-2xl font-black text-white">{Number(payment.amount || 0).toLocaleString("tr-TR")} {payment.currency || "TRY"}</p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button type="button" variant="outline" onClick={() => void openPaymentReceipt(receiptPath)} className="border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Dekont
+                                </Button>
+                                <Button type="button" disabled={paymentActionId === payment.id || payment.status === "approved"} onClick={() => void decideManualPayment(payment, "approved")} className="bg-emerald-600 hover:bg-emerald-500">
+                                  {paymentActionId === payment.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                  Onayla
+                                </Button>
+                                <Button type="button" disabled={paymentActionId === payment.id || payment.status === "rejected"} onClick={() => void decideManualPayment(payment, "rejected")} className="bg-rose-600 hover:bg-rose-500">
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                  Reddet
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+                                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Fatura</p>
+                                <p className="mt-2 font-bold text-white">{invoice.title || "-"}</p>
+                                <p className="mt-1 text-slate-400">{invoice.email || "-"} • {invoice.phone || "-"}</p>
+                                <p className="mt-1 text-slate-400">{invoice.taxOffice || ""} {invoice.taxNumber || invoice.identityNumber || ""}</p>
+                                <p className="mt-1 text-slate-400">{invoice.address || "-"}</p>
+                              </div>
+                              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-sm">
+                                <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Geçmiş</p>
+                                <div className="mt-2 space-y-2">
+                                  {(payment.events || []).slice(0, 4).map((event) => (
+                                    <div key={event.id} className="flex items-start justify-between gap-3 text-xs">
+                                      <span className="font-bold text-slate-200">{event.action}</span>
+                                      <span className="text-slate-500">{formatDate(event.createdAt)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+
+                      {!paymentsBusy && manualPayments.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/35 p-10 text-center text-sm text-slate-400">
+                          Bu filtrede ödeme talebi bulunmuyor.
+                        </div>
+                      ) : null}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            )}
+
             {activeView === "security" && (
               <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
                 <section className="rounded-2xl border border-slate-700/70 bg-slate-900/55 p-5">
@@ -1793,3 +2068,4 @@ export default function PlatformAdmin() {
     </main>
   );
 }
+
