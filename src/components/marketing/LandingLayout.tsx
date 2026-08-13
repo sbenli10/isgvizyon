@@ -1,4 +1,4 @@
-import { ChevronDown, Menu, MessageCircle, Rocket, X } from "lucide-react";
+import { Menu, MessageCircle, Rocket, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -28,12 +28,12 @@ export function LandingLayout({
   const activePath = useMemo(() => location.pathname, [location.pathname]);
   const navLinks = useMemo(
     () => [
-      { label: "Özellikler", path: "/landing/features", hasDropdown: true },
-      { label: "Entegrasyonlar", path: "/landing/product", hasDropdown: true },
-      { label: "Fiyatlar", path: "/landing/pricing", hasDropdown: false },
-      { label: "Referanslar", path: "/landing/trust", hasDropdown: true },
-      { label: "Araçlar", path: "/landing/flow", hasDropdown: true },
-      { label: "Kurumsal", path: "/landing/trust", hasDropdown: true },
+      { label: "Özellikler", path: "/landing/features" },
+      { label: "Entegrasyonlar", path: "/landing/product" },
+      { label: "Fiyatlar", path: "/landing/pricing" },
+      { label: "Referanslar", path: "/landing/trust" },
+      { label: "Araçlar", path: "/landing/flow" },
+      { label: "Kurumsal", path: "/landing/trust" },
     ],
     [],
   );
@@ -94,9 +94,6 @@ export function LandingLayout({
                   ].join(" ")}
                 >
                   {link.label}
-                  {link.hasDropdown ? (
-                    <ChevronDown className="h-3.5 w-3.5 text-slate-400 transition group-hover:text-blue-500" />
-                  ) : null}
                 </button>
               );
             })}
