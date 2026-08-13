@@ -16,11 +16,13 @@ import {
   Edit2,
   FileText,
   GraduationCap,
+  ListChecks,
   MapPin,
   Plus,
   Search,
   Settings,
   ShieldCheck,
+  TimerReset,
   TriangleAlert,
   Trash2,
   Upload,
@@ -99,6 +101,35 @@ type EmployeeRow = {
 type GenericRecord = Record<string, any>;
 
 const db = supabase as any;
+
+type CompanyFollowStatus = "open" | "in_progress" | "waiting" | "completed" | "cancelled";
+type CompanyFollowPriority = "low" | "normal" | "high" | "critical";
+
+type CompanyFollowChecklistItem = {
+  id: string;
+  label: string;
+  done: boolean;
+};
+
+type CompanyFollowUpRow = GenericRecord & {
+  id: string;
+  user_id?: string | null;
+  organization_id?: string | null;
+  company_id?: string | null;
+  title: string;
+  follow_up_type?: string | null;
+  due_date?: string | null;
+  status: CompanyFollowStatus;
+  priority?: CompanyFollowPriority | null;
+  owner_name?: string | null;
+  regulation_area?: string | null;
+  checklist?: CompanyFollowChecklistItem[] | null;
+  notes?: string | null;
+  completed_at?: string | null;
+  reminder_days_before?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
 
 type AssignmentDetailRole =
   | "employer_representative"
@@ -2421,6 +2452,81 @@ export function ProfileCompanyFollowTab() {
   const { user, profile } = useAuth();
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [hasOsgbAssignment, setHasOsgbAssignment] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [companies, setCompanies] = useState<CompanyRow[]>([]);
+  const [rows, setRows] = useState<CompanyFollowUpRow[]>([]);
+  const [open, setOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<CompanyFollowUpRow | null>(null);
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | CompanyFollowStatus | "overdue" | "upcoming">("all");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [saving, setSaving] = useState(false);
+  const defaultChecklist = useMemo<CompanyFollowChecklistItem[]>(
+    () => [
+      { id: "risk", label: "Risk değerlendirmesi güncel ve onaylı", done: false },
+      { id: "adep", label: "Acil durum planı ve ekip atamaları kontrol edildi", done: false },
+      { id: "training", label: "Zorunlu eğitim / katılım kayıtları tamamlandı", done: false },
+      { id: "health", label: "Sağlık gözetimi ve EK-2 kayıtları takip edildi", done: false },
+      { id: "documents", label: "Evrak / sözleşme / rapor dosyaları arşivlendi", done: false },
+    ],
+    [],
+  );
+  const [form, setForm] = useState({
+    company_id: "",
+    title: "",
+    follow_up_type: "Mevzuat Kontrolü",
+    regulation_area: "Genel İSG",
+    due_date: "",
+    status: "open" as CompanyFollowStatus,
+    priority: "normal" as CompanyFollowPriority,
+    owner_name: "",
+    reminder_days_before: "7",
+    notes: "",
+    checklist: defaultChecklist,
+  });
+
+  const followUpTypes = ["Mevzuat Kontrolü", "Eksik Evrak", "Saha Aksiyonu", "Ziyaret Sonrası Takip", "Sözleşme / Süre", "Eğitim Takibi", "Sağlık Gözetimi", "Diğer"];
+  const regulationAreas = ["Genel İSG", "Risk Değerlendirmesi", "Acil Durum", "Eğitim", "Sağlık Gözetimi", "Periyodik Kontrol", "İSG Kurulu", "Evrak / Arşiv", "OSGB Operasyonu"];
+  const statusLabels: Record<CompanyFollowStatus, string> = {
+    open: "Açık",
+    in_progress: "İşlemde",
+    waiting: "Beklemede",
+    completed: "Tamamlandı",
+    cancelled: "İptal",
+  };
+  const priorityLabels: Record<CompanyFollowPriority, string> = {
+    low: "Düşük",
+    normal: "Normal",
+    high: "Yüksek",
+    critical: "Kritik",
+  };
+  const priorityClasses: Record<CompanyFollowPriority, string> = {
+    low: "border-slate-500/30 bg-slate-500/10 text-slate-200",
+    normal: "border-cyan-400/30 bg-cyan-400/10 text-cyan-100",
+    high: "border-amber-400/30 bg-amber-400/10 text-amber-100",
+    critical: "border-rose-400/40 bg-rose-500/15 text-rose-100",
+  };
+
+  const companyById = useMemo(() => new Map(companies.map((company) => [company.id, company])), [companies]);
+
+  const loadTracking = async () => {
+    if (!user?.id) {
+      setCompanies([]);
+      setRows([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const [companyRows, followRows] = await Promise.all([
+      loadProfileCompanies(profile?.organization_id, user.id, 500),
+      safeRows<CompanyFollowUpRow>("company_follow_ups", "*", 500, (q) =>
+        q.eq("user_id", user.id).order("due_date", { ascending: true }).order("created_at", { ascending: false }),
+      ),
+    ]);
+    setCompanies(companyRows.sort((a, b) => (a.name || "").localeCompare(b.name || "", "tr")));
+    setRows(followRows);
+    setLoading(false);
+  };
 
   useEffect(() => {
     let active = true;
@@ -2466,6 +2572,145 @@ export function ProfileCompanyFollowTab() {
     };
   }, [profile?.organization_id, user?.id]);
 
+  useEffect(() => {
+    void loadTracking();
+  }, [profile?.organization_id, user?.id]);
+
+  const resetForm = () => {
+    setEditingRow(null);
+    setForm({
+      company_id: companyFilter !== "all" ? companyFilter : "",
+      title: "",
+      follow_up_type: "Mevzuat Kontrolü",
+      regulation_area: "Genel İSG",
+      due_date: "",
+      status: "open",
+      priority: "normal",
+      owner_name: "",
+      reminder_days_before: "7",
+      notes: "",
+      checklist: defaultChecklist.map((item) => ({ ...item })),
+    });
+  };
+
+  const openCreateDialog = () => {
+    resetForm();
+    setOpen(true);
+  };
+
+  const openEditDialog = (row: CompanyFollowUpRow) => {
+    const checklist = Array.isArray(row.checklist) && row.checklist.length > 0
+      ? row.checklist.map((item) => ({ id: String(item.id || crypto.randomUUID()), label: String(item.label || ""), done: Boolean(item.done) }))
+      : defaultChecklist.map((item) => ({ ...item }));
+    setEditingRow(row);
+    setForm({
+      company_id: row.company_id || "",
+      title: row.title || "",
+      follow_up_type: row.follow_up_type || "Mevzuat Kontrolü",
+      regulation_area: row.regulation_area || "Genel İSG",
+      due_date: row.due_date || "",
+      status: row.status || "open",
+      priority: (row.priority as CompanyFollowPriority) || "normal",
+      owner_name: row.owner_name || "",
+      reminder_days_before: String(row.reminder_days_before ?? 7),
+      notes: row.notes || "",
+      checklist,
+    });
+    setOpen(true);
+  };
+
+  const saveFollowUp = async () => {
+    if (!user?.id) return;
+    if (!form.company_id || !form.title.trim() || !form.due_date) {
+      toast.error("Firma, takip başlığı ve hedef tarih zorunludur.");
+      return;
+    }
+    setSaving(true);
+    const payload = {
+      user_id: user.id,
+      organization_id: profile?.organization_id || null,
+      company_id: form.company_id,
+      title: form.title.trim(),
+      follow_up_type: form.follow_up_type,
+      regulation_area: form.regulation_area,
+      due_date: form.due_date,
+      status: form.status,
+      priority: form.priority,
+      owner_name: form.owner_name.trim() || null,
+      reminder_days_before: Number(form.reminder_days_before || 7),
+      notes: form.notes.trim() || null,
+      checklist: form.checklist,
+      completed_at: form.status === "completed" ? new Date().toISOString() : null,
+    };
+    try {
+      const query = editingRow
+        ? db.from("company_follow_ups").update(payload).eq("id", editingRow.id)
+        : db.from("company_follow_ups").insert(payload);
+      const { error } = await query;
+      if (error) throw error;
+      toast.success(editingRow ? "Takip kaydı güncellendi." : "Takip kaydı oluşturuldu.");
+      setOpen(false);
+      resetForm();
+      void loadTracking();
+    } catch (error: any) {
+      toast.error("Takip kaydı kaydedilemedi.", { description: error.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateFollowStatus = async (row: CompanyFollowUpRow, status: CompanyFollowStatus) => {
+    const { error } = await db.from("company_follow_ups").update({
+      status,
+      completed_at: status === "completed" ? new Date().toISOString() : null,
+    }).eq("id", row.id);
+    if (error) {
+      toast.error("Durum güncellenemedi.", { description: error.message });
+      return;
+    }
+    toast.success(status === "completed" ? "Takip tamamlandı." : "Takip durumu güncellendi.");
+    void loadTracking();
+  };
+
+  const deleteFollowUp = async (row: CompanyFollowUpRow) => {
+    const { error } = await db.from("company_follow_ups").delete().eq("id", row.id);
+    if (error) {
+      toast.error("Takip kaydı silinemedi.", { description: error.message });
+      return;
+    }
+    toast.success("Takip kaydı silindi.");
+    void loadTracking();
+  };
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const upcomingLimit = new Date(today);
+  upcomingLimit.setDate(upcomingLimit.getDate() + 14);
+
+  const filteredRows = rows.filter((row) => {
+    const company = row.company_id ? companyById.get(row.company_id) : null;
+    const dueDate = row.due_date ? new Date(row.due_date) : null;
+    const haystack = [row.title, row.follow_up_type, row.regulation_area, row.owner_name, row.notes, company?.name]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("tr-TR");
+    const matchesQuery = !query.trim() || haystack.includes(query.trim().toLocaleLowerCase("tr-TR"));
+    const matchesCompany = companyFilter === "all" || row.company_id === companyFilter;
+    const matchesStatus =
+      statusFilter === "all" ||
+      row.status === statusFilter ||
+      (statusFilter === "overdue" && row.status !== "completed" && dueDate !== null && dueDate < today) ||
+      (statusFilter === "upcoming" && row.status !== "completed" && dueDate !== null && dueDate >= today && dueDate <= upcomingLimit);
+    return matchesQuery && matchesCompany && matchesStatus;
+  });
+
+  const stats = {
+    total: rows.length,
+    open: rows.filter((row) => row.status !== "completed" && row.status !== "cancelled").length,
+    overdue: rows.filter((row) => row.status !== "completed" && row.due_date && new Date(row.due_date) < today).length,
+    upcoming: rows.filter((row) => row.status !== "completed" && row.due_date && new Date(row.due_date) >= today && new Date(row.due_date) <= upcomingLimit).length,
+  };
+
   if (loadingAssignments) {
     return (
       <PanelShell title="Firma Takip" description="OSGB görevlendirmeleri kontrol ediliyor.">
@@ -2492,7 +2737,204 @@ export function ProfileCompanyFollowTab() {
     );
   }
 
-  return <SimpleRecordsTab title="Firma Takip" description="Atanan firmaların mevzuat checklist&apos;ini ve takip notlarını izleyin." table="company_follow_ups" addLabel="Takip Kaydı Ekle" fields={["company_id", "title", "follow_up_type", "due_date", "status", "notes"]} />;
+  return (
+    <PanelShell
+      title="Firma Takip"
+      description="Firma bazlı mevzuat, evrak, saha aksiyonu ve ziyaret sonrası takipleri tek ekranda yönetin."
+      action={<Button onClick={openCreateDialog} className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg shadow-blue-950/30"><Plus className="mr-2 h-4 w-4" />Takip Kaydı Ekle</Button>}
+    >
+      <div className="mb-5 grid gap-3 md:grid-cols-4">
+        {[
+          { label: "Toplam takip", value: stats.total, icon: ClipboardList, className: "border-blue-400/20 bg-blue-500/10 text-blue-100" },
+          { label: "Açık iş", value: stats.open, icon: TimerReset, className: "border-cyan-400/20 bg-cyan-500/10 text-cyan-100" },
+          { label: "Geciken", value: stats.overdue, icon: AlertTriangle, className: "border-rose-400/25 bg-rose-500/10 text-rose-100" },
+          { label: "14 gün içinde", value: stats.upcoming, icon: CalendarDays, className: "border-amber-400/25 bg-amber-500/10 text-amber-100" },
+        ].map((item) => (
+          <div key={item.label} className={cn("rounded-2xl border p-4", item.className)}>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] opacity-80">{item.label}</p>
+              <item.icon className="h-4 w-4" />
+            </div>
+            <p className="mt-3 text-3xl font-black text-white">{item.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <Toolbar>
+        <div className="relative w-full lg:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Firma, konu, sorumlu veya not ara..." className="h-11 rounded-xl border-slate-700 bg-slate-900 pl-10 text-slate-100" />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:flex">
+          <Select value={companyFilter} onValueChange={setCompanyFilter}>
+            <SelectTrigger className="h-11 min-w-[220px] rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue placeholder="Tüm firmalar" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm firmalar</SelectItem>
+              {companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as typeof statusFilter)}>
+            <SelectTrigger className="h-11 min-w-[180px] rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm durumlar</SelectItem>
+              <SelectItem value="overdue">Gecikenler</SelectItem>
+              <SelectItem value="upcoming">Yaklaşanlar</SelectItem>
+              <SelectItem value="open">Açık</SelectItem>
+              <SelectItem value="in_progress">İşlemde</SelectItem>
+              <SelectItem value="waiting">Beklemede</SelectItem>
+              <SelectItem value="completed">Tamamlandı</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </Toolbar>
+
+      {loading ? (
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/35 p-8 text-center text-sm text-slate-400">Firma takip kayıtları yükleniyor...</div>
+      ) : filteredRows.length === 0 ? (
+        <EmptyState description="Firma seçerek ilk mevzuat veya saha takip kaydını oluşturun." />
+      ) : (
+        <div className="space-y-3">
+          {filteredRows.map((row) => {
+            const company = row.company_id ? companyById.get(row.company_id) : null;
+            const checklist = Array.isArray(row.checklist) ? row.checklist : [];
+            const doneCount = checklist.filter((item) => item.done).length;
+            const dueDate = row.due_date ? new Date(row.due_date) : null;
+            const isOverdue = row.status !== "completed" && dueDate !== null && dueDate < today;
+            const priority = (row.priority as CompanyFollowPriority) || "normal";
+            return (
+              <div key={row.id} className={cn("rounded-2xl border bg-slate-900/35 p-4 transition hover:border-cyan-400/35 hover:bg-slate-900/55", isOverdue ? "border-rose-400/35" : "border-slate-800")}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={cn("border", priorityClasses[priority])}>{priorityLabels[priority]}</Badge>
+                      <Badge className="border border-slate-700 bg-slate-950 text-slate-200">{statusLabels[row.status] || row.status}</Badge>
+                      {isOverdue ? <Badge className="border border-rose-400/40 bg-rose-500/15 text-rose-100">Gecikti</Badge> : null}
+                    </div>
+                    <h3 className="mt-3 text-lg font-black text-white">{row.title}</h3>
+                    <p className="mt-1 text-sm text-slate-400">{company?.name || "Firma seçilmemiş"} • {row.follow_up_type || "Takip"} • {row.regulation_area || "Genel"}</p>
+                    {row.notes ? <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300">{row.notes}</p> : null}
+                  </div>
+                  <div className="grid gap-2 text-sm sm:grid-cols-3 lg:min-w-[460px]">
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/55 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Hedef</p>
+                      <p className="mt-1 font-semibold text-white">{row.due_date ? new Date(row.due_date).toLocaleDateString("tr-TR") : "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/55 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Sorumlu</p>
+                      <p className="mt-1 font-semibold text-white">{row.owner_name || "Atanmadı"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/55 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Checklist</p>
+                      <p className="mt-1 font-semibold text-white">{doneCount}/{checklist.length || defaultChecklist.length}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={() => openEditDialog(row)} className="rounded-xl border-blue-500/35 bg-blue-500/10 text-blue-100 hover:bg-blue-500/20"><Edit2 className="mr-2 h-4 w-4" />Düzenle</Button>
+                  {row.status !== "completed" ? (
+                    <Button size="sm" onClick={() => void updateFollowStatus(row, "completed")} className="rounded-xl bg-emerald-600 text-white hover:bg-emerald-500"><CheckCircle2 className="mr-2 h-4 w-4" />Tamamla</Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => void updateFollowStatus(row, "open")} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">Yeniden Aç</Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => void deleteFollowUp(row)} className="rounded-xl border-rose-500/35 bg-rose-500/10 text-rose-100 hover:bg-rose-500/20"><Trash2 className="mr-2 h-4 w-4" />Sil</Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Dialog open={open} onOpenChange={(nextOpen) => { setOpen(nextOpen); if (!nextOpen) resetForm(); }}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto border-slate-800 bg-slate-950 text-slate-100 sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingRow ? "Takip Kaydını Düzenle" : "Takip Kaydı Ekle"}</DialogTitle>
+            <DialogDescription>Firma için takip edilecek işi, hedef tarihi ve kontrol maddelerini belirleyin.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <Label>Firma *</Label>
+                <Select value={form.company_id} onValueChange={(value) => setForm((current) => ({ ...current, company_id: value }))}>
+                  <SelectTrigger className="rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue placeholder="Firma seçin" /></SelectTrigger>
+                  <SelectContent>{companies.map((company) => <SelectItem key={company.id} value={company.id}>{company.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Takip Başlığı *</Label>
+                <Input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Örn. Risk değerlendirmesi güncelleme takibi" className="rounded-xl border-slate-700 bg-slate-900 text-slate-100" />
+              </div>
+              <div className="space-y-2">
+                <Label>Takip Türü</Label>
+                <Select value={form.follow_up_type} onValueChange={(value) => setForm((current) => ({ ...current, follow_up_type: value }))}>
+                  <SelectTrigger className="rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue /></SelectTrigger>
+                  <SelectContent>{followUpTypes.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Mevzuat Alanı</Label>
+                <Select value={form.regulation_area} onValueChange={(value) => setForm((current) => ({ ...current, regulation_area: value }))}>
+                  <SelectTrigger className="rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue /></SelectTrigger>
+                  <SelectContent>{regulationAreas.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Hedef Tarih *</Label>
+                <Input type="date" value={form.due_date} onChange={(event) => setForm((current) => ({ ...current, due_date: event.target.value }))} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100" />
+              </div>
+              <div className="space-y-2">
+                <Label>Sorumlu Kişi</Label>
+                <Input value={form.owner_name} onChange={(event) => setForm((current) => ({ ...current, owner_name: event.target.value }))} placeholder="Örn. İSG uzmanı / firma yetkilisi" className="rounded-xl border-slate-700 bg-slate-900 text-slate-100" />
+              </div>
+              <div className="space-y-2">
+                <Label>Durum</Label>
+                <Select value={form.status} onValueChange={(value) => setForm((current) => ({ ...current, status: value as CompanyFollowStatus }))}>
+                  <SelectTrigger className="rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(statusLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Öncelik</Label>
+                <Select value={form.priority} onValueChange={(value) => setForm((current) => ({ ...current, priority: value as CompanyFollowPriority }))}>
+                  <SelectTrigger className="rounded-xl border-slate-700 bg-slate-900 text-slate-100"><SelectValue /></SelectTrigger>
+                  <SelectContent>{Object.entries(priorityLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Notlar</Label>
+                <Textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} placeholder="Takip nedeni, görüşülen kişi, eksik evrak veya saha aksiyonu..." className="min-h-[96px] rounded-xl border-slate-700 bg-slate-900 text-slate-100" />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <ListChecks className="h-4 w-4 text-cyan-300" />
+                <p className="font-bold text-white">Kontrol Listesi</p>
+              </div>
+              <div className="grid gap-2">
+                {form.checklist.map((item, index) => (
+                  <label key={item.id} className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-950/55 p-3 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        checklist: current.checklist.map((check, checkIndex) => checkIndex === index ? { ...check, done: event.target.checked } : check),
+                      }))}
+                      className="mt-1 h-4 w-4 rounded border-slate-600 accent-cyan-500"
+                    />
+                    <span>{item.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} className="rounded-xl border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800">İptal</Button>
+            <Button onClick={() => void saveFollowUp()} disabled={saving} className="rounded-xl bg-blue-600 text-white hover:bg-blue-500">{saving ? "Kaydediliyor..." : "Kaydet"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </PanelShell>
+  );
 }
 
 export function ProfileArchiveTab() {
