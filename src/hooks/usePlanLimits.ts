@@ -125,11 +125,12 @@ export function usePlanLimits() {
         };
       }
 
-      if (canAccessPremium) {
-        return { allowed: true, reason: "allowed", currentPlan, featureKey };
-      }
-
-      return { allowed: true, reason: "allowed", currentPlan, featureKey };
+      return {
+        allowed: false,
+        reason: "upgrade_to_premium",
+        currentPlan,
+        featureKey,
+      };
     },
     [canAccessOsgb, canAccessPremium, currentPlan, getFeatureEntitlement],
   );

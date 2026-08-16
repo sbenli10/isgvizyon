@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { consumeFeatureOrRespond } from "../_shared/feature_limits.ts";
 import {
   GeminiHttpError,
   callGeminiWithRetryAndFallback,
@@ -298,6 +299,9 @@ Deno.serve(async (req) => {
         },
       });
     }
+
+    const limitResponse = await consumeFeatureOrRespond(req, "ai.bulk_capa_analysis_monthly");
+    if (limitResponse) return limitResponse;
 
     if (mode === "direct") {
       const { analysis, text, resolvedModel } = await runBulkCapaAnalysis(images, prompt);

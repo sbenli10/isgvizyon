@@ -1,4 +1,5 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { consumeFeatureOrRespond } from "../_shared/feature_limits.ts";
 import {
   GeminiHttpError,
   callGemini,
@@ -1038,6 +1039,12 @@ Deno.serve(async (req) => {
         },
       });
     }
+
+    const limitResponse = await consumeFeatureOrRespond(
+      req,
+      action === "image" ? "ai.evacuation_image_monthly" : "ai.evacuation_plan_monthly",
+    );
+    if (limitResponse) return limitResponse;
 
     const apiKey = getRequiredGoogleApiKey();
     console.log("Gerekli Google API key alindi:", !!apiKey);

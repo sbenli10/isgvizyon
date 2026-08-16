@@ -176,6 +176,14 @@ type PlatformPlanComparisonFormRow = {
   is_active: boolean;
 };
 
+type PlatformPlanFeatureRow = {
+  plan_code: string;
+  feature_key: string;
+  limit_value: string;
+  is_enabled: boolean;
+  period: "monthly" | "lifetime" | "";
+};
+
 type PlatformAdminSecuritySettings = {
   guard_enabled: boolean;
   guard_configured: boolean;
@@ -339,6 +347,28 @@ function normalizePlanComparisonRows(payload: unknown): PlatformPlanComparisonFo
     .sort((a, b) => a.sort_order - b.sort_order);
 }
 
+function normalizePlanFeatureRows(payload: unknown): PlatformPlanFeatureRow[] {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((item) => {
+      const row = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+      const period = String(row.period || "") as PlatformPlanFeatureRow["period"];
+      return {
+        plan_code: String(row.plan_code || "free"),
+        feature_key: String(row.feature_key || ""),
+        limit_value: row.limit_value === null || row.limit_value === undefined ? "" : String(row.limit_value),
+        is_enabled: row.is_enabled !== false,
+        period: period === "monthly" || period === "lifetime" ? period : "",
+      };
+    })
+    .filter((row) => row.feature_key)
+    .sort((a, b) => {
+      const planOrder = ["free", "premium", "osgb"];
+      const planDiff = planOrder.indexOf(a.plan_code) - planOrder.indexOf(b.plan_code);
+      return planDiff !== 0 ? planDiff : a.feature_key.localeCompare(b.feature_key, "tr");
+    });
+}
+
 function normalizeSecuritySettings(payload: unknown): PlatformAdminSecuritySettings {
   const source = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
   return {
@@ -474,6 +504,7 @@ export default function PlatformAdmin() {
     description: "Demo süresince OSGB modülü ve platform özellikleri kullanılabilir.",
   });
   const [planComparisonRows, setPlanComparisonRows] = useState<PlatformPlanComparisonFormRow[]>([]);
+  const [planFeatureRows, setPlanFeatureRows] = useState<PlatformPlanFeatureRow[]>([]);
   const [securitySettings, setSecuritySettings] = useState<PlatformAdminSecuritySettings>(defaultSecuritySettings);
   const [auditLogs, setAuditLogs] = useState<PlatformAdminAuditLog[]>([]);
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("pending");
@@ -638,9 +669,10 @@ export default function PlatformAdmin() {
     setPricingBusy(true);
 
     try {
-      const [{ data, error }, { data: configData, error: configError }] = await Promise.all([
+      const [{ data, error }, { data: configData, error: configError }, { data: featureData, error: featureError }] = await Promise.all([
         (supabase as any).rpc("get_platform_admin_plan_prices"),
         (supabase as any).rpc("get_platform_admin_plan_configuration"),
+        (supabase as any).rpc("get_platform_admin_plan_features"),
       ]);
       if (error) throw error;
 
@@ -666,6 +698,12 @@ export default function PlatformAdmin() {
         setPlanComparisonRows(normalizePlanComparisonRows(config.comparisonRows));
       } else {
         console.warn("Platform plan configuration could not be loaded:", configError);
+      }
+
+      if (!featureError) {
+        setPlanFeatureRows(normalizePlanFeatureRows(featureData));
+      } else {
+        console.warn("Platform plan features could not be loaded:", featureError);
       }
     } catch (error) {
       console.error("Platform plan prices could not be loaded:", error);
@@ -872,6 +910,10 @@ export default function PlatformAdmin() {
     setPlanComparisonRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
   };
 
+  const updatePlanFeatureRow = (index: number, patch: Partial<PlatformPlanFeatureRow>) => {
+    setPlanFeatureRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  };
+
   const addPlanComparisonRow = () => {
     const lastRow = planComparisonRows[planComparisonRows.length - 1];
     const nextOrder = (lastRow?.sort_order ?? planComparisonRows.length * 10) + 10;
@@ -943,6 +985,56 @@ export default function PlatformAdmin() {
     } catch (error) {
       console.error("Plan comparison update failed:", error);
       toast.error("Plan karşılaştırma tablosu güncellenemedi.");
+    } finally {
+      setPricingActionId(null);
+    }
+  };
+
+  const savePlanFeatureRows = async () => {
+    let rows: Array<{
+      plan_code: string;
+      feature_key: string;
+      is_enabled: boolean;
+      limit_value: number | null;
+      period: string | null;
+    }>;
+
+    try {
+      rows = planFeatureRows.map((row) => {
+        const limitText = row.limit_value.trim();
+        const limitValue = limitText === "" ? null : Number(limitText.replace(",", "."));
+
+        if (limitValue !== null && (!Number.isFinite(limitValue) || limitValue < 0)) {
+          throw new Error(`${row.plan_code.toUpperCase()} / ${row.feature_key} için geçerli bir limit girin.`);
+        }
+
+        return {
+          plan_code: row.plan_code,
+          feature_key: row.feature_key,
+          is_enabled: row.is_enabled,
+          limit_value: limitValue,
+          period: row.period || null,
+        };
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Paket limitlerini kontrol edin.");
+      return;
+    }
+
+    setPricingActionId("plan-features");
+
+    try {
+      const { data, error } = await (supabase as any).rpc("update_platform_admin_plan_features", {
+        p_rows: rows,
+      });
+
+      if (error) throw error;
+
+      setPlanFeatureRows(normalizePlanFeatureRows(data));
+      toast.success("Gerçek paket limitleri güncellendi.");
+    } catch (error) {
+      console.error("Plan feature update failed:", error);
+      toast.error(error instanceof Error ? error.message : "Paket limitleri güncellenemedi.");
     } finally {
       setPricingActionId(null);
     }
@@ -1568,6 +1660,76 @@ export default function PlatformAdmin() {
                         {pricingActionId === "demo-settings" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         Demo Ayarlarını Kaydet
                       </Button>
+                    </div>
+                  </section>
+
+                  <section className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-5">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">Gerçek Plan Limitleri</p>
+                        <h3 className="mt-1 text-xl font-black text-white">plan_features Yönetimi</h3>
+                        <p className="mt-1 text-sm leading-6 text-cyan-100/80">
+                          Bu değerler uygulamanın paket kontrolünde kullandığı ana tablodur. Limit boş bırakılırsa ilgili özellik sınırsız çalışır.
+                        </p>
+                      </div>
+                      <Button type="button" onClick={() => void savePlanFeatureRows()} disabled={pricingActionId === "plan-features"} className="bg-cyan-600 hover:bg-cyan-500">
+                        {pricingActionId === "plan-features" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Limitleri Kaydet
+                      </Button>
+                    </div>
+
+                    <div className="mt-5 max-h-[620px] overflow-auto rounded-2xl border border-slate-800">
+                      <div className="grid min-w-[900px] grid-cols-[110px_1.7fr_150px_140px_110px] gap-3 border-b border-slate-800 bg-slate-950/80 px-3 py-3 text-xs font-black uppercase tracking-[0.12em] text-slate-400">
+                        <div>Paket</div>
+                        <div>Feature Key</div>
+                        <div>Limit</div>
+                        <div>Periyot</div>
+                        <div>Aktif</div>
+                      </div>
+                      <div className="min-w-[900px] divide-y divide-slate-800">
+                        {planFeatureRows.map((row, index) => (
+                          <div key={`${row.plan_code}-${row.feature_key}`} className="grid grid-cols-[110px_1.7fr_150px_140px_110px] gap-3 bg-slate-950/35 p-3">
+                            <Badge className={cn(
+                              "h-10 justify-center border font-black",
+                              row.plan_code === "free" ? "border-sky-400/25 bg-sky-500/10 text-sky-100" :
+                                row.plan_code === "premium" ? "border-violet-400/25 bg-violet-500/10 text-violet-100" :
+                                  "border-emerald-400/25 bg-emerald-500/10 text-emerald-100",
+                            )}>
+                              {row.plan_code.toUpperCase()}
+                            </Badge>
+                            <Input
+                              value={row.feature_key}
+                              readOnly
+                              className="border-slate-700 bg-slate-950/70 font-mono text-xs text-white"
+                            />
+                            <Input
+                              value={row.limit_value}
+                              onChange={(event) => updatePlanFeatureRow(index, { limit_value: event.target.value })}
+                              className="border-slate-700 bg-slate-950/70 text-white"
+                              placeholder="Sınırsız"
+                              inputMode="numeric"
+                            />
+                            <select
+                              value={row.period}
+                              onChange={(event) => updatePlanFeatureRow(index, { period: event.target.value as PlatformPlanFeatureRow["period"] })}
+                              className="h-10 rounded-md border border-slate-700 bg-slate-950/70 px-3 text-sm text-white outline-none focus:border-cyan-400"
+                            >
+                              <option value="">Yok</option>
+                              <option value="monthly">Aylık</option>
+                              <option value="lifetime">Toplam</option>
+                            </select>
+                            <label className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-xs font-bold text-slate-200">
+                              <input
+                                type="checkbox"
+                                checked={row.is_enabled}
+                                onChange={(event) => updatePlanFeatureRow(index, { is_enabled: event.target.checked })}
+                                className="h-4 w-4 accent-emerald-500"
+                              />
+                              Açık
+                            </label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </section>
 

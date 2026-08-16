@@ -15,7 +15,7 @@ import type {
 
 const DEFAULT_FEATURES: SubscriptionFeatures = {
   maxCompanies: 1,
-  maxEmployees: 25,
+  maxEmployees: 50,
   aiRiskAnalysis: false,
   pdfExport: true,
   excelExport: false,

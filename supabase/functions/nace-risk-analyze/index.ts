@@ -1,4 +1,5 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { consumeFeatureOrRespond } from "../_shared/feature_limits.ts";
 import {
   GeminiHttpError,
   callGeminiWithRetryAndFallback,
@@ -358,6 +359,8 @@ Deno.serve(async (req) => {
     const sector = typeof body?.sector === "string" ? body.sector.trim() : "";
     const hazardClass = typeof body?.hazardClass === "string" ? body.hazardClass.trim() : "";
     const naceTitle = typeof body?.naceTitle === "string" ? body.naceTitle.trim() : "";
+    const limitResponse = await consumeFeatureOrRespond(req, "ai.nace_analysis_monthly");
+    if (limitResponse) return limitResponse;
 
     logInfo(requestId, "request:normalized", {
       naceCode,

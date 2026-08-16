@@ -1,4 +1,5 @@
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { consumeFeatureOrRespond } from "../_shared/feature_limits.ts";
 import {
   GeminiHttpError,
   callGeminiWithRetryAndFallback,
@@ -160,6 +161,8 @@ Deno.serve(async (req) => {
     const sector = typeof body?.sector === "string" && body.sector.trim() ? body.sector.trim() : "Genel İSG";
     const difficulty = normalizeDifficulty(body?.difficulty);
     const count = Math.min(Math.max(Number(body?.count || 10), 5), 20);
+    const limitResponse = await consumeFeatureOrRespond(req, "ai.risk_generation_monthly");
+    if (limitResponse) return limitResponse;
 
     const apiKey = getRequiredGoogleApiKey();
     const { payload } = await callGeminiWithRetryAndFallback({
