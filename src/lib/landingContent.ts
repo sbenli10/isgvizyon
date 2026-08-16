@@ -46,6 +46,63 @@ export type LandingCard = {
   badge?: string;
 };
 
+export type PlatformFeatureCard = {
+  title: string;
+  description: string;
+  category: "Yönetim" | "Risk" | "Saha" | "Belgeler" | "Çalışan" | "Planlama" | "AI" | "OSGB";
+  icon: LucideIcon;
+  accent: "cyan" | "blue" | "violet" | "emerald" | "amber" | "rose";
+  badge?: "AI" | "Yeni" | "OSGB";
+};
+
+export const platformFeatureCatalog: PlatformFeatureCard[] = [
+  { title: "Komuta Merkezi", description: "Firma, çalışan, risk, görev ve yaklaşan işlemleri tek yönetim görünümünde izleyin.", category: "Yönetim", icon: LayoutDashboard, accent: "blue" },
+  { title: "Firma Yönetimi", description: "İşyeri bilgilerini, tehlike sınıfını, SGK sicilini ve kurumsal kayıtları firma bazında yönetin.", category: "Yönetim", icon: Building2, accent: "cyan" },
+  { title: "Çalışan Yönetimi", description: "Çalışan kayıtlarını toplu aktarın; görev, bölüm, iletişim ve aktiflik durumlarını takip edin.", category: "Çalışan", icon: UserCog, accent: "emerald" },
+  { title: "Risk Değerlendirme", description: "Fine-Kinney tabanlı riskleri oluşturun, puanlayın, sorumlu atayın ve kurumsal rapora dönüştürün.", category: "Risk", icon: ShieldAlert, accent: "violet", badge: "AI" },
+  { title: "AI Saha Analizi", description: "Saha fotoğraflarındaki uygunsuzlukları analiz ederek risk ve aksiyon taslakları hazırlayın.", category: "AI", icon: Sparkles, accent: "violet", badge: "AI" },
+  { title: "DÖF Oluştur", description: "Tekil veya çoklu bulgular için düzeltici ve önleyici faaliyet raporları hazırlayın.", category: "Saha", icon: Workflow, accent: "violet" },
+  { title: "DÖF ve Aksiyon Takibi", description: "Sorumlu, termin, öncelik ve kapanış durumlarını izleyerek açık işleri kontrol altında tutun.", category: "Saha", icon: Target, accent: "rose" },
+  { title: "Dijital Denetimler", description: "Saha kontrollerini, fotoğrafları, uygunsuzlukları ve denetim sonuçlarını merkezi kaydedin.", category: "Saha", icon: ClipboardCheck, accent: "blue" },
+  { title: "Acil Durum Planı", description: "Firmaya özel acil durum planını ekipler, riskler ve tahliye bilgileriyle hazırlayın.", category: "Risk", icon: Siren, accent: "amber" },
+  { title: "ADEP Plan Arşivi", description: "Hazırlanan acil durum planlarını firma bazında görüntüleyin, güncelleyin ve yeniden indirin.", category: "Risk", icon: FolderKanban, accent: "amber" },
+  { title: "Tahliye Kroki Editörü", description: "Kaçış yolları, ekipmanlar, toplanma alanları ve güvenlik işaretleriyle tahliye krokisi oluşturun.", category: "Risk", icon: Waypoints, accent: "cyan", badge: "Yeni" },
+  { title: "AI Kroki Analizi", description: "Yüklenen plan ve krokileri yapay zeka ile inceleyerek eksik güvenlik unsurlarını görün.", category: "AI", icon: Bot, accent: "cyan", badge: "AI" },
+  { title: "İş Kazası İnceleme", description: "5 Neden, neden analizi, DÖF ve delil adımlarıyla kapsamlı iş kazası raporu hazırlayın.", category: "Risk", icon: AlertTriangle, accent: "rose" },
+  { title: "Ramak Kala Kayıtları", description: "Kazaya dönüşmeden fark edilen olayları kayıt altına alın ve önleyici aksiyona bağlayın.", category: "Saha", icon: BellRing, accent: "amber" },
+  { title: "Kurul Toplantıları", description: "İSG kurul gündemini, katılımcıları, kararları ve toplantı tutanaklarını yönetin.", category: "Belgeler", icon: Users, accent: "blue", badge: "AI" },
+  { title: "Atama Yazıları", description: "Risk ekibi, çalışan temsilcisi ve acil durum ekipleri için doldurulmuş Word belgeleri üretin.", category: "Belgeler", icon: FileCheck2, accent: "amber" },
+  { title: "Eğitim Katılım Formu", description: "Eğitim konularını, gün detaylarını ve katılımcıları seçerek imzalı katılım formu hazırlayın.", category: "Belgeler", icon: Video, accent: "amber" },
+  { title: "İşbaşı Eğitim Tutanağı", description: "Oryantasyon konularını çalışan ve firma bilgileriyle birleştirerek PDF tutanağı oluşturun.", category: "Belgeler", icon: FileSpreadsheet, accent: "emerald" },
+  { title: "Tatbikat Tutanağı", description: "Yangın, deprem, tahliye ve diğer senaryolar için değerlendirmeli tatbikat raporu hazırlayın.", category: "Belgeler", icon: Siren, accent: "rose" },
+  { title: "Tespit ve Öneri Defteri", description: "Hazır katalog veya risk değerlendirmesinden seçilen maddeleri firma defterine kaydedin.", category: "Belgeler", icon: ClipboardCheck, accent: "amber" },
+  { title: "Sertifika Merkezi", description: "İSG, yüksekte çalışma, kapalı alan ve yangın eğitim sertifikalarını toplu oluşturun.", category: "Belgeler", icon: CheckCircle2, accent: "emerald", badge: "Yeni" },
+  { title: "Eğitim Soruları", description: "Sektöre ve zorluk seviyesine göre sınav soruları üretin, düzenleyin ve PDF olarak indirin.", category: "AI", icon: Bot, accent: "violet", badge: "AI" },
+  { title: "KKD Zimmet Merkezi", description: "Çalışanlara teslim edilen kişisel koruyucu donanımları tarih ve kontrol bilgileriyle belgeleyin.", category: "Çalışan", icon: ShieldAlert, accent: "emerald" },
+  { title: "İş İzin Formu", description: "Sıcak iş, yüksekte çalışma, kapalı alan ve elektrik işleri için kontrollü izin akışı oluşturun.", category: "Belgeler", icon: FileCheck2, accent: "amber" },
+  { title: "Ceza ve Tebliğ Tutanağı", description: "İhlal, yasal dayanak, yaptırım, savunma ve tebliğ bilgileriyle kurumsal tutanak hazırlayın.", category: "Belgeler", icon: AlertTriangle, accent: "rose" },
+  { title: "Talimat Oluşturucu", description: "İşe ve sektöre özel çalışma talimatlarını düzenleyip firma bazında arşivleyin.", category: "AI", icon: FileSpreadsheet, accent: "blue", badge: "AI" },
+  { title: "Muayene Formu (EK-2)", description: "İşe giriş ve periyodik muayene bilgilerini resmi EK-2 düzeninde kaydedin ve çıktı alın.", category: "Çalışan", icon: Activity, accent: "rose" },
+  { title: "Sağlık Gözetimi", description: "Çalışan muayenelerini, sağlık kayıtlarını ve yaklaşan kontrol tarihlerini firma bazında izleyin.", category: "Çalışan", icon: Activity, accent: "emerald" },
+  { title: "Periyodik Kontroller", description: "Ekipman kontrol tarihlerini, durumlarını ve yaklaşan yükümlülükleri tek listede takip edin.", category: "Planlama", icon: BellRing, accent: "amber", badge: "Yeni" },
+  { title: "Yıllık Çalışma Planları", description: "Yıllık İSG faaliyetlerini aylara, sorumlulara ve tamamlanma durumlarına göre planlayın.", category: "Planlama", icon: LineChart, accent: "cyan" },
+  { title: "Yapay Zeka Raporları", description: "Operasyon verilerini yorumlayan yönetici özetleri ve karar destek raporları oluşturun.", category: "AI", icon: Bot, accent: "violet", badge: "AI" },
+  { title: "NACE Kod Sorgulama", description: "Faaliyet koduna göre sektör ve tehlike sınıfı bilgilerini hızlıca sorgulayın.", category: "Planlama", icon: Boxes, accent: "cyan" },
+  { title: "MYK Zorunluluk Sorgula", description: "Meslek adı veya yeterlilik koduyla belge zorunluluğunu ve yürürlük tarihini bulun.", category: "Planlama", icon: CheckCircle2, accent: "blue" },
+  { title: "İSG Kütüphanesi", description: "Mevzuat, örnek doküman ve uygulama içeriklerine düzenli bir bilgi merkezinden erişin.", category: "Planlama", icon: FileCheck2, accent: "blue" },
+  { title: "İş İlanları", description: "İSG sektöründeki ilanları filtreleyin, iletişim bilgilerine ulaşın veya ücretsiz ilan yayınlayın.", category: "Yönetim", icon: Briefcase, accent: "emerald", badge: "Yeni" },
+  { title: "İSGPratik Bot", description: "İSG süreçleri, mevzuat ve operasyon adımları için yapay zeka destekli asistandan yardım alın.", category: "AI", icon: Bot, accent: "cyan", badge: "AI" },
+  { title: "OSGB Operasyon Paneli", description: "Firma, personel, kapasite, görevlendirme ve hizmet süreçlerini tek merkezden yönetin.", category: "OSGB", icon: Briefcase, accent: "blue", badge: "OSGB" },
+  { title: "OSGB Personel Havuzu", description: "Uzman, hekim ve sağlık personelini kapasite ve görevlendirme durumuyla takip edin.", category: "OSGB", icon: Users, accent: "violet", badge: "OSGB" },
+  { title: "Firma Görevlendirme", description: "OSGB personelini firmalara süre, rol ve hizmet kapsamıyla görevlendirin.", category: "OSGB", icon: UserCog, accent: "rose", badge: "OSGB" },
+  { title: "Firma Takip Sistemi", description: "Firma yükümlülüklerini, takip notlarını, terminleri ve durum değişikliklerini yönetin.", category: "OSGB", icon: Target, accent: "emerald", badge: "OSGB" },
+  { title: "Firma Ziyaretleri", description: "Planlanan ve tamamlanan saha ziyaretlerini takvim üzerinde firma bazında izleyin.", category: "OSGB", icon: Waypoints, accent: "cyan", badge: "OSGB" },
+  { title: "OSGB Finans", description: "Tahsilat, vade, fatura ve cari durum kayıtlarını operasyonla birlikte takip edin.", category: "OSGB", icon: TrendingUp, accent: "amber", badge: "OSGB" },
+  { title: "Müşteri Portalı", description: "Firmalara güvenli giriş hesabı açın; belge gönderimlerini ve hizmet özetlerini paylaşın.", category: "OSGB", icon: Building2, accent: "cyan", badge: "OSGB" },
+  { title: "Firma Arşivi", description: "Belgeleri firma bazlı klasörlerde saklayın, sınıflandırın ve ihtiyaç anında hızlıca bulun.", category: "OSGB", icon: FolderKanban, accent: "amber", badge: "OSGB" },
+  { title: "İSG-KATİP Senkronizasyonu", description: "Yetkili kullanıcı akışıyla görevlendirme ve sözleşme süreçlerini kontrollü biçimde yönetin.", category: "OSGB", icon: Workflow, accent: "rose", badge: "OSGB" },
+];
+
 export const landingValueProps = [
   "Risk, denetim, uygunsuzluk, aksiyon, plan ve rapor akışını tek veri omurgasında birleştirir.",
   "Yapay zeka destekli analizler saha verisini yalnızca kaydetmez; tekrar eden riskleri ve öncelikli müdahale alanlarını görünür kılar.",

@@ -2368,6 +2368,55 @@ body.dark .auth-minimal-surface .auth-minimal-primary * {
   -webkit-text-fill-color: #1d4ed8 !important;
 }
 
+/* Feature catalog is intentionally dark even when the global landing theme is light. */
+.isgvizyon-landing-dark .isgvizyon-feature-catalog,
+.light .isgvizyon-landing-dark .isgvizyon-feature-catalog,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-catalog {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-feature-catalog > div:first-child :is(div, p, span, button),
+.light .isgvizyon-landing-dark .isgvizyon-feature-catalog > div:first-child :is(div, p, span, button),
+.dark .isgvizyon-landing-dark .isgvizyon-feature-catalog > div:first-child :is(div, p, span, button) {
+  opacity: 1 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-category,
+.light .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-category,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-category {
+  color: #67e8f9 !important;
+  -webkit-text-fill-color: #67e8f9 !important;
+  opacity: 1 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-title,
+.light .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-title,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-title {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-description,
+.light .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-description,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-description {
+  color: #cbd5e1 !important;
+  -webkit-text-fill-color: #cbd5e1 !important;
+  opacity: 1 !important;
+}
+
+.isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action,
+.isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action *,
+.light .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action,
+.light .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action *,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action,
+.dark .isgvizyon-landing-dark .isgvizyon-feature-card .isgvizyon-feature-action * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  opacity: 1 !important;
+}
+
 .isgvizyon-hero-sidebar,
 .light .isgvizyon-hero-sidebar,
 .dark .isgvizyon-hero-sidebar {
