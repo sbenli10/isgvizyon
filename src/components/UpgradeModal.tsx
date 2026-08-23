@@ -413,7 +413,10 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   return (
     <>
-    <Dialog open={open && !isDemoActive} onOpenChange={handleOpenChange}>
+    <Dialog
+      open={open && !isDemoActive && !organizationPromptOpen && !manualPaymentOpen}
+      onOpenChange={handleOpenChange}
+    >
       <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-6xl overflow-hidden rounded-3xl border border-slate-700/80 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
         <DialogHeader className="border-b border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_36%),linear-gradient(135deg,rgba(15,23,42,0.98),rgba(17,24,39,0.96))] px-6 py-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -542,7 +545,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
       </DialogContent>
     </Dialog>
     <Dialog open={organizationPromptOpen} onOpenChange={setOrganizationPromptOpen}>
-      <DialogContent className="w-[calc(100vw-24px)] max-w-xl rounded-3xl border border-cyan-300/25 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
+      <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-xl overflow-y-auto rounded-3xl border border-cyan-300/25 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
         <DialogHeader className="border-b border-cyan-300/15 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/60 px-6 py-5">
           <div className="flex items-start gap-3">
             <div className="rounded-2xl border border-cyan-300/25 bg-cyan-500/15 p-3 text-cyan-100">
