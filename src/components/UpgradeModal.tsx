@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   BadgeCheck,
   Building2,
@@ -24,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useCreateWorkspaceOrganization } from "@/hooks/useCreateWorkspaceOrganization";
 import {
   createManualBankTransferPaymentRequest,
   startPlanCheckout,
@@ -212,7 +212,6 @@ function PlanCard({
 }
 
 export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
-  const navigate = useNavigate();
   const { profile } = useAuth();
   const {
     plan,
@@ -233,6 +232,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const [manualBank, setManualBank] = useState<BankTransferSettings>({});
   const [invoiceInfo, setInvoiceInfo] = useState<ManualPaymentInvoiceInfo>(emptyInvoiceInfo);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [organizationPromptOpen, setOrganizationPromptOpen] = useState(false);
 
   const hasOrganization = Boolean(profile?.organization_id);
   const canPurchase = !hasOrganization || isOrganizationAdmin;
@@ -249,6 +249,10 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     return billingPeriod === "yearly" ? formatPrice(monthly * 10, 4990) : formatPrice(osgbMonthly, 499);
   }, [billingPeriod, osgbMonthly]);
 
+  const manualPaymentAmount = manualPlan === "osgb" ? osgbPrice : premiumPrice;
+
+  const { creating: creatingOrganization, createWorkspaceOrganization } = useCreateWorkspaceOrganization();
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && hideAgain) {
       window.localStorage.setItem(HIDE_UPGRADE_MODAL_KEY, "1");
@@ -259,8 +263,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   const runCheckout = async (planCode: PaidPlan) => {
     if (planCode === "osgb" && !hasOrganization) {
-      navigate("/profile?tab=workspace&action=create&next=/settings?tab=billing&upgrade=1");
-      handleOpenChange(false);
+      setOrganizationPromptOpen(true);
       return;
     }
 
@@ -275,13 +278,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     }
   };
 
-  const openManualPayment = (planCode: PaidPlan) => {
-    if (planCode === "osgb" && !hasOrganization) {
-      navigate("/profile?tab=workspace&action=create&next=/settings?tab=billing&upgrade=1");
-      handleOpenChange(false);
-      return;
-    }
-
+  const showManualPayment = (planCode: PaidPlan) => {
     setManualPlan(planCode);
     setManualPaymentOpen(true);
     setManualRequest(null);
@@ -292,6 +289,36 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
       title: current.title || profile?.full_name || "",
       email: current.email || profile?.email || "",
     }));
+  };
+
+  const openManualPayment = (planCode: PaidPlan) => {
+    if (planCode === "osgb" && !hasOrganization) {
+      setOrganizationPromptOpen(true);
+      return;
+    }
+
+    showManualPayment(planCode);
+  };
+
+  const createOrganizationAndContinue = async (paymentMethod: "checkout" | "manual") => {
+    const organizationId = await createWorkspaceOrganization();
+    if (!organizationId) return;
+
+    setOrganizationPromptOpen(false);
+    if (paymentMethod === "manual") {
+      showManualPayment("osgb");
+      return;
+    }
+
+    setLoadingAction("osgb");
+    try {
+      await startPlanCheckout("osgb", billingPeriod);
+    } catch (error) {
+      const details = getUserFacingError(error);
+      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
+    } finally {
+      setLoadingAction(null);
+    }
   };
 
   const updateInvoiceInfo = (patch: Partial<ManualPaymentInvoiceInfo>) => {
@@ -475,6 +502,59 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </div>
       </DialogContent>
     </Dialog>
+    <Dialog open={organizationPromptOpen} onOpenChange={setOrganizationPromptOpen}>
+      <DialogContent className="w-[calc(100vw-24px)] max-w-xl rounded-3xl border border-cyan-300/25 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
+        <DialogHeader className="border-b border-cyan-300/15 bg-gradient-to-r from-slate-950 via-slate-900 to-cyan-950/60 px-6 py-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-2xl border border-cyan-300/25 bg-cyan-500/15 p-3 text-cyan-100">
+              <Building2 className="h-6 w-6" />
+            </div>
+            <div>
+              <DialogTitle className="text-2xl font-black text-white">Önce organizasyonunuzu oluşturun</DialogTitle>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                OSGB paketi kurumsal bir çalışma alanına bağlı çalışır. Organizasyon oluşturulduktan sonra ödeme adımına devam edebilirsiniz.
+              </p>
+            </div>
+          </div>
+        </DialogHeader>
+        <div className="space-y-4 p-6">
+          <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">Seçilen paket</p>
+            <div className="mt-2 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-lg font-black text-white">OSGB / {billingPeriod === "yearly" ? "Yıllık" : "Aylık"}</p>
+                <p className="mt-1 text-sm text-slate-300">Organizasyonu oluşturmadan ödeme başlatılamaz.</p>
+              </div>
+              <p className="whitespace-nowrap text-2xl font-black text-white">{osgbPrice} ₺</p>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
+            Organizasyon oluşturmak OSGB paketini etkinleştirmez. Paket yalnızca ödeme başarıyla tamamlandıktan veya Havale/EFT dekontu platform yöneticisi tarafından onaylandıktan sonra açılır.
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Button
+              type="button"
+              disabled={creatingOrganization}
+              onClick={() => void createOrganizationAndContinue("checkout")}
+              className="h-12 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-black text-white hover:from-cyan-400 hover:to-blue-500"
+            >
+              <CreditCard className="mr-2 h-4 w-4" />
+              {creatingOrganization ? "Oluşturuluyor..." : "Oluştur ve kartla öde"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={creatingOrganization}
+              onClick={() => void createOrganizationAndContinue("manual")}
+              className="h-12 rounded-xl border-amber-300/30 bg-amber-500/10 font-black text-amber-100 hover:bg-amber-500/20 hover:text-white"
+            >
+              <Landmark className="mr-2 h-4 w-4" />
+              {creatingOrganization ? "Oluşturuluyor..." : "Oluştur ve Havale/EFT ile öde"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Dialog open={manualPaymentOpen} onOpenChange={setManualPaymentOpen}>
       <DialogContent className="max-h-[92vh] w-[calc(100vw-24px)] max-w-3xl overflow-y-auto rounded-3xl border border-amber-300/25 bg-[#07111f] p-0 text-white shadow-2xl shadow-black/50">
         <DialogHeader className="border-b border-amber-300/15 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/60 px-6 py-5">
@@ -494,6 +574,21 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         <div className="space-y-5 p-6">
           <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
             <strong>Ödeme onayı 1 iş günü içinde yapılır.</strong> Admin onayı olmadan üyelik açılmaz. Havale/EFT açıklamasına aşağıda üretilen kodu aynen yazın.
+          </div>
+
+          <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-cyan-200">Ödenecek toplam</p>
+                <p className="mt-1 text-sm text-slate-300">
+                  {manualPlan === "osgb" ? "OSGB" : "Premium"} paket · {billingPeriod === "yearly" ? "Yıllık" : "Aylık"} ödeme
+                </p>
+              </div>
+              <p className="text-3xl font-black tracking-tight text-white">{manualPaymentAmount} ₺</p>
+            </div>
+            <p className="mt-3 border-t border-white/10 pt-3 text-xs leading-5 text-slate-400">
+              Ödeme talebi oluşturulduğunda tutar sunucudaki güncel paket fiyatından tekrar doğrulanır.
+            </p>
           </div>
 
           <section className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
