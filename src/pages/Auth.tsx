@@ -851,7 +851,7 @@ export default function Auth() {
         <section className="flex min-h-0 w-full justify-center lg:min-h-[620px] lg:items-center">
           <div
             className={cn(
-              "isgvizyon-auth-card mx-auto max-h-[calc(100dvh-2rem)] w-full max-w-[400px] overflow-y-auto overscroll-contain rounded-[32px] border border-slate-200/80 bg-white/95 p-5 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl [scrollbar-gutter:stable] sm:max-h-[calc(100dvh-3rem)] sm:p-7",
+              "isgvizyon-auth-card mx-auto w-full max-w-[400px] rounded-[32px] border border-slate-200/80 bg-white/95 p-5 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-7",
               mode === "register" && "sm:p-6",
             )}
           >
@@ -878,7 +878,7 @@ export default function Auth() {
                 </div>
 
                 <div>
-                  {notice ? (
+                  {notice && mode !== "register" ? (
                     <div className={cn("mb-5", mode === "register" && "mb-3")}>
                       <Notice type={notice.type} title={notice.title} description={notice.description} />
                     </div>
@@ -1231,16 +1231,14 @@ export default function Auth() {
                           </div>
                         </div>
 
-                        <div className="sticky bottom-0 z-20 -mx-1 border-t border-slate-200/80 bg-white/95 px-1 pb-1 pt-3 backdrop-blur-xl">
-                          <Button
-                            type="submit"
-                            disabled={isBusy}
-                            className="auth-minimal-primary h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-60"
-                          >
-                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {loading ? "Kayıt ediliyor..." : "Hesabı Oluştur"}
-                          </Button>
-                        </div>
+                        <Button
+                          type="submit"
+                          disabled={isBusy}
+                          className="auth-minimal-primary h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-60"
+                        >
+                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          {loading ? "Kayıt ediliyor..." : "Hesabı Oluştur"}
+                        </Button>
 
                         <p className="text-sm text-slate-500">
                           Zaten hesabınız var mı?{" "}
