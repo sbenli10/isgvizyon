@@ -141,6 +141,7 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeRequiresOrganization, setUpgradeRequiresOrganization] = useState(false);
   const [syncingUsage, setSyncingUsage] = useState(false);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -1187,7 +1188,8 @@ const handleForceReset2FA = async () => {
     }
 
     if (planCode === "osgb" && !profileData?.organization_id) {
-      navigate("/profile?tab=workspace&action=create&next=/settings?tab=billing");
+      setUpgradeRequiresOrganization(true);
+      setShowUpgradeModal(true);
       return;
     }
 
@@ -2834,8 +2836,11 @@ const handleForceReset2FA = async () => {
       {/* Upgrade modalı */}
     <UpgradeModal
       open={showUpgradeModal}
-      onOpenChange={setShowUpgradeModal}
-      triggeredBy="manual"
+      onOpenChange={(nextOpen) => {
+        setShowUpgradeModal(nextOpen);
+        if (!nextOpen) setUpgradeRequiresOrganization(false);
+      }}
+      triggeredBy={upgradeRequiresOrganization ? "organization_required" : "manual"}
     />
    {/* 2FA kurulum modalı */}
     {qrCodeData && show2FASetupModal && currentFactorId && (

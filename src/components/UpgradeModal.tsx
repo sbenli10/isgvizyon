@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BadgeCheck,
@@ -38,7 +38,7 @@ import type { BillingCatalogPlan, BillingPeriod, SubscriptionPlan } from "@/type
 interface UpgradeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  triggeredBy?: "trial_expired" | "feature_locked" | "manual";
+  triggeredBy?: "trial_expired" | "feature_locked" | "manual" | "organization_required";
 }
 
 type PaidPlan = Extract<SubscriptionPlan, "premium" | "osgb">;
@@ -218,7 +218,7 @@ function PlanCard({
   );
 }
 
-export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
+export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: UpgradeModalProps) {
   const { profile } = useAuth();
   const {
     plan,
@@ -359,6 +359,12 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     }));
     setOrganizationPromptOpen(true);
   };
+
+  useEffect(() => {
+    if (open && triggeredBy === "organization_required" && !hasOrganization) {
+      openOrganizationPrompt();
+    }
+  }, [open, triggeredBy, hasOrganization]);
 
   const updateInvoiceInfo = (patch: Partial<ManualPaymentInvoiceInfo>) => {
     setInvoiceInfo((current) => ({ ...current, ...patch }));
