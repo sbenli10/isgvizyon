@@ -848,9 +848,14 @@ export default function Auth() {
           </div>
         </section>
 
-        <section className="flex w-full justify-center lg:min-h-[620px] lg:items-center">
-          <div className="isgvizyon-auth-card mx-auto w-full max-w-[400px] rounded-[32px] border border-slate-200/80 bg-white/95 p-7 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl sm:p-8">
-                <div className="space-y-5">
+        <section className="flex min-h-0 w-full justify-center lg:min-h-[620px] lg:items-center">
+          <div
+            className={cn(
+              "isgvizyon-auth-card mx-auto max-h-[calc(100dvh-2rem)] w-full max-w-[400px] overflow-y-auto overscroll-contain rounded-[32px] border border-slate-200/80 bg-white/95 p-5 shadow-[0_30px_90px_rgba(15,23,42,0.12)] backdrop-blur-xl [scrollbar-gutter:stable] sm:max-h-[calc(100dvh-3rem)] sm:p-7",
+              mode === "register" && "sm:p-6",
+            )}
+          >
+                <div className={cn("space-y-5", mode === "register" && "space-y-3")}>
                   <div className="flex items-center gap-3">
                     <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-cyan-500 to-violet-600 shadow-lg shadow-blue-500/20">
                       <Shield className="h-6 w-6 text-white" />
@@ -863,8 +868,8 @@ export default function Auth() {
 
                   <div>
                     <p className="text-sm font-bold uppercase tracking-[0.18em] !text-blue-600">{activeEyebrow}</p>
-                    <h1 className="mt-2 text-3xl font-black tracking-tight !text-slate-950">{activeHeading}</h1>
-                    <p className="mt-2 text-sm leading-6 !text-slate-500">
+                    <h1 className={cn("mt-2 text-3xl font-black tracking-tight !text-slate-950", mode === "register" && "text-2xl sm:text-[1.65rem]")}>{activeHeading}</h1>
+                    <p className={cn("mt-2 text-sm leading-6 !text-slate-500", mode === "register" && "leading-5")}>
                       {isAdminEntry
                         ? "Platform sahibi hesabınızla giriş yaparak ilan, yorum ve yayın yönetimi paneline devam edin."
                         : "Hesabınıza giriş yaparak İSGVizyon panelinize devam edin."}
@@ -874,7 +879,7 @@ export default function Auth() {
 
                 <div>
                   {notice ? (
-                    <div className="mb-5">
+                    <div className={cn("mb-5", mode === "register" && "mb-3")}>
                       <Notice type={notice.type} title={notice.title} description={notice.description} />
                     </div>
                   ) : null}
@@ -1071,8 +1076,8 @@ export default function Auth() {
 
                   {mode === "register" && (
                     <AnimatedPanel activeKey="register">
-                      <form onSubmit={handleRegister} className="space-y-4">
-                        <div className="space-y-2">
+                      <form onSubmit={handleRegister} className="space-y-3 pb-1">
+                        <div className="space-y-1.5">
                           <Label htmlFor="register-name" className="flex items-center gap-2 text-sm font-medium !text-slate-700">
                             <User className="h-4 w-4 text-slate-400" />
                             Ad Soyad
@@ -1085,7 +1090,7 @@ export default function Auth() {
                               value={formData.fullName}
                               onChange={handleInputChange}
                               placeholder="Örn: Ahmet Yılmaz"
-                              className="h-12 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                              className="h-11 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
                               disabled={isBusy}
                               required
                               autoComplete="name"
@@ -1093,7 +1098,7 @@ export default function Auth() {
                           </FancyInput>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label htmlFor="register-email" className="flex items-center gap-2 text-sm font-medium !text-slate-700">
                             <Mail className="h-4 w-4 text-slate-400" />
                             E-posta
@@ -1106,7 +1111,7 @@ export default function Auth() {
                               value={formData.email}
                               onChange={handleInputChange}
                               placeholder="ornek@firma.com"
-                              className="h-12 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                              className="h-11 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
                               disabled={isBusy}
                               required
                               autoComplete="email"
@@ -1115,7 +1120,7 @@ export default function Auth() {
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             <Label htmlFor="register-password" className="flex items-center gap-2 text-sm font-medium !text-slate-700">
                               <Lock className="h-4 w-4 text-slate-400" />
                               Şifre
@@ -1128,7 +1133,7 @@ export default function Auth() {
                                 value={formData.password}
                                 onChange={handleInputChange}
                                 placeholder="••••••••"
-                                className="h-12 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                className="h-11 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
                                 disabled={isBusy}
                                 required
                                 autoComplete="new-password"
@@ -1137,7 +1142,7 @@ export default function Auth() {
                             {fieldErrors.password ? null : <StrengthBar password={formData.password} />}
                           </div>
 
-                          <div className="space-y-2">
+                          <div className="space-y-1.5">
                             <Label htmlFor="register-password-confirm" className="flex items-center gap-2 text-sm font-medium !text-slate-700">
                               <Lock className="h-4 w-4 text-slate-400" />
                               Şifre Tekrar
@@ -1150,7 +1155,7 @@ export default function Auth() {
                                 value={formData.passwordConfirm}
                                 onChange={handleInputChange}
                                 placeholder="••••••••"
-                                className="h-12 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
+                                className="h-11 border-0 bg-transparent !text-slate-950 placeholder:!text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0"
                                 disabled={isBusy}
                                 required
                                 autoComplete="new-password"
@@ -1159,7 +1164,7 @@ export default function Auth() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                           <Checkbox
                             id="show-register-password"
                             checked={showRegisterPassword}
@@ -1171,8 +1176,8 @@ export default function Auth() {
                           </Label>
                         </div>
 
-                        <div className="space-y-3">
-                          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                        <div className="space-y-2">
+                          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                             <Checkbox
                               id="consentDataProcessing"
                               checked={formData.consentDataProcessing}
@@ -1212,7 +1217,7 @@ export default function Auth() {
                             </div>
                           </div>
 
-                          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                             <Checkbox
                               id="consentMarketing"
                               checked={formData.consentMarketing}
@@ -1226,14 +1231,16 @@ export default function Auth() {
                           </div>
                         </div>
 
-                        <Button
-                          type="submit"
-                          disabled={isBusy}
-                          className="auth-minimal-primary h-12 w-full rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-500 font-black text-white shadow-[0_20px_45px_rgba(37,99,235,0.25)] transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-60"
-                        >
-                          {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {loading ? "Kayıt ediliyor..." : "Hesabı Oluştur"}
-                        </Button>
+                        <div className="sticky bottom-0 z-20 -mx-1 border-t border-slate-200/80 bg-white/95 px-1 pb-1 pt-3 backdrop-blur-xl">
+                          <Button
+                            type="submit"
+                            disabled={isBusy}
+                            className="auth-minimal-primary h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 font-black text-white shadow-[0_14px_30px_rgba(37,99,235,0.22)] transition hover:-translate-y-0.5 hover:from-blue-700 hover:to-cyan-600 disabled:opacity-60"
+                          >
+                            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {loading ? "Kayıt ediliyor..." : "Hesabı Oluştur"}
+                          </Button>
+                        </div>
 
                         <p className="text-sm text-slate-500">
                           Zaten hesabınız var mı?{" "}
