@@ -43,6 +43,13 @@ interface UpgradeModalProps {
 
 type PaidPlan = Extract<SubscriptionPlan, "premium" | "osgb">;
 type PlanTone = "free" | "premium" | "osgb";
+type OrganizationForm = {
+  name: string;
+  industry: string;
+  city: string;
+  phone: string;
+  website: string;
+};
 
 const HIDE_UPGRADE_MODAL_KEY = "isgvizyon-hide-upgrade-modal";
 
@@ -233,6 +240,13 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const [invoiceInfo, setInvoiceInfo] = useState<ManualPaymentInvoiceInfo>(emptyInvoiceInfo);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [organizationPromptOpen, setOrganizationPromptOpen] = useState(false);
+  const [organizationForm, setOrganizationForm] = useState<OrganizationForm>({
+    name: "",
+    industry: "Ortak Sağlık ve Güvenlik Birimi (OSGB)",
+    city: "",
+    phone: "",
+    website: "",
+  });
 
   const hasOrganization = Boolean(profile?.organization_id);
   const canPurchase = !hasOrganization || isOrganizationAdmin;
@@ -263,7 +277,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   const runCheckout = async (planCode: PaidPlan) => {
     if (planCode === "osgb" && !hasOrganization) {
-      setOrganizationPromptOpen(true);
+      openOrganizationPrompt();
       return;
     }
 
@@ -293,7 +307,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   const openManualPayment = (planCode: PaidPlan) => {
     if (planCode === "osgb" && !hasOrganization) {
-      setOrganizationPromptOpen(true);
+      openOrganizationPrompt();
       return;
     }
 
@@ -301,7 +315,23 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   };
 
   const createOrganizationAndContinue = async (paymentMethod: "checkout" | "manual") => {
-    const organizationId = await createWorkspaceOrganization();
+    const name = organizationForm.name.trim();
+    if (name.length < 2) {
+      toast.error("Organizasyon adını yazın.");
+      return;
+    }
+
+    const website = organizationForm.website.trim();
+    if (website && !/^(https?:\/\/)?[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(website)) {
+      toast.error("Geçerli bir web sitesi adresi yazın.");
+      return;
+    }
+
+    const organizationId = await createWorkspaceOrganization(undefined, {
+      ...organizationForm,
+      name,
+      website,
+    });
     if (!organizationId) return;
 
     setOrganizationPromptOpen(false);
@@ -319,6 +349,15 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
     } finally {
       setLoadingAction(null);
     }
+  };
+
+  const openOrganizationPrompt = () => {
+    setOrganizationForm((current) => ({
+      ...current,
+      name: current.name || `${profile?.full_name?.trim() || "Yeni"} OSGB`,
+      phone: current.phone || profile?.phone || "",
+    }));
+    setOrganizationPromptOpen(true);
   };
 
   const updateInvoiceInfo = (patch: Partial<ManualPaymentInvoiceInfo>) => {
@@ -526,6 +565,65 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
                 <p className="mt-1 text-sm text-slate-300">Organizasyonu oluşturmadan ödeme başlatılamaz.</p>
               </div>
               <p className="whitespace-nowrap text-2xl font-black text-white">{osgbPrice} ₺</p>
+            </div>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="organization-name" className="text-slate-200">Organizasyon adı *</Label>
+              <Input
+                id="organization-name"
+                value={organizationForm.name}
+                onChange={(event) => setOrganizationForm((current) => ({ ...current, name: event.target.value }))}
+                placeholder="Örn. ABC Ortak Sağlık Güvenlik Birimi"
+                maxLength={120}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization-industry" className="text-slate-200">Sektör</Label>
+              <Input
+                id="organization-industry"
+                value={organizationForm.industry}
+                onChange={(event) => setOrganizationForm((current) => ({ ...current, industry: event.target.value }))}
+                placeholder="Örn. OSGB"
+                maxLength={100}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization-city" className="text-slate-200">Şehir</Label>
+              <Input
+                id="organization-city"
+                value={organizationForm.city}
+                onChange={(event) => setOrganizationForm((current) => ({ ...current, city: event.target.value }))}
+                placeholder="Örn. İstanbul"
+                maxLength={80}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization-phone" className="text-slate-200">Telefon</Label>
+              <Input
+                id="organization-phone"
+                type="tel"
+                value={organizationForm.phone}
+                onChange={(event) => setOrganizationForm((current) => ({ ...current, phone: event.target.value }))}
+                placeholder="Örn. 0 212 000 00 00"
+                maxLength={30}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="organization-website" className="text-slate-200">Web sitesi</Label>
+              <Input
+                id="organization-website"
+                type="url"
+                value={organizationForm.website}
+                onChange={(event) => setOrganizationForm((current) => ({ ...current, website: event.target.value }))}
+                placeholder="Örn. https://firma.com"
+                maxLength={160}
+                className="h-11 rounded-xl border-slate-700 bg-slate-950 text-white placeholder:text-slate-500"
+              />
             </div>
           </div>
           <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">

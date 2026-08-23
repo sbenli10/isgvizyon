@@ -15,13 +15,21 @@ function getDefaultOrganizationName(userEmail?: string | null, fullName?: string
   return "İSGVizyon Çalışma Alanı";
 }
 
+export type WorkspaceOrganizationInput = {
+  name?: string;
+  industry?: string;
+  city?: string;
+  phone?: string;
+  website?: string;
+};
+
 export function useCreateWorkspaceOrganization() {
   const { user, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 
   const createWorkspaceOrganization = useCallback(
-    async (nextPath?: string) => {
+    async (nextPath?: string, input?: WorkspaceOrganizationInput) => {
       if (!user?.id) {
         toast.error("Organizasyon oluşturmak için giriş yapmalısınız.");
         return null;
@@ -30,11 +38,11 @@ export function useCreateWorkspaceOrganization() {
       setCreating(true);
       try {
         const { data, error } = await (supabase as any).rpc("create_workspace_organization", {
-          p_name: getDefaultOrganizationName(user.email, user.user_metadata?.full_name),
-          p_industry: null,
-          p_city: null,
-          p_phone: null,
-          p_website: null,
+          p_name: input?.name?.trim() || getDefaultOrganizationName(user.email, user.user_metadata?.full_name),
+          p_industry: input?.industry?.trim() || null,
+          p_city: input?.city?.trim() || null,
+          p_phone: input?.phone?.trim() || null,
+          p_website: input?.website?.trim() || null,
         });
 
         if (error) throw error;
