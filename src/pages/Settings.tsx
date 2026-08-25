@@ -1205,6 +1205,13 @@ const handleForceReset2FA = async () => {
   };
 
   const handleOpenBillingPortal = async () => {
+    if (!hasStripeCustomer && !hasStripeSubscription) {
+      toast.info("Üyeliğiniz manuel ödeme ile etkinleştirildi", {
+        description: "Havale/EFT üyeliklerinde çevrim içi abonelik portalı bulunmaz. Plan değişikliği veya iptal işlemi için destek ekibiyle iletişime geçin.",
+      });
+      return;
+    }
+
     setCheckoutLoading("portal");
     try {
       await openBillingPortal();
@@ -1319,7 +1326,9 @@ const handleForceReset2FA = async () => {
   const yearlySavingsPercent = 17;
   const activeMonthlyPlanPrice = activeCatalogPlan?.price ?? null;
   const canManageBilling = !profileData?.organization_id || isOrganizationAdmin;
-  const hasBillingPortal = hasStripeCustomer || hasStripeSubscription || isPaidPlan;
+  // Havale/EFT ile etkinleşen ücretli planların Stripe müşteri kaydı olmaz.
+  // Portal yalnızca Stripe tarafından yönetilen aboneliklerde açılabilir.
+  const hasBillingPortal = hasStripeCustomer || hasStripeSubscription;
   const planCards = [
     {
       code: "free" as const,
@@ -2575,10 +2584,10 @@ const handleForceReset2FA = async () => {
                               key={period}
                               type="button"
                               onClick={() => setBillingPeriod(period)}
-                              className={`rounded-xl px-4 py-2 text-sm font-bold transition ${
+                              className={`rounded-xl border px-4 py-2 text-sm font-bold transition ${
                                 billingPeriod === period
-                                  ? "bg-white text-slate-950"
-                                  : "text-slate-300 hover:bg-white/10 hover:text-white"
+                                  ? "!border-cyan-300 !bg-cyan-500 !text-white shadow-[0_8px_20px_rgba(6,182,212,0.28)]"
+                                  : "!border-transparent !bg-transparent !text-slate-200 hover:!bg-white/10 hover:!text-white"
                               }`}
                             >
                               {period === "monthly" ? "Aylık" : `Yıllık · %${yearlySavingsPercent}`}
@@ -2588,7 +2597,8 @@ const handleForceReset2FA = async () => {
                         <Button
                           variant="outline"
                           onClick={() => void handleOpenBillingPortal()}
-                          disabled={!hasBillingPortal || checkoutLoading === "portal"}
+                          disabled={(!hasBillingPortal && !isPaidPlan) || !canManageBilling || checkoutLoading === "portal"}
+                          title={!hasBillingPortal && isPaidPlan ? "Havale/EFT üyelikleri destek ekibi tarafından yönetilir." : undefined}
                           className={premiumOutlineButtonClassName}
                         >
                           {checkoutLoading === "portal" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
@@ -2693,7 +2703,7 @@ const handleForceReset2FA = async () => {
                             )}
                           </div>
                           <Badge className="rounded-full border border-white/10 bg-white/10 px-3 py-1 text-slate-100">
-                            {hasBillingPortal ? "Portal hazır" : "Checkout bekliyor"}
+                            {hasBillingPortal ? "Portal hazır" : isPaidPlan ? "Manuel ödeme ile aktif" : "Checkout bekliyor"}
                           </Badge>
                         </div>
 

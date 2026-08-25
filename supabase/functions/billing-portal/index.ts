@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
-import { buildAppUrl, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
+import { buildAppUrl, createStripeClient, getPublicAppUrl, requireBillingContext } from "../_shared/billing.ts";
 
 serve(async (req): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -8,7 +8,10 @@ serve(async (req): Promise<Response> => {
   }
 
   try {
-    const context = await requireBillingContext(req);
+    // A manual bank-transfer subscription does not require Stripe. Resolve the
+    // user and subscription first so those accounts receive a controlled
+    // response instead of a missing Stripe configuration error.
+    const context = await requireBillingContext(req, { requireStripe: false });
     if ("errorResponse" in context) {
       return context.errorResponse as Response;
     }
@@ -21,16 +24,22 @@ serve(async (req): Promise<Response> => {
     }
 
     const adminClient = context.adminClient;
-    const { data: subscription } = await adminClient
+    const { data: subscription, error: subscriptionError } = await adminClient
       .from("organization_subscriptions")
       .select("stripe_customer_id")
       .eq("org_id", context.profile.organization_id)
       .maybeSingle();
 
+    if (subscriptionError) {
+      throw new Error(subscriptionError.message || "Abonelik kaydı alınamadı.");
+    }
+
     if (!subscription?.stripe_customer_id) {
-      return jsonResponse(400, {
+      return jsonResponse(409, {
         success: false,
-        error: { message: "Bu organizasyon icin aktif bir Stripe musterisi bulunamadi." },
+        error: {
+          message: "Bu üyelik Havale/EFT ile etkinleştirildiği için çevrim içi abonelik portalı bulunmuyor. Üyelik değişiklikleri için destek ekibiyle iletişime geçin.",
+        },
       });
     }
 
@@ -38,7 +47,8 @@ serve(async (req): Promise<Response> => {
     const returnPath = typeof body?.returnPath === "string" ? body.returnPath : "/settings";
     const appUrl = getPublicAppUrl(req);
 
-    const portalSession = await context.stripe.billingPortal.sessions.create({
+    const stripe = createStripeClient();
+    const portalSession = await stripe.billingPortal.sessions.create({
       customer: subscription.stripe_customer_id,
       return_url: buildAppUrl(appUrl, returnPath),
     });
