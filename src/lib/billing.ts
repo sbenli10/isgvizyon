@@ -194,9 +194,13 @@ export async function getBillingCatalog(): Promise<BillingCatalogPlan[]> {
       .select("plan_code, feature_key, limit_value, is_enabled, period"),
   ]);
 
-  if (plansError || featuresError) {
+  if (plansError) {
     return getStaticBillingCatalog();
   }
+
+  const fallbackFeaturesByPlan = new Map(
+    getStaticBillingCatalog().map((plan) => [plan.planCode, plan.features] as const),
+  );
 
   const featuresByPlan = new Map<string, RawPlanFeature[]>();
   for (const row of (featureRows ?? []) as RawPlanFeature[]) {
@@ -233,12 +237,14 @@ export async function getBillingCatalog(): Promise<BillingCatalogPlan[]> {
     currency: row.currency ?? "TRY",
     billingPeriod: row.billing_period === "yearly" ? "yearly" : "monthly",
     isCurrent: row.plan_code === "free",
-    features: (featuresByPlan.get(row.plan_code) ?? []).map((feature) => ({
-      featureKey: feature.feature_key,
-      isEnabled: feature.is_enabled,
-      limitValue: feature.limit_value,
-      period: feature.period,
-    })),
+    features: featuresError
+      ? fallbackFeaturesByPlan.get(row.plan_code) ?? []
+      : (featuresByPlan.get(row.plan_code) ?? []).map((feature) => ({
+          featureKey: feature.feature_key,
+          isEnabled: feature.is_enabled,
+          limitValue: feature.limit_value,
+          period: feature.period,
+        })),
   }));
 
   return catalog.length > 0 ? catalog : getStaticBillingCatalog();

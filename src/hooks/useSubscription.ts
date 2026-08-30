@@ -187,9 +187,13 @@ export function useSubscription() {
     }
 
     try {
-      const [nextOverview] = await Promise.all([getBillingOverview(), loadDemoSubscription()]);
+      const [nextOverview, catalog] = await Promise.all([
+        getBillingOverview(),
+        getBillingCatalog(),
+        loadDemoSubscription(),
+      ]);
       setOverview(nextOverview);
-      setCatalogPlans(nextOverview.plans ?? []);
+      setCatalogPlans(catalog);
     } catch (error) {
       console.error("Subscription fetch error:", error);
       setOverview(null);
@@ -316,7 +320,8 @@ export function useSubscription() {
   const canStartPersonalTrial = !profile?.organization_id && personalPlan === "free" && !profile?.subscription_started_at;
   const currentPlans = useMemo(() => {
     const activePlanCode = plan;
-    return (overview?.plans ?? catalogPlans).map((entry) => ({
+    const latestPlans = catalogPlans.length > 0 ? catalogPlans : overview?.plans ?? [];
+    return latestPlans.map((entry) => ({
       ...entry,
       isCurrent: entry.planCode === activePlanCode,
     }));
