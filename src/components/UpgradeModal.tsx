@@ -26,7 +26,6 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useCreateWorkspaceOrganization } from "@/hooks/useCreateWorkspaceOrganization";
 import {
   createManualBankTransferPaymentRequest,
-  startPlanCheckout,
   submitManualPaymentReceipt,
   type BankTransferSettings,
   type ManualPaymentInvoiceInfo,
@@ -230,7 +229,6 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     hasStripeSubscription,
   } = useSubscription();
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
-  const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [hideAgain, setHideAgain] = useState(false);
   const [manualPlan, setManualPlan] = useState<PaidPlan | null>(null);
   const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
@@ -275,23 +273,6 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     onOpenChange(nextOpen);
   };
 
-  const runCheckout = async (planCode: PaidPlan) => {
-    if (planCode === "osgb" && !hasOrganization) {
-      openOrganizationPrompt();
-      return;
-    }
-
-    setLoadingAction(planCode);
-    try {
-      await startPlanCheckout(planCode, billingPeriod);
-    } catch (error) {
-      const details = getUserFacingError(error);
-      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
-    } finally {
-      setLoadingAction(null);
-    }
-  };
-
   const showManualPayment = (planCode: PaidPlan) => {
     setManualPlan(planCode);
     setManualPaymentOpen(true);
@@ -314,7 +295,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     showManualPayment(planCode);
   };
 
-  const createOrganizationAndContinue = async (paymentMethod: "checkout" | "manual") => {
+  const createOrganizationAndContinue = async () => {
     const name = organizationForm.name.trim();
     if (name.length < 2) {
       toast.error("Organizasyon adını yazın.");
@@ -335,20 +316,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
     if (!organizationId) return;
 
     setOrganizationPromptOpen(false);
-    if (paymentMethod === "manual") {
-      showManualPayment("osgb");
-      return;
-    }
-
-    setLoadingAction("osgb");
-    try {
-      await startPlanCheckout("osgb", billingPeriod);
-    } catch (error) {
-      const details = getUserFacingError(error);
-      toast.error(details.title, { description: getUserFacingErrorDescription(error) });
-    } finally {
-      setLoadingAction(null);
-    }
+    showManualPayment("osgb");
   };
 
   const openOrganizationPrompt = () => {
@@ -435,8 +403,8 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
                 Planınızı seçin, ödeme adımına güvenle geçin
               </DialogTitle>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-                Free, Premium ve OSGB paketlerini tek ekranda karşılaştırın. Ödeme Stripe Checkout üzerinden
-                3D Secure destekli güvenli ödeme sayfasında tamamlanır.
+                Free, Premium ve OSGB paketlerini tek ekranda karşılaştırın. Ücretli paket başvuruları
+                fatura bilgileri ve ödeme dekontuyla güvenli biçimde alınır.
               </p>
             </div>
 
@@ -482,13 +450,9 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               icon={<Rocket className="h-6 w-6" />}
               badge={billingPeriod === "yearly" ? "2 ay avantaj" : "Popüler"}
               current={plan === "premium" || status === "trial"}
-              disabled={!canPurchase || loadingAction !== null || plan === "osgb"}
-              loading={loadingAction === "premium"}
-              secondaryButtonLabel={plan === "osgb" ? undefined : "Havale / EFT ile öde"}
-              secondaryLoading={manualPaymentBusy && manualPlan === "premium"}
+              disabled={!canPurchase || plan === "osgb"}
               buttonLabel={plan === "osgb" ? "OSGB paketine dahil" : "Premium'a geç"}
-              onClick={() => void runCheckout("premium")}
-              onSecondaryClick={() => openManualPayment("premium")}
+              onClick={() => openManualPayment("premium")}
             />
 
             <PlanCard
@@ -500,21 +464,17 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
               icon={<Building2 className="h-6 w-6" />}
               badge="Kurumsal"
               current={plan === "osgb"}
-              disabled={!canPurchase || loadingAction !== null}
-              loading={loadingAction === "osgb"}
-              secondaryButtonLabel={!hasOrganization ? undefined : "Havale / EFT ile öde"}
-              secondaryLoading={manualPaymentBusy && manualPlan === "osgb"}
-              buttonLabel={!hasOrganization ? "Organizasyon oluştur" : "OSGB'ye geç"}
-              onClick={() => void runCheckout("osgb")}
-              onSecondaryClick={() => openManualPayment("osgb")}
+              disabled={!canPurchase}
+              buttonLabel="OSGB'ye geç"
+              onClick={() => openManualPayment("osgb")}
             />
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
               <CreditCard className="mb-3 h-5 w-5 text-cyan-300" />
-              <p className="font-bold text-white">Gerçek ödeme akışı</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400">Checkout, abonelik ve müşteri portalı canlı ödeme altyapısına bağlıdır.</p>
+              <p className="font-bold text-white">Güvenli ödeme başvurusu</p>
+              <p className="mt-1 text-sm leading-6 text-slate-400">Benzersiz açıklama kodu ve zorunlu dekont ile her ödeme kayıt altına alınır.</p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
               <Sparkles className="mb-3 h-5 w-5 text-violet-300" />
@@ -545,7 +505,7 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
           </label>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-300">
             <Crown className="h-4 w-4 text-amber-300" />
-            Fiyatlar admin panelinden güncellenebilir, checkout canlı price id ile çalışır.
+            Fiyatlar admin panelinden güncellenir; üyelik yalnızca ödeme onayından sonra açılır.
           </div>
         </div>
       </DialogContent>
@@ -638,25 +598,15 @@ export function UpgradeModal({ open, onOpenChange, triggeredBy = "manual" }: Upg
           <div className="rounded-2xl border border-amber-300/20 bg-amber-500/10 p-4 text-sm leading-6 text-amber-50">
             Organizasyon oluşturmak OSGB paketini etkinleştirmez. Paket yalnızca ödeme başarıyla tamamlandıktan veya Havale/EFT dekontu platform yöneticisi tarafından onaylandıktan sonra açılır.
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div>
             <Button
               type="button"
               disabled={creatingOrganization}
-              onClick={() => void createOrganizationAndContinue("checkout")}
-              className="h-12 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-black text-white hover:from-cyan-400 hover:to-blue-500"
-            >
-              <CreditCard className="mr-2 h-4 w-4" />
-              {creatingOrganization ? "Oluşturuluyor..." : "Oluştur ve kartla öde"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={creatingOrganization}
-              onClick={() => void createOrganizationAndContinue("manual")}
-              className="h-12 rounded-xl border-amber-300/30 bg-amber-500/10 font-black text-amber-100 hover:bg-amber-500/20 hover:text-white"
+              onClick={() => void createOrganizationAndContinue()}
+              className="h-12 w-full rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 font-black text-white hover:from-cyan-400 hover:to-blue-500"
             >
               <Landmark className="mr-2 h-4 w-4" />
-              {creatingOrganization ? "Oluşturuluyor..." : "Oluştur ve Havale/EFT ile öde"}
+              {creatingOrganization ? "Oluşturuluyor..." : "Organizasyonu oluştur ve ödemeye geç"}
             </Button>
           </div>
         </div>

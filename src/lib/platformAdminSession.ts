@@ -1,4 +1,5 @@
 const PLATFORM_ADMIN_SESSION_KEY = "isgvizyon-platform-admin-session";
+const PLATFORM_ADMIN_GUARD_KEY = "isgvizyon-admin-guard-verified";
 
 export function markPlatformAdminSession() {
   if (typeof window === "undefined") return;
@@ -8,6 +9,7 @@ export function markPlatformAdminSession() {
 export function clearPlatformAdminSession() {
   if (typeof window === "undefined") return;
   window.sessionStorage.removeItem(PLATFORM_ADMIN_SESSION_KEY);
+  window.sessionStorage.removeItem(PLATFORM_ADMIN_GUARD_KEY);
 }
 
 export function hasPlatformAdminSession() {

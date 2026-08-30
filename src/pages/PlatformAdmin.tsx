@@ -5,6 +5,7 @@ import {
   Activity,
   AlertTriangle,
   Archive,
+  ArrowRightLeft,
   BarChart3,
   Bell,
   BriefcaseBusiness,
@@ -779,6 +780,11 @@ export default function PlatformAdmin() {
     navigate("/admin-login", { replace: true });
   };
 
+  const handleSwitchToUserPanel = () => {
+    clearPlatformAdminSession();
+    navigate("/dashboard", { replace: true });
+  };
+
   const updatePostStatus = async (postId: string, status: JobStatus) => {
     setActionId(postId);
 
@@ -1187,8 +1193,8 @@ export default function PlatformAdmin() {
             <Button onClick={() => navigate("/admin-login", { replace: true })} className="bg-rose-600 hover:bg-rose-500">
               Admin girişine git
             </Button>
-            <Button variant="outline" onClick={() => navigate("/auth", { replace: true })} className="border-slate-600 bg-slate-900/70 text-slate-100 hover:bg-slate-800">
-              Normal giriş ekranı
+            <Button variant="outline" onClick={handleSwitchToUserPanel} className="border-slate-600 bg-slate-900/70 text-slate-100 hover:bg-slate-800">
+              Normal kullanıcı paneline dön
             </Button>
           </div>
         </div>
@@ -1275,6 +1281,10 @@ export default function PlatformAdmin() {
                   <Button onClick={() => void loadPlatformData()} disabled={busy} className="bg-slate-800 text-slate-100 hover:bg-slate-700">
                     {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                     Yenile
+                  </Button>
+                  <Button onClick={handleSwitchToUserPanel} className="bg-cyan-600 text-white hover:bg-cyan-500">
+                    <ArrowRightLeft className="mr-2 h-4 w-4" />
+                    Kullanıcı paneline geç
                   </Button>
                   <Button variant="outline" onClick={() => void handleAdminExit()} className="border-slate-600 bg-slate-950/50 text-slate-100 hover:bg-slate-900">
                     Admin çıkışı
